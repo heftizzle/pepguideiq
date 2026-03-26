@@ -4,7 +4,7 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
-import { hasAccess } from "./lib/tiers.js";
+import { formatPlan, hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
@@ -206,7 +206,7 @@ export default function PepGuideIQ() {
                 <div style={{ width:1,height:20,background:"#14202e",margin:"0 8px" }} />
                 <div style={{ display:"flex",alignItems:"center",gap:6 }}>
                   <span className="pill" style={{ background: user.plan==="goat"?"#a855f720":user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="goat"?"#a855f7":user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="goat"?"#a855f730":user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:9 }}>
-                    {user.plan.toUpperCase()}
+                    {formatPlan(user.plan)}
                   </span>
                   <span style={{ fontSize:11,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
                   <button type="button" className="btn-red" style={{ fontSize:10,padding:"3px 8px" }} onClick={() => void handleSignOut()}>↩</button>
@@ -470,37 +470,111 @@ export default function PepGuideIQ() {
         )}
 
         {showUpgrade && (
-          <Modal onClose={() => setShowUpgrade(false)} maxWidth={480} label="Upgrade Plan">
+          <Modal onClose={() => setShowUpgrade(false)} maxWidth={540} label="Upgrade Plan">
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
               <div className="brand" style={{ fontSize:16,fontWeight:700 }}>Upgrade Your Plan</div>
-              <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={() => setShowUpgrade(false)} aria-label="Close">×</button>
+              <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={() => setShowUpgrade(false)}>×</button>
             </div>
             <div style={{ fontSize:12,color:"#4a6080",marginBottom:20 }}>
-              {user.plan === "entry" ? "You've hit the Entry plan limit. Upgrade to unlock unlimited stack tracking and AI Advisor." : "Upgrade for advanced labs, custom entries, and physician export."}
+              Unlock the full protocol stack.
             </div>
-            <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
-              {PLANS.filter((p) => p.id !== "entry" && p.id !== user.plan).map((plan) => (
-                <div key={plan.id} style={{ background:"#07090e",border:`1px solid ${plan.color}30`,borderRadius:8,padding:14,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                  <div>
-                    <div className="brand" style={{ color:plan.color,fontWeight:700,fontSize:14 }}>{plan.label} — {plan.price}<span style={{ fontSize:10,color:"#4a6080" }}> {plan.period}</span></div>
-                    <div style={{ fontSize:11,color:"#4a6080",marginTop:3 }}>{plan.features[0]}, {plan.features[1]}</div>
+
+            {(() => {
+              const upgradeHandler = async (planId) => {
+                const { error } = await updateUserPlan(planId);
+                if (!error) {
+                  const u = await getCurrentUser();
+                  if (u) setUser(u);
+                }
+                setShowUpgrade(false);
+              };
+
+              const PlanCard = ({ plan }) => {
+                const isCurrent = plan.id === user.plan;
+                const isEntry = plan.id === "entry";
+                const canUpgrade = !isCurrent && !isEntry;
+                const btnText = isCurrent ? "Current" : isEntry ? "Included" : "Upgrade";
+
+                return (
+                  <div style={{ background:"#07090e",border:`1px solid ${plan.color}30`,borderRadius:8,padding:14,display:"flex",flexDirection:"column",gap:10 }}>
+                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10 }}>
+                      <div>
+                        <div className="brand" style={{ color:plan.color,fontWeight:800,fontSize:14 }}>{plan.label}</div>
+                        <div style={{ marginTop:2 }}>
+                          <span className="brand" style={{ fontSize:20,fontWeight:800,color:"#dde4ef" }}>{plan.price}</span>
+                          <span style={{ fontSize:10,color:"#4a6080",marginLeft:4 }}>{plan.period}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-teal"
+                        disabled={!canUpgrade}
+                        style={{
+                          borderColor: plan.color,
+                          color: plan.color,
+                          background: plan.color + "12",
+                          fontSize: 12,
+                          whiteSpace: "nowrap",
+                          opacity: canUpgrade ? 1 : 0.5,
+                          cursor: canUpgrade ? "pointer" : "not-allowed",
+                        }}
+                        onClick={() => void upgradeHandler(plan.id)}
+                      >
+                        {btnText}
+                      </button>
+                    </div>
+                    <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+                      {plan.features.map((f) => (
+                        <div key={f} style={{ fontSize:11,color:"#4a6080",lineHeight:1.4 }}>{f}</div>
+                      ))}
+                    </div>
                   </div>
-                  <button type="button" className="btn-teal" style={{ borderColor:plan.color,color:plan.color,background:plan.color+"12",fontSize:12,whiteSpace:"nowrap",marginLeft:12 }}
-                    onClick={() => void (async () => {
-                      const { error } = await updateUserPlan(plan.id);
-                      if (!error) {
-                        const u = await getCurrentUser();
-                        if (u) setUser(u);
-                      }
-                      setShowUpgrade(false);
-                    })()}>
-                    Upgrade
-                  </button>
-                </div>
-              ))}
-            </div>
+                );
+              };
+
+              const goatPlan = PLANS.find((p) => p.id === "goat");
+              const goatDisabled = user.plan === "goat";
+
+              return (
+                <>
+                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8 }}>
+                    {PLANS.filter((p) => p.id !== "goat").map((plan) => (
+                      <PlanCard key={plan.id} plan={plan} />
+                    ))}
+                  </div>
+
+                  <div style={{ border:"1px solid #a855f730",borderRadius:8,background:"#a855f708",padding:16,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <div>
+                      <div className="brand" style={{ color:"#a855f7",fontWeight:800,fontSize:16 }}>
+                        GOAT — {goatPlan?.price ?? "$21.99"}
+                        <span style={{ fontSize:10,color:"#4a6080" }}> {goatPlan?.period ?? "/mo"}</span>
+                      </div>
+                      <div style={{ fontSize:11,color:"#4a6080",marginTop:4 }}>4 profiles · 60 stack slots · 48 AI queries/day · Family / Couples plan</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      disabled={goatDisabled}
+                      style={{
+                        borderColor: "#a855f7",
+                        color: "#a855f7",
+                        background: "#a855f712",
+                        whiteSpace: "nowrap",
+                        marginLeft: 16,
+                        opacity: goatDisabled ? 0.5 : 1,
+                        cursor: goatDisabled ? "not-allowed" : "pointer",
+                      }}
+                      onClick={() => void upgradeHandler("goat")}
+                    >
+                      {goatDisabled ? "Current" : "Go GOAT"}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+
             <div style={{ marginTop:14,fontSize:10,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>
-              Subscriptions billed via App Store / Google Play on mobile.
+              Subscriptions billed monthly. Cancel anytime.
             </div>
           </Modal>
         )}

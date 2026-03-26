@@ -40,18 +40,48 @@ export const PEPTIDES = [
   { id:"klow", name:"KLOW (Peptide Blend)", category:"Healing / Recovery", aliases:["GHK-Cu + TB-500 + BPC-157 + KPV blend","KLOW 80mg"], mechanism:"4-in-1 advanced regenerative blend: GHK-Cu (collagen synthesis, antioxidant), TB-500 (cell migration, angiogenesis), BPC-157 (tissue healing, NO pathway, gut protection), KPV (NF-κB inhibition, gut mucosal repair, anti-inflammatory cytokine reduction)", halfLife:"Variable per component", route:["subQ injection"], typicalDose:"80mg total blend per vial (GHK-Cu, TB-500, BPC-157, KPV)", startDose:"Dose to individual peptide targets within the blend", titrationNote:"SubQ injection. Reconstitute with BAC water and dose by target compound concentration.", benefits:["Soft tissue, muscle, and ligament repair","Skin rejuvenation and wound healing","Gut barrier integrity and IBD support","Anti-inflammatory and immune modulation","Comprehensive healing across skin, muscle, and gut"], sideEffects:["Generally well tolerated — consistent with individual component profiles","Injection site reactions"], stacksWith:["thymosinA1","ll37","epitalon"], cycle:"4–12 weeks", storage:"Frozen (lyophilized); refrigerated after reconstitution", reconstitution:"BAC water", notes:"Upgraded version of GLOW with added KPV for gut and anti-inflammatory depth. The 4-in-1 combination covers skin, muscle, connective tissue, and gut in a single vial. Research use only.", tags:["healing","blend","gut","anti-inflammatory","tissue repair","skin","advanced","IBD"] },
 ];
 
-export const CATEGORIES = ["All", ...new Set(PEPTIDES.map((p) => p.category))];
+export const CATEGORIES = [
+  "All",
+  "GLP-1 / Metabolic",
+  "GH Peptides",
+  "Sleep",
+  "Nootropic",
+  "Longevity",
+  "Mitochondrial",
+  "Healing / Recovery",
+  "Immune",
+  "Skin / Hair / Nails",
+  "Sexual Health",
+  "Other",
+];
 
 export const GOALS = [
-  "Weight Loss / Body Recomposition","Sleep Optimization","Cognitive Enhancement",
-  "Longevity / Anti-Aging","Injury Recovery / Healing","GH / Hormone Optimization",
-  "Immune Support","Metabolic Health / Insulin","Sexual Function","Cardiovascular / Mitochondrial",
+  "Fat Loss",
+  "Muscle Building",
+  "Longevity",
+  "Sleep Optimization",
+  "Cognitive Enhancement",
+  "Recovery",
+  "Hormone Optimization",
+  "Immune Support",
+  "Skin & Aesthetics",
+  "Sexual Health",
+  "Mitochondrial Health",
+  "Anti-Inflammation",
 ];
 
 export const CAT_COLORS = {
-  "GLP-1 / Metabolic":"#00d4aa","Sleep":"#8b5cf6","Longevity":"#f59e0b",
-  "Nootropic":"#3b82f6","Mitochondrial":"#10b981","Healing / Recovery":"#06b6d4",
-  "GH Peptides":"#ef4444","Immune":"#ec4899","Other":"#6b7280",
+  "GLP-1 / Metabolic": "#00d4aa",
+  "GH Peptides": "#3b82f6",
+  Sleep: "#8b5cf6",
+  Nootropic: "#a855f7",
+  Longevity: "#f59e0b",
+  Mitochondrial: "#10b981",
+  "Healing / Recovery": "#06b6d4",
+  Immune: "#84cc16",
+  "Skin / Hair / Nails": "#ec4899",
+  "Sexual Health": "#f97316",
+  Other: "#6b7280",
 };
 
 const PLAN_CONFIG = [
@@ -61,46 +91,40 @@ const PLAN_CONFIG = [
     color: "#4a6080",
     features: [
       "Browse full peptide library",
-      "View basic compound info",
-      "Up to 3 stack entries",
-      "Limited AI queries (5/day)",
+      `${TIERS.entry.stackLimit} stack slots`,
+      `${TIERS.entry.aiQueriesPerDay} AI query/day`,
+      `${TIERS.entry.reconLimit} reconstitution saves`,
     ],
   },
   {
     id: "pro",
-    period: "/ month",
+    period: "/mo",
     color: "#00d4aa",
     popular: true,
     features: [
-      "Unlimited stack tracking",
-      "Unlimited AI Advisor queries",
-      "Full protocol details & notes",
-      "Cycle reminders",
-      "Priority support",
+      `${TIERS.pro.stackLimit} stack slots`,
+      `${TIERS.pro.aiQueriesPerDay} AI queries/day`,
+      `${TIERS.pro.reconLimit} reconstitution saves`,
     ],
   },
   {
     id: "elite",
-    period: "/ month",
+    period: "/mo",
     color: "#f59e0b",
     features: [
-      "Everything in Pro",
-      "Lab result tracking",
-      "Custom peptide entries",
-      "Physician sharing export",
-      "Early access features",
+      `${TIERS.elite.stackLimit} stack slots`,
+      `${TIERS.elite.aiQueriesPerDay} AI queries/day`,
+      `${TIERS.elite.profiles} profiles`,
     ],
   },
   {
     id: "goat",
-    period: "/ month",
+    period: "/mo",
     color: "#a855f7",
     features: [
-      "Everything in Elite",
-      "White-glove protocol reviews",
-      "Priority roadmap voting",
-      "Private alpha experiments",
-      "Founders tier perks",
+      `${TIERS.goat.stackLimit} stack slots`,
+      `${TIERS.goat.aiQueriesPerDay} AI queries/day`,
+      `${TIERS.goat.profiles} profiles — Family / Couples`,
     ],
   },
 ];
