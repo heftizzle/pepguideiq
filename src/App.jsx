@@ -4,6 +4,7 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
@@ -88,8 +89,8 @@ export default function PepGuideIQ() {
     return mc && ms;
   });
 
-  const canAddToStack = user?.plan !== "free" || myStack.length < 3;
-  const canAI = user?.plan !== "free";
+  const canAddToStack = hasAccess(user?.plan, "pro") || myStack.length < 3;
+  const canAI = hasAccess(user?.plan, "pro");
 
   const openAdd = (p) => { setAddTarget(p); setStackEntry({ dose:p.startDose, frequency:"", notes:"" }); setShowAdd(true); };
   const confirmAdd = () => {
@@ -204,7 +205,7 @@ export default function PepGuideIQ() {
                 ))}
                 <div style={{ width:1,height:20,background:"#14202e",margin:"0 8px" }} />
                 <div style={{ display:"flex",alignItems:"center",gap:6 }}>
-                  <span className="pill" style={{ background: user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:9 }}>
+                  <span className="pill" style={{ background: user.plan==="goat"?"#a855f720":user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="goat"?"#a855f7":user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="goat"?"#a855f730":user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:9 }}>
                     {user.plan.toUpperCase()}
                   </span>
                   <span style={{ fontSize:11,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
@@ -263,7 +264,7 @@ export default function PepGuideIQ() {
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:8 }}>
                 <div>
                   <div className="brand" style={{ fontSize:17,fontWeight:700 }}>MY PROTOCOL STACK</div>
-                  <div className="mono" style={{ fontSize:10,color:"#243040",marginTop:2 }}>{myStack.length} compound{myStack.length!==1?"s":""} active{user.plan==="free"?` · ${3-myStack.length} slots remaining (Free plan)`:""}</div>
+                  <div className="mono" style={{ fontSize:10,color:"#243040",marginTop:2 }}>{myStack.length} compound{myStack.length!==1?"s":""} active{user.plan==="entry"?` · ${3-myStack.length} slots remaining (Entry plan)`:""}</div>
                 </div>
                 <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
               </div>
@@ -475,10 +476,10 @@ export default function PepGuideIQ() {
               <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={() => setShowUpgrade(false)} aria-label="Close">×</button>
             </div>
             <div style={{ fontSize:12,color:"#4a6080",marginBottom:20 }}>
-              {user.plan === "free" ? "You've hit the Free plan limit. Upgrade to unlock unlimited stack tracking and AI Advisor." : "Upgrade to Elite for lab tracking, custom entries, and physician export."}
+              {user.plan === "entry" ? "You've hit the Entry plan limit. Upgrade to unlock unlimited stack tracking and AI Advisor." : "Upgrade for advanced labs, custom entries, and physician export."}
             </div>
             <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
-              {PLANS.filter((p) => p.id !== "free" && p.id !== user.plan).map((plan) => (
+              {PLANS.filter((p) => p.id !== "entry" && p.id !== user.plan).map((plan) => (
                 <div key={plan.id} style={{ background:"#07090e",border:`1px solid ${plan.color}30`,borderRadius:8,padding:14,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                   <div>
                     <div className="brand" style={{ color:plan.color,fontWeight:700,fontSize:14 }}>{plan.label} — {plan.price}<span style={{ fontSize:10,color:"#4a6080" }}> {plan.period}</span></div>

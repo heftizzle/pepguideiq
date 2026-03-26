@@ -27,7 +27,7 @@ export async function signIn(email, password) {
  * Register; stores `name` and `plan` in user_metadata.
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
-export async function signUp(name, email, password, plan = "free") {
+export async function signUp(name, email, password, plan = "entry") {
   if (!supabase) return { user: null, error: notConfiguredError() };
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -60,7 +60,7 @@ export async function getCurrentUser() {
     id: u.id,
     email: profile?.email ?? u.email ?? "",
     name: profile?.name ?? u.user_metadata?.name ?? u.email ?? "",
-    plan: profile?.plan ?? u.user_metadata?.plan ?? "free",
+    plan: profile?.plan ?? u.user_metadata?.plan ?? "entry",
   };
 }
 

@@ -1,3 +1,5 @@
+import { TIERS, formatPrice } from "../lib/tiers.js";
+
 export const PEPTIDES = [
   { id:"retatrutide", name:"Retatrutide", category:"GLP-1 / Metabolic", aliases:["LY3437943"], mechanism:"Triple agonist: GIP, GLP-1, and Glucagon receptors", halfLife:"~6 days", route:["subQ injection"], typicalDose:"0.5–12 mg/week", startDose:"0.5 mg/week", titrationNote:"Titrate slowly in 0.5–1mg increments to minimize GI sides. Most protocols stay 4–8mg.", benefits:["Weight loss","Appetite suppression","Metabolic improvement","Potential CV benefits"], sideEffects:["Nausea","GI disturbance","Tachycardia at higher doses"], stacksWith:["MOTS-C","SS-31","BPC-157"], cycle:"Ongoing / maintenance", storage:"Refrigerated 2–8°C", reconstitution:"BAC water, 1–2mL per vial", notes:"Most potent GLP class available. Requires careful titration. Send vials to Finnrick for independent purity verification.", tags:["weight loss","metabolic","flagship","GLP-1"] },
   { id:"tirzepatide", name:"Tirzepatide", category:"GLP-1 / Metabolic", aliases:["Mounjaro","Zepbound"], mechanism:"Dual agonist: GIP + GLP-1 receptors", halfLife:"~5 days", route:["subQ injection"], typicalDose:"2.5–15 mg/week", startDose:"2.5 mg/week", titrationNote:"Increase by 2.5mg every 4 weeks as tolerated", benefits:["Weight loss","T2D management","Appetite suppression","CV risk reduction"], sideEffects:["Nausea","Vomiting","Diarrhea"], stacksWith:["BPC-157","MOTS-C"], cycle:"Ongoing", storage:"Refrigerated", reconstitution:"BAC water", notes:"Pharmaceutical grade available via compounding pharmacies. Strong clinical data.", tags:["weight loss","metabolic","pharma-available"] },
@@ -37,11 +39,59 @@ export const CAT_COLORS = {
   "GH Peptides":"#ef4444","Immune":"#ec4899","Other":"#6b7280",
 };
 
-export const PLANS = [
-  { id:"free",  label:"Free",   price:"$0",     period:"forever", color:"#4a6080",
-    features:["Browse full peptide library","View basic compound info","Up to 3 stack entries","Limited AI queries (5/day)"] },
-  { id:"pro",   label:"Pro",    price:"$9.99",  period:"/ month", color:"#00d4aa", popular:true,
-    features:["Unlimited stack tracking","Unlimited AI Advisor queries","Full protocol details & notes","Cycle reminders","Priority support"] },
-  { id:"elite", label:"Elite",  price:"$19.99", period:"/ month", color:"#f59e0b",
-    features:["Everything in Pro","Lab result tracking","Custom peptide entries","Physician sharing export","Early access features"] },
+const PLAN_CONFIG = [
+  {
+    id: "entry",
+    period: "forever",
+    color: "#4a6080",
+    features: [
+      "Browse full peptide library",
+      "View basic compound info",
+      "Up to 3 stack entries",
+      "Limited AI queries (5/day)",
+    ],
+  },
+  {
+    id: "pro",
+    period: "/ month",
+    color: "#00d4aa",
+    popular: true,
+    features: [
+      "Unlimited stack tracking",
+      "Unlimited AI Advisor queries",
+      "Full protocol details & notes",
+      "Cycle reminders",
+      "Priority support",
+    ],
+  },
+  {
+    id: "elite",
+    period: "/ month",
+    color: "#f59e0b",
+    features: [
+      "Everything in Pro",
+      "Lab result tracking",
+      "Custom peptide entries",
+      "Physician sharing export",
+      "Early access features",
+    ],
+  },
+  {
+    id: "goat",
+    period: "/ month",
+    color: "#a855f7",
+    features: [
+      "Everything in Elite",
+      "White-glove protocol reviews",
+      "Priority roadmap voting",
+      "Private alpha experiments",
+      "Founders tier perks",
+    ],
+  },
 ];
+
+export const PLANS = PLAN_CONFIG.map((plan) => ({
+  ...plan,
+  label: TIERS[plan.id]?.name ?? TIERS.entry.name,
+  price: formatPrice(plan.id),
+}));

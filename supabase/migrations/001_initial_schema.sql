@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id          UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email       TEXT        NOT NULL,
   name        TEXT,
-  plan        TEXT        NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'elite')),
+  plan        TEXT        NOT NULL DEFAULT 'entry' CHECK (plan IN ('entry', 'pro', 'elite', 'goat')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -128,7 +128,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'plan', 'free')
+    COALESCE(NEW.raw_user_meta_data->>'plan', 'entry')
   )
   ON CONFLICT (id) DO NOTHING;
 
@@ -186,7 +186,7 @@ SET search_path = public
 AS $$
 BEGIN
   -- Validate plan value
-  IF p_plan NOT IN ('free', 'pro', 'elite') THEN
+  IF p_plan NOT IN ('entry', 'pro', 'elite', 'goat') THEN
     RAISE EXCEPTION 'Invalid plan: %', p_plan;
   END IF;
 
@@ -205,7 +205,7 @@ $$;
 
 -- ── 8. DAILY AI QUERY COUNT HELPER ───────────────────────────────────────────
 -- Returns the number of AI queries a user has made today.
--- Used by the Worker / app to enforce free plan rate limits.
+-- Used by the Worker / app to enforce entry plan rate limits.
 -- Usage: SELECT get_daily_ai_count('user-uuid-here');
 
 CREATE OR REPLACE FUNCTION public.get_daily_ai_count(p_user_id UUID)

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PLANS } from "../data/catalog.js";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { getCurrentUser, signIn, signUp } from "../lib/supabase.js";
+import { getTier } from "../lib/tiers.js";
 import { Logo } from "./Logo.jsx";
 
 export function AuthScreen({ onAuth }) {
@@ -208,7 +209,7 @@ export function AuthScreen({ onAuth }) {
                 disabled={busy}
                 onClick={() => selectPlan(plan.id)}
               >
-                {busy ? "…" : plan.id === "free" ? "Start Free" : `Get ${plan.label}`}
+                {busy ? "…" : plan.id === "entry" ? `Start ${getTier("entry").label}` : `Get ${plan.label}`}
               </button>
             </div>
           ))}
