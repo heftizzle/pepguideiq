@@ -1,7 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useFocusTrap } from "./useFocusTrap.js";
 
-export function Modal({ onClose, children, maxWidth = 580, label = "Dialog" }) {
+/**
+ * @param {{ onClose: () => void; children: import("react").ReactNode; maxWidth?: number; label?: string; variant?: "default" | "sheet" }} props
+ */
+export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", variant = "default" }) {
   const ref = useRef(null);
   useFocusTrap(ref, true);
 
@@ -17,9 +20,12 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog" }) {
     };
   }, [onClose]);
 
+  const isSheet = variant === "sheet";
+
   return (
     <div
       onClick={onClose}
+      className={isSheet ? "modal-backdrop modal-backdrop--sheet" : "modal-backdrop"}
       style={{
         position: "fixed",
         inset: 0,
@@ -38,6 +44,7 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog" }) {
         aria-modal="true"
         aria-label={label}
         onClick={(e) => e.stopPropagation()}
+        className={isSheet ? "modal-panel modal-panel--sheet" : "modal-panel"}
         style={{
           background: "#0b0f17",
           border: "1px solid #1a2840",

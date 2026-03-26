@@ -43,6 +43,14 @@ export const TIERS = {
 
 export const TIER_ORDER = ["entry", "pro", "elite", "goat"];
 
+/** Next tier above `plan`, or `null` if already at GOAT. */
+export function getNextTierId(plan) {
+  const p = plan ?? "entry";
+  const i = TIER_ORDER.indexOf(p);
+  if (i === -1 || i >= TIER_ORDER.length - 1) return null;
+  return TIER_ORDER[i + 1];
+}
+
 export function getTier(plan) {
   return TIERS[plan] ?? TIERS.entry;
 }

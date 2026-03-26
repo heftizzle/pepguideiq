@@ -1,17 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS, PLANS } from "./data/catalog.js";
+import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
-import { formatPlan, hasAccess, TIER_ORDER } from "./lib/tiers.js";
-
-function getNextTierId(plan) {
-  const p = plan ?? "entry";
-  const i = TIER_ORDER.indexOf(p);
-  if (i === -1 || i >= TIER_ORDER.length - 1) return null;
-  return TIER_ORDER[i + 1];
-}
+import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
+import { formatPlan, getNextTierId, getTier, hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
@@ -20,7 +14,6 @@ import {
   onAuthStateChange,
   saveStack,
   signOut,
-  updateUserPlan,
 } from "./lib/supabase.js";
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
@@ -99,7 +92,8 @@ export default function PepGuideIQ() {
     return mc && ms;
   });
 
-  const canAddToStack = hasAccess(user?.plan, "pro") || myStack.length < 3;
+  const savedStackLimit = getTier(user?.plan ?? "entry").stackLimit;
+  const canAddToStack = myStack.length < savedStackLimit;
   const canAI = hasAccess(user?.plan, "pro");
 
   const openUpgradeModal = () => {
@@ -218,7 +212,7 @@ export default function PepGuideIQ() {
               <div style={{ display:"flex",alignItems:"center",gap:0,overflowX:"auto" }}>
                 {[
                   { id:"library", label:"Library", count:PEPTIDES.length },
-                  { id:"stack",   label:"My Stack", count:myStack.length||null },
+                  { id:"stack",   label:"Saved Stacks", count:myStack.length||null },
                   { id:"advisor", label:"AI Advisor" },
                 ].map((t) => (
                   <button type="button" key={t.id} className={`tab-btn ${activeTab===t.id?"active":""}`} onClick={() => setActiveTab(t.id)}>
@@ -279,7 +273,7 @@ export default function PepGuideIQ() {
                         <div className="mono" style={{ fontSize:10,color:"#2e4055" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
                         <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ padding:"5px 10px",fontSize:11 }}
                           onClick={(e) => { e.stopPropagation(); if (!inStack) openAdd(p); }}>
-                          {inStack ? "✓ In Stack" : "+ Stack"}
+                          {inStack ? "✓ Saved" : "+ Saved Stack"}
                         </button>
                       </div>
                     </div>
@@ -294,15 +288,28 @@ export default function PepGuideIQ() {
             <div>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:8 }}>
                 <div>
-                  <div className="brand" style={{ fontSize:17,fontWeight:700 }}>MY PROTOCOL STACK</div>
-                  <div className="mono" style={{ fontSize:10,color:"#243040",marginTop:2 }}>{myStack.length} compound{myStack.length!==1?"s":""} active{user.plan==="entry"?` · ${3-myStack.length} slots remaining (Entry plan)`:""}</div>
+                  <div
+                    className="brand"
+                    style={{ fontSize:17,fontWeight:700 }}
+                    title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
+                  >
+                    SAVED STACKS
+                  </div>
+                  <div
+                    className="mono"
+                    style={{ fontSize:10,color:"#243040",marginTop:2,maxWidth:520 }}
+                    title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
+                  >
+                    {myStack.length} peptide{myStack.length!==1?"s":""} saved
+                    {` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`}
+                  </div>
                 </div>
                 <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
               </div>
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed #14202e",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
                   <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>⬡</div>
-                  <div className="mono" style={{ color:"#243040",fontSize:12 }}>// Stack is empty. Add compounds from the Library.</div>
+                  <div className="mono" style={{ color:"#243040",fontSize:12 }}>// No Saved Stacks yet. Add compounds from the Library.</div>
                 </div>
               ) : (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
@@ -329,7 +336,7 @@ export default function PepGuideIQ() {
                     );
                   })}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
-                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// STACK BREAKDOWN</div>
+                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
                       {[...new Set(myStack.map((p) => p.category))].map((cat) => {
                         const cc = getCatColor(cat); const n = myStack.filter((p) => p.category===cat).length;
@@ -361,7 +368,7 @@ export default function PepGuideIQ() {
                 ))}
                 {myStack.length > 0 && (
                   <div style={{ marginTop:14,paddingTop:14,borderTop:"1px solid #0e1822" }}>
-                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// STACK LOADED</div>
+                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// SAVED STACK LOADED</div>
                     {myStack.map((p) => <div key={p.id} className="mono" style={{ fontSize:10,color:"#2e4055",padding:"2px 0" }}>→ {p.name}</div>)}
                   </div>
                 )}
@@ -474,7 +481,7 @@ export default function PepGuideIQ() {
                 </button>
                 <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ fontSize:12 }}
                   onClick={() => { if (!inStack) { openAdd(p); setSelPeptide(null); } }}>
-                  {inStack ? "✓ In Stack" : "+ Add to Stack"}
+                  {inStack ? "✓ Saved" : "+ Add to Saved Stack"}
                 </button>
               </div>
             </Modal>
@@ -482,8 +489,8 @@ export default function PepGuideIQ() {
         })()}
 
         {showAdd && addTarget && (
-          <Modal onClose={() => { setShowAdd(false); setAddTarget(null); }} maxWidth={380} label="Add to Stack">
-            <div className="brand" style={{ fontSize:15,fontWeight:700,marginBottom:3 }}>Add to Stack</div>
+          <Modal onClose={() => { setShowAdd(false); setAddTarget(null); }} maxWidth={380} label="Add to Saved Stack">
+            <div className="brand" style={{ fontSize:15,fontWeight:700,marginBottom:3 }}>Add to Saved Stack</div>
             <div className="mono" style={{ fontSize:10,color:"#243040",marginBottom:18 }}>{addTarget.name}</div>
             <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
               {[["DOSE","dose",addTarget.startDose],["FREQUENCY","frequency","e.g. Daily, 2x/week, Pre-sleep"],["NOTES","notes","Optional notes…"]].map(([label,key,ph]) => (
@@ -495,134 +502,18 @@ export default function PepGuideIQ() {
             </div>
             <div style={{ marginTop:18,display:"flex",gap:8,justifyContent:"flex-end" }}>
               <button type="button" className="btn-red" onClick={() => { setShowAdd(false); setAddTarget(null); }}>Cancel</button>
-              <button type="button" className="btn-teal" onClick={confirmAdd}>Add to Stack</button>
+              <button type="button" className="btn-teal" onClick={confirmAdd}>Save to Stack</button>
             </div>
           </Modal>
         )}
 
         {showUpgrade && (
-          <Modal onClose={closeUpgradeModal} maxWidth={540} label="Upgrade Plan">
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
-              <div className="brand" style={{ fontSize:16,fontWeight:700 }}>Upgrade Your Plan</div>
-              <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={closeUpgradeModal}>×</button>
-            </div>
-            <div style={{ fontSize:12,color:"#4a6080",marginBottom:20 }}>
-              Unlock the full protocol stack.
-            </div>
-
-            {(() => {
-              const upgradeHandler = async (planId) => {
-                const { error } = await updateUserPlan(planId);
-                if (!error) {
-                  const u = await getCurrentUser();
-                  if (u) setUser(u);
-                }
-                closeUpgradeModal();
-              };
-
-              const PlanCard = ({ plan }) => {
-                const isCurrent = plan.id === user.plan;
-                const isEntry = plan.id === "entry";
-                const canUpgrade = !isCurrent && !isEntry;
-                const btnText = isCurrent ? "Current" : isEntry ? "Included" : "Upgrade";
-                const isFocused = upgradeFocusTier === plan.id;
-
-                return (
-                  <div style={{
-                    background:"#07090e",
-                    border:`${isFocused ? 2 : 1}px solid ${isFocused ? plan.color : plan.color + "30"}`,
-                    boxShadow: isFocused ? `0 0 0 1px ${plan.color}50, 0 8px 24px ${plan.color}18` : "none",
-                    borderRadius:8,padding:14,display:"flex",flexDirection:"column",gap:10,
-                  }}>
-                    <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10 }}>
-                      <div>
-                        <div className="brand" style={{ color:plan.color,fontWeight:800,fontSize:14 }}>{plan.label}</div>
-                        <div style={{ marginTop:2 }}>
-                          <span className="brand" style={{ fontSize:20,fontWeight:800,color:"#dde4ef" }}>{plan.price}</span>
-                          <span style={{ fontSize:10,color:"#4a6080",marginLeft:4 }}>{plan.period}</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-teal"
-                        disabled={!canUpgrade}
-                        style={{
-                          borderColor: plan.color,
-                          color: plan.color,
-                          background: plan.color + "12",
-                          fontSize: 12,
-                          whiteSpace: "nowrap",
-                          opacity: canUpgrade ? 1 : 0.5,
-                          cursor: canUpgrade ? "pointer" : "not-allowed",
-                        }}
-                        onClick={() => void upgradeHandler(plan.id)}
-                      >
-                        {btnText}
-                      </button>
-                    </div>
-                    <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-                      {plan.features.map((f) => (
-                        <div key={f} style={{ fontSize:11,color:"#4a6080",lineHeight:1.4 }}>{f}</div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              };
-
-              const goatPlan = PLANS.find((p) => p.id === "goat");
-              const goatDisabled = user.plan === "goat";
-
-              return (
-                <>
-                  <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8 }}>
-                    {PLANS.filter((p) => p.id !== "goat").map((plan) => (
-                      <PlanCard key={plan.id} plan={plan} />
-                    ))}
-                  </div>
-
-                  <div style={{
-                    border: `${upgradeFocusTier === "goat" ? 2 : 1}px solid ${upgradeFocusTier === "goat" ? "#a855f7" : "#a855f730"}`,
-                    boxShadow: upgradeFocusTier === "goat" ? "0 0 0 1px #a855f750, 0 8px 24px #a855f718" : "none",
-                    borderRadius:8,
-                    background:"#a855f708",
-                    padding:16,
-                    display:"flex",
-                    justifyContent:"space-between",
-                    alignItems:"center",
-                  }}>
-                    <div>
-                      <div className="brand" style={{ color:"#a855f7",fontWeight:800,fontSize:16 }}>
-                        GOAT — {goatPlan?.price ?? "$21.99"}
-                        <span style={{ fontSize:10,color:"#4a6080" }}> {goatPlan?.period ?? "/mo"}</span>
-                      </div>
-                      <div style={{ fontSize:11,color:"#4a6080",marginTop:4 }}>4 profiles · 60 stack slots · 48 AI queries/day · Family / Couples plan</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn-teal"
-                      disabled={goatDisabled}
-                      style={{
-                        borderColor: "#a855f7",
-                        color: "#a855f7",
-                        background: "#a855f712",
-                        whiteSpace: "nowrap",
-                        marginLeft: 16,
-                        opacity: goatDisabled ? 0.5 : 1,
-                        cursor: goatDisabled ? "not-allowed" : "pointer",
-                      }}
-                      onClick={() => void upgradeHandler("goat")}
-                    >
-                      {goatDisabled ? "Current" : "Go GOAT"}
-                    </button>
-                  </div>
-                </>
-              );
-            })()}
-
-            <div style={{ marginTop:14,fontSize:10,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>
-              Subscriptions billed monthly. Cancel anytime.
-            </div>
-          </Modal>
+          <UpgradePlanModal
+            onClose={closeUpgradeModal}
+            user={user}
+            upgradeFocusTier={upgradeFocusTier}
+            setUser={setUser}
+          />
         )}
 
       </div>

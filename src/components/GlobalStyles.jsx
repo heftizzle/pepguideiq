@@ -47,6 +47,28 @@ export function GlobalStyles() {
       .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#4a6080;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
       .sugg-btn:hover{border-color:#00d4aa30;color:#8fa5bf}
       .advisor-sidebar{scrollbar-width:thin}
+      .modal-backdrop--sheet{align-items:flex-end;justify-content:center;padding:0}
+      @media (min-width:769px){
+        .modal-backdrop--sheet{align-items:center;padding:16px}
+      }
+      @keyframes upgradeSheetUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+      @keyframes upgradeFadeCenter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+      @media (max-width:768px){
+        .modal-backdrop--sheet .modal-panel--sheet{
+          animation:upgradeSheetUp .34s ease;
+          max-width:100%!important;width:100%;border-radius:16px 16px 0 0;
+          max-height:min(92vh,900px)!important;padding-bottom:max(24px,env(safe-area-inset-bottom))
+        }
+      }
+      @media (min-width:769px){
+        .modal-backdrop--sheet .modal-panel--sheet{animation:upgradeFadeCenter .26s ease}
+      }
+      .modal-backdrop:not(.modal-backdrop--sheet) .modal-panel{animation:upgradeFadeCenter .22s ease}
+      .btn-upgrade-current{background:transparent!important;border:1px solid #2e4055!important;color:#6b8299!important;cursor:not-allowed!important;opacity:1!important}
+      .btn-upgrade-cta{background:#00d4aa!important;border:1px solid #00d4aa!important;color:#07090e!important;font-weight:600!important}
+      .btn-upgrade-cta:hover{background:#00e6b8!important;border-color:#00e6b8!important}
+      .btn-upgrade-ghost{background:transparent!important;border:1px solid #243040!important;color:#8fa5bf!important}
+      .btn-upgrade-ghost:hover{border-color:#4a6080!important;color:#dde4ef!important}
       @media (max-width: 640px) {
         .advisor-sidebar{display:none}
         .tab-btn{padding:10px 10px;font-size:11px}

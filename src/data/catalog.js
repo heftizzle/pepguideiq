@@ -113,7 +113,7 @@ const PLAN_CONFIG = [
     color: "#4a6080",
     features: [
       "Browse full peptide library",
-      `${TIERS.entry.stackLimit} stack slots`,
+      `${TIERS.entry.stackLimit} Saved Stacks`,
       `${TIERS.entry.aiQueriesPerDay} AI query/day`,
       `${TIERS.entry.reconLimit} reconstitution saves`,
     ],
@@ -124,7 +124,7 @@ const PLAN_CONFIG = [
     color: "#00d4aa",
     popular: true,
     features: [
-      `${TIERS.pro.stackLimit} stack slots`,
+      `${TIERS.pro.stackLimit} Saved Stacks`,
       `${TIERS.pro.aiQueriesPerDay} AI queries/day`,
       `${TIERS.pro.reconLimit} reconstitution saves`,
     ],
@@ -134,7 +134,7 @@ const PLAN_CONFIG = [
     period: "/mo",
     color: "#f59e0b",
     features: [
-      `${TIERS.elite.stackLimit} stack slots`,
+      `${TIERS.elite.stackLimit} Saved Stacks`,
       `${TIERS.elite.aiQueriesPerDay} AI queries/day`,
       `${TIERS.elite.profiles} profiles`,
     ],
@@ -144,7 +144,7 @@ const PLAN_CONFIG = [
     period: "/mo",
     color: "#a855f7",
     features: [
-      `${TIERS.goat.stackLimit} stack slots`,
+      `${TIERS.goat.stackLimit} Saved Stacks`,
       `${TIERS.goat.aiQueriesPerDay} AI queries/day`,
       `${TIERS.goat.profiles} profiles — Family / Couples`,
     ],
