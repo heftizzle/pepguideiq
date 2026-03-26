@@ -1,207 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS, PLANS } from "./data/catalog.js";
-
-const DEMO_USER = { id:"u1", email:"demo@pepguideiq.io", password:"demo1234", name:"Demo User", plan:"pro" };
-
-function mockLogin(email, pw) {
-  if (email === DEMO_USER.email && pw === DEMO_USER.password) return { ...DEMO_USER, password: undefined };
-  return null;
-}
-
-function mockRegister(name, email) {
-  return { id:"u_" + Date.now(), email, name, plan: "free" };
-}
+import { AuthScreen } from "./components/AuthScreen.jsx";
+import { GlobalStyles } from "./components/GlobalStyles.jsx";
+import { Logo } from "./components/Logo.jsx";
+import { Modal } from "./components/Modal.jsx";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
+import {
+  getCurrentUser,
+  loadStack,
+  onAuthStateChange,
+  saveStack,
+  signOut,
+  updateUserPlan,
+} from "./lib/supabase.js";
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
 
-function useFocusTrap(ref, active) {
-  useEffect(() => {
-    if (!active || !ref.current) return;
-    const el = ref.current;
-    const focusable = () => [...el.querySelectorAll('button,input,textarea,select,[tabindex]:not([tabindex="-1"])')];
-    const handler = (e) => {
-      if (e.key !== "Tab") return;
-      const els = focusable();
-      if (!els.length) return;
-      if (e.shiftKey) {
-        if (document.activeElement === els[0]) { e.preventDefault(); els[els.length - 1].focus(); }
-      } else {
-        if (document.activeElement === els[els.length - 1]) { e.preventDefault(); els[0].focus(); }
-      }
-    };
-    focusable()[0]?.focus();
-    el.addEventListener("keydown", handler);
-    return () => el.removeEventListener("keydown", handler);
-  }, [active, ref]);
-}
-
-function Modal({ onClose, children, maxWidth = 580, label = "Dialog" }) {
-  const ref = useRef(null);
-  useFocusTrap(ref, true);
-
-  useEffect(() => {
-    const prev = document.activeElement;
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); prev?.focus(); };
-  }, [onClose]);
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16 }}
-      role="presentation"
-    >
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        onClick={(e) => e.stopPropagation()}
-        style={{ background:"#0b0f17",border:"1px solid #1a2840",borderRadius:12,padding:24,maxWidth,width:"100%",maxHeight:"90vh",overflowY:"auto" }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function AuthScreen({ onAuth }) {
-  const [mode, setMode]   = useState("login");
-  const [form, setForm]   = useState({ name:"", email:"", password:"" });
-  const [error, setError] = useState("");
-  const [busy, setBusy]   = useState(false);
-  const [newUser, setNewUser] = useState(null);
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const submit = () => {
-    setError(""); setBusy(true);
-    setTimeout(() => {
-      if (mode === "login") {
-        const u = mockLogin(form.email, form.password);
-        if (u) onAuth(u); else setError("Invalid email or password.");
-      } else {
-        if (!form.name || !form.email || !form.password) { setError("All fields required."); setBusy(false); return; }
-        const u = mockRegister(form.name, form.email);
-        setNewUser(u); setMode("plans");
-      }
-      setBusy(false);
-    }, 500);
-  };
-
-  const selectPlan = (planId) => onAuth({ ...newUser, plan: planId });
-
-  if (mode === "plans") {
-    return (
-      <div style={{ minHeight:"100vh",background:"#07090e",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px" }}>
-        <Logo style={{ marginBottom:28 }} />
-        <div className="mono" style={{ fontSize:9,color:"#243040",letterSpacing:".2em",marginBottom:28,textAlign:"center" }}>SELECT YOUR PLAN</div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:12,maxWidth:720,width:"100%" }}>
-          {PLANS.map((plan) => (
-            <div key={plan.id} style={{ background:"#0b0f17",border:`1px solid ${plan.popular ? plan.color : "#14202e"}`,borderRadius:10,padding:20,position:"relative",display:"flex",flexDirection:"column" }}>
-              {plan.popular && (
-                <div style={{ position:"absolute",top:-1,left:"50%",transform:"translateX(-50%)",background:plan.color,color:"#07090e",fontSize:8,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",padding:"2px 12px",borderRadius:"0 0 6px 6px",letterSpacing:".12em",whiteSpace:"nowrap" }}>MOST POPULAR</div>
-              )}
-              <div className="brand" style={{ fontWeight:800,fontSize:15,color:plan.color,marginBottom:4,marginTop:plan.popular?8:0 }}>{plan.label}</div>
-              <div style={{ marginBottom:14 }}>
-                <span className="brand" style={{ fontSize:22,fontWeight:800,color:"#dde4ef" }}>{plan.price}</span>
-                <span style={{ fontSize:10,color:"#4a6080",marginLeft:4 }}>{plan.period}</span>
-              </div>
-              <div style={{ display:"flex",flexDirection:"column",gap:6,marginBottom:18,flex:1 }}>
-                {plan.features.map((f) => (
-                  <div key={f} style={{ display:"flex",gap:6,alignItems:"flex-start" }}>
-                    <span style={{ color:plan.color,fontSize:10,marginTop:2,flexShrink:0 }}>✓</span>
-                    <span style={{ fontSize:11,color:"#4a6080",lineHeight:1.5 }}>{f}</span>
-                  </div>
-                ))}
-              </div>
-              <button type="button" className="btn-teal" style={{ borderColor:plan.color,color:plan.color,background:plan.color+"12",width:"100%",padding:"8px 0",fontSize:12 }} onClick={() => selectPlan(plan.id)}>
-                {plan.id === "free" ? "Start Free" : `Get ${plan.label}`}
-              </button>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop:16,fontSize:11,color:"#243040" }}>Subscriptions managed via App Store / Google Play on mobile.</div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ minHeight:"100vh",background:"#07090e",display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
-      <div style={{ width:"100%",maxWidth:380 }}>
-        <div style={{ textAlign:"center",marginBottom:32 }}>
-          <Logo />
-          <div className="mono" style={{ fontSize:9,color:"#243040",letterSpacing:".18em",marginTop:4 }}>
-            {mode === "login" ? "SIGN IN TO YOUR ACCOUNT" : "CREATE YOUR ACCOUNT"}
-          </div>
-        </div>
-
-        <div style={{ background:"#0b0f17",border:"1px solid #14202e",borderRadius:10,padding:24 }}>
-          {mode === "register" && (
-            <div style={{ marginBottom:14 }}>
-              <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:5,letterSpacing:".12em" }}>NAME</div>
-              <input className="form-input" style={{ width:"100%" }} value={form.name} placeholder="Your name" onChange={set("name")} />
-            </div>
-          )}
-          <div style={{ marginBottom:14 }}>
-            <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:5,letterSpacing:".12em" }}>EMAIL</div>
-            <input className="form-input" style={{ width:"100%" }} type="email" value={form.email} placeholder="you@email.com" onChange={set("email")}
-              onKeyDown={(e) => e.key === "Enter" && submit()} />
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:5,letterSpacing:".12em" }}>PASSWORD</div>
-            <input className="form-input" style={{ width:"100%" }} type="password" value={form.password} placeholder="••••••••" onChange={set("password")}
-              onKeyDown={(e) => e.key === "Enter" && submit()} />
-          </div>
-          {error && <div style={{ fontSize:11,color:"#ef4444",marginBottom:14,fontFamily:"'JetBrains Mono',monospace" }}>{error}</div>}
-          <button type="button" className="btn-teal" style={{ width:"100%",padding:"10px 0",fontSize:13,opacity: busy ? 0.6 : 1 }} onClick={submit} disabled={busy}>
-            {busy ? "…" : mode === "login" ? "Sign In" : "Create Account"}
-          </button>
-
-          <div style={{ marginTop:16,textAlign:"center",fontSize:11,color:"#243040" }}>
-            {mode === "login" ? (
-              <>Don&apos;t have an account?{" "}
-                <button type="button" style={{ background:"none",border:"none",color:"#00d4aa",cursor:"pointer",fontSize:11,fontFamily:"'Outfit',sans-serif" }} onClick={() => { setMode("register"); setError(""); }}>
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>Already have an account?{" "}
-                <button type="button" style={{ background:"none",border:"none",color:"#00d4aa",cursor:"pointer",fontSize:11,fontFamily:"'Outfit',sans-serif" }} onClick={() => { setMode("login"); setError(""); }}>
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
-
-          {mode === "login" && (
-            <div style={{ marginTop:12,textAlign:"center" }}>
-              <div style={{ fontSize:9,color:"#1a2840",fontFamily:"'JetBrains Mono',monospace",marginBottom:4 }}>— DEMO ACCOUNT —</div>
-              <div style={{ fontSize:9,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>demo@pepguideiq.io / demo1234</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Logo({ size = 19, style = {} }) {
-  return (
-    <div style={{ display:"inline-flex",alignItems:"center",gap:10,...style }}>
-      <div style={{ width:32,height:32,background:"linear-gradient(135deg,#00d4aa,#0891b2)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0 }}>⬡</div>
-      <div>
-        <div className="brand" style={{ fontSize:size,fontWeight:800,letterSpacing:".05em",lineHeight:1.1 }}>
-          <span style={{ color:"#00d4aa" }}>Pep</span><span style={{ color:"#dde4ef" }}>Guide</span><span style={{ color:"#00d4aa",fontSize:size*.7 }}>IQ</span>
-        </div>
-        <div className="mono" style={{ fontSize:7,color:"#243040",letterSpacing:".18em" }}>RESEARCH INTELLIGENCE</div>
-      </div>
-    </div>
-  );
-}
-
 export default function PepGuideIQ() {
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [user, setUser]           = useState(null);
   const [activeTab, setActiveTab] = useState("library");
   const [selCat, setSelCat]       = useState("All");
@@ -217,6 +33,52 @@ export default function PepGuideIQ() {
   const [goals, setGoals]         = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const msgEnd = useRef(null);
+  const stackHydrated = useRef(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setAuthReady(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const u = await getCurrentUser();
+      if (!cancelled && u) setUser(u);
+      if (!cancelled) setAuthReady(true);
+    })();
+    const { data: { subscription } } = onAuthStateChange(async () => {
+      const u = await getCurrentUser();
+      if (!cancelled) setUser(u);
+    });
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    stackHydrated.current = false;
+    if (!user?.id || !isSupabaseConfigured()) {
+      return;
+    }
+    let ignore = false;
+    loadStack(user.id).then((s) => {
+      if (ignore) return;
+      setMyStack(Array.isArray(s) ? s : []);
+      stackHydrated.current = true;
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured() || !stackHydrated.current) return;
+    const t = setTimeout(() => {
+      saveStack(user.id, myStack);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [myStack, user?.id]);
 
   const filtered = PEPTIDES.filter((p) => {
     const mc = selCat === "All" || p.category === selCat;
@@ -248,22 +110,71 @@ export default function PepGuideIQ() {
     setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
     const stackCtx = myStack.length > 0 ? `\n\nUser's current stack: ${myStack.map((p) => `${p.name} (${p.stackDose||p.startDose}${p.stackFrequency?", "+p.stackFrequency:""})`).join("; ")}.` : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
+    const system = `You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight. The user is an advanced biohacker.${stackCtx}${goalsCtx}`;
+    if (!isApiWorkerConfigured()) {
+      setAiMsgs((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Configure VITE_API_WORKER_URL in .env.local (deploy workers/api-proxy.js and use POST /v1/chat). The Anthropic key must stay on the Worker only.",
+        },
+      ]);
+      setAiLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000,
-          system:`You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight. The user is an advanced biohacker.${stackCtx}${goalsCtx}`,
-          messages:msgs }),
+      const res = await fetch(`${API_WORKER_URL}/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: msgs, system }),
       });
-      const data = await res.json();
-      setAiMsgs((prev) => [...prev, { role:"assistant", content:data.content?.[0]?.text || "No response." }]);
-    } catch {
-      setAiMsgs((prev) => [...prev, { role:"assistant", content:"API error — check connection." }]);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errText = typeof data.error === "string" ? data.error : data.error?.message || `Worker ${res.status}`;
+        throw new Error(errText);
+      }
+      const text = typeof data.text === "string" ? data.text : "";
+      setAiMsgs((prev) => [...prev, { role: "assistant", content: text || "No response." }]);
+    } catch (e) {
+      setAiMsgs((prev) => [
+        ...prev,
+        { role: "assistant", content: e instanceof Error ? e.message : "API error — check Worker and network." },
+      ]);
     }
     setAiLoading(false);
   };
 
   useEffect(() => { msgEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [aiMsgs]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    stackHydrated.current = false;
+    setMyStack([]);
+    setUser(null);
+  };
+
+  if (!authReady) {
+    return (
+      <>
+        <GlobalStyles />
+        <div
+          className="mono"
+          style={{
+            minHeight: "100vh",
+            background: "#07090e",
+            color: "#243040",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+          }}
+        >
+          // Loading session…
+        </div>
+      </>
+    );
+  }
 
   if (!user) return (
     <>
@@ -297,7 +208,7 @@ export default function PepGuideIQ() {
                     {user.plan.toUpperCase()}
                   </span>
                   <span style={{ fontSize:11,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
-                  <button type="button" className="btn-red" style={{ fontSize:10,padding:"3px 8px" }} onClick={() => setUser(null)}>↩</button>
+                  <button type="button" className="btn-red" style={{ fontSize:10,padding:"3px 8px" }} onClick={() => void handleSignOut()}>↩</button>
                 </div>
               </div>
             </div>
@@ -574,7 +485,14 @@ export default function PepGuideIQ() {
                     <div style={{ fontSize:11,color:"#4a6080",marginTop:3 }}>{plan.features[0]}, {plan.features[1]}</div>
                   </div>
                   <button type="button" className="btn-teal" style={{ borderColor:plan.color,color:plan.color,background:plan.color+"12",fontSize:12,whiteSpace:"nowrap",marginLeft:12 }}
-                    onClick={() => { setUser((u) => ({ ...u, plan:plan.id })); setShowUpgrade(false); }}>
+                    onClick={() => void (async () => {
+                      const { error } = await updateUserPlan(plan.id);
+                      if (!error) {
+                        const u = await getCurrentUser();
+                        if (u) setUser(u);
+                      }
+                      setShowUpgrade(false);
+                    })()}>
                     Upgrade
                   </button>
                 </div>
@@ -588,62 +506,5 @@ export default function PepGuideIQ() {
 
       </div>
     </>
-  );
-}
-
-function GlobalStyles() {
-  return (
-    <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap');
-      *{box-sizing:border-box;margin:0;padding:0}
-      ::-webkit-scrollbar{width:3px}
-      ::-webkit-scrollbar-thumb{background:#00d4aa30;border-radius:2px}
-      .grid-bg{background-image:linear-gradient(rgba(0,212,170,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,.025) 1px,transparent 1px);background-size:48px 48px}
-      .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#4a6080;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
-      .tab-btn:hover{color:#8fa5bf}
-      .tab-btn.active{color:#00d4aa;border-bottom-color:#00d4aa}
-      .pcard{background:#0b0f17;border:1px solid #14202e;border-radius:8px;padding:16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-      .pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,#00d4aa);opacity:.5}
-      .pcard:hover{border-color:var(--cc,#00d4aa);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.5)}
-      .pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
-      .search-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:10px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%}
-      .search-input:focus{border-color:#00d4aa50}
-      .search-input::placeholder{color:#243040}
-      .btn-teal{background:#00d4aa14;border:1px solid #00d4aa;color:#00d4aa;padding:7px 14px;border-radius:5px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:500;transition:all .2s}
-      .btn-teal:hover{background:#00d4aa22}
-      .btn-teal:disabled{opacity:.4;cursor:not-allowed}
-      .btn-green{background:#10b98115;border:1px solid #10b981;color:#10b981;padding:7px 14px;border-radius:5px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:500}
-      .btn-red{background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 11px;border-radius:4px;cursor:pointer;font-size:11px;font-family:'Outfit',sans-serif;transition:all .2s}
-      .btn-red:hover{background:#ef444418}
-      .cat-btn{background:transparent;border:1px solid #14202e;color:#4a6080;padding:5px 12px;border-radius:20px;cursor:pointer;font-size:11px;white-space:nowrap;transition:all .2s;font-family:'Outfit',sans-serif}
-      .cat-btn.active{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
-      .cat-btn:hover:not(.active){border-color:#243040;color:#8fa5bf}
-      .mono{font-family:'JetBrains Mono',monospace}
-      .brand{font-family:'Oxanium',sans-serif}
-      .drow{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #0e1822;align-items:flex-start}
-      .dlabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:#00d4aa;text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0}
-      .dval{font-size:12px;color:#8fa5bf;flex:1;line-height:1.5}
-      .goal-chip{padding:6px 10px;border-radius:20px;border:1px solid #14202e;background:transparent;color:#4a6080;cursor:pointer;font-size:11px;font-family:'Outfit',sans-serif;transition:all .2s;text-align:left;width:100%}
-      .goal-chip.on{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
-      .ai-msg{padding:12px 14px;border-radius:8px;margin:6px 0;font-size:13px;line-height:1.65;animation:fi .3s ease}
-      @keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-      .ai-user{background:#00d4aa0e;border:1px solid #00d4aa18;margin-left:32px}
-      .ai-bot{background:#0b0f17;border:1px solid #14202e;margin-right:32px}
-      .ai-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:11px 13px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;resize:none;flex:1;transition:border-color .2s}
-      .ai-input:focus{border-color:#00d4aa50}
-      .scard{background:#0b0f17;border:1px solid #14202e;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:14px;transition:border-color .2s}
-      .scard:hover{border-color:#1e2e40}
-      .form-input{background:#07090e;border:1px solid #14202e;color:#dde4ef;padding:8px 11px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;width:100%;transition:border-color .2s}
-      .form-input:focus{border-color:#00d4aa50}
-      .pulse{animation:pulse 2s infinite}
-      @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-      .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#4a6080;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
-      .sugg-btn:hover{border-color:#00d4aa30;color:#8fa5bf}
-      .advisor-sidebar{scrollbar-width:thin}
-      @media (max-width: 640px) {
-        .advisor-sidebar{display:none}
-        .tab-btn{padding:10px 10px;font-size:11px}
-      }
-    `}</style>
   );
 }
