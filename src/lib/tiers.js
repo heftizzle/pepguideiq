@@ -23,7 +23,7 @@ export const TIERS = {
     label: "$16.99/mo",
     stackLimit: 30,
     reconLimit: 30,
-    aiQueriesPerDay: 16,
+    aiQueriesPerDay: 8,
     profiles: 2,
   },
   goat: {
@@ -32,7 +32,7 @@ export const TIERS = {
     label: "$21.99/mo",
     stackLimit: 60,
     reconLimit: 60,
-    aiQueriesPerDay: 48,
+    aiQueriesPerDay: 16,
     profiles: 4,
   },
 };

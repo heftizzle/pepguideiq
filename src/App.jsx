@@ -8,6 +8,7 @@ import { formatPlan, hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
+  getSessionAccessToken,
   loadStack,
   onAuthStateChange,
   saveStack,
@@ -125,10 +126,13 @@ export default function PepGuideIQ() {
       return;
     }
     try {
+      const token = await getSessionAccessToken();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(`${API_WORKER_URL}/v1/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: msgs, system }),
+        headers,
+        body: JSON.stringify({ messages: msgs, system, plan: user.plan }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

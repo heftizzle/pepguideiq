@@ -46,6 +46,13 @@ export async function signOut() {
  * Profile row from `public.profiles` (see supabase/migrations/001_initial_schema.sql).
  * @returns {Promise<{ id: string, email: string, name: string, plan: string } | null>}
  */
+/** Access token for Worker JWT verification (Authorization: Bearer …). */
+export async function getSessionAccessToken() {
+  if (!supabase) return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
 export async function getCurrentUser() {
   if (!supabase) return null;
   const { data: auth } = await supabase.auth.getUser();
