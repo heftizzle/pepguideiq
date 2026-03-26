@@ -4,7 +4,14 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
-import { formatPlan, hasAccess } from "./lib/tiers.js";
+import { formatPlan, hasAccess, TIER_ORDER } from "./lib/tiers.js";
+
+function getNextTierId(plan) {
+  const p = plan ?? "entry";
+  const i = TIER_ORDER.indexOf(p);
+  if (i === -1 || i >= TIER_ORDER.length - 1) return null;
+  return TIER_ORDER[i + 1];
+}
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
@@ -34,6 +41,8 @@ export default function PepGuideIQ() {
   const [aiLoading, setAiLoading] = useState(false);
   const [goals, setGoals]         = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  /** Which paid tier row to emphasize when the modal opens (next tier above current). */
+  const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
 
@@ -93,10 +102,19 @@ export default function PepGuideIQ() {
   const canAddToStack = hasAccess(user?.plan, "pro") || myStack.length < 3;
   const canAI = hasAccess(user?.plan, "pro");
 
+  const openUpgradeModal = () => {
+    setUpgradeFocusTier(getNextTierId(user?.plan));
+    setShowUpgrade(true);
+  };
+  const closeUpgradeModal = () => {
+    setShowUpgrade(false);
+    setUpgradeFocusTier(null);
+  };
+
   const openAdd = (p) => { setAddTarget(p); setStackEntry({ dose:p.startDose, frequency:"", notes:"" }); setShowAdd(true); };
   const confirmAdd = () => {
     if (!addTarget) return;
-    if (!canAddToStack) { setShowUpgrade(true); setShowAdd(false); return; }
+    if (!canAddToStack) { openUpgradeModal(); setShowAdd(false); return; }
     if (!myStack.find((s) => s.id === addTarget.id)) {
       setMyStack((prev) => [...prev, { ...addTarget, stackDose:stackEntry.dose, stackFrequency:stackEntry.frequency, stackNotes:stackEntry.notes, addedDate:new Date().toLocaleDateString() }]);
     }
@@ -106,7 +124,7 @@ export default function PepGuideIQ() {
 
   const sendAI = async () => {
     if (!aiInput.trim() || aiLoading) return;
-    if (!canAI) { setShowUpgrade(true); return; }
+    if (!canAI) { openUpgradeModal(); return; }
     const userMsg = { role:"user", content:aiInput };
     const msgs = [...aiMsgs, userMsg];
     setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
@@ -212,6 +230,15 @@ export default function PepGuideIQ() {
                   <span className="pill" style={{ background: user.plan==="goat"?"#a855f720":user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="goat"?"#a855f7":user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="goat"?"#a855f730":user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:9 }}>
                     {formatPlan(user.plan)}
                   </span>
+                  {user.plan === "goat" ? (
+                    <button type="button" disabled className="btn-teal" style={{ fontSize:10,padding:"4px 10px",opacity:0.45,cursor:"not-allowed",borderColor:"#243040",color:"#4a6080",background:"#0b0f17" }} title="You are on the highest plan">
+                      Max Tier
+                    </button>
+                  ) : (
+                    <button type="button" className="btn-teal" style={{ fontSize:10,padding:"4px 10px" }} onClick={openUpgradeModal}>
+                      Upgrade
+                    </button>
+                  )}
                   <span style={{ fontSize:11,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
                   <button type="button" className="btn-red" style={{ fontSize:10,padding:"3px 8px" }} onClick={() => void handleSignOut()}>↩</button>
                 </div>
@@ -365,7 +392,7 @@ export default function PepGuideIQ() {
                           "Explain SS-31's mechanism of action",
                           "What's the mitochondrial trinity protocol?",
                         ].map((s) => (
-                          <button type="button" key={s} className="sugg-btn" onClick={() => canAI ? setAiInput(s) : setShowUpgrade(true)}>{s}</button>
+                          <button type="button" key={s} className="sugg-btn" onClick={() => canAI ? setAiInput(s) : openUpgradeModal()}>{s}</button>
                         ))}
                       </div>
                     </div>
@@ -474,10 +501,10 @@ export default function PepGuideIQ() {
         )}
 
         {showUpgrade && (
-          <Modal onClose={() => setShowUpgrade(false)} maxWidth={540} label="Upgrade Plan">
+          <Modal onClose={closeUpgradeModal} maxWidth={540} label="Upgrade Plan">
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
               <div className="brand" style={{ fontSize:16,fontWeight:700 }}>Upgrade Your Plan</div>
-              <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={() => setShowUpgrade(false)}>×</button>
+              <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20 }} onClick={closeUpgradeModal}>×</button>
             </div>
             <div style={{ fontSize:12,color:"#4a6080",marginBottom:20 }}>
               Unlock the full protocol stack.
@@ -490,7 +517,7 @@ export default function PepGuideIQ() {
                   const u = await getCurrentUser();
                   if (u) setUser(u);
                 }
-                setShowUpgrade(false);
+                closeUpgradeModal();
               };
 
               const PlanCard = ({ plan }) => {
@@ -498,9 +525,15 @@ export default function PepGuideIQ() {
                 const isEntry = plan.id === "entry";
                 const canUpgrade = !isCurrent && !isEntry;
                 const btnText = isCurrent ? "Current" : isEntry ? "Included" : "Upgrade";
+                const isFocused = upgradeFocusTier === plan.id;
 
                 return (
-                  <div style={{ background:"#07090e",border:`1px solid ${plan.color}30`,borderRadius:8,padding:14,display:"flex",flexDirection:"column",gap:10 }}>
+                  <div style={{
+                    background:"#07090e",
+                    border:`${isFocused ? 2 : 1}px solid ${isFocused ? plan.color : plan.color + "30"}`,
+                    boxShadow: isFocused ? `0 0 0 1px ${plan.color}50, 0 8px 24px ${plan.color}18` : "none",
+                    borderRadius:8,padding:14,display:"flex",flexDirection:"column",gap:10,
+                  }}>
                     <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10 }}>
                       <div>
                         <div className="brand" style={{ color:plan.color,fontWeight:800,fontSize:14 }}>{plan.label}</div>
@@ -547,7 +580,16 @@ export default function PepGuideIQ() {
                     ))}
                   </div>
 
-                  <div style={{ border:"1px solid #a855f730",borderRadius:8,background:"#a855f708",padding:16,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                  <div style={{
+                    border: `${upgradeFocusTier === "goat" ? 2 : 1}px solid ${upgradeFocusTier === "goat" ? "#a855f7" : "#a855f730"}`,
+                    boxShadow: upgradeFocusTier === "goat" ? "0 0 0 1px #a855f750, 0 8px 24px #a855f718" : "none",
+                    borderRadius:8,
+                    background:"#a855f708",
+                    padding:16,
+                    display:"flex",
+                    justifyContent:"space-between",
+                    alignItems:"center",
+                  }}>
                     <div>
                       <div className="brand" style={{ color:"#a855f7",fontWeight:800,fontSize:16 }}>
                         GOAT — {goatPlan?.price ?? "$21.99"}

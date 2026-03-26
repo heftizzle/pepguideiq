@@ -1,6 +1,7 @@
 export const TIERS = {
   entry: {
     name: "Entry",
+    emoji: "💸",
     price: 0,
     label: "Free",
     stackLimit: 2,
@@ -10,6 +11,7 @@ export const TIERS = {
   },
   pro: {
     name: "Pro",
+    emoji: "🔬",
     price: 8.99,
     label: "$8.99/mo",
     stackLimit: 15,
@@ -19,6 +21,7 @@ export const TIERS = {
   },
   elite: {
     name: "Elite",
+    emoji: "⚡",
     price: 16.99,
     label: "$16.99/mo",
     stackLimit: 30,
@@ -28,6 +31,7 @@ export const TIERS = {
   },
   goat: {
     name: "GOAT",
+    emoji: "🐐",
     price: 21.99,
     label: "$21.99/mo",
     stackLimit: 60,
