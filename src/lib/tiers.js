@@ -43,6 +43,9 @@ export const TIERS = {
 
 export const TIER_ORDER = ["entry", "pro", "elite", "goat"];
 
+/** For upgrade / downgrade comparisons (Stripe tier vs selected tier). */
+export const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
+
 /** Next tier above `plan`, or `null` if already at GOAT. */
 export function getNextTierId(plan) {
   const p = plan ?? "entry";

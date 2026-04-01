@@ -1,19 +1,89 @@
+import { useEffect, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
 import { getStripeCheckoutUrl } from "../lib/checkout.js";
-import { getNextTierId, TIER_ORDER } from "../lib/tiers.js";
+import { fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
+import { formatPlan, getNextTierId, TIER_RANK } from "../lib/tiers.js";
 import { getCurrentUser, updateUserPlan } from "../lib/supabase.js";
 
 const ROWS = getUpgradeTierRows();
 
+const BILLING_ERROR_USER_MESSAGE = "Unable to load billing info. Please try again.";
+
+const mutedDowngradeBtn = {
+  width: "100%",
+  padding: "10px 12px",
+  fontSize: 12,
+  borderRadius: 10,
+  border: "1px solid #4a6080",
+  color: "#8fa5bf",
+  background: "transparent",
+  cursor: "pointer",
+};
+
 export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
-  const currentId = user?.plan ?? "entry";
-  const currentIdx = TIER_ORDER.indexOf(currentId);
-  const safeIdx = currentIdx === -1 ? 0 : currentIdx;
-  const nextId = getNextTierId(currentId);
+  const [subscriptionInfo, setSubscriptionInfo] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionError, setSubscriptionError] = useState(null);
+  const [downgradeFlow, setDowngradeFlow] = useState(null);
+  const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
+  const [downgradeError, setDowngradeError] = useState(null);
+
+  const refetchSubscription = () => {
+    setSubscriptionLoading(true);
+    setSubscriptionError(null);
+    fetchStripeSubscription().then(({ data, error }) => {
+      setSubscriptionLoading(false);
+      if (error) {
+        setSubscriptionError(error.message);
+        setSubscriptionInfo(null);
+        return;
+      }
+      setSubscriptionInfo(data);
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setSubscriptionLoading(true);
+    setSubscriptionError(null);
+    fetchStripeSubscription().then(({ data, error }) => {
+      if (cancelled) return;
+      setSubscriptionLoading(false);
+      if (error) {
+        setSubscriptionError(error.message);
+        setSubscriptionInfo(null);
+        return;
+      }
+      setSubscriptionInfo(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const actionsDisabled = subscriptionLoading || subscriptionError != null;
+  const subscriptionOk = !subscriptionLoading && subscriptionError == null && subscriptionInfo != null;
+  const stripeTier = subscriptionOk && subscriptionInfo.plan ? subscriptionInfo.plan : "entry";
+
+  const canDowngrade =
+    subscriptionOk &&
+    subscriptionInfo.current_period_end > 0 &&
+    ["active", "trialing", "past_due"].includes(subscriptionInfo.status);
+
+  const periodEndDate =
+    subscriptionOk && subscriptionInfo.current_period_end > 0
+      ? new Date(subscriptionInfo.current_period_end * 1000).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "";
+
+  const nextStripeTier = getNextTierId(stripeTier);
 
   const tierAction = async (planId) => {
-    if (planId === "entry") return;
+    if (actionsDisabled || planId === "entry") return;
     const url = getStripeCheckoutUrl(planId);
     if (url) {
       onClose();
@@ -28,19 +98,163 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
     onClose();
   };
 
-  const ctaForTier = (planId) => {
-    const idx = TIER_ORDER.indexOf(planId);
-    const isCurrent = planId === currentId;
-    if (isCurrent) {
-      return { kind: "current", label: "Your Plan", disabled: true };
+  const confirmDowngrade = async (targetId) => {
+    setDowngradeError(null);
+    setDowngradeSubmitting(true);
+    const { ok, error } = await scheduleDowngrade(targetId);
+    setDowngradeSubmitting(false);
+    if (!ok) {
+      setDowngradeError(error?.message ?? "Request failed");
+      return;
     }
-    if (idx < safeIdx) {
-      return { kind: "below", label: "Included", disabled: true };
+    setDowngradeFlow(null);
+    refetchSubscription();
+  };
+
+  const renderTierActions = (row) => {
+    const rowId = row.id;
+    const isSame = rowId === stripeTier;
+    const isUpgrade = TIER_RANK[rowId] > TIER_RANK[stripeTier];
+    const isDowngrade = TIER_RANK[rowId] < TIER_RANK[stripeTier];
+
+    if (downgradeFlow?.targetId === rowId) {
+      const isEntryTarget = downgradeFlow.kind === "entry";
+      return (
+        <div
+          style={{
+            border: "1px solid #14202e",
+            borderRadius: 10,
+            padding: 12,
+            background: "#0b0f17",
+          }}
+        >
+          <div className="brand" style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", marginBottom: 10 }}>
+            {isEntryTarget ? "⚠️  Moving to Entry (Free)" : "⏳  Confirm downgrade"}
+          </div>
+          <div style={{ fontSize: 11, color: "#8fa5bf", lineHeight: 1.55, marginBottom: 14 }}>
+            {isEntryTarget ? (
+              <>
+                You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
+                <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>.
+                <br />
+                On <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>, billing stops and your plan moves to Entry.
+                <br />
+                You can resubscribe anytime.
+              </>
+            ) : (
+              <>
+                You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
+                <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>.
+                <br />
+                On <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>, your plan moves to{" "}
+                <strong style={{ color: "#dde4ef" }}>{formatPlan(rowId)}</strong>.
+                <br />
+                No action needed — this happens automatically.
+              </>
+            )}
+          </div>
+          {downgradeError && (
+            <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginBottom: 10 }}>
+              {downgradeError}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="btn-teal btn-upgrade-ghost"
+              style={{ padding: "8px 12px", fontSize: 11 }}
+              disabled={downgradeSubmitting}
+              onClick={() => {
+                setDowngradeFlow(null);
+                setDowngradeError(null);
+              }}
+            >
+              Keep current plan
+            </button>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ padding: "8px 12px", fontSize: 11 }}
+              disabled={downgradeSubmitting}
+              onClick={() => void confirmDowngrade(rowId)}
+            >
+              {isEntryTarget ? "Confirm" : "Confirm downgrade"}
+            </button>
+          </div>
+        </div>
+      );
     }
-    if (planId === nextId) {
-      return { kind: "upgrade", label: "Upgrade Now", disabled: false };
+
+    if (actionsDisabled) {
+      return (
+        <button
+          type="button"
+          disabled
+          className="btn-teal btn-upgrade-current"
+          style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+        >
+          {subscriptionLoading ? "Loading…" : isSame ? "This is your current plan" : isUpgrade ? "Upgrade" : "Downgrade"}
+        </button>
+      );
     }
-    return { kind: "learn", label: "Learn More", disabled: false };
+
+    if (isSame) {
+      return (
+        <button
+          type="button"
+          disabled
+          className="btn-teal btn-upgrade-current"
+          style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+        >
+          This is your current plan
+        </button>
+      );
+    }
+
+    if (isUpgrade) {
+      const isNext = rowId === nextStripeTier;
+      const label = isNext ? "Upgrade Now" : "Learn More";
+      return (
+        <button
+          type="button"
+          className={isNext ? "btn-teal btn-upgrade-cta" : "btn-teal btn-upgrade-ghost"}
+          style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}
+          onClick={() => void tierAction(rowId)}
+        >
+          {label}
+        </button>
+      );
+    }
+
+    if (isDowngrade) {
+      if (!canDowngrade) {
+        return (
+          <button
+            type="button"
+            disabled
+            className="btn-teal btn-upgrade-current"
+            style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+          >
+            {rowId === "entry" ? "Move to Free" : "Schedule Downgrade"}
+          </button>
+        );
+      }
+      const label = rowId === "entry" ? "Move to Free" : "Schedule Downgrade";
+      return (
+        <button
+          type="button"
+          style={{ ...mutedDowngradeBtn }}
+          onClick={() => {
+            setDowngradeError(null);
+            setDowngradeFlow({ targetId: rowId, kind: rowId === "entry" ? "entry" : "paid" });
+          }}
+        >
+          {label}
+        </button>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -63,6 +277,54 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       </div>
 
       <div
+        style={{
+          marginBottom: 16,
+          padding: 12,
+          background: "#0b0f17",
+          border: "1px solid #14202e",
+          borderRadius: 8,
+        }}
+      >
+        <div className="mono" style={{ fontSize: 9, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
+          // BILLING (STRIPE)
+        </div>
+        {subscriptionLoading && (
+          <div className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+            Loading subscription…
+          </div>
+        )}
+        {!subscriptionLoading && subscriptionError && (
+          <div className="mono" style={{ fontSize: 11, color: "#f59e0b", lineHeight: 1.5 }}>
+            {BILLING_ERROR_USER_MESSAGE}
+          </div>
+        )}
+        {subscriptionOk && (
+          <div style={{ fontSize: 11, color: "#8fa5bf", lineHeight: 1.55 }}>
+            <div>
+              <span className="mono" style={{ color: "#4a6080" }}>status</span> {subscriptionInfo.status}
+            </div>
+            {subscriptionInfo.current_period_end > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <span className="mono" style={{ color: "#4a6080" }}>current_period_end</span> {periodEndDate}
+              </div>
+            )}
+            <div style={{ marginTop: 6 }}>
+              <span className="mono" style={{ color: "#4a6080" }}>cancel_at_period_end</span>{" "}
+              {subscriptionInfo.cancel_at_period_end ? "true" : "false"}
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <span className="mono" style={{ color: "#4a6080" }}>plan</span> {subscriptionInfo.plan}
+            </div>
+            {subscriptionInfo.pending_plan != null && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #14202e", color: "#6b8299" }}>
+                <span className="mono" style={{ color: "#4a6080" }}>pending_plan</span> {subscriptionInfo.pending_plan}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div
         className="upgrade-tier-grid"
         style={{
           display: "grid",
@@ -71,9 +333,8 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         }}
       >
         {ROWS.map((row) => {
-          const cta = ctaForTier(row.id);
-          const isCurrent = row.id === currentId;
-          const isNext = row.id === nextId;
+          const isCurrent = row.id === stripeTier;
+          const isNext = row.id === nextStripeTier;
           const isRec = row.id === upgradeFocusTier || isNext;
 
           return (
@@ -104,38 +365,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
               <div style={{ fontSize: 11, color: "#6b8299", lineHeight: 1.5 }}>{row.subline}</div>
 
-              <div style={{ marginTop: "auto", paddingTop: 6 }}>
-                {cta.kind === "current" && (
-                  <button type="button" className="btn-teal btn-upgrade-current" disabled style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}>
-                    {cta.label}
-                  </button>
-                )}
-                {cta.kind === "below" && (
-                  <button type="button" className="btn-teal btn-upgrade-current" disabled style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}>
-                    {cta.label}
-                  </button>
-                )}
-                {cta.kind === "upgrade" && (
-                  <button
-                    type="button"
-                    className="btn-teal btn-upgrade-cta"
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}
-                    onClick={() => void tierAction(row.id)}
-                  >
-                    {cta.label}
-                  </button>
-                )}
-                {cta.kind === "learn" && (
-                  <button
-                    type="button"
-                    className="btn-teal btn-upgrade-ghost"
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}
-                    onClick={() => void tierAction(row.id)}
-                  >
-                    {cta.label}
-                  </button>
-                )}
-              </div>
+              <div style={{ marginTop: "auto", paddingTop: 6 }}>{renderTierActions(row)}</div>
             </div>
           );
         })}

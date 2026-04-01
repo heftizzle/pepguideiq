@@ -14,7 +14,15 @@
  * Response: JSON { text } (plain assistant string) on success.
  *
  * CORS: Access-Control-Allow-Origin is * for now; for production lock to https://pepguideiq.com (or your Pages origin).
+ *
+ * Stripe (billing source of truth):
+ *   GET  /stripe/subscription — subscription fields from Stripe + pending_plan from Supabase
+ *   POST /stripe/subscription/schedule-downgrade — body { target_plan } — sets pending_plan + pending_plan_date
+ *   Secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET
  */
+
+const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
+const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
 
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
 const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
@@ -25,7 +33,7 @@ const ANTHROPIC_VERSION = "2023-06-01";
 // TODO(prod): set to "https://pepguideiq.com" (or exact Pages URL) instead of "*"
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
@@ -71,7 +79,7 @@ function base64UrlToBytes(b64url) {
  * Verifies Supabase HS256 JWT and returns plan from token claims (not from request body).
  * @param {string | null} authorization
  * @param {string} secret
- * @returns {Promise<{ plan: string | null }>}
+ * @returns {Promise<{ plan: string | null, sub: string | null }>}
  */
 async function verifyJWT(authorization, secret) {
   const raw = authorization?.replace(/^Bearer\s+/i, "")?.trim();
@@ -108,7 +116,235 @@ async function verifyJWT(authorization, secret) {
   if (um && typeof um === "object" && typeof um.plan === "string") plan = um.plan;
   else if (am && typeof am === "object" && typeof am.plan === "string") plan = am.plan;
   else if (typeof payload.plan === "string") plan = payload.plan;
-  return { plan };
+  const sub = typeof payload.sub === "string" ? payload.sub : null;
+  return { plan, sub };
+}
+
+function buildSystem(body) {
+  const extra = typeof body?.system === "string" ? body.system.trim() : "";
+  const base =
+    "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
+  return extra ? `${base}\n\n${extra}` : base;
+}
+
+/** @param {Record<string, unknown> | null | undefined} subscr */
+function tierPlanFromStripeSubscription(subscr) {
+  if (!subscr || typeof subscr !== "object") return "entry";
+  const st = typeof subscr.status === "string" ? subscr.status : "";
+  if (st === "canceled" || st === "unpaid" || st === "incomplete_expired") return "entry";
+  const m =
+    (typeof subscr.metadata?.plan === "string" && subscr.metadata.plan.trim().toLowerCase()) ||
+    (typeof subscr.items?.data?.[0]?.price?.metadata?.plan === "string" &&
+      subscr.items.data[0].price.metadata.plan.trim().toLowerCase()) ||
+    "";
+  return VALID_PLAN_TIERS.has(m) ? m : "entry";
+}
+
+async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
+  const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(patch),
+  });
+  return res.ok;
+}
+
+/**
+ * @param {Request} request
+ * @param {Record<string, string | undefined>} env
+ */
+async function handleStripeSubscription(request, env) {
+  const jwtSecret = env.SUPABASE_JWT_SECRET ?? "";
+  if (!jwtSecret) {
+    return jsonResponse({ error: "SUPABASE_JWT_SECRET is not set on the Worker" }, 503);
+  }
+
+  let userId;
+  try {
+    const v = await verifyJWT(request.headers.get("Authorization"), jwtSecret);
+    userId = v.sub;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unauthorized";
+    return jsonResponse({ error: msg }, 401);
+  }
+  if (!userId) {
+    return jsonResponse({ error: "Invalid token: missing sub" }, 401);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl || !serviceKey) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+  }
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id,pending_plan,pending_plan_date`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const profileRows = await pr.json().catch(() => []);
+  const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+  const customerId =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+
+  const emptyResponse = () =>
+    jsonResponse({
+      current_period_end: 0,
+      cancel_at_period_end: false,
+      status: "none",
+      plan: "entry",
+      pending_plan: profile?.pending_plan != null ? String(profile.pending_plan) : null,
+    });
+
+  if (!customerId) {
+    return emptyResponse();
+  }
+
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503);
+  }
+
+  const qs = new URLSearchParams({
+    customer: customerId,
+    limit: "1",
+    status: "all",
+  });
+  qs.append("expand[]", "data.default_payment_method");
+  const sr = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const sdata = await sr.json().catch(() => ({}));
+  if (!sr.ok) {
+    return jsonResponse(
+      { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
+      sr.status >= 400 && sr.status < 600 ? sr.status : 502
+    );
+  }
+
+  const list = Array.isArray(sdata.data) ? sdata.data : [];
+  const subscr = list[0];
+  if (!subscr) {
+    return emptyResponse();
+  }
+
+  const cpe = subscr.current_period_end;
+  const cpeNum = typeof cpe === "number" ? cpe : 0;
+
+  return jsonResponse({
+    current_period_end: cpeNum,
+    cancel_at_period_end: Boolean(subscr.cancel_at_period_end),
+    status: typeof subscr.status === "string" ? subscr.status : "unknown",
+    plan: tierPlanFromStripeSubscription(subscr),
+    pending_plan: profile?.pending_plan != null ? String(profile.pending_plan) : null,
+  });
+}
+
+/**
+ * POST body: { target_plan: "entry" | "pro" | "elite" | "goat" }
+ */
+async function handleScheduleDowngrade(request, env) {
+  const jwtSecret = env.SUPABASE_JWT_SECRET ?? "";
+  if (!jwtSecret) {
+    return jsonResponse({ error: "SUPABASE_JWT_SECRET is not set on the Worker" }, 503);
+  }
+
+  let userId;
+  try {
+    const v = await verifyJWT(request.headers.get("Authorization"), jwtSecret);
+    userId = v.sub;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unauthorized";
+    return jsonResponse({ error: msg }, 401);
+  }
+  if (!userId) {
+    return jsonResponse({ error: "Invalid token: missing sub" }, 401);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+  const target = typeof body?.target_plan === "string" ? body.target_plan.trim().toLowerCase() : "";
+  if (!VALID_PLAN_TIERS.has(target)) {
+    return jsonResponse({ error: "Invalid target_plan" }, 400);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl || !serviceKey) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+  }
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const profileRows = await pr.json().catch(() => []);
+  const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+  const customerId =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+  if (!customerId) {
+    return jsonResponse({ error: "No Stripe customer on file" }, 400);
+  }
+
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503);
+  }
+
+  const qs = new URLSearchParams({ customer: customerId, limit: "1", status: "all" });
+  qs.append("expand[]", "data.default_payment_method");
+  const sr = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const sdata = await sr.json().catch(() => ({}));
+  if (!sr.ok) {
+    return jsonResponse(
+      { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
+      502
+    );
+  }
+  const list = Array.isArray(sdata.data) ? sdata.data : [];
+  const subscr = list[0];
+  if (!subscr || typeof subscr.current_period_end !== "number") {
+    return jsonResponse({ error: "No active subscription to schedule against" }, 400);
+  }
+
+  const currentTier = tierPlanFromStripeSubscription(subscr);
+  const activeLike = ["active", "trialing", "past_due"].includes(subscr.status);
+  if (!activeLike) {
+    return jsonResponse({ error: "Subscription is not in a state that allows scheduling" }, 400);
+  }
+  if (TIER_RANK[target] >= TIER_RANK[currentTier]) {
+    return jsonResponse({ error: "target_plan must be lower than current plan" }, 400);
+  }
+
+  const ok = await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
+    pending_plan: target,
+    pending_plan_date: new Date(subscr.current_period_end * 1000).toISOString(),
+  });
+  if (!ok) {
+    return jsonResponse({ error: "Failed to update profile" }, 502);
+  }
+
+  return jsonResponse({ ok: true });
 }
 
 export default {
@@ -118,6 +354,15 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    if (url.pathname === "/stripe/subscription" && request.method === "GET") {
+      return handleStripeSubscription(request, env);
+    }
+
+    if (url.pathname === "/stripe/subscription/schedule-downgrade" && request.method === "POST") {
+      return handleScheduleDowngrade(request, env);
+    }
+
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {
       return new Response("Not found", { status: 404, headers: CORS });
     }

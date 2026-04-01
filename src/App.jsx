@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { AddToStackForm } from "./components/AddToStackForm.jsx";
+import { SavedStackEntryRow, getStackRowListKey } from "./components/SavedStackEntryRow.jsx";
+import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
-import { formatPlan, getNextTierId, getTier, hasAccess } from "./lib/tiers.js";
+import { formatPlan, getNextTierId, getTier, hasAccess, TIER_RANK } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import {
   getCurrentUser,
@@ -18,17 +21,44 @@ import {
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
 
+/** Parent row for a variant (`variantOf` id), if present in the catalog. */
+function getVariantParent(peptide) {
+  if (!peptide?.variantOf) return null;
+  return PEPTIDES.find((q) => q.id === peptide.variantOf) ?? null;
+}
+
+/** All catalog categories for a row (multi-label imports use `categories[]`; core rows use string `category`). */
+function peptideCategories(p) {
+  if (Array.isArray(p.categories) && p.categories.length) return p.categories;
+  if (Array.isArray(p.category)) return p.category;
+  if (typeof p.category === "string" && p.category) return [p.category];
+  return [];
+}
+
+function primaryCategory(p) {
+  return peptideCategories(p)[0] ?? "";
+}
+
+const SORT_OPTIONS = [
+  { value: "default", label: "Default" },
+  { value: "az", label: "A → Z" },
+  { value: "za", label: "Z → A" },
+  { value: "tier", label: "Tier" },
+  { value: "category", label: "Category" },
+];
+
 export default function PepGuideIQ() {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [user, setUser]           = useState(null);
   const [activeTab, setActiveTab] = useState("library");
   const [selCat, setSelCat]       = useState("All");
+  const [sortMode, setSortMode]   = useState("default");
   const [search, setSearch]       = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
+  const [stackName, setStackName] = useState("");
   const [showAdd, setShowAdd]     = useState(false);
   const [addTarget, setAddTarget] = useState(null);
-  const [stackEntry, setStackEntry] = useState({ dose:"", frequency:"", notes:"" });
   const [aiMsgs, setAiMsgs]       = useState([]);
   const [aiInput, setAiInput]     = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -36,6 +66,8 @@ export default function PepGuideIQ() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
+  /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
+  const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
 
@@ -68,7 +100,10 @@ export default function PepGuideIQ() {
     let ignore = false;
     loadStack(user.id).then((s) => {
       if (ignore) return;
-      setMyStack(Array.isArray(s) ? s : []);
+      const stack = s && typeof s === "object" && !Array.isArray(s) && Array.isArray(s.stack) ? s.stack : Array.isArray(s) ? s : [];
+      const name = s && typeof s === "object" && !Array.isArray(s) && typeof s.name === "string" ? s.name : "";
+      setMyStack(stack);
+      setStackName(name);
       stackHydrated.current = true;
     });
     return () => {
@@ -79,18 +114,56 @@ export default function PepGuideIQ() {
   useEffect(() => {
     if (!user?.id || !isSupabaseConfigured() || !stackHydrated.current) return;
     const t = setTimeout(() => {
-      saveStack(user.id, myStack);
+      saveStack(user.id, myStack, stackName);
     }, 800);
     return () => clearTimeout(t);
-  }, [myStack, user?.id]);
+  }, [myStack, stackName, user?.id]);
 
-  const filtered = PEPTIDES.filter((p) => {
-    const mc = selCat === "All" || p.category === selCat;
-    const ms = !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())) ||
-      p.aliases.some((a) => a.toLowerCase().includes(search.toLowerCase()));
-    return mc && ms;
-  });
+  // FUTURE: Dual-tag filter mode
+  // When implemented, each card can match on EITHER primary category OR secondaryCategory
+  // UI pattern: primary filter row (current) + optional secondary filter row
+  // State needed: activeCategory (string), activeSecondaryCategory (string | null)
+  // Filter logic: p.category.includes(activeCategory) && (!activeSecondaryCategory || p.secondaryCategory?.includes(activeSecondaryCategory))
+  // This enables stacking filters like "GH Peptides" + "Longevity" without a boolean OR mess
+
+  const filtered = useMemo(
+    () =>
+      PEPTIDES.filter((p) => {
+        const mc = selCat === "All" || peptideCategories(p).includes(selCat);
+        const ms =
+          !search ||
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())) ||
+          p.aliases.some((a) => a.toLowerCase().includes(search.toLowerCase()));
+        return mc && ms;
+      }),
+    [selCat, search]
+  );
+
+  const sortedPeptides = useMemo(() => {
+    const base = [...filtered];
+    switch (sortMode) {
+      case "az":
+        return base.sort((a, b) => a.name.localeCompare(b.name));
+      case "za":
+        return base.sort((a, b) => b.name.localeCompare(a.name));
+      case "tier":
+        return base.sort((a, b) => (TIER_RANK[a.tier] ?? 0) - (TIER_RANK[b.tier] ?? 0));
+      case "category":
+        return base.sort((a, b) => {
+          const catA = primaryCategory(a) || "";
+          const catB = primaryCategory(b) || "";
+          return catA.localeCompare(catB) || a.name.localeCompare(b.name);
+        });
+      default:
+        return base;
+    }
+  }, [filtered, sortMode]);
+
+  const handleCategorySelect = (cat) => {
+    setSelCat(cat);
+    setSortMode("default");
+  };
 
   const savedStackLimit = getTier(user?.plan ?? "entry").stackLimit;
   const canAddToStack = myStack.length < savedStackLimit;
@@ -105,16 +178,34 @@ export default function PepGuideIQ() {
     setUpgradeFocusTier(null);
   };
 
-  const openAdd = (p) => { setAddTarget(p); setStackEntry({ dose:p.startDose, frequency:"", notes:"" }); setShowAdd(true); };
-  const confirmAdd = () => {
+  const openAdd = (p) => { setAddTarget(p); setShowAdd(true); };
+  const confirmAdd = ({ dose, frequency, notes }) => {
     if (!addTarget) return;
-    if (!canAddToStack) { openUpgradeModal(); setShowAdd(false); return; }
+    if (!canAddToStack) { openUpgradeModal(); setShowAdd(false); setAddTarget(null); return; }
     if (!myStack.find((s) => s.id === addTarget.id)) {
-      setMyStack((prev) => [...prev, { ...addTarget, stackDose:stackEntry.dose, stackFrequency:stackEntry.frequency, stackNotes:stackEntry.notes, addedDate:new Date().toLocaleDateString() }]);
+      const stackRowKey = crypto.randomUUID();
+      setMyStack((prev) => [
+        ...prev,
+        {
+          ...addTarget,
+          stackRowKey,
+          stackDose: dose,
+          stackFrequency: frequency,
+          stackNotes: notes,
+          addedDate: new Date().toLocaleDateString(),
+        },
+      ]);
     }
-    setShowAdd(false); setAddTarget(null);
+    setShowAdd(false);
+    setAddTarget(null);
   };
-  const removeFromStack = (id) => setMyStack((prev) => prev.filter((s) => s.id !== id));
+  const updateStackItem = (rowKey, patch) => {
+    setMyStack((prev) =>
+      prev.map((s) => (getStackRowListKey(s) === rowKey ? { ...s, ...patch } : s))
+    );
+  };
+  const removeFromStack = (rowKey) =>
+    setMyStack((prev) => prev.filter((s) => getStackRowListKey(s) !== rowKey));
 
   const sendAI = async () => {
     if (!aiInput.trim() || aiLoading) return;
@@ -122,7 +213,17 @@ export default function PepGuideIQ() {
     const userMsg = { role:"user", content:aiInput };
     const msgs = [...aiMsgs, userMsg];
     setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
-    const stackCtx = myStack.length > 0 ? `\n\nUser's current stack: ${myStack.map((p) => `${p.name} (${p.stackDose||p.startDose}${p.stackFrequency?", "+p.stackFrequency:""})`).join("; ")}.` : "";
+    const stackCtx =
+      myStack.length > 0
+        ? `\n\nUser's current stack${stackName ? ` (“${stackName}”)` : ""}: ${myStack
+            .map((p) => {
+              const dose = p.stackDose || p.startDose || "";
+              const freq = p.stackFrequency ? `, ${p.stackFrequency}` : "";
+              const note = p.stackNotes ? `; notes: ${p.stackNotes}` : "";
+              return `${p.name} (${dose}${freq})${note}`;
+            })
+            .join("; ")}.`
+        : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
     const system = `You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight. The user is an advanced biohacker.${stackCtx}${goalsCtx}`;
     if (!isApiWorkerConfigured()) {
@@ -168,6 +269,7 @@ export default function PepGuideIQ() {
     await signOut();
     stackHydrated.current = false;
     setMyStack([]);
+    setStackName("");
     setUser(null);
   };
 
@@ -247,26 +349,105 @@ export default function PepGuideIQ() {
             <div>
               <div style={{ display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center" }}>
                 <input className="search-input" style={{ maxWidth:280,flex:"1 1 200px" }} placeholder="Search by name, alias, tag…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                <div style={{ display:"flex",gap:6,overflowX:"auto",paddingBottom:2,flexWrap:"wrap" }}>
+                <div style={{ display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"center",overflowX:"auto",paddingBottom:2,minWidth:0 }}>
                   {CATEGORIES.map((cat) => (
-                    <button type="button" key={cat} className={`cat-btn ${selCat===cat?"active":""}`} onClick={() => setSelCat(cat)}>{cat}</button>
+                    <button type="button" key={cat} className={`cat-btn ${selCat===cat?"active":""}`} onClick={() => handleCategorySelect(cat)}>{cat}</button>
                   ))}
+                  <div style={{ display:"flex",alignItems:"center",gap:8,marginLeft:"auto",flexWrap:"wrap" }}>
+                    <span style={{ color:"#dde4ef",fontSize:11 }}>Sort</span>
+                    <div style={{ display:"flex",gap:2,alignItems:"center",flexWrap:"wrap" }}>
+                      {SORT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setSortMode(opt.value)}
+                          style={{
+                            background:
+                              sortMode === opt.value ? "rgba(0,212,170,0.12)" : "rgba(255,255,255,0.03)",
+                            border:
+                              sortMode === opt.value
+                                ? "1px solid rgba(0,212,170,0.5)"
+                                : "1px solid #3d4f63",
+                            color: sortMode === opt.value ? "rgb(0,212,170)" : "#dde4ef",
+                            fontSize: 11,
+                            borderRadius: 5,
+                            padding: "3px 8px",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10 }}>
-                {filtered.map((p) => {
-                  const cc = getCatColor(p.category);
+                {sortedPeptides.map((p) => {
+                  const cat0 = primaryCategory(p);
+                  const cc = getCatColor(cat0);
                   const inStack = myStack.some((s) => s.id === p.id);
                   return (
                     <div key={p.id} className="pcard" style={{ "--cc":cc }} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
                         <div>
                           <div className="brand" style={{ fontWeight:700,fontSize:14,color:"#dde4ef" }}>{p.name}</div>
-                          {p.aliases[0] && <div className="mono" style={{ fontSize:9,color:"#243040",marginTop:1 }}>{p.aliases[0]}</div>}
+                          {p.variantOf && (
+                            <div>
+                              <div
+                                className="mono"
+                                title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
+                                onClick={
+                                  typeof p.variantNote === "string" && p.variantNote.trim()
+                                    ? (e) => {
+                                        e.stopPropagation();
+                                        setVariantNoteExpandedById((prev) => ({
+                                          ...prev,
+                                          [p.id]: !prev[p.id],
+                                        }));
+                                      }
+                                    : undefined
+                                }
+                                style={{
+                                  fontSize: 11,
+                                  opacity: 0.65,
+                                  color: "#8fa5bf",
+                                  marginTop: 3,
+                                  lineHeight: 1.35,
+                                  fontWeight: 400,
+                                  WebkitTapHighlightColor: "transparent",
+                                  ...(typeof p.variantNote === "string" && p.variantNote.trim()
+                                    ? { cursor: "pointer" }
+                                    : {}),
+                                }}
+                              >
+                                Variant of: {getVariantParent(p)?.name ?? p.variantOf}
+                              </div>
+                              {variantNoteExpandedById[p.id] &&
+                                typeof p.variantNote === "string" &&
+                                p.variantNote.trim() && (
+                                  <div
+                                    className="mono"
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      fontSize: 10,
+                                      opacity: 0.8,
+                                      color: "#8fa5bf",
+                                      marginTop: 4,
+                                      lineHeight: 1.45,
+                                    }}
+                                  >
+                                    {p.variantNote}
+                                  </div>
+                                )}
+                            </div>
+                          )}
+                          {p.aliases[0] && <div className="mono" style={{ fontSize:9,color:"#657d99",marginTop:1 }}>{p.aliases[0]}</div>}
                         </div>
-                        <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize:9 }}>{p.category.split("/")[0].trim()}</span>
+                        <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize:9 }}>{cat0}</span>
                       </div>
-                      <div style={{ fontSize:11,color:"#4a6080",marginBottom:12,lineHeight:1.55 }}>
+                      <div style={{ fontSize:11,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
                         {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
                       </div>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
@@ -279,7 +460,7 @@ export default function PepGuideIQ() {
                     </div>
                   );
                 })}
-                {filtered.length === 0 && <div className="mono" style={{ color:"#243040",fontSize:12,padding:"40px 0",gridColumn:"1/-1" }}>// No results</div>}
+                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"#243040",fontSize:12,padding:"40px 0",gridColumn:"1/-1" }}>// No results</div>}
               </div>
             </div>
           )}
@@ -313,38 +494,42 @@ export default function PepGuideIQ() {
                 </div>
               ) : (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
-                  {myStack.map((p) => {
-                    const cc = getCatColor(p.category);
-                    return (
-                      <div key={p.id} className="scard">
-                        <div style={{ width:3,height:44,background:cc,borderRadius:2,flexShrink:0 }} />
-                        <div style={{ flex:1 }}>
-                          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:6 }}>
-                            <div>
-                              <div className="brand" style={{ fontWeight:700,fontSize:14 }}>{p.name}</div>
-                              <div className="mono" style={{ fontSize:9,color:"#243040",marginTop:2 }}>{p.category} · added {p.addedDate}</div>
-                            </div>
-                            <div style={{ display:"flex",gap:8,alignItems:"center",flexWrap:"wrap" }}>
-                              <span className="pill" style={{ background:cc+"15",color:cc,border:`1px solid ${cc}30` }}>{p.stackDose||p.startDose}</span>
-                              {p.stackFrequency && <span className="pill" style={{ background:"#14202e",color:"#4a6080" }}>{p.stackFrequency}</span>}
-                              <button type="button" className="btn-red" onClick={() => removeFromStack(p.id)}>✕</button>
-                            </div>
-                          </div>
-                          {p.stackNotes && <div style={{ fontSize:11,color:"#2e4055",marginTop:5,fontStyle:"italic" }}>{p.stackNotes}</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div style={{ marginBottom:4 }}>
+                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
+                    <SavedStackNameInput initialName={stackName} onCommit={setStackName} />
+                  </div>
+                  {myStack.map((p) => (
+                    <SavedStackEntryRow
+                      key={getStackRowListKey(p)}
+                      item={p}
+                      catColor={getCatColor(primaryCategory(p))}
+                      catLabel={primaryCategory(p)}
+                      onUpdate={updateStackItem}
+                      onRemove={removeFromStack}
+                    />
+                  ))}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
                     <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
-                      {[...new Set(myStack.map((p) => p.category))].map((cat) => {
-                        const cc = getCatColor(cat); const n = myStack.filter((p) => p.category===cat).length;
+                      {[...new Set(myStack.map((p) => primaryCategory(p)))].map((cat) => {
+                        const cc = getCatColor(cat); const n = myStack.filter((p) => primaryCategory(p) === cat).length;
                         return <span key={cat} className="pill" style={{ background:cc+"15",color:cc,border:`1px solid ${cc}30`,fontSize:10,padding:"4px 10px" }}>{cat}: {n}</span>;
                       })}
                     </div>
                     <button type="button" className="btn-teal" style={{ fontSize:12 }}
-                      onClick={() => { setAiInput(`Analyze my current stack and give me optimization recommendations, timing protocols, and safety considerations: ${myStack.map((p)=>p.name).join(", ")}`); setActiveTab("advisor"); }}>
+                      onClick={() => {
+                        const summary = myStack
+                          .map((p) => {
+                            const dose = p.stackDose || p.startDose || "";
+                            const freq = p.stackFrequency ? ` ${p.stackFrequency}` : "";
+                            const note = p.stackNotes ? ` — ${p.stackNotes}` : "";
+                            return `${p.name} (${dose}${freq})${note}`;
+                          })
+                          .join("; ");
+                        const title = stackName ? `“${stackName}”: ` : "";
+                        setAiInput(`Analyze my current stack and give me optimization recommendations, timing protocols, and safety considerations: ${title}${summary}`);
+                        setActiveTab("advisor");
+                      }}>
                       Analyze with AI →
                     </button>
                     <div style={{ marginTop:10,fontSize:11,color:"#2e4055" }}>
@@ -369,7 +554,7 @@ export default function PepGuideIQ() {
                 {myStack.length > 0 && (
                   <div style={{ marginTop:14,paddingTop:14,borderTop:"1px solid #0e1822" }}>
                     <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// SAVED STACK LOADED</div>
-                    {myStack.map((p) => <div key={p.id} className="mono" style={{ fontSize:10,color:"#2e4055",padding:"2px 0" }}>→ {p.name}</div>)}
+                    {myStack.map((p) => <div key={getStackRowListKey(p)} className="mono" style={{ fontSize:10,color:"#2e4055",padding:"2px 0" }}>→ {p.name}</div>)}
                   </div>
                 )}
               </div>
@@ -437,16 +622,36 @@ export default function PepGuideIQ() {
         </div>
 
         {selPeptide && (() => {
-          const p = selPeptide; const cc = getCatColor(p.category); const inStack = myStack.some((s)=>s.id===p.id);
+          const p = selPeptide;
+          const pCat = primaryCategory(p);
+          const cc = getCatColor(pCat);
+          const inStack = myStack.some((s)=>s.id===p.id);
           return (
             <Modal onClose={() => setSelPeptide(null)} label={p.name}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14 }}>
                 <div>
                   <div className="brand" style={{ fontSize:20,fontWeight:800,color:"#dde4ef" }}>{p.name}</div>
+                  {p.variantOf && (
+                    <div
+                      className="mono"
+                      title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
+                      style={{
+                        fontSize: 11,
+                        opacity: 0.65,
+                        color: "#8fa5bf",
+                        marginTop: 4,
+                        lineHeight: 1.4,
+                        fontWeight: 400,
+                        ...(p.variantNote ? { cursor: "help" } : {}),
+                      }}
+                    >
+                      Variant of: {getVariantParent(p)?.name ?? p.variantOf}
+                    </div>
+                  )}
                   <div className="mono" style={{ fontSize:10,color:"#243040",marginTop:3 }}>{p.aliases.join(" · ")}</div>
                 </div>
                 <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                  <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35` }}>{p.category}</span>
+                  <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35` }}>{pCat}</span>
                   <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
@@ -490,20 +695,11 @@ export default function PepGuideIQ() {
 
         {showAdd && addTarget && (
           <Modal onClose={() => { setShowAdd(false); setAddTarget(null); }} maxWidth={380} label="Add to Saved Stack">
-            <div className="brand" style={{ fontSize:15,fontWeight:700,marginBottom:3 }}>Add to Saved Stack</div>
-            <div className="mono" style={{ fontSize:10,color:"#243040",marginBottom:18 }}>{addTarget.name}</div>
-            <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-              {[["DOSE","dose",addTarget.startDose],["FREQUENCY","frequency","e.g. Daily, 2x/week, Pre-sleep"],["NOTES","notes","Optional notes…"]].map(([label,key,ph]) => (
-                <div key={key}>
-                  <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:5,letterSpacing:".12em" }}>{label}</div>
-                  <input className="form-input" value={stackEntry[key]} placeholder={ph} onChange={(e) => setStackEntry((prev) => ({ ...prev,[key]:e.target.value }))} />
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop:18,display:"flex",gap:8,justifyContent:"flex-end" }}>
-              <button type="button" className="btn-red" onClick={() => { setShowAdd(false); setAddTarget(null); }}>Cancel</button>
-              <button type="button" className="btn-teal" onClick={confirmAdd}>Save to Stack</button>
-            </div>
+            <AddToStackForm
+              peptide={addTarget}
+              onCancel={() => { setShowAdd(false); setAddTarget(null); }}
+              onSave={confirmAdd}
+            />
           </Modal>
         )}
 

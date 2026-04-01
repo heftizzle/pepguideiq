@@ -1,6 +1,10 @@
 # Deploy: npx wrangler deploy
 # Secrets: npx wrangler secret put ANTHROPIC_API_KEY
 # Optional (verify JWT; plan from token, not body): npx wrangler secret put SUPABASE_JWT_SECRET
+# Stripe: GET /stripe/subscription, POST /stripe/subscription/schedule-downgrade
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 
 name = "pepguideiq-api-proxy"
 main = "workers/api-proxy.js"

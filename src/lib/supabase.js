@@ -99,23 +99,26 @@ export function onAuthStateChange(callback) {
 
 /**
  * @param {string} userId
- * @returns {Promise<unknown[]>}
+ * @returns {Promise<{ stack: unknown[], name: string }>}
  */
 export async function loadStack(userId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("user_stacks").select("stack").eq("user_id", userId).maybeSingle();
-  if (error || !data) return [];
-  return Array.isArray(data.stack) ? data.stack : [];
+  if (!supabase) return { stack: [], name: "" };
+  const { data, error } = await supabase.from("user_stacks").select("stack, stack_name").eq("user_id", userId).maybeSingle();
+  if (error || !data) return { stack: [], name: "" };
+  const stack = Array.isArray(data.stack) ? data.stack : [];
+  const name = typeof data.stack_name === "string" ? data.stack_name : "";
+  return { stack, name };
 }
 
 /**
  * @param {string} userId
  * @param {unknown[]} stack JSON-serializable peptide stack rows
+ * @param {string} [stackName] optional display name for the stack
  */
-export async function saveStack(userId, stack) {
+export async function saveStack(userId, stack, stackName = "") {
   if (!supabase) return { error: notConfiguredError() };
   const { error } = await supabase.from("user_stacks").upsert(
-    { user_id: userId, stack, updated_at: new Date().toISOString() },
+    { user_id: userId, stack, stack_name: stackName, updated_at: new Date().toISOString() },
     { onConflict: "user_id" }
   );
   return { error: error ?? null };
