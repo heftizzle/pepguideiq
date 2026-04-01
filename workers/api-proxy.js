@@ -8,7 +8,7 @@
  *   When unset, body.plan is used for /v1/chat (dev only — do not use in production).
  *
  * Route: POST /v1/chat — body JSON { system?, messages, plan?, max_tokens? }
- *   system: optional extra context appended after the Worker’s fixed advisor prompt (client cannot replace the persona).
+ *   system: optional extra context appended after the Worker’s fixed guide prompt (client cannot replace the persona).
  *   messages: only the last 10 turns are forwarded (cost / abuse limit).
  *   max_tokens: capped at 1024 regardless of client value.
  * Response: JSON { text, id?, role?, usage?: { queries_today, queries_limit, plan } } on success.

@@ -46,7 +46,7 @@ export function GlobalStyles() {
       @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
       .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#4a6080;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
       .sugg-btn:hover{border-color:#00d4aa30;color:#8fa5bf}
-      .advisor-sidebar{scrollbar-width:thin}
+      .guide-sidebar{scrollbar-width:thin}
       .modal-backdrop--sheet{align-items:flex-end;justify-content:center;padding:0}
       @media (min-width:769px){
         .modal-backdrop--sheet{align-items:center;padding:16px}
@@ -70,7 +70,7 @@ export function GlobalStyles() {
       .btn-upgrade-ghost{background:transparent!important;border:1px solid #243040!important;color:#8fa5bf!important}
       .btn-upgrade-ghost:hover{border-color:#4a6080!important;color:#dde4ef!important}
       @media (max-width: 640px) {
-        .advisor-sidebar{display:none}
+        .guide-sidebar{display:none}
         .tab-btn{padding:10px 10px;font-size:11px}
       }
     `}</style>

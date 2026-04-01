@@ -32,8 +32,8 @@ export const TIERS = {
   goat: {
     name: "GOAT",
     emoji: "🐐",
-    price: 21.99,
-    label: "$21.99/mo",
+    price: 22.99,
+    label: "$22.99/mo",
     stackLimit: 60,
     reconLimit: 60,
     aiQueriesPerDay: 16,

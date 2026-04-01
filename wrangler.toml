@@ -17,7 +17,7 @@
 #
 # 5. Run Supabase migration 003_query_log.sql
 #
-# 6. Test: submit a query in AI Advisor
+# 6. Test: submit a query in AI Guide
 #    → network request must go to workers.dev (never api.anthropic.com)
 #    → response must include usage.queries_today
 #    → Entry user: 2nd query same day should return 429

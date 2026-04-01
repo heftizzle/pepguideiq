@@ -343,7 +343,7 @@ export default function PepGuideIQ() {
                 {[
                   { id:"library", label:"Library", count:PEPTIDES.length },
                   { id:"stack",   label:"Saved Stacks", count:myStack.length||null },
-                  { id:"advisor", label:"AI Advisor" },
+                  { id:"guide", label:"AI Guide" },
                 ].map((t) => (
                   <button type="button" key={t.id} className={`tab-btn ${activeTab===t.id?"active":""}`} onClick={() => setActiveTab(t.id)}>
                     {t.label}{t.count ? ` (${t.count})` : ""}
@@ -556,7 +556,7 @@ export default function PepGuideIQ() {
                           .join("; ");
                         const title = stackName ? `“${stackName}”: ` : "";
                         setAiInput(`Analyze my current stack and give me optimization recommendations, timing protocols, and safety considerations: ${title}${summary}`);
-                        setActiveTab("advisor");
+                        setActiveTab("guide");
                       }}>
                       Analyze with AI →
                     </button>
@@ -569,9 +569,9 @@ export default function PepGuideIQ() {
             </div>
           )}
 
-          {activeTab === "advisor" && (
+          {activeTab === "guide" && (
             <div style={{ display:"flex",gap:16,height:"calc(100vh - 170px)",flexDirection:"row" }}>
-              <div style={{ width:190,flexShrink:0,overflowY:"auto",display:"flex",flexDirection:"column",gap:5 }} className="advisor-sidebar">
+              <div style={{ width:190,flexShrink:0,overflowY:"auto",display:"flex",flexDirection:"column",gap:5 }} className="guide-sidebar">
                 <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#243040" }}>(optional)</span></div>
                 {GOALS.map((g) => (
                   <button type="button" key={g} className={`goal-chip ${goals.includes(g)?"on":""}`}
@@ -724,7 +724,7 @@ export default function PepGuideIQ() {
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>
                 <button type="button" className="btn-teal" style={{ fontSize:12 }}
-                  onClick={() => { setSelPeptide(null); setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`); setActiveTab("advisor"); }}>
+                  onClick={() => { setSelPeptide(null); setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`); setActiveTab("guide"); }}>
                   Ask AI →
                 </button>
                 <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ fontSize:12 }}

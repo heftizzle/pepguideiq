@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS user_stacks_user_id_idx ON public.user_stacks(user_id
 
 
 -- ── 3. AI QUERY LOG ───────────────────────────────────────────────────────────
--- Tracks AI Advisor usage per user for rate limiting and analytics.
+-- Tracks AI Guide usage per user for rate limiting and analytics.
 -- The Cloudflare Worker can also use KV for this — this is the persistent log.
 
 CREATE TABLE IF NOT EXISTS public.ai_queries (
@@ -227,7 +227,7 @@ $$;
 -- Done. Tables created:
 --   public.profiles      — user account + plan tier
 --   public.user_stacks   — saved peptide stack (JSONB)
---   public.ai_queries    — AI Advisor usage log
+--   public.ai_queries    — AI Guide usage log
 --
 -- Triggers:
 --   on_auth_user_created — auto-creates profile + empty stack on signup
