@@ -62,6 +62,8 @@ export default function PepGuideIQ() {
   const [aiMsgs, setAiMsgs]       = useState([]);
   const [aiInput, setAiInput]     = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  /** From Worker POST /v1/chat success: `usage.queries_today` / `queries_limit`. */
+  const [aiQueryUsage, setAiQueryUsage] = useState(null);
   const [goals, setGoals]         = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
@@ -249,11 +251,36 @@ export default function PepGuideIQ() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errText = typeof data.error === "string" ? data.error : data.error?.message || `Worker ${res.status}`;
+        const errText =
+          typeof data.error === "string" ? data.error : data.error?.message || `Worker ${res.status}`;
+        if (res.status === 429) {
+          setAiMsgs((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: errText,
+              limitReached: data.limit_reached === true,
+            },
+          ]);
+          setAiLoading(false);
+          return;
+        }
         throw new Error(errText);
       }
-      const text = typeof data.text === "string" ? data.text : "";
-      setAiMsgs((prev) => [...prev, { role: "assistant", content: text || "No response." }]);
+      const { text, usage } = data;
+      const outText = typeof text === "string" ? text : "";
+      if (
+        usage &&
+        typeof usage.queries_today === "number" &&
+        typeof usage.queries_limit === "number"
+      ) {
+        setAiQueryUsage({
+          today: usage.queries_today,
+          limit: usage.queries_limit,
+          plan: typeof usage.plan === "string" ? usage.plan : user.plan,
+        });
+      }
+      setAiMsgs((prev) => [...prev, { role: "assistant", content: outText || "No response." }]);
     } catch (e) {
       setAiMsgs((prev) => [
         ...prev,
@@ -270,6 +297,7 @@ export default function PepGuideIQ() {
     stackHydrated.current = false;
     setMyStack([]);
     setStackName("");
+    setAiQueryUsage(null);
     setUser(null);
   };
 
@@ -597,6 +625,11 @@ export default function PepGuideIQ() {
                         </div>
                       )}
                       <div style={{ whiteSpace:"pre-wrap",color:msg.role==="user"?"#dde4ef":"#8fa5bf" }}>{msg.content}</div>
+                      {msg.role === "assistant" && msg.limitReached && (
+                        <button type="button" className="btn-teal" onClick={openUpgradeModal} style={{ marginTop:10, fontSize:11, padding:"6px 12px" }}>
+                          Upgrade for more queries
+                        </button>
+                      )}
                     </div>
                   ))}
                   {aiLoading && (
@@ -607,14 +640,24 @@ export default function PepGuideIQ() {
                   <div ref={msgEnd} />
                 </div>
 
-                <div style={{ padding:10,borderTop:"1px solid #0e1822",display:"flex",gap:8 }}>
-                  <textarea className="ai-input" rows={2} placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
-                    value={aiInput} onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendAI(); } }}
-                  />
-                  <button type="button" className="btn-teal" onClick={sendAI} disabled={aiLoading||!aiInput.trim()} style={{ padding:"0 18px",alignSelf:"stretch",fontSize:16 }}>
-                    {aiLoading?"…":"→"}
-                  </button>
+                <div style={{ padding:10,borderTop:"1px solid #0e1822",display:"flex",flexDirection:"column",gap:4 }}>
+                  <div style={{ display:"flex",gap:8 }}>
+                    <textarea className="ai-input" rows={2} placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
+                      value={aiInput} onChange={(e) => setAiInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendAI(); } }}
+                    />
+                    <button type="button" className="btn-teal" onClick={sendAI} disabled={aiLoading||!aiInput.trim()} style={{ padding:"0 18px",alignSelf:"stretch",fontSize:16 }}>
+                      {aiLoading?"…":"→"}
+                    </button>
+                  </div>
+                  {canAI && aiQueryUsage != null && (
+                    <div style={{ fontSize:11,color:"#8fa5bf",textAlign:"right",marginTop:4 }}>
+                      {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
+                      {aiQueryUsage.today >= aiQueryUsage.limit && (
+                        <span style={{ color:"#f97316",marginLeft:8 }}>· Limit reached</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -2,27 +2,34 @@
  * Cloudflare Worker: proxies Anthropic Messages API so the API key never ships to the browser.
  *
  * Secrets: wrangler secret put ANTHROPIC_API_KEY
- * Optional (hardened model selection): wrangler secret put SUPABASE_JWT_SECRET
- *   Same value as Supabase Dashboard → Project Settings → API → JWT Secret (legacy).
- *   When set, `Authorization: Bearer <access_token>` is verified; plan comes from the JWT
- *   `user_metadata.plan` (and body.plan is ignored for routing). When unset, body.plan is used.
+ * Supabase: wrangler secret put SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   When both are set, `Authorization: Bearer <access_token>` is verified via GET /auth/v1/user
+ *   (same as supabase.auth.getUser); plan comes from user_metadata / app_metadata.
+ *   When unset, body.plan is used for /v1/chat (dev only — do not use in production).
  *
  * Route: POST /v1/chat — body JSON { system?, messages, plan?, max_tokens? }
  *   system: optional extra context appended after the Worker’s fixed advisor prompt (client cannot replace the persona).
  *   messages: only the last 10 turns are forwarded (cost / abuse limit).
  *   max_tokens: capped at 1024 regardless of client value.
- * Response: JSON { text } (plain assistant string) on success.
+ * Response: JSON { text, id?, role?, usage?: { queries_today, queries_limit, plan } } on success.
  *
  * CORS: Access-Control-Allow-Origin is * for now; for production lock to https://pepguideiq.com (or your Pages origin).
  *
  * Stripe (billing source of truth):
  *   GET  /stripe/subscription — subscription fields from Stripe + pending_plan from Supabase
  *   POST /stripe/subscription/schedule-downgrade — body { target_plan } — sets pending_plan + pending_plan_date
- *   Secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET
+ *   Secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
 const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
+
+const DAILY_QUERY_LIMIT = {
+  entry: 1,
+  pro:   4,
+  elite: 8,
+  goat:  16,
+};
 
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
 const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
@@ -65,59 +72,107 @@ function modelForPlan(plan) {
   return MODEL_ENTRY_PRO;
 }
 
-function base64UrlToBytes(b64url) {
-  let s = b64url.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = s.length % 4;
-  if (pad) s += "=".repeat(4 - pad);
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+/**
+ * Checks and increments daily query counter in KV.
+ * Key format: "rl:{userId}:{YYYY-MM-DD}" (UTC)
+ * TTL: 25 hours — self-expiring, no cleanup needed.
+ * If KV is not bound (dev mode), fails open with a warning.
+ */
+async function checkRateLimit(kv, userId, plan) {
+  if (!kv) {
+    console.warn("RATE_LIMIT_KV not bound — rate limiting disabled");
+    return { allowed: true, count: 0, limit: 99 };
+  }
+
+  const limit = DAILY_QUERY_LIMIT[plan] ?? DAILY_QUERY_LIMIT.entry;
+  const today = new Date().toISOString().slice(0, 10); // "2026-04-01"
+  const key   = `rl:${userId}:${today}`;
+
+  const raw     = await kv.get(key);
+  const current = raw ? JSON.parse(raw) : { count: 0 };
+
+  if (current.count >= limit) {
+    return { allowed: false, count: current.count, limit };
+  }
+
+  const next = { count: current.count + 1 };
+  await kv.put(key, JSON.stringify(next), { expirationTtl: 90000 }); // 25hr TTL
+  return { allowed: true, count: next.count, limit };
 }
 
 /**
- * Verifies Supabase HS256 JWT and returns plan from token claims (not from request body).
- * @param {string | null} authorization
- * @param {string} secret
- * @returns {Promise<{ plan: string | null, sub: string | null }>}
+ * Fire-and-forget usage log to Supabase query_log table.
+ * Never awaited — never blocks the response.
  */
-async function verifyJWT(authorization, secret) {
+function logUsage(env, userId, plan, model, tokenCount) {
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey  = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl || !serviceKey || !userId) return;
+
+  fetch(`${supabaseUrl}/rest/v1/query_log`, {
+    method: "POST",
+    headers: {
+      apikey:          serviceKey,
+      Authorization:   `Bearer ${serviceKey}`,
+      "Content-Type":  "application/json",
+      Prefer:          "return=minimal",
+    },
+    body: JSON.stringify({
+      user_id:    userId,
+      plan,
+      model,
+      token_count: tokenCount ?? 0,
+      queried_at:  new Date().toISOString(),
+    }),
+  }).catch(() => {}); // swallow — logging must never break a response
+}
+
+/**
+ * Validates the access token via Supabase Auth REST (same behavior as supabase.auth.getUser(jwt)).
+ * @param {Record<string, string | undefined>} env
+ * @param {string | null} authorization
+ * @returns {Promise<{ data: { plan: string | null, sub: string | null } | null, error: Error | null }>}
+ */
+async function getSessionUser(env, authorization) {
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const raw = authorization?.replace(/^Bearer\s+/i, "")?.trim();
+  if (!supabaseUrl || !serviceKey) {
+    return { data: null, error: new Error("Supabase not configured on the Worker") };
+  }
   if (!raw) {
-    throw new Error("Missing Authorization Bearer token");
+    return { data: null, error: new Error("Missing Authorization Bearer token") };
   }
-  const parts = raw.split(".");
-  if (parts.length !== 3) {
-    throw new Error("Invalid token");
+  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${raw}`,
+      apikey: serviceKey,
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { data: null, error: new Error("Unauthorized") };
   }
-  const [h, p, sigB64] = parts;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-  const signedBytes = new TextEncoder().encode(`${h}.${p}`);
-  const sig = base64UrlToBytes(sigB64);
-  const ok = await crypto.subtle.verify("HMAC", key, sig, signedBytes);
-  if (!ok) {
-    throw new Error("Invalid token signature");
+  const user =
+    body && typeof body === "object" && typeof body.id === "string"
+      ? body
+      : body && typeof body === "object" && body.user && typeof body.user.id === "string"
+        ? body.user
+        : null;
+  if (!user) {
+    return { data: null, error: new Error("Unauthorized") };
   }
-  const payloadJson = new TextDecoder().decode(base64UrlToBytes(p));
-  const payload = JSON.parse(payloadJson);
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.exp != null && now > payload.exp) {
-    throw new Error("Token expired");
-  }
-  const um = payload.user_metadata;
-  const am = payload.app_metadata;
+  const um = user.user_metadata;
+  const am = user.app_metadata;
   let plan = null;
   if (um && typeof um === "object" && typeof um.plan === "string") plan = um.plan;
   else if (am && typeof am === "object" && typeof am.plan === "string") plan = am.plan;
-  else if (typeof payload.plan === "string") plan = payload.plan;
-  const sub = typeof payload.sub === "string" ? payload.sub : null;
-  return { plan, sub };
+  const sub = typeof user.id === "string" ? user.id : null;
+  return { data: { plan, sub }, error: null };
+}
+
+function supabaseAuthReady(env) {
+  return Boolean((env.SUPABASE_URL ?? "").trim() && (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim());
 }
 
 function buildSystem(body) {
@@ -159,28 +214,18 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
  * @param {Record<string, string | undefined>} env
  */
 async function handleStripeSubscription(request, env) {
-  const jwtSecret = env.SUPABASE_JWT_SECRET ?? "";
-  if (!jwtSecret) {
-    return jsonResponse({ error: "SUPABASE_JWT_SECRET is not set on the Worker" }, 503);
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
   }
 
-  let userId;
-  try {
-    const v = await verifyJWT(request.headers.get("Authorization"), jwtSecret);
-    userId = v.sub;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unauthorized";
-    return jsonResponse({ error: msg }, 401);
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
-  if (!userId) {
-    return jsonResponse({ error: "Invalid token: missing sub" }, 401);
-  }
+  const userId = user.sub;
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceKey) {
-    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
-  }
 
   const pr = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id,pending_plan,pending_plan_date`,
@@ -253,22 +298,15 @@ async function handleStripeSubscription(request, env) {
  * POST body: { target_plan: "entry" | "pro" | "elite" | "goat" }
  */
 async function handleScheduleDowngrade(request, env) {
-  const jwtSecret = env.SUPABASE_JWT_SECRET ?? "";
-  if (!jwtSecret) {
-    return jsonResponse({ error: "SUPABASE_JWT_SECRET is not set on the Worker" }, 503);
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
   }
 
-  let userId;
-  try {
-    const v = await verifyJWT(request.headers.get("Authorization"), jwtSecret);
-    userId = v.sub;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unauthorized";
-    return jsonResponse({ error: msg }, 401);
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
   }
-  if (!userId) {
-    return jsonResponse({ error: "Invalid token: missing sub" }, 401);
-  }
+  const userId = user.sub;
 
   let body;
   try {
@@ -379,20 +417,38 @@ export default {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
 
-    const jwtSecret = env.SUPABASE_JWT_SECRET ?? "";
     let plan;
-    if (jwtSecret) {
-      try {
-        const v = await verifyJWT(request.headers.get("Authorization"), jwtSecret);
-        plan = v.plan;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Unauthorized";
-        return jsonResponse({ error: msg }, 401);
+    let userId = null;
+    if (supabaseAuthReady(env)) {
+      const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+      if (error || !user?.sub) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
       }
+      plan = user.plan;
+      userId = user.sub;
     } else {
-      // body.plan is trusted only when SUPABASE_JWT_SECRET is unset; set the secret to close this gap.
+      // body.plan is trusted only when Supabase auth is not configured on the Worker (dev only).
       plan = body.plan;
     }
+
+    // ── Rate limit ──────────────────────────────────────────────
+    const rl = await checkRateLimit(
+      env.RATE_LIMIT_KV,
+      userId,
+      plan ?? "entry"
+    );
+    if (!rl.allowed) {
+      return jsonResponse(
+        {
+          error: `Daily query limit reached (${rl.limit}/day on ${plan ?? "entry"} plan). Upgrade for more queries.`,
+          limit_reached: true,
+          limit:         rl.limit,
+          count:         rl.count,
+        },
+        429
+      );
+    }
+    // ────────────────────────────────────────────────────────────
 
     const model = modelForPlan(plan);
 
@@ -432,6 +488,19 @@ export default {
       : null;
     const text = block?.text ?? "";
 
-    return jsonResponse({ text, id: data.id, role: "assistant" });
+    const inputTokens  = data.usage?.input_tokens  ?? 0;
+    const outputTokens = data.usage?.output_tokens ?? 0;
+    logUsage(env, userId, plan, model, inputTokens + outputTokens);
+
+    return jsonResponse({
+      text,
+      id:   data.id,
+      role: "assistant",
+      usage: {
+        queries_today: rl.count,
+        queries_limit: rl.limit,
+        plan:          plan ?? "entry",
+      },
+    });
   },
 };

@@ -1,14 +1,38 @@
-# Deploy: npx wrangler deploy
-# Secrets: npx wrangler secret put ANTHROPIC_API_KEY
-# Optional (verify JWT; plan from token, not body): npx wrangler secret put SUPABASE_JWT_SECRET
-# Stripe: GET /stripe/subscription, POST /stripe/subscription/schedule-downgrade
-#   npx wrangler secret put STRIPE_SECRET_KEY
-#   npx wrangler secret put SUPABASE_URL
-#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# ── FIRST DEPLOY CHECKLIST ──────────────────────────────────────
+# 1. Set secrets (all required before deploy):
+#    npx wrangler secret put ANTHROPIC_API_KEY
+#    npx wrangler secret put SUPABASE_URL
+#    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#
+# 2. Optional (Stripe — set when ready):
+#    npx wrangler secret put STRIPE_SECRET_KEY
+#
+# 3. Deploy:
+#    npx wrangler deploy
+#
+# 4. Copy Worker URL from deploy output
+#    → add to .env.local:
+#      VITE_API_WORKER_URL=https://pepguideiq-api-proxy.YOUR-SUBDOMAIN.workers.dev
+#    → restart Vite: npm run dev
+#
+# 5. Run Supabase migration 003_query_log.sql
+#
+# 6. Test: submit a query in AI Advisor
+#    → network request must go to workers.dev (never api.anthropic.com)
+#    → response must include usage.queries_today
+#    → Entry user: 2nd query same day should return 429
+#
+# 7. Before go-live: change CORS from "*" to "https://pepguideiq.com"
+# ────────────────────────────────────────────────────────────────
 
 name = "pepguideiq-api-proxy"
 main = "workers/api-proxy.js"
 compatibility_date = "2024-12-01"
 
-# Uncomment to bind a custom domain / route in the Cloudflare dashboard instead.
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "8e4c0ecee5b54a81abf179e58624fd33"
+preview_id = "2239fd8dcc6f40fdaf903993ff5a1cd8"
+
+# Uncomment to bind a custom domain once pepguideiq.com is on Cloudflare:
 # routes = [{ pattern = "api.pepguideiq.com/*", zone_name = "pepguideiq.com" }]
