@@ -42,6 +42,36 @@ function primaryCategory(p) {
   return peptideCategories(p)[0] ?? "";
 }
 
+/** Route-of-administration filter keys; one active at a time, stacks with category + search. */
+const ROUTE_FILTERS = [
+  { id: "injectable", label: "💉 Injectable" },
+  { id: "intranasal", label: "👃 Intranasal" },
+  { id: "oral", label: "💊 Oral" },
+  { id: "topical", label: "🧴 Topical" },
+];
+
+function peptideMatchesRouteFilter(p, routeKey) {
+  if (!routeKey) return true;
+  const parts = Array.isArray(p.route) ? p.route.map((x) => String(x).toLowerCase()) : [];
+  const s = parts.join(" | ");
+  switch (routeKey) {
+    case "injectable":
+      return (
+        /subq|subcutaneous|intramuscular|injection|injectable|iv infusion|intravenous/.test(s) ||
+        /\biv\b/.test(s) ||
+        /(^|[\s,/])im([\s,/]|$)/.test(s)
+      );
+    case "intranasal":
+      return /intranasal|nasal|nasal spray/.test(s);
+    case "oral":
+      return /\boral\b|tablet|capsule/.test(s);
+    case "topical":
+      return /topical|cream|serum|transdermal/.test(s);
+    default:
+      return true;
+  }
+}
+
 const SORT_OPTIONS = [
   { value: "default", label: "Default" },
   { value: "az", label: "A → Z" },
@@ -55,6 +85,7 @@ export default function PepGuideIQ() {
   const [user, setUser]           = useState(null);
   const [activeTab, setActiveTab] = useState("library");
   const [selCat, setSelCat]       = useState("All");
+  const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("default");
   const [search, setSearch]       = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
@@ -135,14 +166,15 @@ export default function PepGuideIQ() {
     () =>
       PEPTIDES.filter((p) => {
         const mc = selCat === "All" || peptideCategories(p).includes(selCat);
+        const mr = peptideMatchesRouteFilter(p, routeFilter);
         const ms =
           !search ||
           p.name.toLowerCase().includes(search.toLowerCase()) ||
           p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())) ||
           p.aliases.some((a) => a.toLowerCase().includes(search.toLowerCase()));
-        return mc && ms;
+        return mc && mr && ms;
       }),
-    [selCat, search]
+    [selCat, routeFilter, search]
   );
 
   const sortedPeptides = useMemo(() => {
@@ -414,6 +446,32 @@ export default function PepGuideIQ() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 10,
+                    color: "#00d4aa",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    marginBottom: 6,
+                    textAlign: "left",
+                  }}
+                >
+                  // ROUTE
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {ROUTE_FILTERS.map((r) => (
+                    <button
+                      type="button"
+                      key={r.id}
+                      className={`cat-btn ${routeFilter === r.id ? "active" : ""}`}
+                      onClick={() => setRouteFilter((prev) => (prev === r.id ? null : r.id))}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14 }}>
@@ -761,7 +819,15 @@ export default function PepGuideIQ() {
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>
                 <button type="button" className="btn-teal" style={{ fontSize:12 }}
-                  onClick={() => { setSelPeptide(null); setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`); setActiveTab("guide"); }}>
+                  onClick={() => {
+                    if (!canAI) {
+                      openUpgradeModal();
+                      return;
+                    }
+                    setSelPeptide(null);
+                    setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
+                    setActiveTab("guide");
+                  }}>
                   Ask AI →
                 </button>
                 <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ fontSize:12 }}

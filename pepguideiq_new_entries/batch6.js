@@ -235,6 +235,7 @@ export const BATCH6 = [
     name: "RU58841",
     aliases: ["RU-58841", "PSK-3841", "Topical Anti-androgen"],
     category: ["Skin / Hair / Nails"],
+    route: ["topical"],
     mechanism:
       "Non-steroidal topical androgen receptor antagonist. Binds AR in scalp follicles with high affinity, blocking DHT-driven miniaturization. Minimal systemic absorption when applied correctly — acts locally without suppressing systemic androgen levels. Research compound — not approved.",
     halfLife: "Topical — local residence, minimal systemic",

@@ -181,6 +181,7 @@ export const BATCH1 = [
     name: "Orforglipron",
     aliases: ["LY3502970", "Oral GLP-1"],
     category: ["GLP / Metabolic"],
+    route: ["oral"],
     mechanism:
       "First oral non-peptide GLP-1 receptor agonist (Eli Lilly). Small molecule — no injection required. Phase 3 trials showing weight loss comparable to injectable GLP-1 agents. Eliminates cold chain storage, reconstitution, and injection entirely. Category-defining compound.",
     halfLife: "~12 hours (twice-daily or daily dosing)",

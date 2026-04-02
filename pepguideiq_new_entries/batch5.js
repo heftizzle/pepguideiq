@@ -4,6 +4,7 @@ export const BATCH5 = [
     name: "MK-677 (Ibutamoren)",
     aliases: ["Ibutamoren", "Nutrobal", "MK677"],
     category: ["SARMs", "GH Peptides"],
+    route: ["oral"],
     mechanism:
       "Oral ghrelin receptor agonist (not technically a SARM). Stimulates GH and IGF-1 secretion without affecting cortisol. Oral GH secretagogue — only option for oral GH axis stimulation. Significantly increases appetite. 24-hour half-life enables once-daily dosing.",
     halfLife: "~24 hours",
@@ -24,6 +25,7 @@ export const BATCH5 = [
     name: "RAD-140 (Testolone)",
     aliases: ["Testolone", "RAD140"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "Highly selective androgen receptor modulator. High anabolic:androgenic ratio (~90:1). Activates AR in muscle and bone with minimal prostate/DHT-pathway activity. Neuroprotective via AR activation in the brain — reduces amyloid-beta toxicity in preclinical models.",
     halfLife: "~60 hours",
@@ -44,6 +46,7 @@ export const BATCH5 = [
     name: "GW-501516 (Cardarine)",
     aliases: ["Cardarine", "GW501516", "Endurobol"],
     category: ["SARMs", "GLP / Metabolic"],
+    route: ["oral"],
     mechanism:
       "PPARδ (Peroxisome proliferator-activated receptor delta) agonist. Not technically a SARM — activates fatty acid oxidation pathways, dramatically increases endurance and exercise capacity, and shifts metabolism toward fat burning. No androgen receptor activity.",
     halfLife: "~16-24 hours",
@@ -65,6 +68,7 @@ export const BATCH5 = [
     name: "YK-11",
     aliases: ["YK11"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "Steroidal SARM and myostatin inhibitor. Binds AR and also inhibits myostatin expression in muscle cells via Follistatin upregulation. Dual mechanism: anabolic AR activation + myostatin suppression. One of the most potent SARMs by lean mass impact.",
     halfLife: "~6-10 hours",
@@ -85,6 +89,7 @@ export const BATCH5 = [
     name: "S4 (Andarine)",
     aliases: ["Andarine", "GTx-007"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "Partial androgen receptor agonist. Strong affinity for muscle and bone AR. Notable for hardening and vascularity effects. Yellow vision tint (temporary) is dose-dependent and the primary side effect — caused by binding to ocular AR.",
     halfLife: "~3-4 hours",
@@ -100,6 +105,7 @@ export const BATCH5 = [
     name: "S-23",
     aliases: ["S23"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "High-affinity, non-steroidal SARM. Among the most potent by AR binding affinity. Strong anabolic effects in muscle and bone. Significantly suppresses FSH/LH — studied as a male contraceptive. Dramatic lean mass increases in research models.",
     halfLife: "~12 hours",
@@ -120,6 +126,7 @@ export const BATCH5 = [
     name: "RAD-150 (TLB-150)",
     aliases: ["TLB-150", "Esterified RAD-140"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "Benzoate ester prodrug of RAD-140. Esterification extends half-life and provides more stable blood levels than RAD-140. Cleaves in plasma to deliver RAD-140. Same AR selectivity and anabolic:androgenic ratio as parent compound with smoother pharmacokinetic profile.",
     halfLife: "~48-72 hours (ester prolongs vs ~60hr RAD-140)",
@@ -137,6 +144,7 @@ export const BATCH5 = [
     name: "SR-9011",
     aliases: ["Rev-Erb Agonist", "SR9011"],
     category: ["SARMs", "Longevity"],
+    route: ["oral"],
     mechanism:
       "Rev-Erb α/β nuclear receptor agonist. Modulates circadian rhythm machinery at the molecular level. Increases metabolic rate, reduces fat mass, improves endurance, and normalizes disrupted circadian gene expression. SLU-PP-332 targets the same receptor. Not an androgen receptor compound — different mechanism than other SARMs.",
     halfLife: "~4 hours (short — split dosing)",
@@ -153,6 +161,7 @@ export const BATCH5 = [
     name: "AC-262 (Accadrine)",
     aliases: ["AC-262536", "Accadrine"],
     category: ["SARMs"],
+    route: ["oral"],
     mechanism:
       "Partial androgen receptor agonist. Moderate selectivity — weaker than RAD-140 or S-23 but cleaner side effect profile. Research focus on muscle and bone with reduced prostate stimulation. More conservative entry-level SARM profile.",
     halfLife: "~6 hours",
@@ -168,6 +177,7 @@ export const BATCH5 = [
     name: "SLU-PP-332",
     aliases: ["SLU PP 332", "Exercise Mimetic"],
     category: ["SARMs", "GLP / Metabolic"],
+    route: ["oral"],
     mechanism:
       "Pan-ERR (Estrogen-Related Receptor) agonist. Activates ERRα, ERRβ, and ERRγ — transcription factors regulating mitochondrial biogenesis and oxidative metabolism. Animal studies show dramatic endurance improvement (running distance +70%), fat loss, and cardiac protection. True 'exercise in a pill' mechanism.",
     halfLife: "Unknown — short likely",
