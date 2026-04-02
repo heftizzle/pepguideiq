@@ -49,7 +49,7 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", var
           background: "#0b0f17",
           border: "1px solid #1a2840",
           borderRadius: 12,
-          padding: 24,
+          padding: 28,
           maxWidth,
           width: "100%",
           maxHeight: "90vh",

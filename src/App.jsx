@@ -8,8 +8,11 @@ import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey } from "./components/SavedStackEntryRow.jsx";
 import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
+import { StackPhotoUpload } from "./components/StackPhotoUpload.jsx";
+import { VialTracker } from "./components/VialTracker.jsx";
 import { formatPlan, getNextTierId, getTier, hasAccess, TIER_RANK } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
+import { resolveStability } from "./lib/catalogStability.js";
 import {
   getCurrentUser,
   getSessionAccessToken,
@@ -170,6 +173,8 @@ export default function PepGuideIQ() {
   const savedStackLimit = getTier(user?.plan ?? "entry").stackLimit;
   const canAddToStack = myStack.length < savedStackLimit;
   const canAI = hasAccess(user?.plan, "pro");
+  const canUploadStackPhoto = hasAccess(user?.plan ?? "entry", "pro");
+  const canVialTracker = hasAccess(user?.plan ?? "entry", "pro");
 
   const openUpgradeModal = () => {
     setUpgradeFocusTier(getNextTierId(user?.plan));
@@ -310,7 +315,7 @@ export default function PepGuideIQ() {
           style={{
             minHeight: "100vh",
             background: "#07090e",
-            color: "#243040",
+            color: "#a0a0b0",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -355,7 +360,7 @@ export default function PepGuideIQ() {
                     {formatPlan(user.plan)}
                   </span>
                   {user.plan === "goat" ? (
-                    <button type="button" disabled className="btn-teal" style={{ fontSize:10,padding:"4px 10px",opacity:0.45,cursor:"not-allowed",borderColor:"#243040",color:"#4a6080",background:"#0b0f17" }} title="You are on the highest plan">
+                    <button type="button" disabled className="btn-teal" style={{ fontSize:10,padding:"4px 10px",opacity:0.45,cursor:"not-allowed",borderColor:"#243040",color:"#a0a0b0",background:"#0b0f17" }} title="You are on the highest plan">
                       Max Tier
                     </button>
                   ) : (
@@ -363,7 +368,7 @@ export default function PepGuideIQ() {
                       Upgrade
                     </button>
                   )}
-                  <span style={{ fontSize:11,color:"#243040",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
+                  <span style={{ fontSize:11,color:"#a0a0b0",fontFamily:"'JetBrains Mono',monospace" }}>{user.name}</span>
                   <button type="button" className="btn-red" style={{ fontSize:10,padding:"3px 8px" }} onClick={() => void handleSignOut()}>↩</button>
                 </div>
               </div>
@@ -411,7 +416,7 @@ export default function PepGuideIQ() {
                   </div>
                 </div>
               </div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10 }}>
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14 }}>
                 {sortedPeptides.map((p) => {
                   const cat0 = primaryCategory(p);
                   const cc = getCatColor(cat0);
@@ -471,7 +476,7 @@ export default function PepGuideIQ() {
                                 )}
                             </div>
                           )}
-                          {p.aliases[0] && <div className="mono" style={{ fontSize:9,color:"#657d99",marginTop:1 }}>{p.aliases[0]}</div>}
+                          {p.aliases[0] && <div className="mono" style={{ fontSize:9,color:"#a0a0b0",marginTop:1 }}>{p.aliases[0]}</div>}
                         </div>
                         <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize:9 }}>{cat0}</span>
                       </div>
@@ -479,7 +484,7 @@ export default function PepGuideIQ() {
                         {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
                       </div>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                        <div className="mono" style={{ fontSize:10,color:"#2e4055" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
+                        <div className="mono" style={{ fontSize:10,color:"#a0a0b0" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
                         <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ padding:"5px 10px",fontSize:11 }}
                           onClick={(e) => { e.stopPropagation(); if (!inStack) openAdd(p); }}>
                           {inStack ? "✓ Saved" : "+ Saved Stack"}
@@ -488,37 +493,51 @@ export default function PepGuideIQ() {
                     </div>
                   );
                 })}
-                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"#243040",fontSize:12,padding:"40px 0",gridColumn:"1/-1" }}>// No results</div>}
+                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"#a0a0b0",fontSize:12,padding:"40px 0",gridColumn:"1/-1" }}>// No results</div>}
               </div>
             </div>
           )}
 
           {activeTab === "stack" && (
             <div>
-              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:8 }}>
-                <div>
-                  <div
-                    className="brand"
-                    style={{ fontSize:17,fontWeight:700 }}
-                    title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
-                  >
-                    SAVED STACKS
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8 }}>
+                  <div>
+                    <div
+                      className="brand"
+                      style={{ fontSize:17,fontWeight:700 }}
+                      title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
+                    >
+                      SAVED STACKS
+                    </div>
+                    <div
+                      className="mono"
+                      style={{ fontSize:10,color:"#a0a0b0",marginTop:2,maxWidth:520 }}
+                      title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
+                    >
+                      {myStack.length} peptide{myStack.length!==1?"s":""} saved
+                      {` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`}
+                    </div>
                   </div>
-                  <div
-                    className="mono"
-                    style={{ fontSize:10,color:"#243040",marginTop:2,maxWidth:520 }}
-                    title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
-                  >
-                    {myStack.length} peptide{myStack.length!==1?"s":""} saved
-                    {` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`}
-                  </div>
+                  <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
                 </div>
-                <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
+                <div style={{ marginTop: 14 }}>
+                  <StackPhotoUpload
+                    stackPhotoUrl={user?.stackPhotoUrl ?? null}
+                    canUpload={canUploadStackPhoto}
+                    workerConfigured={isApiWorkerConfigured()}
+                    onUpgrade={openUpgradeModal}
+                    onUploaded={async () => {
+                      const u = await getCurrentUser();
+                      if (u) setUser(u);
+                    }}
+                  />
+                </div>
               </div>
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed #14202e",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
                   <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>⬡</div>
-                  <div className="mono" style={{ color:"#243040",fontSize:12 }}>// No Saved Stacks yet. Add compounds from the Library.</div>
+                  <div className="mono" style={{ color:"#a0a0b0",fontSize:12 }}>// No Saved Stacks yet. Add compounds from the Library.</div>
                 </div>
               ) : (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
@@ -526,16 +545,34 @@ export default function PepGuideIQ() {
                     <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
                     <SavedStackNameInput initialName={stackName} onCommit={setStackName} />
                   </div>
-                  {myStack.map((p) => (
-                    <SavedStackEntryRow
-                      key={getStackRowListKey(p)}
-                      item={p}
-                      catColor={getCatColor(primaryCategory(p))}
-                      catLabel={primaryCategory(p)}
-                      onUpdate={updateStackItem}
-                      onRemove={removeFromStack}
-                    />
-                  ))}
+                  {myStack.map((p) => {
+                    const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
+                    const stab = resolveStability(catalogPeptide ?? p);
+                    return (
+                      <div key={getStackRowListKey(p)} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        <SavedStackEntryRow
+                          item={p}
+                          catColor={getCatColor(primaryCategory(p))}
+                          catLabel={primaryCategory(p)}
+                          onUpdate={updateStackItem}
+                          onRemove={removeFromStack}
+                        />
+                        {stab.stabilityDays != null && user?.id && (
+                          <VialTracker
+                            userId={user.id}
+                            peptideId={p.id}
+                            catalogEntry={{
+                              name: p.name,
+                              stabilityDays: stab.stabilityDays,
+                              stabilityNote: stab.stabilityNote,
+                            }}
+                            canUse={canVialTracker}
+                            onUpgrade={openUpgradeModal}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
                     <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
@@ -572,7 +609,7 @@ export default function PepGuideIQ() {
           {activeTab === "guide" && (
             <div style={{ display:"flex",gap:16,height:"calc(100vh - 170px)",flexDirection:"row" }}>
               <div style={{ width:190,flexShrink:0,overflowY:"auto",display:"flex",flexDirection:"column",gap:5 }} className="guide-sidebar">
-                <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#243040" }}>(optional)</span></div>
+                <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#a0a0b0" }}>(optional)</span></div>
                 {GOALS.map((g) => (
                   <button type="button" key={g} className={`goal-chip ${goals.includes(g)?"on":""}`}
                     onClick={() => setGoals((prev) => prev.includes(g) ? prev.filter((x)=>x!==g) : [...prev,g])}>
@@ -590,10 +627,10 @@ export default function PepGuideIQ() {
               <div style={{ flex:1,display:"flex",flexDirection:"column",background:"#0b0f17",border:"1px solid #14202e",borderRadius:10,overflow:"hidden",minWidth:0 }}>
                 <div style={{ padding:"12px 16px",borderBottom:"1px solid #0e1822",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap" }}>
                   <div className={aiLoading?"pulse":""} style={{ width:7,height:7,borderRadius:"50%",background:aiLoading?"#f59e0b":"#00d4aa",flexShrink:0 }} />
-                  <div className="brand" style={{ fontSize:12,color:"#8fa5bf",letterSpacing:".06em" }}>
+                  <div className="brand" style={{ fontSize:12,color:"#a0a0b0",letterSpacing:".06em" }}>
                     <span style={{ color:"#00d4aa" }}>Pep</span>GuideIQ INTELLIGENCE
                   </div>
-                  {goals.length > 0 && <span className="mono" style={{ fontSize:9,color:"#243040" }}>{goals.length} goal{goals.length>1?"s":""} active</span>}
+                  {goals.length > 0 && <span className="mono" style={{ fontSize:9,color:"#a0a0b0" }}>{goals.length} goal{goals.length>1?"s":""} active</span>}
                   {!canAI && <span className="pill" style={{ background:"#f59e0b15",color:"#f59e0b",border:"1px solid #f59e0b30",fontSize:9,marginLeft:"auto" }}>Upgrade to unlock AI</span>}
                 </div>
 
@@ -601,7 +638,7 @@ export default function PepGuideIQ() {
                   {aiMsgs.length === 0 && (
                     <div style={{ textAlign:"center",padding:"32px 16px" }}>
                       <div style={{ fontSize:28,opacity:.2,marginBottom:10 }}>⬡</div>
-                      <div className="mono" style={{ color:"#243040",fontSize:11,marginBottom:18 }}>
+                      <div className="mono" style={{ color:"#a0a0b0",fontSize:11,marginBottom:18 }}>
                         // Optional: select goals above, then ask anything.
                       </div>
                       <div style={{ display:"flex",flexDirection:"column",gap:7,maxWidth:360,margin:"0 auto" }}>
@@ -691,14 +728,14 @@ export default function PepGuideIQ() {
                       Variant of: {getVariantParent(p)?.name ?? p.variantOf}
                     </div>
                   )}
-                  <div className="mono" style={{ fontSize:10,color:"#243040",marginTop:3 }}>{p.aliases.join(" · ")}</div>
+                  <div className="mono" style={{ fontSize:10,color:"#a0a0b0",marginTop:3 }}>{p.aliases.join(" · ")}</div>
                 </div>
                 <div style={{ display:"flex",gap:8,alignItems:"center" }}>
                   <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35` }}>{pCat}</span>
                   <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
-              <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize:12,color:"#4a6080",lineHeight:1.6 }}>{p.mechanism}</div>
+              <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize:12,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
               {[["Typical Dose",p.typicalDose],["Start Dose",p.startDose],["Titration",p.titrationNote],["Half-life",p.halfLife],["Route",p.route.join(", ")],["Cycle",p.cycle],["Storage",p.storage],["Reconstitution",p.reconstitution]].map(([l,v]) => (
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
@@ -718,8 +755,8 @@ export default function PepGuideIQ() {
               )}
               {p.notes && (
                 <div style={{ marginTop:12,background:"#07090e",border:"1px solid #0e1822",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize:8,color:"#243040",marginBottom:5,letterSpacing:".15em" }}>// NOTES</div>
-                  <div style={{ fontSize:11,color:"#4a6080",lineHeight:1.65 }}>{p.notes}</div>
+                  <div className="mono" style={{ fontSize:9,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>// NOTES</div>
+                  <div style={{ fontSize:11,color:"#a0a0b0",lineHeight:1.65 }}>{p.notes}</div>
                 </div>
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>

@@ -262,7 +262,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
         <div>
           <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Choose your plan</div>
-          <div className="mono" style={{ fontSize: 10, color: "#243040", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 10, color: "#a0a0b0", marginTop: 4 }}>
             Compare tiers — upgrade anytime. Cancel anytime.
           </div>
         </div>
@@ -371,7 +371,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         })}
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 10, color: "#243040", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
+      <div style={{ marginTop: 16, fontSize: 10, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
         Subscriptions billed monthly. Cancel anytime.
       </div>
 

@@ -15,7 +15,14 @@
 #      VITE_API_WORKER_URL=https://pepguideiq-api-proxy.YOUR-SUBDOMAIN.workers.dev
 #    → restart Vite: npm run dev
 #
-# 5. Run Supabase migration 003_query_log.sql
+# 5. Run Supabase migrations (e.g. 003_query_log.sql, 004_profiles_stack_photo_url.sql)
+#
+# Stack photos (R2):
+# - Create bucket "stack-photos" in Cloudflare R2; enable public access (r2.dev or custom domain).
+# - [[r2_buckets]] below binds the bucket to the Worker.
+# - Set Worker var (dashboard or wrangler.toml [vars]):
+#     R2_PUBLIC_BASE_URL = https://pub-XXXX.r2.dev
+#   (no trailing slash; must match how objects are exposed publicly)
 #
 # 6. Test: submit a query in AI Guide
 #    → network request must go to workers.dev (never api.anthropic.com)
@@ -33,6 +40,15 @@ compatibility_date = "2024-12-01"
 binding = "RATE_LIMIT_KV"
 id = "8e4c0ecee5b54a81abf179e58624fd33"
 preview_id = "2239fd8dcc6f40fdaf903993ff5a1cd8"
+
+[[r2_buckets]]
+binding = "STACK_PHOTOS"
+bucket_name = "stack-photos"
+
+# Public base URL for stack-photos objects (required for POST /upload-stack-photo).
+# Example after enabling public access on the bucket: https://pub-xxxxx.r2.dev
+# [vars]
+# R2_PUBLIC_BASE_URL = "https://pub-xxxxx.r2.dev"
 
 # Uncomment to bind a custom domain once pepguideiq.com is on Cloudflare:
 # routes = [{ pattern = "api.pepguideiq.com/*", zone_name = "pepguideiq.com" }]

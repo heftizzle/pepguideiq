@@ -2,6 +2,7 @@ import { TIERS, formatPrice } from "../lib/tiers.js";
 import { NEW_PEPTIDES } from "../../pepguideiq_new_entries/index.js";
 import { normalizeNewCatalogEntry } from "../lib/normalizeNewCatalogEntry.js";
 import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
+import { resolveStability } from "../lib/catalogStability.js";
 
 /**
  * Peptide catalog row schema (merged `PEPTIDES`):
@@ -13,6 +14,7 @@ import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
  * - variantOf?: string — optional parent peptide id; UI shows “Variant of: [parent name]”.
  * - variantNote?: string — optional difference vs parent; card shows as tooltip on the variant line.
  * - tier?: string — optional entitlements / catalog tier hint.
+ * - stabilityDays?: number | null — reconstituted vial fridge stability (days); null = no vial tracking (see catalogStability.js).
  */
 
 /** Strip vendor URLs, brand sourcing, prices from text fields (all rows). */
@@ -135,7 +137,14 @@ const PEPTIDES_CORE = [
 const coreIds = new Set(PEPTIDES_CORE.map((p) => p.id));
 const mergedNew = NEW_PEPTIDES.filter((raw) => !coreIds.has(raw.id)).map((raw) => sanitizeEntryText(normalizeNewCatalogEntry(raw)));
 
-export const PEPTIDES = [...PEPTIDES_CORE.map(sanitizeEntryText), ...mergedNew];
+export const PEPTIDES = [...PEPTIDES_CORE.map(sanitizeEntryText), ...mergedNew].map((p) => {
+  const stab = resolveStability(p);
+  return {
+    ...p,
+    stabilityDays: Object.prototype.hasOwnProperty.call(p, "stabilityDays") ? p.stabilityDays : stab.stabilityDays,
+    stabilityNote: Object.prototype.hasOwnProperty.call(p, "stabilityNote") ? p.stabilityNote : stab.stabilityNote,
+  };
+});
 
 export const CATEGORIES = [
   "All",

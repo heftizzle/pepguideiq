@@ -103,7 +103,7 @@ export function AuthScreen({ onAuth }) {
           className="mono"
           style={{
             fontSize: 9,
-            color: "#243040",
+            color: "#a0a0b0",
             letterSpacing: ".2em",
             marginBottom: 28,
             textAlign: "center",
@@ -214,7 +214,7 @@ export function AuthScreen({ onAuth }) {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16, fontSize: 11, color: "#243040" }}>
+        <div style={{ marginTop: 16, fontSize: 11, color: "#a0a0b0" }}>
           Subscriptions managed via App Store / Google Play on mobile.
         </div>
       </div>
@@ -235,7 +235,7 @@ export function AuthScreen({ onAuth }) {
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Logo />
-          <div className="mono" style={{ fontSize: 9, color: "#243040", letterSpacing: ".18em", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 9, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
             {mode === "login" ? "SIGN IN TO YOUR ACCOUNT" : "CREATE YOUR ACCOUNT"}
           </div>
         </div>
@@ -298,7 +298,7 @@ export function AuthScreen({ onAuth }) {
             {busy ? "…" : mode === "login" ? "Sign In" : "Continue"}
           </button>
 
-          <div style={{ marginTop: 16, textAlign: "center", fontSize: 11, color: "#243040" }}>
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: 11, color: "#a0a0b0" }}>
             {mode === "login" ? (
               <>
                 Don&apos;t have an account?{" "}

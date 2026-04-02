@@ -19,6 +19,11 @@
  *   GET  /stripe/subscription — subscription fields from Stripe + pending_plan from Supabase
  *   POST /stripe/subscription/schedule-downgrade — body { target_plan } — sets pending_plan + pending_plan_date
  *   Secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *
+ * Stack photos (R2 + profiles.stack_photo_url):
+ *   POST /upload-stack-photo — multipart field "file" (jpeg/png/webp, max 5MB). Pro+ only (plan from public.profiles).
+ *   Binding: [[r2_buckets]] STACK_PHOTOS → bucket stack-photos
+ *   Var: R2_PUBLIC_BASE_URL (no trailing slash), e.g. https://pub-xxxxx.r2.dev
  */
 
 const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
@@ -33,6 +38,13 @@ const DAILY_QUERY_LIMIT = {
 
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
 const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
+
+const STACK_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const STACK_PHOTO_TYPES = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -173,6 +185,32 @@ async function getSessionUser(env, authorization) {
 
 function supabaseAuthReady(env) {
   return Boolean((env.SUPABASE_URL ?? "").trim() && (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim());
+}
+
+function normalizePlanTier(p) {
+  const x = typeof p === "string" ? p.trim().toLowerCase() : "";
+  return VALID_PLAN_TIERS.has(x) ? x : "entry";
+}
+
+/**
+ * Effective plan from `public.profiles` (billing-aligned), not JWT metadata alone.
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ */
+async function fetchProfilePlan(supabaseUrl, serviceKey, userId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=plan`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  return normalizePlanTier(row?.plan);
 }
 
 function buildSystem(body) {
@@ -385,6 +423,91 @@ async function handleScheduleDowngrade(request, env) {
   return jsonResponse({ ok: true });
 }
 
+/**
+ * POST multipart/form-data; field name "file".
+ */
+async function handleUploadStackPhoto(request, env) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+  }
+
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return jsonResponse({ error: "R2 bucket STACK_PHOTOS is not bound on the Worker" }, 503);
+  }
+
+  const publicBase = (env.R2_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
+  if (!publicBase) {
+    return jsonResponse({ error: "R2_PUBLIC_BASE_URL is not set on the Worker" }, 503);
+  }
+
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+  const userId = sessionUser.sub;
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "Pro plan or higher required to upload stack photos" }, 403);
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return jsonResponse({ error: "Invalid multipart body" }, 400);
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+    return jsonResponse({ error: 'Expected multipart field "file"' }, 400);
+  }
+
+  const size = typeof file.size === "number" ? file.size : 0;
+  if (size <= 0 || size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400);
+  }
+
+  const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
+  const ext = STACK_PHOTO_TYPES.get(mime);
+  if (!ext) {
+    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400);
+  }
+
+  const key = `${userId}/stack.${ext}`;
+  let bytes;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return jsonResponse({ error: "Could not read file" }, 400);
+  }
+  if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400);
+  }
+
+  try {
+    await bucket.put(key, bytes, {
+      httpMetadata: { contentType: mime },
+    });
+  } catch (e) {
+    console.error("R2 put failed", e);
+    return jsonResponse({ error: "Storage upload failed" }, 502);
+  }
+
+  const publicUrl = `${publicBase}/${key}`;
+  const patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
+    stack_photo_url: publicUrl,
+  });
+  if (!patched) {
+    return jsonResponse({ error: "Failed to update profile URL" }, 502);
+  }
+
+  return jsonResponse({ url: publicUrl });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -399,6 +522,10 @@ export default {
 
     if (url.pathname === "/stripe/subscription/schedule-downgrade" && request.method === "POST") {
       return handleScheduleDowngrade(request, env);
+    }
+
+    if (url.pathname === "/upload-stack-photo" && request.method === "POST") {
+      return handleUploadStackPhoto(request, env);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {

@@ -14,7 +14,7 @@ export function AddToStackForm({ peptide, onCancel, onSave }) {
   return (
     <>
       <div className="brand" style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>Add to Saved Stack</div>
-      <div className="mono" style={{ fontSize: 10, color: "#243040", marginBottom: 18 }}>{peptide.name}</div>
+      <div className="mono" style={{ fontSize: 10, color: "#a0a0b0", marginBottom: 18 }}>{peptide.name}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>DOSE</div>

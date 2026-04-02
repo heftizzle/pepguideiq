@@ -26,7 +26,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 6 }}>
           <div>
             <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-            <div className="mono" style={{ fontSize: 9, color: "#243040", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
+            <div className="mono" style={{ fontSize: 9, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
           </div>
           <button type="button" className="btn-red" onClick={() => onRemove(rowKey)}>✕</button>
         </div>

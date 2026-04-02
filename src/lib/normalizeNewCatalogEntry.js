@@ -1,4 +1,5 @@
 import { sanitizeVendorRefs, neutralSourcingFallback } from "./catalogVendorSanitize.js";
+import { resolveStability, resolveStabilityDays } from "./catalogStability.js";
 
 function formatReconstitution(r) {
   if (r == null) return "Per supplier / protocol";
@@ -79,14 +80,17 @@ export function normalizeNewCatalogEntry(raw) {
   const dosing = formatDosing(raw.dosingRange);
   const warnings = Array.isArray(raw.warnings) ? raw.warnings.map((w) => sanitizeVendorRefs(String(w))) : [];
   const noteParts = [];
+  if (raw.notes != null && String(raw.notes).trim()) noteParts.push(sanitizeVendorRefs(String(raw.notes)));
   if (raw.sourcingNotes) noteParts.push(neutralSourcingFallback(String(raw.sourcingNotes)));
   if (raw.variantNote) noteParts.push(sanitizeVendorRefs(String(raw.variantNote)));
-  const notes = noteParts.filter(Boolean).join(" ");
+  const notesJoined = noteParts.filter(Boolean).join(" ");
 
-  const benefits = tags
+  const benefitsFromTags = tags
     .slice(0, 8)
     .map(tagToBenefitPhrase)
     .filter(Boolean);
+  const benefitsExplicit = Array.isArray(raw.benefits) ? raw.benefits.map((b) => sanitizeVendorRefs(String(b))) : [];
+  const benefits = benefitsExplicit.length ? benefitsExplicit : benefitsFromTags;
 
   const cycle =
     raw.cycle != null
@@ -95,13 +99,38 @@ export function normalizeNewCatalogEntry(raw) {
         ? `Per ${dosing.titrationNote}`
         : "Per protocol / research context";
 
-  const routes = inferRoute(raw);
+  const routes =
+    Array.isArray(raw.route) && raw.route.length > 0
+      ? raw.route.map((r) => String(r))
+      : inferRoute(raw);
   const oralOnly = routes.length === 1 && routes[0] === "oral";
-  const storageDefault = oralOnly
-    ? "Room temperature typical for oral solids unless supplier specifies otherwise"
-    : "Refrigerate or freeze lyophilized material; follow supplier COA";
+  const topicalOnly = routes.length === 1 && routes[0] === "topical";
+  const storageDefault = topicalOnly
+    ? "Room temperature; protect from light per formulation"
+    : oralOnly
+      ? "Room temperature typical for oral solids unless supplier specifies otherwise"
+      : "Refrigerate or freeze lyophilized material; follow supplier COA";
 
-  return {
+  const typicalDose =
+    raw.typicalDose != null && String(raw.typicalDose).trim() ? String(raw.typicalDose) : dosing.typicalDose;
+  const startDose =
+    raw.startDose != null && String(raw.startDose).trim() ? String(raw.startDose) : dosing.startDose;
+  const titrationNote =
+    raw.titrationNote != null && String(raw.titrationNote).trim()
+      ? String(raw.titrationNote)
+      : dosing.titrationNote;
+
+  const sideEffectsExplicit = Array.isArray(raw.sideEffects)
+    ? raw.sideEffects.map((s) => sanitizeVendorRefs(String(s)))
+    : [];
+  const sideEffects = sideEffectsExplicit.length ? sideEffectsExplicit : warnings.length ? warnings : ["Use under qualified oversight"];
+
+  const reconstitution =
+    typeof raw.reconstitution === "string"
+      ? sanitizeVendorRefs(raw.reconstitution)
+      : formatReconstitution(raw.reconstitution);
+
+  const entry = {
     id: String(raw.id),
     name: String(raw.name),
     category: primary,
@@ -109,20 +138,25 @@ export function normalizeNewCatalogEntry(raw) {
     aliases: Array.isArray(raw.aliases) ? raw.aliases.map(String) : [],
     mechanism: sanitizeVendorRefs(String(raw.mechanism ?? "")),
     halfLife: String(raw.halfLife ?? ""),
-    route: inferRoute(raw),
-    typicalDose: dosing.typicalDose,
-    startDose: dosing.startDose,
-    titrationNote: dosing.titrationNote,
+    route: routes,
+    typicalDose,
+    startDose,
+    titrationNote,
     benefits: benefits.length ? benefits : ["Research / protocol context — see mechanism"],
-    sideEffects: warnings.length ? warnings : ["Use under qualified oversight"],
+    sideEffects,
     stacksWith: Array.isArray(raw.stacksWith) ? raw.stacksWith.map(String) : [],
     cycle,
     storage: raw.storage != null ? sanitizeVendorRefs(String(raw.storage)) : storageDefault,
-    reconstitution: formatReconstitution(raw.reconstitution),
-    notes: notes || neutralSourcingFallback(raw.sourcingNotes),
+    reconstitution,
+    notes: notesJoined || neutralSourcingFallback(raw.sourcingNotes),
     tags,
     ...(raw.variantOf ? { variantOf: String(raw.variantOf) } : {}),
     ...(raw.variantNote ? { variantNote: sanitizeVendorRefs(String(raw.variantNote)) } : {}),
     ...(raw.tier != null ? { tier: String(raw.tier) } : {}),
   };
+  const merged = { ...entry };
+  if (Object.prototype.hasOwnProperty.call(raw, "stabilityDays")) merged.stabilityDays = raw.stabilityDays;
+  if (Object.prototype.hasOwnProperty.call(raw, "stabilityNote")) merged.stabilityNote = raw.stabilityNote;
+  const stab = resolveStability(merged);
+  return { ...entry, stabilityDays: stab.stabilityDays, stabilityNote: stab.stabilityNote };
 }
