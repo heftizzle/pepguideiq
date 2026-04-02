@@ -6,6 +6,7 @@
 #
 # 2. Optional (Stripe — set when ready):
 #    npx wrangler secret put STRIPE_SECRET_KEY
+#    npx wrangler secret put STRIPE_WEBHOOK_SECRET
 #
 # 3. Deploy:
 #    npx wrangler deploy
@@ -15,26 +16,30 @@
 #      VITE_API_WORKER_URL=https://pepguideiq-api-proxy.YOUR-SUBDOMAIN.workers.dev
 #    → restart Vite: npm run dev
 #
-# 5. Run Supabase migrations (e.g. 003_query_log.sql, 004_profiles_stack_photo_url.sql)
+# 5. Run Supabase migrations through 008_plan_and_stack_photo_security.sql (plan enforcement + stack_photo_r2_key).
 #
 # Stack photos (R2):
-# - Create bucket "stack-photos" in Cloudflare R2; enable public access (r2.dev or custom domain).
-# - [[r2_buckets]] below binds the bucket to the Worker.
-# - Set Worker var (dashboard or wrangler.toml [vars]):
-#     R2_PUBLIC_BASE_URL = https://pub-XXXX.r2.dev
-#   (no trailing slash; must match how objects are exposed publicly)
+# - Create private bucket "stack-photos"; bind via [[r2_buckets]] below (no public r2.dev required).
+# - Users download via Worker GET /stack-photo (Authorization: Bearer).
 #
-# 6. Test: submit a query in AI Guide
+# 6. Stripe: Dashboard → Webhook URL {worker}/stripe/webhook with signing secret as STRIPE_WEBHOOK_SECRET.
+#
+# 7. Test: submit a query in AI Guide
 #    → network request must go to workers.dev (never api.anthropic.com)
 #    → response must include usage.queries_today
 #    → Entry user: 2nd query same day should return 429
 #
-# 7. Before go-live: change CORS from "*" to "https://pepguideiq.com"
+# 8. Production: uncomment [vars] ENVIRONMENT + ALLOWED_ORIGIN (exact site origin, not "*")
 # ────────────────────────────────────────────────────────────────
 
 name = "pepguideiq-api-proxy"
 main = "workers/api-proxy.js"
 compatibility_date = "2024-12-01"
+
+# Production: set ENVIRONMENT = "production" and ALLOWED_ORIGIN = "https://your-domain.com"
+# [vars]
+# ENVIRONMENT = "production"
+# ALLOWED_ORIGIN = "https://pepguideiq.com"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
@@ -44,11 +49,6 @@ preview_id = "2239fd8dcc6f40fdaf903993ff5a1cd8"
 [[r2_buckets]]
 binding = "STACK_PHOTOS"
 bucket_name = "stack-photos"
-
-# Public base URL for stack-photos objects (required for POST /upload-stack-photo).
-# Example after enabling public access on the bucket: https://pub-xxxxx.r2.dev
-# [vars]
-# R2_PUBLIC_BASE_URL = "https://pub-xxxxx.r2.dev"
 
 # Uncomment to bind a custom domain once pepguideiq.com is on Cloudflare:
 # routes = [{ pattern = "api.pepguideiq.com/*", zone_name = "pepguideiq.com" }]

@@ -67,7 +67,7 @@ export async function signOut() {
 
 /**
  * Profile row from `public.profiles` (see supabase/migrations/001_initial_schema.sql).
- * @returns {Promise<{ id: string, email: string, name: string, plan: string, stackPhotoUrl: string | null } | null>}
+ * @returns {Promise<{ id: string, email: string, name: string, plan: string, stackPhotoUrl: string | null, stackPhotoKey: string | null } | null>}
  */
 /** Access token for Worker JWT verification (Authorization: Bearer …). */
 export async function getSessionAccessToken() {
@@ -83,30 +83,21 @@ export async function getCurrentUser() {
   if (!u) return null;
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, name, plan")
-    // stack_photo_url — add to select after running migration 004_profiles_stack_photo_url.sql
+    .select("email, name, plan, stack_photo_url, stack_photo_r2_key")
     .eq("id", u.id)
     .maybeSingle();
-  const stackPhotoUrl = null;
+  const stackPhotoKey =
+    profile && typeof profile.stack_photo_r2_key === "string" ? profile.stack_photo_r2_key.trim() : null;
+  const stackPhotoUrlLegacy =
+    profile && typeof profile.stack_photo_url === "string" ? profile.stack_photo_url.trim() : null;
   return {
     id: u.id,
     email: profile?.email ?? u.email ?? "",
     name: profile?.name ?? u.user_metadata?.name ?? u.email ?? "",
     plan: profile?.plan ?? u.user_metadata?.plan ?? "entry",
-    stackPhotoUrl,
+    stackPhotoUrl: stackPhotoUrlLegacy,
+    stackPhotoKey,
   };
-}
-
-/** Sync plan to JWT metadata and `public.profiles` (in-app upgrade / checkout). */
-export async function updateUserPlan(plan) {
-  if (!supabase) return { error: notConfiguredError() };
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth?.user?.id;
-  if (!uid) return { error: new Error("Not signed in") };
-  const { error: authErr } = await supabase.auth.updateUser({ data: { plan } });
-  if (authErr) return { error: authErr };
-  const { error: profileErr } = await supabase.from("profiles").update({ plan }).eq("id", uid);
-  return { error: profileErr ?? null };
 }
 
 /**
