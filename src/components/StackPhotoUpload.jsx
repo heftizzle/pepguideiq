@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSessionAccessToken } from "../lib/supabase.js";
 import { API_WORKER_URL } from "../lib/config.js";
 
@@ -9,17 +9,64 @@ const OK_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 /**
  * @param {{
  *   stackPhotoUrl: string | null,
+ *   stackPhotoKey: string | null,
  *   canUpload: boolean,
  *   workerConfigured: boolean,
  *   onUpgrade: () => void,
  *   onUploaded: () => Promise<void>,
  * }} props
  */
-export function StackPhotoUpload({ stackPhotoUrl, canUpload, workerConfigured, onUpgrade, onUploaded }) {
+export function StackPhotoUpload({
+  stackPhotoUrl,
+  stackPhotoKey,
+  canUpload,
+  workerConfigured,
+  onUpgrade,
+  onUploaded,
+}) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [err, setErr] = useState(null);
+  const [privateBlobUrl, setPrivateBlobUrl] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let revoke = null;
+
+    async function loadPrivate() {
+      if (!stackPhotoKey || !workerConfigured) {
+        setPrivateBlobUrl(null);
+        return;
+      }
+      const token = await getSessionAccessToken();
+      if (!token) {
+        setPrivateBlobUrl(null);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) {
+          setPrivateBlobUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        revoke = url;
+        if (!cancelled) setPrivateBlobUrl(url);
+      } catch {
+        if (!cancelled) setPrivateBlobUrl(null);
+      }
+    }
+
+    void loadPrivate();
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [stackPhotoKey, workerConfigured]);
 
   const gated = !canUpload;
   const noWorker = canUpload && !workerConfigured;
@@ -132,7 +179,9 @@ export function StackPhotoUpload({ stackPhotoUrl, canUpload, workerConfigured, o
     if (f) void sendFile(f);
   }
 
-  const showThumb = Boolean(stackPhotoUrl);
+  const displayUrl = privateBlobUrl || stackPhotoUrl || "";
+  const showThumb = Boolean(displayUrl);
+
   const zoneTitle = gated
     ? "Upgrade to Pro to upload your stack photo"
     : noWorker
@@ -214,7 +263,7 @@ export function StackPhotoUpload({ stackPhotoUrl, canUpload, workerConfigured, o
         {showThumb ? (
           <>
             <img
-              src={stackPhotoUrl}
+              src={displayUrl}
               alt=""
               style={{
                 width: "100%",
