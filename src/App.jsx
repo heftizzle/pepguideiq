@@ -10,6 +10,7 @@ import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
 import { StackPhotoUpload } from "./components/StackPhotoUpload.jsx";
 import { VialTracker } from "./components/VialTracker.jsx";
+import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
 import { formatPlan, getNextTierId, getTier, hasAccess, TIER_RANK } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import { resolveStability } from "./lib/catalogStability.js";
@@ -284,7 +285,7 @@ export default function PepGuideIQ() {
       const res = await fetch(`${API_WORKER_URL}/v1/chat`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ messages: msgs, system, plan: user.plan }),
+        body: JSON.stringify({ messages: msgs, system }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -582,6 +583,7 @@ export default function PepGuideIQ() {
                 <div style={{ marginTop: 14 }}>
                   <StackPhotoUpload
                     stackPhotoUrl={user?.stackPhotoUrl ?? null}
+                    stackPhotoKey={user?.stackPhotoKey ?? null}
                     canUpload={canUploadStackPhoto}
                     workerConfigured={isApiWorkerConfigured()}
                     onUpgrade={openUpgradeModal}
@@ -857,6 +859,8 @@ export default function PepGuideIQ() {
             setUser={setUser}
           />
         )}
+
+        <LegalDisclaimer />
 
       </div>
     </>

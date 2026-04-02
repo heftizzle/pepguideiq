@@ -1,29 +1,10 @@
 /**
- * Cloudflare Worker: proxies Anthropic Messages API so the API key never ships to the browser.
+ * Cloudflare Worker: Anthropic proxy, Stripe billing helpers, R2 stack photos.
  *
- * Secrets: wrangler secret put ANTHROPIC_API_KEY
- * Supabase: wrangler secret put SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- *   When both are set, `Authorization: Bearer <access_token>` is verified via GET /auth/v1/user
- *   (same as supabase.auth.getUser); plan comes from user_metadata / app_metadata.
- *   When unset, body.plan is used for /v1/chat (dev only — do not use in production).
- *
- * Route: POST /v1/chat — body JSON { system?, messages, plan?, max_tokens? }
- *   system: optional extra context appended after the Worker’s fixed guide prompt (client cannot replace the persona).
- *   messages: only the last 10 turns are forwarded (cost / abuse limit).
- *   max_tokens: capped at 1024 regardless of client value.
- * Response: JSON { text, id?, role?, usage?: { queries_today, queries_limit, plan } } on success.
- *
- * CORS: Access-Control-Allow-Origin is * for now; for production lock to https://pepguideiq.com (or your Pages origin).
- *
- * Stripe (billing source of truth):
- *   GET  /stripe/subscription — subscription fields from Stripe + pending_plan from Supabase
- *   POST /stripe/subscription/schedule-downgrade — body { target_plan } — sets pending_plan + pending_plan_date
- *   Secrets: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- *
- * Stack photos (R2 + profiles.stack_photo_url):
- *   POST /upload-stack-photo — multipart field "file" (jpeg/png/webp, max 5MB). Pro+ only (plan from public.profiles).
- *   Binding: [[r2_buckets]] STACK_PHOTOS → bucket stack-photos
- *   Var: R2_PUBLIC_BASE_URL (no trailing slash), e.g. https://pub-xxxxx.r2.dev
+ * Secrets: wrangler secret put ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ * Optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+ * Vars: ALLOWED_ORIGIN (exact origin, e.g. https://pepguideiq.com; omit or * for dev),
+ *       ENVIRONMENT=production (strict: require Supabase + KV for /v1/chat, fail closed on rate limit)
  */
 
 const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
@@ -31,9 +12,9 @@ const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
 
 const DAILY_QUERY_LIMIT = {
   entry: 1,
-  pro:   4,
+  pro: 4,
   elite: 8,
-  goat:  16,
+  goat: 16,
 };
 
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
@@ -49,18 +30,113 @@ const STACK_PHOTO_TYPES = new Map([
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-// TODO(prod): set to "https://pepguideiq.com" (or exact Pages URL) instead of "*"
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
+const CORS_BASE = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
 
-function jsonResponse(body, status = 200) {
+/** @param {Record<string, string | undefined>} env */
+function isProduction(env) {
+  return String(env.ENVIRONMENT ?? "").toLowerCase() === "production";
+}
+
+/**
+ * @param {Record<string, string | undefined>} env
+ * @param {Request} request
+ * @returns {Record<string, string> | null} null = reject request (wrong Origin)
+ */
+function corsHeaders(env, request) {
+  const allowed = (env.ALLOWED_ORIGIN ?? "*").trim();
+  const origin = request.headers.get("Origin");
+  if (allowed === "*") {
+    return { ...CORS_BASE, "Access-Control-Allow-Origin": "*" };
+  }
+  if (origin && origin === allowed) {
+    return { ...CORS_BASE, "Access-Control-Allow-Origin": origin, Vary: "Origin" };
+  }
+  if (!origin) {
+    return { ...CORS_BASE, "Access-Control-Allow-Origin": allowed, Vary: "Origin" };
+  }
+  return null;
+}
+
+/** @param {Record<string, string | undefined>} env */
+function log(env, level, msg, extra = {}) {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    level,
+    msg,
+    service: "pepguideiq-api-proxy",
+    ...extra,
+  });
+  if (level === "error") console.error(line);
+  else if (level === "warn") console.warn(line);
+  else console.log(line);
+}
+
+/**
+ * Stripe webhook signature verification (raw body + Stripe-Signature header).
+ * @see https://stripe.com/docs/webhooks/signatures
+ */
+async function verifyStripeWebhookSignature(rawBody, sigHeader, secret) {
+  if (!sigHeader || !secret) return false;
+  const items = sigHeader.split(",").map((s) => s.trim());
+  let t = "";
+  const v1list = [];
+  for (const item of items) {
+    const i = item.indexOf("=");
+    if (i === -1) continue;
+    const k = item.slice(0, i);
+    const v = item.slice(i + 1);
+    if (k === "t") t = v;
+    if (k === "v1") v1list.push(v);
+  }
+  if (!t || v1list.length === 0) return false;
+  const tsMs = Number(t) * 1000;
+  if (Number.isFinite(tsMs)) {
+    const maxSkew = 5 * 60 * 1000;
+    if (Math.abs(Date.now() - tsMs) > maxSkew) return false;
+  }
+  const signedPayload = `${t}.${rawBody}`;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const mac = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, enc.encode(signedPayload))
+  );
+  const expectedHex = [...mac].map((b) => b.toString(16).padStart(2, "0")).join("");
+  for (const v1 of v1list) {
+    if (v1.length !== expectedHex.length) continue;
+    let diff = 0;
+    for (let j = 0; j < v1.length; j++) {
+      diff |= v1.charCodeAt(j) ^ expectedHex.charCodeAt(j);
+    }
+    if (diff === 0) return true;
+  }
+  return false;
+}
+
+async function fetchStripeSubscriptionExpanded(stripeKey, subscriptionId) {
+  const qs = new URLSearchParams();
+  qs.append("expand[]", "items.data.price");
+  const r = await fetch(
+    `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}?${qs}`,
+    { headers: { Authorization: `Bearer ${stripeKey}` } }
+  );
+  if (!r.ok) return null;
+  return r.json();
+}
+
+function jsonResponse(body, status = 200, cors) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "Content-Type": "application/json" },
+    headers: { ...cors, "Content-Type": "application/json" },
   });
 }
 
@@ -77,7 +153,6 @@ function normalizeMessages(messages) {
   }));
 }
 
-/** Entry + Pro → Haiku; Elite + GOAT → Sonnet. Unknown/missing plan defaults to Haiku. */
 function modelForPlan(plan) {
   const p = typeof plan === "string" ? plan.trim().toLowerCase() : "";
   if (p === "elite" || p === "goat") return MODEL_ELITE_GOAT;
@@ -85,22 +160,31 @@ function modelForPlan(plan) {
 }
 
 /**
- * Checks and increments daily query counter in KV.
- * Key format: "rl:{userId}:{YYYY-MM-DD}" (UTC)
- * TTL: 25 hours — self-expiring, no cleanup needed.
- * If KV is not bound (dev mode), fails open with a warning.
+ * @param {import("@cloudflare/workers-types").KVNamespace | undefined} kv
+ * @param {string | null} userId
+ * @param {string} plan
  */
-async function checkRateLimit(kv, userId, plan) {
+async function checkRateLimit(env, kv, userId, plan) {
+  const production = isProduction(env);
   if (!kv) {
-    console.warn("RATE_LIMIT_KV not bound — rate limiting disabled");
+    const msg = "RATE_LIMIT_KV not bound — rate limiting disabled";
+    if (production) {
+      log(env, "error", "rate_limit_kv_required", {});
+      return { allowed: false, count: 0, limit: 0, error: "Rate limiting unavailable" };
+    }
+    console.warn(msg);
     return { allowed: true, count: 0, limit: 99 };
   }
 
-  const limit = DAILY_QUERY_LIMIT[plan] ?? DAILY_QUERY_LIMIT.entry;
-  const today = new Date().toISOString().slice(0, 10); // "2026-04-01"
-  const key   = `rl:${userId}:${today}`;
+  if (!userId) {
+    return { allowed: false, count: 0, limit: 0, error: "Missing user" };
+  }
 
-  const raw     = await kv.get(key);
+  const limit = DAILY_QUERY_LIMIT[plan] ?? DAILY_QUERY_LIMIT.entry;
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `rl:${userId}:${today}`;
+
+  const raw = await kv.get(key);
   const current = raw ? JSON.parse(raw) : { count: 0 };
 
   if (current.count >= limit) {
@@ -108,43 +192,33 @@ async function checkRateLimit(kv, userId, plan) {
   }
 
   const next = { count: current.count + 1 };
-  await kv.put(key, JSON.stringify(next), { expirationTtl: 90000 }); // 25hr TTL
+  await kv.put(key, JSON.stringify(next), { expirationTtl: 90000 });
   return { allowed: true, count: next.count, limit };
 }
 
-/**
- * Fire-and-forget usage log to Supabase query_log table.
- * Never awaited — never blocks the response.
- */
 function logUsage(env, userId, plan, model, tokenCount) {
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
-  const serviceKey  = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!supabaseUrl || !serviceKey || !userId) return;
 
   fetch(`${supabaseUrl}/rest/v1/query_log`, {
     method: "POST",
     headers: {
-      apikey:          serviceKey,
-      Authorization:   `Bearer ${serviceKey}`,
-      "Content-Type":  "application/json",
-      Prefer:          "return=minimal",
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
     },
     body: JSON.stringify({
-      user_id:    userId,
+      user_id: userId,
       plan,
       model,
       token_count: tokenCount ?? 0,
-      queried_at:  new Date().toISOString(),
+      queried_at: new Date().toISOString(),
     }),
-  }).catch(() => {}); // swallow — logging must never break a response
+  }).catch(() => {});
 }
 
-/**
- * Validates the access token via Supabase Auth REST (same behavior as supabase.auth.getUser(jwt)).
- * @param {Record<string, string | undefined>} env
- * @param {string | null} authorization
- * @returns {Promise<{ data: { plan: string | null, sub: string | null } | null, error: Error | null }>}
- */
 async function getSessionUser(env, authorization) {
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -174,13 +248,8 @@ async function getSessionUser(env, authorization) {
   if (!user) {
     return { data: null, error: new Error("Unauthorized") };
   }
-  const um = user.user_metadata;
-  const am = user.app_metadata;
-  let plan = null;
-  if (um && typeof um === "object" && typeof um.plan === "string") plan = um.plan;
-  else if (am && typeof am === "object" && typeof am.plan === "string") plan = am.plan;
   const sub = typeof user.id === "string" ? user.id : null;
-  return { data: { plan, sub }, error: null };
+  return { data: { sub }, error: null };
 }
 
 function supabaseAuthReady(env) {
@@ -192,12 +261,6 @@ function normalizePlanTier(p) {
   return VALID_PLAN_TIERS.has(x) ? x : "entry";
 }
 
-/**
- * Effective plan from `public.profiles` (billing-aligned), not JWT metadata alone.
- * @param {string} supabaseUrl
- * @param {string} serviceKey
- * @param {string} userId
- */
 async function fetchProfilePlan(supabaseUrl, serviceKey, userId) {
   const res = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=plan`,
@@ -220,7 +283,6 @@ function buildSystem(body) {
   return extra ? `${base}\n\n${extra}` : base;
 }
 
-/** @param {Record<string, unknown> | null | undefined} subscr */
 function tierPlanFromStripeSubscription(subscr) {
   if (!subscr || typeof subscr !== "object") return "entry";
   const st = typeof subscr.status === "string" ? subscr.status : "";
@@ -248,17 +310,41 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
 }
 
 /**
- * @param {Request} request
- * @param {Record<string, string | undefined>} env
+ * Updates plan in profiles + auth user metadata via trusted RPC (see migration 008).
+ * Optionally sets Stripe customer id (service role only).
  */
-async function handleStripeSubscription(request, env) {
+async function supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, stripeCustomerId) {
+  const rpc = await fetch(`${supabaseUrl}/rest/v1/rpc/update_user_plan`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ p_user_id: userId, p_plan: plan }),
+  });
+  if (!rpc.ok) {
+    const t = await rpc.text().catch(() => "");
+    log(env, "error", "update_user_plan_rpc_failed", { status: rpc.status, body: t.slice(0, 500) });
+    return false;
+  }
+  if (stripeCustomerId) {
+    return supabasePatchProfile(supabaseUrl, serviceKey, userId, {
+      stripe_customer_id: stripeCustomerId,
+    });
+  }
+  return true;
+}
+
+async function handleStripeSubscription(request, env, cors) {
   if (!supabaseAuthReady(env)) {
-    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
   }
 
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
   }
   const userId = user.sub;
 
@@ -286,7 +372,7 @@ async function handleStripeSubscription(request, env) {
       status: "none",
       plan: "entry",
       pending_plan: profile?.pending_plan != null ? String(profile.pending_plan) : null,
-    });
+    }, 200, cors);
 
   if (!customerId) {
     return emptyResponse();
@@ -294,7 +380,7 @@ async function handleStripeSubscription(request, env) {
 
   const stripeKey = env.STRIPE_SECRET_KEY ?? "";
   if (!stripeKey) {
-    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503);
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
   }
 
   const qs = new URLSearchParams({
@@ -310,7 +396,8 @@ async function handleStripeSubscription(request, env) {
   if (!sr.ok) {
     return jsonResponse(
       { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
-      sr.status >= 400 && sr.status < 600 ? sr.status : 502
+      sr.status >= 400 && sr.status < 600 ? sr.status : 502,
+      cors
     );
   }
 
@@ -329,20 +416,17 @@ async function handleStripeSubscription(request, env) {
     status: typeof subscr.status === "string" ? subscr.status : "unknown",
     plan: tierPlanFromStripeSubscription(subscr),
     pending_plan: profile?.pending_plan != null ? String(profile.pending_plan) : null,
-  });
+  }, 200, cors);
 }
 
-/**
- * POST body: { target_plan: "entry" | "pro" | "elite" | "goat" }
- */
-async function handleScheduleDowngrade(request, env) {
+async function handleScheduleDowngrade(request, env, cors) {
   if (!supabaseAuthReady(env)) {
-    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
   }
 
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
   }
   const userId = user.sub;
 
@@ -350,17 +434,17 @@ async function handleScheduleDowngrade(request, env) {
   try {
     body = await request.json();
   } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
   }
   const target = typeof body?.target_plan === "string" ? body.target_plan.trim().toLowerCase() : "";
   if (!VALID_PLAN_TIERS.has(target)) {
-    return jsonResponse({ error: "Invalid target_plan" }, 400);
+    return jsonResponse({ error: "Invalid target_plan" }, 400, cors);
   }
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!supabaseUrl || !serviceKey) {
-    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
   }
 
   const pr = await fetch(
@@ -377,12 +461,12 @@ async function handleScheduleDowngrade(request, env) {
   const customerId =
     profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
   if (!customerId) {
-    return jsonResponse({ error: "No Stripe customer on file" }, 400);
+    return jsonResponse({ error: "No Stripe customer on file" }, 400, cors);
   }
 
   const stripeKey = env.STRIPE_SECRET_KEY ?? "";
   if (!stripeKey) {
-    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503);
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
   }
 
   const qs = new URLSearchParams({ customer: customerId, limit: "1", status: "all" });
@@ -394,22 +478,23 @@ async function handleScheduleDowngrade(request, env) {
   if (!sr.ok) {
     return jsonResponse(
       { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
-      502
+      502,
+      cors
     );
   }
   const list = Array.isArray(sdata.data) ? sdata.data : [];
   const subscr = list[0];
   if (!subscr || typeof subscr.current_period_end !== "number") {
-    return jsonResponse({ error: "No active subscription to schedule against" }, 400);
+    return jsonResponse({ error: "No active subscription to schedule against" }, 400, cors);
   }
 
   const currentTier = tierPlanFromStripeSubscription(subscr);
   const activeLike = ["active", "trialing", "past_due"].includes(subscr.status);
   if (!activeLike) {
-    return jsonResponse({ error: "Subscription is not in a state that allows scheduling" }, 400);
+    return jsonResponse({ error: "Subscription is not in a state that allows scheduling" }, 400, cors);
   }
   if (TIER_RANK[target] >= TIER_RANK[currentTier]) {
-    return jsonResponse({ error: "target_plan must be lower than current plan" }, 400);
+    return jsonResponse({ error: "target_plan must be lower than current plan" }, 400, cors);
   }
 
   const ok = await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
@@ -417,33 +502,25 @@ async function handleScheduleDowngrade(request, env) {
     pending_plan_date: new Date(subscr.current_period_end * 1000).toISOString(),
   });
   if (!ok) {
-    return jsonResponse({ error: "Failed to update profile" }, 502);
+    return jsonResponse({ error: "Failed to update profile" }, 502, cors);
   }
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true }, 200, cors);
 }
 
-/**
- * POST multipart/form-data; field name "file".
- */
-async function handleUploadStackPhoto(request, env) {
+async function handleUploadStackPhoto(request, env, cors) {
   if (!supabaseAuthReady(env)) {
-    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503);
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
   }
 
   const bucket = env.STACK_PHOTOS;
   if (!bucket) {
-    return jsonResponse({ error: "R2 bucket STACK_PHOTOS is not bound on the Worker" }, 503);
-  }
-
-  const publicBase = (env.R2_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
-  if (!publicBase) {
-    return jsonResponse({ error: "R2_PUBLIC_BASE_URL is not set on the Worker" }, 503);
+    return jsonResponse({ error: "R2 bucket STACK_PHOTOS is not bound on the Worker" }, 503, cors);
   }
 
   const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
   if (authErr || !sessionUser?.sub) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
   }
   const userId = sessionUser.sub;
 
@@ -451,30 +528,30 @@ async function handleUploadStackPhoto(request, env) {
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
   if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
-    return jsonResponse({ error: "Pro plan or higher required to upload stack photos" }, 403);
+    return jsonResponse({ error: "Pro plan or higher required to upload stack photos" }, 403, cors);
   }
 
   let formData;
   try {
     formData = await request.formData();
   } catch {
-    return jsonResponse({ error: "Invalid multipart body" }, 400);
+    return jsonResponse({ error: "Invalid multipart body" }, 400, cors);
   }
 
   const file = formData.get("file");
   if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
-    return jsonResponse({ error: 'Expected multipart field "file"' }, 400);
+    return jsonResponse({ error: 'Expected multipart field "file"' }, 400, cors);
   }
 
   const size = typeof file.size === "number" ? file.size : 0;
   if (size <= 0 || size > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400);
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
   }
 
   const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
   const ext = STACK_PHOTO_TYPES.get(mime);
   if (!ext) {
-    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400);
+    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400, cors);
   }
 
   const key = `${userId}/stack.${ext}`;
@@ -482,10 +559,10 @@ async function handleUploadStackPhoto(request, env) {
   try {
     bytes = await file.arrayBuffer();
   } catch {
-    return jsonResponse({ error: "Could not read file" }, 400);
+    return jsonResponse({ error: "Could not read file" }, 400, cors);
   }
   if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400);
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
   }
 
   try {
@@ -493,89 +570,301 @@ async function handleUploadStackPhoto(request, env) {
       httpMetadata: { contentType: mime },
     });
   } catch (e) {
-    console.error("R2 put failed", e);
-    return jsonResponse({ error: "Storage upload failed" }, 502);
+    log(env, "error", "r2_put_failed", { message: String(e) });
+    return jsonResponse({ error: "Storage upload failed" }, 502, cors);
   }
 
-  const publicUrl = `${publicBase}/${key}`;
   const patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
-    stack_photo_url: publicUrl,
+    stack_photo_r2_key: key,
+    stack_photo_url: null,
   });
   if (!patched) {
-    return jsonResponse({ error: "Failed to update profile URL" }, 502);
+    return jsonResponse({ error: "Failed to update profile" }, 502, cors);
   }
 
-  return jsonResponse({ url: publicUrl });
+  return jsonResponse({ key, private: true }, 200, cors);
+}
+
+/**
+ * Authenticated GET — streams the user's stack photo from R2 (not publicly enumerable).
+ */
+async function handleGetStackPhoto(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return new Response("Service unavailable", { status: 503, headers: cors });
+  }
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return new Response("Not configured", { status: 503, headers: cors });
+  }
+
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return new Response("Unauthorized", { status: 401, headers: cors });
+  }
+  const userId = sessionUser.sub;
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stack_photo_r2_key`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const key = row && typeof row.stack_photo_r2_key === "string" ? row.stack_photo_r2_key.trim() : "";
+  if (!key) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+
+  try {
+    const obj = await bucket.get(key);
+    if (!obj) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+    const ct = obj.httpMetadata?.contentType ?? "application/octet-stream";
+    return new Response(obj.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": ct,
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
+  } catch (e) {
+    log(env, "error", "r2_get_failed", { message: String(e) });
+    return new Response("Storage error", { status: 502, headers: cors });
+  }
+}
+
+/**
+ * Stripe → Supabase sync. Configure Payment Links / Checkout with client_reference_id = Supabase user UUID
+ * and subscription or price metadata `plan` = entry|pro|elite|goat.
+ */
+async function handleStripeWebhook(request, env) {
+  const whSecret = env.STRIPE_WEBHOOK_SECRET;
+  const stripeKey = env.STRIPE_SECRET_KEY;
+  if (!whSecret || !stripeKey) {
+    log(env, "warn", "stripe_webhook_not_configured", {});
+    return new Response("Webhook not configured", { status: 503 });
+  }
+
+  const sig = request.headers.get("stripe-signature");
+  if (!sig) {
+    return new Response("Missing signature", { status: 400 });
+  }
+
+  const body = await request.text();
+  const verified = await verifyStripeWebhookSignature(body, sig, whSecret);
+  if (!verified) {
+    log(env, "warn", "stripe_webhook_verify_failed", {});
+    return new Response("Bad signature", { status: 400 });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(body);
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl || !serviceKey) {
+    return new Response("Supabase not configured", { status: 503 });
+  }
+
+  const eventId = typeof event.id === "string" ? event.id : "";
+
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data?.object ?? {};
+        const userId =
+          (typeof session.client_reference_id === "string" && session.client_reference_id) ||
+          (typeof session.metadata?.supabase_user_id === "string" && session.metadata.supabase_user_id) ||
+          "";
+        const customerId =
+          typeof session.customer === "string"
+            ? session.customer
+            : session.customer && typeof session.customer === "object"
+              ? session.customer.id
+              : "";
+        let plan =
+          (typeof session.metadata?.plan === "string" && normalizePlanTier(session.metadata.plan)) ||
+          "entry";
+        if (userId && customerId) {
+          const subId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription && typeof session.subscription === "object"
+                ? session.subscription.id
+                : "";
+          if ((plan === "entry" || !VALID_PLAN_TIERS.has(plan)) && subId) {
+            const sub = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+            if (sub) plan = tierPlanFromStripeSubscription(sub);
+          }
+          const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
+          if (!ok) {
+            log(env, "error", "stripe_webhook_profile_sync_failed", { userId, eventId });
+            return new Response("Profile sync failed", { status: 502 });
+          }
+          log(env, "info", "stripe_checkout_completed", { userId, plan, customerId });
+        }
+        break;
+      }
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const sub = event.data?.object ?? {};
+        const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+        if (!customerId) break;
+
+        const pr = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=id`,
+          {
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+          }
+        );
+        const rows = await pr.json().catch(() => []);
+        const profile = Array.isArray(rows) ? rows[0] : null;
+        const userId = profile && typeof profile.id === "string" ? profile.id : null;
+        if (!userId) {
+          log(env, "warn", "stripe_subscription_no_profile", { customerId });
+          break;
+        }
+
+        const plan =
+          event.type === "customer.subscription.deleted"
+            ? "entry"
+            : tierPlanFromStripeSubscription(sub);
+        const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
+        if (!ok) {
+          log(env, "error", "stripe_webhook_subscription_sync_failed", { userId, eventId });
+          return new Response("Sync failed", { status: 502 });
+        }
+        log(env, "info", "stripe_subscription_synced", { userId, plan, type: event.type });
+        break;
+      }
+      default:
+        break;
+    }
+  } catch (e) {
+    log(env, "error", "stripe_webhook_handler_error", { message: String(e), eventId });
+    return new Response("Handler error", { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 export default {
   async fetch(request, env) {
+    const cors = corsHeaders(env, request);
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS });
+      if (!cors) {
+        return new Response(null, { status: 403 });
+      }
+      return new Response(null, { headers: cors });
     }
 
     const url = new URL(request.url);
 
+    if (url.pathname === "/stripe/webhook" && request.method === "POST") {
+      return handleStripeWebhook(request, env);
+    }
+
+    if (!cors) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
     if (url.pathname === "/stripe/subscription" && request.method === "GET") {
-      return handleStripeSubscription(request, env);
+      return handleStripeSubscription(request, env, cors);
     }
 
     if (url.pathname === "/stripe/subscription/schedule-downgrade" && request.method === "POST") {
-      return handleScheduleDowngrade(request, env);
+      return handleScheduleDowngrade(request, env, cors);
     }
 
     if (url.pathname === "/upload-stack-photo" && request.method === "POST") {
-      return handleUploadStackPhoto(request, env);
+      return handleUploadStackPhoto(request, env, cors);
+    }
+
+    if (url.pathname === "/stack-photo" && request.method === "GET") {
+      return handleGetStackPhoto(request, env, cors);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {
-      return new Response("Not found", { status: 404, headers: CORS });
+      return new Response("Not found", { status: 404, headers: cors });
     }
 
     const key = env.ANTHROPIC_API_KEY;
     if (!key) {
-      return jsonResponse({ error: "ANTHROPIC_API_KEY is not set on the Worker" }, 500);
+      return jsonResponse({ error: "ANTHROPIC_API_KEY is not set on the Worker" }, 500, cors);
+    }
+
+    const production = isProduction(env);
+    if (production && !supabaseAuthReady(env)) {
+      log(env, "error", "production_missing_supabase", {});
+      return jsonResponse(
+        { error: "Server misconfiguration: Supabase auth is required" },
+        503,
+        cors
+      );
     }
 
     let body;
     try {
       body = await request.json();
     } catch {
-      return jsonResponse({ error: "Invalid JSON body" }, 400);
+      return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
     }
 
-    let plan;
     let userId = null;
+    let plan = "entry";
+
     if (supabaseAuthReady(env)) {
       const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
       if (error || !user?.sub) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
+        return jsonResponse({ error: "Unauthorized" }, 401, cors);
       }
-      plan = user.plan;
       userId = user.sub;
+      const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+      const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+      plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
     } else {
-      // body.plan is trusted only when Supabase auth is not configured on the Worker (dev only).
-      plan = body.plan;
+      if (production) {
+        return jsonResponse({ error: "Unauthorized" }, 401, cors);
+      }
+      plan = normalizePlanTier(body.plan);
+      log(env, "warn", "dev_mode_chat_without_supabase", {});
     }
 
-    // ── Rate limit ──────────────────────────────────────────────
-    const rl = await checkRateLimit(
-      env.RATE_LIMIT_KV,
-      userId,
-      plan ?? "entry"
-    );
+    const rl = await checkRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
+    if (rl.error) {
+      return jsonResponse({ error: rl.error }, 503, cors);
+    }
     if (!rl.allowed) {
       return jsonResponse(
         {
-          error: `Daily query limit reached (${rl.limit}/day on ${plan ?? "entry"} plan). Upgrade for more queries.`,
+          error: `Daily query limit reached (${rl.limit}/day on ${plan} plan). Upgrade for more queries.`,
           limit_reached: true,
-          limit:         rl.limit,
-          count:         rl.count,
+          limit: rl.limit,
+          count: rl.count,
         },
-        429
+        429,
+        cors
       );
     }
-    // ────────────────────────────────────────────────────────────
 
     const model = modelForPlan(plan);
 
@@ -597,16 +886,19 @@ export default {
         },
         body: JSON.stringify(payload),
       });
-    } catch {
-      return jsonResponse({ error: "Upstream request failed" }, 502);
+    } catch (e) {
+      log(env, "error", "anthropic_fetch_failed", { message: String(e) });
+      return jsonResponse({ error: "Upstream request failed" }, 502, cors);
     }
 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      log(env, "warn", "anthropic_error", { status: res.status, body: data });
       return jsonResponse(
         { error: data.error?.message || data.error || `Anthropic error (${res.status})` },
-        res.status >= 400 && res.status < 600 ? res.status : 502
+        res.status >= 400 && res.status < 600 ? res.status : 502,
+        cors
       );
     }
 
@@ -615,19 +907,23 @@ export default {
       : null;
     const text = block?.text ?? "";
 
-    const inputTokens  = data.usage?.input_tokens  ?? 0;
+    const inputTokens = data.usage?.input_tokens ?? 0;
     const outputTokens = data.usage?.output_tokens ?? 0;
     logUsage(env, userId, plan, model, inputTokens + outputTokens);
 
-    return jsonResponse({
-      text,
-      id:   data.id,
-      role: "assistant",
-      usage: {
-        queries_today: rl.count,
-        queries_limit: rl.limit,
-        plan:          plan ?? "entry",
+    return jsonResponse(
+      {
+        text,
+        id: data.id,
+        role: "assistant",
+        usage: {
+          queries_today: rl.count,
+          queries_limit: rl.limit,
+          plan,
+        },
       },
-    });
+      200,
+      cors
+    );
   },
 };

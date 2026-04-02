@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
-import { getStripeCheckoutUrl } from "../lib/checkout.js";
+import { getStripeCheckoutUrlWithClientRef } from "../lib/checkout.js";
 import { fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
 import { formatPlan, getNextTierId, TIER_RANK } from "../lib/tiers.js";
-import { getCurrentUser, updateUserPlan } from "../lib/supabase.js";
 
 const ROWS = getUpgradeTierRows();
 
@@ -28,6 +27,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
   const [downgradeFlow, setDowngradeFlow] = useState(null);
   const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
   const [downgradeError, setDowngradeError] = useState(null);
+  const [upgradeActionError, setUpgradeActionError] = useState(null);
 
   const refetchSubscription = () => {
     setSubscriptionLoading(true);
@@ -84,18 +84,16 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
   const tierAction = async (planId) => {
     if (actionsDisabled || planId === "entry") return;
-    const url = getStripeCheckoutUrl(planId);
+    setUpgradeActionError(null);
+    const url = getStripeCheckoutUrlWithClientRef(planId, user?.id);
     if (url) {
       onClose();
       window.location.assign(url);
       return;
     }
-    const { error } = await updateUserPlan(planId);
-    if (!error) {
-      const u = await getCurrentUser();
-      if (u) setUser(u);
-    }
-    onClose();
+    setUpgradeActionError(
+      "Checkout is not configured. Set VITE_STRIPE_CHECKOUT_* for your domain and configure the Worker webhook (STRIPE_WEBHOOK_SECRET). See README."
+    );
   };
 
   const confirmDowngrade = async (targetId) => {
@@ -265,6 +263,11 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           <div className="mono" style={{ fontSize: 10, color: "#a0a0b0", marginTop: 4 }}>
             Compare tiers — upgrade anytime. Cancel anytime.
           </div>
+          {upgradeActionError && (
+            <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginTop: 8, maxWidth: 520 }}>
+              {upgradeActionError}
+            </div>
+          )}
         </div>
         <button
           type="button"
