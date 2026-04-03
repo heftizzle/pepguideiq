@@ -2,6 +2,7 @@
 -- Stack photos: store R2 object key for Worker-only reads (see GET /stack-photo on api-proxy).
 
 -- 1) R2 object key (e.g. "{user_id}/stack.jpg"); Worker serves bytes with auth — no public URL required.
+DROP FUNCTION IF EXISTS public.update_user_plan(UUID, TEXT);
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS stack_photo_r2_key TEXT;
 
