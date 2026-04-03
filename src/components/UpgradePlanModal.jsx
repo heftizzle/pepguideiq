@@ -288,7 +288,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           borderRadius: 8,
         }}
       >
-        <div className="mono" style={{ fontSize: 9, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
+        <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
           // BILLING (STRIPE)
         </div>
         {subscriptionLoading && (

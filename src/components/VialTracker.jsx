@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured } from "../lib/config.js";
+import { mcgToUnits, roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import {
   deleteUserVial,
   insertDoseLog,
@@ -297,7 +298,7 @@ function DoseHistoryCalendar({
 
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 8, letterSpacing: ".12em" }}>
+      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", marginBottom: 8, letterSpacing: ".12em" }}>
         DOSE HISTORY
       </div>
       <div
@@ -369,7 +370,7 @@ function DoseHistoryCalendar({
             className="mono"
             style={{
               textAlign: "center",
-              fontSize: 9,
+              fontSize: 12,
               color: "#8fa5bf",
               padding: "4px 0",
               letterSpacing: "0.06em",
@@ -508,13 +509,25 @@ function VialRow({
   stabilityNote,
 }) {
   const [label, setLabel] = useState(vial.label ?? "Vial 1");
-  const [doseMcg, setDoseMcg] = useState("");
+  const [doseUnits, setDoseUnits] = useState(10);
   const [doseNotes, setDoseNotes] = useState("");
   const [savingLabel, setSavingLabel] = useState(false);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
-  }, [vial.id, vial.label]);
+    const recentForVial = doses ?? [];
+    const lastMcg = recentForVial.length > 0 ? recentForVial[0].dose_mcg : null;
+    const units =
+      mcgToUnits(lastMcg, vial.concentration_mcg_ml) ??
+      mcgToUnits(vial.desired_dose_mcg, vial.concentration_mcg_ml) ??
+      10;
+    setDoseUnits(Math.max(0.5, Math.min(300, units)));
+  }, [vial.id, vial.label, vial.concentration_mcg_ml, vial.desired_dose_mcg, doses]);
+
+  const rowDerivedMcg = useMemo(
+    () => unitsToMcg(doseUnits, vial.concentration_mcg_ml),
+    [doseUnits, vial.concentration_mcg_ml]
+  );
 
   const dr = daysRemaining(vial.expires_at);
   const expired = dr < 0 || new Date(vial.expires_at) < new Date();
@@ -537,17 +550,15 @@ function VialRow({
   async function submitDose(e) {
     e.preventDefault();
     if (!canMutate) return;
-    const n = parseFloat(String(doseMcg).replace(/,/g, ""));
-    if (!Number.isFinite(n) || n <= 0) return;
+    if (!rowDerivedMcg || rowDerivedMcg <= 0) return;
     const { error } = await insertDoseLog({
       user_id: userId,
       vial_id: vial.id,
       peptide_id: peptideId,
-      dose_mcg: n,
+      dose_mcg: rowDerivedMcg,
       notes: doseNotes.trim() || null,
     });
     if (!error) {
-      setDoseMcg("");
       setDoseNotes("");
       onReload();
     }
@@ -638,23 +649,29 @@ function VialRow({
 
       {logOpen && canMutate && (
         <form onSubmit={submitDose} style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #0e1822" }}>
-          <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 4 }}>LOG DOSE (mcg)</div>
+          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 6 }}>LOG DOSE</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <input
-              className="form-input"
-              style={{ width: 100, fontSize: 11 }}
-              inputMode="decimal"
-              placeholder="250"
-              value={doseMcg}
-              onChange={(e) => setDoseMcg(e.target.value)}
-            />
-            <input
-              className="form-input"
-              style={{ flex: "1 1 120px", fontSize: 11 }}
+            <button type="button" className="btn-teal"
+              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+              onClick={() => setDoseUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}>
+              −
+            </button>
+            <div className="mono" style={{ fontSize: 16, color: "#dde4ef", minWidth: 50, textAlign: "center" }}>
+              {doseUnits}
+            </div>
+            <button type="button" className="btn-teal"
+              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+              onClick={() => setDoseUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}>
+              +
+            </button>
+            <div className="mono" style={{ fontSize: 12, color: "#00d4aa" }}>
+              {rowDerivedMcg != null
+                ? `= ${rowDerivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
+                : "— mcg"}
+            </div>
+            <input className="form-input" style={{ flex: "1 1 120px", fontSize: 11 }}
               placeholder="Optional notes"
-              value={doseNotes}
-              onChange={(e) => setDoseNotes(e.target.value)}
-            />
+              value={doseNotes} onChange={(e) => setDoseNotes(e.target.value)} />
             <button type="submit" className="btn-teal" style={{ fontSize: 10, padding: "4px 12px" }}>
               Save dose
             </button>
@@ -664,7 +681,7 @@ function VialRow({
 
       {doses.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div className="mono" style={{ fontSize: 9, color: "#a0a0b0", marginBottom: 4 }}>RECENT</div>
+          <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 4 }}>RECENT</div>
           {doses.map((d) => (
             <div key={d.id} className="mono" style={{ fontSize: 10, color: "#4a6080", padding: "2px 0" }}>
               {formatShortDate(d.dosed_at)} — {Number(d.dose_mcg).toLocaleString()} mcg
@@ -698,7 +715,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
   const [logVialId, setLogVialId] = useState(null);
   const [viewMonth, setViewMonth] = useState(() => currentViewMonth());
   const [calLogYmd, setCalLogYmd] = useState(null);
-  const [calLogDoseMcg, setCalLogDoseMcg] = useState("");
+  const [calLogUnits, setCalLogUnits] = useState(10);
   const [calLogTime, setCalLogTime] = useState("08:00");
   const [calLogNotes, setCalLogNotes] = useState("");
   const [calLogVialPick, setCalLogVialPick] = useState("");
@@ -822,6 +839,16 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
     return (vials ?? []).filter((v) => vialActiveOnYmd(v, calLogYmd));
   }, [calLogYmd, vials]);
 
+  const calSelectedVial = useMemo(
+    () => qualifyingVialsForCal.find((v) => v.id === calLogVialPick),
+    [qualifyingVialsForCal, calLogVialPick]
+  );
+
+  const calDerivedMcg = useMemo(
+    () => unitsToMcg(calLogUnits, calSelectedVial?.concentration_mcg_ml),
+    [calLogUnits, calSelectedVial]
+  );
+
   const canCalGoPrev = cmpViewMonth(viewMonth, minViewMonth()) > 0;
   const canCalGoNext = cmpViewMonth(viewMonth, currentViewMonth()) < 0;
 
@@ -832,21 +859,23 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
     const q = (vials ?? []).filter((v) => vialActiveOnYmd(v, calLogYmd));
     if (q.length === 0) {
       setCalLogVialPick("");
-      setCalLogDoseMcg("");
+      setCalLogUnits(10);
       return;
     }
-    if (q.length === 1) {
-      setCalLogVialPick(q[0].id);
-      const dd = q[0].desired_dose_mcg;
-      setCalLogDoseMcg(dd != null && Number(dd) > 0 ? String(dd) : "");
-      return;
-    }
-    const withD = q.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0);
-    const pick = withD ?? q[0];
+    const pick =
+      q.length === 1
+        ? q[0]
+        : (q.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) ?? q[0]);
     setCalLogVialPick(pick.id);
-    const dd = pick.desired_dose_mcg;
-    setCalLogDoseMcg(dd != null && Number(dd) > 0 ? String(dd) : "");
-  }, [calLogYmd, vials]);
+    // Prefer most recent actual log, fall back to desired_dose_mcg, fall back to 10
+    const recentDoses = dosesByVial[pick.id] ?? [];
+    const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
+    const units =
+      mcgToUnits(lastMcg, pick.concentration_mcg_ml) ??
+      mcgToUnits(pick.desired_dose_mcg, pick.concentration_mcg_ml) ??
+      10;
+    setCalLogUnits(Math.max(0.5, Math.min(300, units)));
+  }, [calLogYmd, vials, dosesByVial]);
 
   function goCalPrevMonth() {
     setCalLogYmd(null);
@@ -867,8 +896,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
   async function submitCalendarDoseLog(e) {
     e.preventDefault();
     if (!canMutate || !calLogYmd) return;
-    const n = parseFloat(String(calLogDoseMcg).replace(/,/g, ""));
-    if (!Number.isFinite(n) || n <= 0) return;
+    if (!calDerivedMcg || calDerivedMcg <= 0) return;
     if (!calLogVialPick) return;
     setCalLogSaving(true);
     const dosed_at = combineYmdAndTimeToIso(calLogYmd, calLogTime);
@@ -876,7 +904,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
       user_id: userId,
       vial_id: calLogVialPick,
       peptide_id: peptideId,
-      dose_mcg: n,
+      dose_mcg: calDerivedMcg,
       notes: calLogNotes.trim() || null,
       dosed_at,
     });
@@ -915,14 +943,11 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
         }}
         title="Upgrade to Pro to track your vials"
       >
-        <div className="mono" style={{ fontSize: 9, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
+        <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           VIALS
         </div>
-        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", marginBottom: 6, lineHeight: 1.4 }}>
-          // Track reconstituted vials and expiry
-        </div>
         <div className="mono" style={{ fontSize: 11, color: "#4a6080" }}>
-          // Upgrade to Pro to track your vials
+          Upgrade to Pro to track your vials
         </div>
       </div>
     );
@@ -930,18 +955,15 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
 
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="mono" style={{ fontSize: 9, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
+      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
         VIALS
-      </div>
-      <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", marginBottom: 8, lineHeight: 1.4 }}>
-        // Track reconstituted vials and expiry
       </div>
 
       {!isSupabaseConfigured() && (
-        <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginBottom: 8 }}>// Configure Supabase to sync vials</div>
+        <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
       )}
 
-      {loading && <div className="mono" style={{ fontSize: 10, color: "#a0a0b0" }}>// Loading…</div>}
+      {loading && <div className="mono" style={{ fontSize: 10, color: "#a0a0b0" }}>Loading…</div>}
 
       <DoseHistoryCalendar
         doses={calendarDoses}
@@ -972,12 +994,12 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             gap: 10,
           }}
         >
-          <div className="mono" style={{ fontSize: 9, color: "#00d4aa", letterSpacing: "0.1em", lineHeight: 1.4 }}>
+          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", letterSpacing: "0.1em", lineHeight: 1.4 }}>
             LOG DOSE — {formatLogHeaderDate(calLogYmd)}
           </div>
           {calDetail.length > 0 && (
             <div style={{ paddingBottom: 10, borderBottom: "1px solid #14202e" }}>
-              <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 6 }}>
+              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>
                 EXISTING ON THIS DAY
               </div>
               {calDetail.map((log) => (
@@ -990,18 +1012,44 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             </div>
           )}
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>DOSE (mcg)</div>
-            <input
-              className="form-input"
-              style={{ fontSize: 11, maxWidth: 200 }}
-              inputMode="decimal"
-              value={calLogDoseMcg}
-              onChange={(e) => setCalLogDoseMcg(e.target.value)}
-            />
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>UNITS DRAWN</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                className="btn-teal"
+                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+                onClick={() => setCalLogUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}
+              >
+                −
+              </button>
+              <div className="mono" style={{
+                fontSize: 16,
+                color: "#dde4ef",
+                minWidth: 60,
+                textAlign: "center",
+                padding: "6px 0",
+                borderBottom: "1px solid #14202e",
+              }}>
+                {calLogUnits}
+              </div>
+              <button
+                type="button"
+                className="btn-teal"
+                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+                onClick={() => setCalLogUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}
+              >
+                +
+              </button>
+              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginLeft: 6 }}>
+                {calDerivedMcg != null
+                  ? `= ${calDerivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
+                  : "— mcg"}
+              </div>
+            </div>
           </div>
           {qualifyingVialsForCal.length > 1 && (
             <div>
-              <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>WHICH VIAL</div>
+              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>WHICH VIAL</div>
               <select
                 className="form-input"
                 style={{ fontSize: 11, maxWidth: 280 }}
@@ -1010,9 +1058,14 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
                   const id = e.target.value;
                   setCalLogVialPick(id);
                   const v = qualifyingVialsForCal.find((x) => x.id === id);
-                  if (v?.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) {
-                    setCalLogDoseMcg(String(v.desired_dose_mcg));
-                  }
+                  if (!v) return;
+                  const recentDoses = dosesByVial[v.id] ?? [];
+                  const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
+                  const units =
+                    mcgToUnits(lastMcg, v.concentration_mcg_ml) ??
+                    mcgToUnits(v.desired_dose_mcg, v.concentration_mcg_ml) ??
+                    10;
+                  setCalLogUnits(Math.max(0.5, Math.min(300, units)));
                 }}
               >
                 {qualifyingVialsForCal.map((v) => (
@@ -1034,7 +1087,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             </div>
           )}
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>TIME</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>TIME</div>
             <input
               className="form-input"
               style={{ fontSize: 11, maxWidth: 160 }}
@@ -1044,7 +1097,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
             <input
               className="form-input"
               style={{ fontSize: 11 }}
@@ -1102,23 +1155,23 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             maxWidth: 400,
           }}
         >
-          <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 0 }}>
+          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 0 }}>
             NEW VIAL
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
             <div>
-              <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>LABEL</div>
+              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>LABEL</div>
               <input className="form-input" style={{ fontSize: 11 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
             <div>
-              <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>RECONSTITUTION DATE</div>
+              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>RECONSTITUTION DATE</div>
               <input className="form-input" style={{ fontSize: 11 }} type="date" value={formRecon} onChange={(e) => setFormRecon(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 6 }}>VIAL SIZE (mg)</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>VIAL SIZE (mg)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_MG_OPTIONS.map((o) => (
                 <SelectPill key={o.key} active={mgQuick === o.key} onClick={() => { setMgQuick(o.key); setFormMg(o.val); }}>
@@ -1142,7 +1195,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 6 }}>BAC WATER (mL)</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>BAC WATER (mL)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_ML_OPTIONS.map((o) => (
                 <SelectPill key={o.key} active={mlQuick === o.key} onClick={() => { setMlQuick(o.key); setFormMl(o.val); }}>
@@ -1166,7 +1219,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 6 }}>DESIRED DOSE (mcg per injection)</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>DESIRED DOSE (mcg per injection)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_DOSE_OPTIONS.map((o) => (
                 <SelectPill
@@ -1205,7 +1258,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
                 background: "#07090e",
               }}
             >
-              <div className="mono" style={{ fontSize: 8, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
+              <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
                 LIVE RESULTS
               </div>
               <div className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
@@ -1225,7 +1278,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
                       border: "1px solid #00d4aa",
                     }}
                   >
-                    <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.06em" }}>
+                    <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.06em" }}>
                       INSULIN SYRINGE
                     </div>
                     <div className="mono" style={{ fontSize: 12, color: "#00d4aa", lineHeight: 1.45 }}>
@@ -1260,7 +1313,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           )}
 
           <div>
-            <div className="mono" style={{ fontSize: 8, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
+            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
             <input className="form-input" style={{ fontSize: 11 }} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
           </div>
           <button type="submit" className="btn-teal" style={{ fontSize: 11, alignSelf: "flex-start" }}>

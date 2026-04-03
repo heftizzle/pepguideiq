@@ -5,13 +5,15 @@ import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { AddToStackForm } from "./components/AddToStackForm.jsx";
-import { SavedStackEntryRow, getStackRowListKey } from "./components/SavedStackEntryRow.jsx";
+import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
+import { ProtocolTab } from "./components/ProtocolTab.jsx";
 import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
 import { StackPhotoUpload } from "./components/StackPhotoUpload.jsx";
 import { VialTracker } from "./components/VialTracker.jsx";
+import { StackProtocolQuickLog } from "./components/StackProtocolQuickLog.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
-import { formatPlan, getNextTierId, getTier, hasAccess, TIER_RANK } from "./lib/tiers.js";
+import { formatPlan, getNextTierId, getTier, hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import { resolveStability } from "./lib/catalogStability.js";
 import {
@@ -77,7 +79,6 @@ const SORT_OPTIONS = [
   { value: "default", label: "Default" },
   { value: "az", label: "A → Z" },
   { value: "za", label: "Z → A" },
-  { value: "tier", label: "Tier" },
   { value: "category", label: "Category" },
 ];
 
@@ -105,8 +106,14 @@ export default function PepGuideIQ() {
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
   /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
+  /** Protocol session from nav pills, URL, or localStorage; cleared when leaving Protocol tab. */
+  const [protocolDeepLink, setProtocolDeepLink] = useState(null);
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
+
+  useEffect(() => {
+    if (activeTab !== "protocol") setProtocolDeepLink(null);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -130,6 +137,34 @@ export default function PepGuideIQ() {
   }, []);
 
   useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get("protocolSession");
+      const fromLs =
+        typeof localStorage !== "undefined" ? localStorage.getItem("protocolSession") : null;
+      const raw0 = fromUrl || fromLs;
+      const raw = raw0 === "evening" ? "night" : raw0;
+      const v =
+        raw === "morning" || raw === "afternoon" || raw === "night" ? raw : null;
+      if (v) {
+        if (typeof localStorage !== "undefined") localStorage.removeItem("protocolSession");
+        if (fromUrl) {
+          params.delete("protocolSession");
+          const qs = params.toString();
+          const path = window.location.pathname || "/";
+          const hash = window.location.hash || "";
+          window.history.replaceState({}, "", `${path}${qs ? `?${qs}` : ""}${hash}`);
+        }
+        setProtocolDeepLink(v);
+        setActiveTab("protocol");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
     stackHydrated.current = false;
     if (!user?.id || !isSupabaseConfigured()) {
       return;
@@ -137,7 +172,16 @@ export default function PepGuideIQ() {
     let ignore = false;
     loadStack(user.id).then((s) => {
       if (ignore) return;
-      const stack = s && typeof s === "object" && !Array.isArray(s) && Array.isArray(s.stack) ? s.stack : Array.isArray(s) ? s : [];
+      const raw =
+        s && typeof s === "object" && !Array.isArray(s) && Array.isArray(s.stack)
+          ? s.stack
+          : Array.isArray(s)
+            ? s
+            : [];
+      const stack = raw.map((item) => ({
+        ...item,
+        sessions: normalizeStackSessions(item.sessions),
+      }));
       const name = s && typeof s === "object" && !Array.isArray(s) && typeof s.name === "string" ? s.name : "";
       setMyStack(stack);
       setStackName(name);
@@ -185,8 +229,6 @@ export default function PepGuideIQ() {
         return base.sort((a, b) => a.name.localeCompare(b.name));
       case "za":
         return base.sort((a, b) => b.name.localeCompare(a.name));
-      case "tier":
-        return base.sort((a, b) => (TIER_RANK[a.tier] ?? 0) - (TIER_RANK[b.tier] ?? 0));
       case "category":
         return base.sort((a, b) => {
           const catA = primaryCategory(a) || "";
@@ -208,6 +250,33 @@ export default function PepGuideIQ() {
   const canAI = hasAccess(user?.plan, "pro");
   const canUploadStackPhoto = hasAccess(user?.plan ?? "entry", "pro");
   const canVialTracker = hasAccess(user?.plan ?? "entry", "pro");
+
+  const protocolRows = useMemo(
+    () =>
+      myStack.flatMap((p) => {
+        const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
+        const stab = resolveStability(catalogPeptide ?? p);
+        return stab.stabilityDays != null ? [{ peptideId: p.id, name: p.name }] : [];
+      }),
+    [myStack]
+  );
+
+  const protocolBaseRows = useMemo(
+    () =>
+      myStack.flatMap((p) => {
+        const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
+        const stab = resolveStability(catalogPeptide ?? p);
+        if (stab.stabilityDays == null) return [];
+        return [
+          {
+            peptideId: p.id,
+            name: p.name,
+            sessions: normalizeStackSessions(p.sessions),
+          },
+        ];
+      }),
+    [myStack]
+  );
 
   const openUpgradeModal = () => {
     setUpgradeFocusTier(getNextTierId(user?.plan));
@@ -232,6 +301,7 @@ export default function PepGuideIQ() {
           stackDose: dose,
           stackFrequency: frequency,
           stackNotes: notes,
+          sessions: ["morning", "afternoon", "night"],
           addedDate: new Date().toLocaleDateString(),
         },
       ]);
@@ -377,10 +447,8 @@ export default function PepGuideIQ() {
           <div style={{ maxWidth:1200,margin:"0 auto",padding:"0 16px" }}>
             <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
               <Logo />
-              <div style={{ display:"flex",alignItems:"center",gap:0,overflowX:"auto" }}>
+              <div id="nav-account-anchor" style={{ display:"flex",alignItems:"center",gap:0,overflowX:"auto",marginLeft:"auto",flexWrap:"wrap" }}>
                 {[
-                  { id:"library", label:"Library", count:PEPTIDES.length },
-                  { id:"stack",   label:"Saved Stacks", count:myStack.length||null },
                   { id:"guide", label:"AI Guide" },
                 ].map((t) => (
                   <button type="button" key={t.id} className={`tab-btn ${activeTab===t.id?"active":""}`} onClick={() => setActiveTab(t.id)}>
@@ -389,7 +457,7 @@ export default function PepGuideIQ() {
                 ))}
                 <div style={{ width:1,height:20,background:"#14202e",margin:"0 8px" }} />
                 <div style={{ display:"flex",alignItems:"center",gap:6 }}>
-                  <span className="pill" style={{ background: user.plan==="goat"?"#a855f720":user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="goat"?"#a855f7":user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="goat"?"#a855f730":user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:9 }}>
+                  <span className="pill" style={{ background: user.plan==="goat"?"#a855f720":user.plan==="elite"?"#f59e0b20":user.plan==="pro"?"#00d4aa20":"#14202e", color:user.plan==="goat"?"#a855f7":user.plan==="elite"?"#f59e0b":user.plan==="pro"?"#00d4aa":"#4a6080", border:`1px solid ${user.plan==="goat"?"#a855f730":user.plan==="elite"?"#f59e0b30":user.plan==="pro"?"#00d4aa30":"#14202e"}`, fontSize:11 }}>
                     {formatPlan(user.plan)}
                   </span>
                   {user.plan === "goat" ? (
@@ -409,7 +477,7 @@ export default function PepGuideIQ() {
           </div>
         </div>
 
-        <div style={{ maxWidth:1200,margin:"0 auto",padding:"20px 16px" }}>
+        <div style={{ maxWidth:1200,margin:"0 auto",padding:"20px 16px 88px" }}>
 
           {activeTab === "library" && (
             <div>
@@ -450,18 +518,6 @@ export default function PepGuideIQ() {
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 10,
-                    color: "#00d4aa",
-                    fontFamily: "'JetBrains Mono', monospace",
-                    marginBottom: 6,
-                    textAlign: "left",
-                  }}
-                >
-                  // ROUTE
-                </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   {ROUTE_FILTERS.map((r) => (
                     <button
@@ -535,13 +591,22 @@ export default function PepGuideIQ() {
                                 )}
                             </div>
                           )}
-                          {p.aliases[0] && <div className="mono" style={{ fontSize:9,color:"#a0a0b0",marginTop:1 }}>{p.aliases[0]}</div>}
+                          {p.aliases[0] && <div className="mono" style={{ fontSize:11,color:"#a0a0b0",marginTop:1 }}>{p.aliases[0]}</div>}
                         </div>
-                        <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize:9 }}>{cat0}</span>
+                        <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize:11 }}>{cat0}</span>
                       </div>
                       <div style={{ fontSize:11,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
                         {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
                       </div>
+                      {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
+                        <div
+                          className="mono"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ fontSize: 11, color: "#f59e0b", marginBottom: 10, lineHeight: 1.45 }}
+                        >
+                          ⚠ {p.bioavailabilityNote}
+                        </div>
+                      )}
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                         <div className="mono" style={{ fontSize:10,color:"#a0a0b0" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
                         <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ padding:"5px 10px",fontSize:11 }}
@@ -602,9 +667,18 @@ export default function PepGuideIQ() {
               ) : (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
                   <div style={{ marginBottom:4 }}>
-                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
+                    <div className="mono" style={{ fontSize:11,color:"#00d4aa",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
                     <SavedStackNameInput initialName={stackName} onCommit={setStackName} />
                   </div>
+                  {user?.id && (
+                    <StackProtocolQuickLog
+                      userId={user.id}
+                      protocolRows={protocolRows}
+                      canUse={canVialTracker}
+                      onUpgrade={openUpgradeModal}
+                      userPlan={user?.plan ?? "entry"}
+                    />
+                  )}
                   {myStack.map((p) => {
                     const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
                     const stab = resolveStability(catalogPeptide ?? p);
@@ -634,7 +708,7 @@ export default function PepGuideIQ() {
                     );
                   })}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
-                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
+                    <div className="mono" style={{ fontSize:11,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
                       {[...new Set(myStack.map((p) => primaryCategory(p)))].map((cat) => {
                         const cc = getCatColor(cat); const n = myStack.filter((p) => primaryCategory(p) === cat).length;
@@ -666,10 +740,24 @@ export default function PepGuideIQ() {
             </div>
           )}
 
+          {activeTab === "protocol" && user?.id && protocolDeepLink && (
+            <ProtocolTab
+              key={protocolDeepLink}
+              userId={user.id}
+              protocolBaseRows={protocolBaseRows}
+              canUse={canVialTracker}
+              onUpgrade={openUpgradeModal}
+              initialSession={protocolDeepLink}
+              onDeepLinkConsumed={() => {}}
+              onLoggedNavigateLibrary={() => setActiveTab("library")}
+              userPlan={user?.plan ?? "entry"}
+            />
+          )}
+
           {activeTab === "guide" && (
             <div style={{ display:"flex",gap:16,height:"calc(100vh - 170px)",flexDirection:"row" }}>
               <div style={{ width:190,flexShrink:0,overflowY:"auto",display:"flex",flexDirection:"column",gap:5 }} className="guide-sidebar">
-                <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#a0a0b0" }}>(optional)</span></div>
+                <div className="mono" style={{ fontSize:11,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#a0a0b0" }}>(optional)</span></div>
                 {GOALS.map((g) => (
                   <button type="button" key={g} className={`goal-chip ${goals.includes(g)?"on":""}`}
                     onClick={() => setGoals((prev) => prev.includes(g) ? prev.filter((x)=>x!==g) : [...prev,g])}>
@@ -678,7 +766,7 @@ export default function PepGuideIQ() {
                 ))}
                 {myStack.length > 0 && (
                   <div style={{ marginTop:14,paddingTop:14,borderTop:"1px solid #0e1822" }}>
-                    <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// SAVED STACK LOADED</div>
+                    <div className="mono" style={{ fontSize:11,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// SAVED STACK LOADED</div>
                     {myStack.map((p) => <div key={getStackRowListKey(p)} className="mono" style={{ fontSize:10,color:"#2e4055",padding:"2px 0" }}>→ {p.name}</div>)}
                   </div>
                 )}
@@ -690,8 +778,8 @@ export default function PepGuideIQ() {
                   <div className="brand" style={{ fontSize:12,color:"#a0a0b0",letterSpacing:".06em" }}>
                     <span style={{ color:"#00d4aa" }}>Pep</span>GuideIQ INTELLIGENCE
                   </div>
-                  {goals.length > 0 && <span className="mono" style={{ fontSize:9,color:"#a0a0b0" }}>{goals.length} goal{goals.length>1?"s":""} active</span>}
-                  {!canAI && <span className="pill" style={{ background:"#f59e0b15",color:"#f59e0b",border:"1px solid #f59e0b30",fontSize:9,marginLeft:"auto" }}>Upgrade to unlock AI</span>}
+                  {goals.length > 0 && <span className="mono" style={{ fontSize:11,color:"#a0a0b0" }}>{goals.length} goal{goals.length>1?"s":""} active</span>}
+                  {!canAI && <span className="pill" style={{ background:"#f59e0b15",color:"#f59e0b",border:"1px solid #f59e0b30",fontSize:11,marginLeft:"auto" }}>Upgrade to unlock AI</span>}
                 </div>
 
                 <div style={{ flex:1,overflowY:"auto",padding:14 }}>
@@ -717,7 +805,7 @@ export default function PepGuideIQ() {
                   {aiMsgs.map((msg,i) => (
                     <div key={i} className={`ai-msg ${msg.role==="user"?"ai-user":"ai-bot"}`}>
                       {msg.role === "assistant" && (
-                        <div className="mono" style={{ fontSize:8,color:"#00d4aa",marginBottom:5,letterSpacing:".15em" }}>
+                        <div className="mono" style={{ fontSize:11,color:"#00d4aa",marginBottom:5,letterSpacing:".15em" }}>
                           <span style={{ color:"#00d4aa" }}>Pep</span>GuideIQ
                         </div>
                       )}
@@ -796,26 +884,31 @@ export default function PepGuideIQ() {
                 </div>
               </div>
               <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize:12,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
+              {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
+                <div className="mono" style={{ fontSize: 11, color: "#f59e0b", marginBottom: 12, lineHeight: 1.45 }}>
+                  ⚠ {p.bioavailabilityNote}
+                </div>
+              )}
               {[["Typical Dose",p.typicalDose],["Start Dose",p.startDose],["Titration",p.titrationNote],["Half-life",p.halfLife],["Route",p.route.join(", ")],["Cycle",p.cycle],["Storage",p.storage],["Reconstitution",p.reconstitution]].map(([l,v]) => (
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
               <div style={{ marginTop:12 }}>
-                <div className="mono" style={{ fontSize:9,color:"#00d4aa",letterSpacing:".12em",marginBottom:7 }}>// BENEFITS</div>
+                <div className="mono" style={{ fontSize:11,color:"#00d4aa",letterSpacing:".12em",marginBottom:7 }}>// BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"#00d4aa0e",color:"#00d4aa70",border:"1px solid #00d4aa18" }}>{b}</span>)}</div>
               </div>
               <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize:9,color:"#f59e0b",letterSpacing:".12em",marginBottom:7 }}>// SIDE EFFECTS</div>
+                <div className="mono" style={{ fontSize:11,color:"#f59e0b",letterSpacing:".12em",marginBottom:7 }}>// SIDE EFFECTS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
               </div>
               {p.stacksWith.length > 0 && (
                 <div style={{ marginTop:10 }}>
-                  <div className="mono" style={{ fontSize:9,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>// STACKS WELL WITH</div>
+                  <div className="mono" style={{ fontSize:11,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>// STACKS WELL WITH</div>
                   <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
                 </div>
               )}
               {p.notes && (
                 <div style={{ marginTop:12,background:"#07090e",border:"1px solid #0e1822",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize:9,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>// NOTES</div>
+                  <div className="mono" style={{ fontSize:11,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>// NOTES</div>
                   <div style={{ fontSize:11,color:"#a0a0b0",lineHeight:1.65 }}>{p.notes}</div>
                 </div>
               )}
@@ -860,7 +953,191 @@ export default function PepGuideIQ() {
           />
         )}
 
-        <LegalDisclaimer />
+        <nav
+          aria-label="Main"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 40,
+            background: "#07090e",
+            borderTop: "1px solid #0e1822",
+            padding: "8px 10px calc(8px + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 1200,
+              margin: "0 auto",
+              display: "flex",
+              alignItems: "stretch",
+              justifyContent: "space-between",
+              gap: 6,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveTab("library")}
+              style={{
+                flex: "1 1 0",
+                minWidth: 0,
+                minHeight: 44,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+                padding: "6px 4px",
+                borderRadius: 12,
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+                border: activeTab === "library" ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
+                background: activeTab === "library" ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
+                boxShadow: activeTab === "library" ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+              }}
+            >
+              <span style={{ fontSize: 18, lineHeight: 1, opacity: activeTab === "library" ? 1 : 0.72 }} aria-hidden>
+                🧬
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.15,
+                  letterSpacing: "0.06em",
+                  color: activeTab === "library" ? "#00d4aa" : "#5c6d82",
+                  fontWeight: 500,
+                }}
+              >
+                LIBRARY
+              </span>
+            </button>
+            <div
+              role="group"
+              aria-label="Protocol session"
+              style={{
+                flex: "3 1 0",
+                minWidth: 0,
+                display: "flex",
+                alignItems: "stretch",
+                gap: 4,
+              }}
+            >
+              {[
+                { session: "morning", emoji: "🌅" },
+                { session: "afternoon", emoji: "☀️" },
+                { session: "night", emoji: "🌙" },
+              ].map(({ session, emoji }) => {
+                const isActive = activeTab === "protocol" && protocolDeepLink === session;
+                const ariaLabel =
+                  session === "morning"
+                    ? "Morning"
+                    : session === "afternoon"
+                      ? "Afternoon"
+                      : "Night";
+                return (
+                  <button
+                    key={session}
+                    type="button"
+                    aria-label={ariaLabel}
+                    onClick={() => {
+                      setActiveTab("protocol");
+                      setProtocolDeepLink(session);
+                    }}
+                    style={{
+                      flex: "1 1 0",
+                      minWidth: 0,
+                      minHeight: 44,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "6px 2px",
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      border: isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
+                      background: isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
+                      boxShadow: isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                    }}
+                  >
+                    <span style={{ fontSize: 18, lineHeight: 1, opacity: isActive ? 1 : 0.72 }} aria-hidden>
+                      {emoji}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {[
+              {
+                tabId: "vials",
+                emoji: "🧪",
+                label: "VIALS",
+                isActive: activeTab === "stack",
+                onClick: () => setActiveTab("stack"),
+              },
+              {
+                tabId: "stacks",
+                emoji: "📋",
+                label: "STACKS",
+                isActive: activeTab === "stack",
+                onClick: () => setActiveTab("stack"),
+              },
+              {
+                tabId: "profile",
+                emoji: "👤",
+                label: "PROFILE",
+                isActive: false,
+                onClick: () => {
+                  document.getElementById("nav-account-anchor")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                },
+              },
+            ].map((item) => (
+              <button
+                key={item.tabId}
+                type="button"
+                onClick={item.onClick}
+                style={{
+                  flex: "1 1 0",
+                  minWidth: 0,
+                  minHeight: 44,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  padding: "6px 4px",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  border: item.isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
+                  background: item.isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
+                  boxShadow: item.isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1, opacity: item.isActive ? 1 : 0.72 }} aria-hidden>
+                  {item.emoji}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    lineHeight: 1.15,
+                    letterSpacing: "0.06em",
+                    color: item.isActive ? "#00d4aa" : "#5c6d82",
+                    fontWeight: 500,
+                  }}
+                >
+                  {item.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        <div style={{ paddingBottom: 72 }}>
+          <LegalDisclaimer />
+        </div>
 
       </div>
     </>

@@ -1,21 +1,71 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
+
+const SESSION_ORDER = { morning: 0, afternoon: 1, night: 2 };
+
+/** Default: compound appears in all three protocol sessions. */
+export const DEFAULT_STACK_SESSIONS = ["morning", "afternoon", "night"];
+
+/** @param {unknown} s */
+export function normalizeStackSessions(s) {
+  const allowed = new Set(["morning", "afternoon", "night"]);
+  if (!Array.isArray(s)) return [...DEFAULT_STACK_SESSIONS];
+  const f = [
+    ...new Set(
+      s.map((x) => (x === "evening" ? "night" : x)).filter((x) => allowed.has(x))
+    ),
+  ];
+  return f.length ? f.sort((a, b) => SESSION_ORDER[a] - SESSION_ORDER[b]) : [...DEFAULT_STACK_SESSIONS];
+}
 
 /** Stable list key for a saved stack row (uuid when present, else catalog id). */
 export function getStackRowListKey(item) {
   return item.stackRowKey ?? item.id;
 }
 
+const SESSION_TOGGLES = [
+  { id: "morning", icon: "🌞" },
+  { id: "afternoon", icon: "🌅" },
+  { id: "night", icon: "🌙" },
+];
+
 export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemove }) {
   const rowKey = getStackRowListKey(item);
   const [dose, setDose] = useState(() => item.stackDose ?? item.startDose ?? "");
   const [frequency, setFrequency] = useState(() => item.stackFrequency ?? "");
   const [notes, setNotes] = useState(() => item.stackNotes ?? "");
+  const [sessionTimingBannerDismissed, setSessionTimingBannerDismissed] = useState(false);
 
   useEffect(() => {
     setDose(item.stackDose ?? item.startDose ?? "");
     setFrequency(item.stackFrequency ?? "");
     setNotes(item.stackNotes ?? "");
   }, [rowKey]);
+
+  const sessions = normalizeStackSessions(item.sessions);
+  const peptideId = item.id;
+
+  useEffect(() => {
+    setSessionTimingBannerDismissed(false);
+  }, [rowKey, sessions.join(",")]);
+
+  const activeSessionWarning = useMemo(() => {
+    for (const sid of sessions) {
+      if (hasAnyTimingConflict([peptideId], sid)) {
+        return getTimingWarning(peptideId, sid);
+      }
+    }
+    return null;
+  }, [peptideId, sessions.join(",")]);
+
+  const toggleSession = (sid) => {
+    if (sessions.includes(sid)) {
+      if (sessions.length <= 1) return;
+      onUpdate(rowKey, { sessions: sessions.filter((x) => x !== sid) });
+    } else {
+      onUpdate(rowKey, { sessions: normalizeStackSessions([...sessions, sid]) });
+    }
+  };
 
   const cc = catColor;
 
@@ -26,13 +76,90 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 6 }}>
           <div>
             <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-            <div className="mono" style={{ fontSize: 9, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
+            <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
           </div>
           <button type="button" className="btn-red" onClick={() => onRemove(rowKey)}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
           <div>
-            <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              {SESSION_TOGGLES.map((t) => {
+                const on = sessions.includes(t.id);
+                const sessionWarning = getTimingWarning(peptideId, t.id);
+                const warnSelected = on && sessionWarning;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    title={sessionWarning ? sessionWarning : t.id}
+                    onClick={() => toggleSession(t.id)}
+                    style={{
+                      minWidth: 40,
+                      minHeight: 40,
+                      borderRadius: 8,
+                      border: warnSelected
+                        ? "1px solid rgba(245, 158, 11, 0.55)"
+                        : on
+                          ? "1px solid rgba(0,212,170,0.45)"
+                          : "1px solid #243040",
+                      background: on ? "rgba(0,212,170,0.1)" : "rgba(255,255,255,0.03)",
+                      fontSize: 18,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      opacity: on ? 1 : 0.45,
+                    }}
+                  >
+                    {t.icon}
+                  </button>
+                );
+              })}
+            </div>
+            {activeSessionWarning && !sessionTimingBannerDismissed && (
+              <div
+                className="mono"
+                style={{
+                  marginTop: 6,
+                  padding: 10,
+                  borderRadius: 8,
+                  border: "1px solid rgba(245, 158, 11, 0.45)",
+                  background: "rgba(245, 158, 11, 0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#f59e0b",
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-line",
+                    marginBottom: 8,
+                  }}
+                >
+                  ⚠ {activeSessionWarning}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn-teal"
+                    style={{ fontSize: 11, padding: "5px 10px" }}
+                    onClick={() => setSessionTimingBannerDismissed(true)}
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-teal"
+                    style={{ fontSize: 11, padding: "5px 10px", opacity: 0.92 }}
+                    onClick={() => setSessionTimingBannerDismissed(true)}
+                  >
+                    Keep sessions anyway
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
             <input
               className="form-input"
               style={{ fontSize: 12 }}
@@ -42,7 +169,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
             <input
               className="form-input"
               style={{ fontSize: 12 }}
@@ -53,7 +180,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
             <textarea
               className="form-input"
               style={{ fontSize: 12, minHeight: 56, resize: "vertical" }}

@@ -102,7 +102,7 @@ export function AuthScreen({ onAuth }) {
         <div
           className="mono"
           style={{
-            fontSize: 9,
+            fontSize: 11,
             color: "#a0a0b0",
             letterSpacing: ".2em",
             marginBottom: 28,
@@ -156,7 +156,7 @@ export function AuthScreen({ onAuth }) {
                     transform: "translateX(-50%)",
                     background: plan.color,
                     color: "#07090e",
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: 700,
                     fontFamily: "'JetBrains Mono',monospace",
                     padding: "2px 12px",
@@ -235,7 +235,7 @@ export function AuthScreen({ onAuth }) {
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Logo />
-          <div className="mono" style={{ fontSize: 9, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
             {mode === "login" ? "SIGN IN TO YOUR ACCOUNT" : "CREATE YOUR ACCOUNT"}
           </div>
         </div>
@@ -243,7 +243,7 @@ export function AuthScreen({ onAuth }) {
         <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
           {mode === "register" && (
             <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+              <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
                 NAME
               </div>
               <input
@@ -256,7 +256,7 @@ export function AuthScreen({ onAuth }) {
             </div>
           )}
           <div style={{ marginBottom: 14 }}>
-            <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               EMAIL
             </div>
             <input
@@ -270,7 +270,7 @@ export function AuthScreen({ onAuth }) {
             />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <div className="mono" style={{ fontSize: 9, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
             <input

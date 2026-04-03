@@ -153,6 +153,9 @@ export function normalizeNewCatalogEntry(raw) {
     ...(raw.variantOf ? { variantOf: String(raw.variantOf) } : {}),
     ...(raw.variantNote ? { variantNote: sanitizeVendorRefs(String(raw.variantNote)) } : {}),
     ...(raw.tier != null ? { tier: String(raw.tier) } : {}),
+    ...(raw.bioavailabilityNote != null && String(raw.bioavailabilityNote).trim()
+      ? { bioavailabilityNote: sanitizeVendorRefs(String(raw.bioavailabilityNote)) }
+      : {}),
   };
   const merged = { ...entry };
   if (Object.prototype.hasOwnProperty.call(raw, "stabilityDays")) merged.stabilityDays = raw.stabilityDays;

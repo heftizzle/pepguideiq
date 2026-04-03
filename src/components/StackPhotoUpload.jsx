@@ -195,7 +195,7 @@ export function StackPhotoUpload({
       <div
         className="mono"
         style={{
-          fontSize: 9,
+          fontSize: 11,
           color: "#00d4aa",
           marginBottom: 6,
           letterSpacing: "0.12em",
@@ -292,12 +292,12 @@ export function StackPhotoUpload({
           </>
         ) : (
           <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", padding: "12px 14px", textAlign: "center" }}>
-            // Upload your stack photo
+            Upload your stack photo
           </div>
         )}
       </div>
       {err && (
-        <div className="mono" style={{ fontSize: 9, color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
+        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
           {err}
         </div>
       )}

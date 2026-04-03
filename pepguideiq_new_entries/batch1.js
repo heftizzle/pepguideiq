@@ -5,6 +5,7 @@ export const BATCH1 = [
     name: "Semax",
     aliases: ["ACTH(4-10) analog", "MEHFPGP"],
     category: ["Nootropic"],
+    route: ["intranasal", "subQ injection"],
     mechanism:
       "Synthetic ACTH(4-7)-Pro-Gly-Pro fragment. Upregulates BDNF and NGF; neuroprotective. Shorter half-life than N-Acetyl Amidate form. Standard intranasal or subQ research compound.",
     halfLife: "~20 minutes (intranasal active window longer)",
@@ -23,6 +24,7 @@ export const BATCH1 = [
     name: "Selank",
     aliases: ["Tuftsin analog", "TP-7"],
     category: ["Nootropic", "Sleep"],
+    route: ["subQ injection", "intranasal"],
     mechanism:
       "Synthetic Tuftsin analog (TKPRPGP). Anxiolytic via GABAergic and serotonergic modulation. Immunomodulatory. Enkephalin metabolism regulation. Base form without acetyl/amidate modifications.",
     halfLife: "~2 hours",

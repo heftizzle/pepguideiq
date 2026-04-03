@@ -22,7 +22,7 @@ export function Logo({ size = 19, style = {} }) {
           <span style={{ color: "#dde4ef" }}>Guide</span>
           <span style={{ color: "#00d4aa", fontSize: size * 0.7 }}>IQ</span>
         </div>
-        <div className="mono" style={{ fontSize: 7, color: "#a0a0b0", letterSpacing: ".18em" }}>
+        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", letterSpacing: ".18em" }}>
           RESEARCH INTELLIGENCE
         </div>
       </div>

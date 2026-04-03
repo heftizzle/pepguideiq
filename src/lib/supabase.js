@@ -253,3 +253,16 @@ export async function insertDoseLog(row) {
   const { error } = await supabase.from("dose_logs").insert(row);
   return { error: error ?? null };
 }
+
+export async function listRecentDosedAtDates(userId) {
+  if (!isSupabaseConfigured()) return { dates: [], error: null };
+  const since = new Date();
+  since.setDate(since.getDate() - 400);
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("dosed_at")
+    .eq("user_id", userId)
+    .gte("dosed_at", since.toISOString())
+    .order("dosed_at", { ascending: false });
+  return { dates: data?.map((r) => r.dosed_at) ?? [], error };
+}
