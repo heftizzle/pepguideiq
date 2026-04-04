@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { isSupabaseConfigured } from "../lib/config.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { mcgToUnits, roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import {
   deleteUserVial,
+  getProfileStackShotR2Keys,
+  getSessionAccessToken,
   insertDoseLog,
   insertUserVial,
   listDoseLogsForPeptideRange,
@@ -10,6 +12,349 @@ import {
   listVialsForPeptide,
   updateUserVial,
 } from "../lib/supabase.js";
+
+const VIAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const VIAL_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const VIAL_PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+
+function useWorkerObjectUrl(r2Key, workerConfigured) {
+  const [objectUrl, setObjectUrl] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let revoke = null;
+
+    async function run() {
+      if (!r2Key || !workerConfigured) {
+        setObjectUrl(null);
+        return;
+      }
+      const token = await getSessionAccessToken();
+      if (!token || cancelled) {
+        setObjectUrl(null);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) {
+          setObjectUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        const u = URL.createObjectURL(blob);
+        revoke = u;
+        if (!cancelled) setObjectUrl(u);
+      } catch {
+        if (!cancelled) setObjectUrl(null);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [r2Key, workerConfigured]);
+
+  return objectUrl;
+}
+
+/**
+ * @param {{ kind: "stack_shot_1" | "stack_shot_2", r2Key: string | null, workerConfigured: boolean, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void }} props
+ */
+function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState(null);
+  const imgUrl = useWorkerObjectUrl(r2Key, workerConfigured);
+  const showImage = Boolean(r2Key && imgUrl);
+
+  function openPicker() {
+    if (uploading) return;
+    if (!canMutate) {
+      onUpgrade();
+      return;
+    }
+    if (!workerConfigured) {
+      setErr("// Configure VITE_API_WORKER_URL");
+      return;
+    }
+    setErr(null);
+    inputRef.current?.click();
+  }
+
+  async function onInputChange(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setErr(null);
+    if (!VIAL_PHOTO_TYPES.has(f.type)) {
+      setErr("// JPEG, PNG, or WebP only");
+      return;
+    }
+    if (f.size > VIAL_PHOTO_MAX_BYTES) {
+      setErr("// Max 5MB");
+      return;
+    }
+    const token = await getSessionAccessToken();
+    if (!token) {
+      setErr("// Sign in required");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("kind", kind);
+    setUploading(true);
+    try {
+      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
+        setErr(`// ${msg}`);
+        return;
+      }
+      await onUploaded();
+    } catch {
+      setErr("// Network error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={VIAL_PHOTO_ACCEPT}
+        style={{ display: "none" }}
+        onChange={(e) => void onInputChange(e)}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={uploading}
+        style={{
+          width: "100%",
+          aspectRatio: "3 / 4",
+          maxHeight: 220,
+          borderRadius: 12,
+          border: showImage ? "1px solid #1e2a38" : "2px dashed #243040",
+          background: "#07090e",
+          cursor: uploading ? "wait" : "pointer",
+          padding: 0,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {showImage ? (
+          <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : r2Key ? (
+          <span className="mono" style={{ fontSize: 12, color: "#4a6080" }}>
+            Loading…
+          </span>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+            <span style={{ fontSize: 32, lineHeight: 1, opacity: 0.8 }} aria-hidden>
+              📷
+            </span>
+            <span className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.08em" }}>
+              STACK SHOT
+            </span>
+          </div>
+        )}
+      </button>
+      <div
+        className="mono"
+        style={{
+          fontSize: 11,
+          color: "#7a8694",
+          textAlign: "center",
+          letterSpacing: "0.06em",
+          lineHeight: 1.35,
+          maxWidth: "100%",
+        }}
+      >
+        STACK SHOT
+      </div>
+      {err && (
+        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", textAlign: "center" }}>
+          {err}
+        </div>
+      )}
+      {uploading && (
+        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0" }}>
+          Uploading…
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * @param {{ vialId: string, r2Key: string | null | undefined, workerConfigured: boolean, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void }} props
+ */
+function VialPhotoThumb({ vialId, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState(null);
+  const key = typeof r2Key === "string" ? r2Key.trim() : "";
+  const imgUrl = useWorkerObjectUrl(key || null, workerConfigured);
+  const showImage = Boolean(key && imgUrl);
+
+  function openPicker() {
+    if (uploading) return;
+    if (!canMutate) {
+      onUpgrade();
+      return;
+    }
+    if (!workerConfigured) {
+      setErr("// Worker URL");
+      return;
+    }
+    setErr(null);
+    inputRef.current?.click();
+  }
+
+  async function onInputChange(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setErr(null);
+    if (!VIAL_PHOTO_TYPES.has(f.type)) {
+      setErr("JPEG, PNG, or WebP only");
+      return;
+    }
+    if (f.size > VIAL_PHOTO_MAX_BYTES) {
+      setErr("Max 5MB");
+      return;
+    }
+    const token = await getSessionAccessToken();
+    if (!token) {
+      setErr("Sign in required");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("kind", "vial");
+    fd.append("vial_id", vialId);
+    setUploading(true);
+    try {
+      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
+        setErr(msg);
+        return;
+      }
+      await onUploaded();
+    } catch {
+      setErr("Network error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        width: 64,
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        alignItems: "stretch",
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={VIAL_PHOTO_ACCEPT}
+        style={{ display: "none" }}
+        onChange={(e) => void onInputChange(e)}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={uploading}
+        title={showImage ? "Replace photo" : "Add photo"}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          border: showImage ? "1px solid #1e2a38" : "1px dashed #243040",
+          background: "#0a0f16",
+          cursor: uploading ? "wait" : "pointer",
+          padding: 0,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        {showImage ? (
+          <img
+            src={imgUrl}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : key ? (
+          <span className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+            …
+          </span>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+              padding: 4,
+            }}
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }} aria-hidden>
+              📷
+            </span>
+            <span
+              className="mono"
+              style={{ fontSize: 9, color: "#5c6d82", lineHeight: 1.15, textAlign: "center" }}
+            >
+              Add photo
+            </span>
+          </div>
+        )}
+      </button>
+      {err && (
+        <div className="mono" style={{ fontSize: 9, color: "#f59e0b", textAlign: "center", lineHeight: 1.2 }}>
+          {err}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function todayYmd() {
   const d = new Date();
@@ -46,6 +391,10 @@ function formatShortDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function formatMediumDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 function formatConc(n) {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
@@ -53,7 +402,7 @@ function formatConc(n) {
 }
 
 const PILL = {
-  borderRadius: 9999,
+  borderRadius: 12,
   fontFamily: "JetBrains Mono, monospace",
   fontSize: 13,
   padding: "10px 20px",
@@ -99,13 +448,6 @@ function nextVialLabel(vials) {
   return `Vial ${n}`;
 }
 
-function countdownStyle(days, expired) {
-  if (expired) return { color: "#6b7280", textDecoration: "line-through" };
-  if (days > 14) return { color: "#10b981" };
-  if (days >= 7) return { color: "#f59e0b" };
-  return { color: "#ef4444" };
-}
-
 const ADD_VIAL_MG_OPTIONS = [
   { key: "2", val: "2", label: "2 mg" },
   { key: "5", val: "5", label: "5 mg" },
@@ -128,6 +470,41 @@ function stripTimeLocal(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+}
+
+/** Calendar span from local recon day → local expiry day (minimum 1). For UI only; does not alter stored expiry. */
+function totalStabilityCalendarDays(reconIso, expiresIso) {
+  const recon = stripTimeLocal(new Date(reconIso));
+  const exp = stripTimeLocal(new Date(expiresIso));
+  const days = Math.round((exp.getTime() - recon.getTime()) / 86400000);
+  return Math.max(1, days);
+}
+
+/** Bar + badge colors from fraction of stability window still remaining (dr / total). */
+function urgencyFromLifeRemaining(remainingFrac) {
+  const f = Math.min(1, Math.max(0, remainingFrac));
+  if (f > 0.5) {
+    return {
+      barColor: "#10b981",
+      badgeBg: "rgba(16, 185, 129, 0.18)",
+      badgeBorder: "rgba(16, 185, 129, 0.45)",
+      badgeText: "#6ee7b7",
+    };
+  }
+  if (f > 0.25) {
+    return {
+      barColor: "#f59e0b",
+      badgeBg: "rgba(245, 158, 11, 0.18)",
+      badgeBorder: "rgba(245, 158, 11, 0.45)",
+      badgeText: "#fcd34d",
+    };
+  }
+  return {
+    barColor: "#ef4444",
+    badgeBg: "rgba(239, 68, 68, 0.18)",
+    badgeBorder: "rgba(239, 68, 68, 0.45)",
+    badgeText: "#fca5a5",
+  };
 }
 
 function startOfWeekSunday(d) {
@@ -320,6 +697,7 @@ function DoseHistoryCalendar({
             fontSize: 12,
             padding: "4px 10px",
             minWidth: 36,
+            borderRadius: 12,
             opacity: canGoPrev ? 1 : 0.35,
             cursor: canGoPrev ? "pointer" : "not-allowed",
           }}
@@ -348,6 +726,7 @@ function DoseHistoryCalendar({
             fontSize: 12,
             padding: "4px 10px",
             minWidth: 36,
+            borderRadius: 12,
             opacity: canGoNext ? 1 : 0.35,
             cursor: canGoNext ? "pointer" : "not-allowed",
           }}
@@ -410,7 +789,7 @@ function DoseHistoryCalendar({
                 style={{
                   minWidth: 36,
                   minHeight: 36,
-                  borderRadius: 6,
+                  borderRadius: 12,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -459,7 +838,7 @@ function DoseHistoryCalendar({
               style={{
                 minWidth: 36,
                 minHeight: 36,
-                borderRadius: 6,
+                borderRadius: 12,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -500,6 +879,7 @@ function DoseHistoryCalendar({
 function VialRow({
   vial,
   userId,
+  profileId,
   peptideId,
   canMutate,
   doses,
@@ -507,11 +887,15 @@ function VialRow({
   logOpen,
   onToggleLog,
   stabilityNote,
+  workerConfigured,
+  onUpgrade,
 }) {
   const [label, setLabel] = useState(vial.label ?? "Vial 1");
   const [doseUnits, setDoseUnits] = useState(10);
   const [doseNotes, setDoseNotes] = useState("");
   const [savingLabel, setSavingLabel] = useState(false);
+  const [expiryDetailOpen, setExpiryDetailOpen] = useState(false);
+  const expiryDetailRef = useRef(null);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
@@ -524,6 +908,16 @@ function VialRow({
     setDoseUnits(Math.max(0.5, Math.min(300, units)));
   }, [vial.id, vial.label, vial.concentration_mcg_ml, vial.desired_dose_mcg, doses]);
 
+  useEffect(() => {
+    if (!expiryDetailOpen) return;
+    function onPointerDown(e) {
+      const el = expiryDetailRef.current;
+      if (el && !el.contains(e.target)) setExpiryDetailOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [expiryDetailOpen]);
+
   const rowDerivedMcg = useMemo(
     () => unitsToMcg(doseUnits, vial.concentration_mcg_ml),
     [doseUnits, vial.concentration_mcg_ml]
@@ -532,18 +926,22 @@ function VialRow({
   const dr = daysRemaining(vial.expires_at);
   const expired = dr < 0 || new Date(vial.expires_at) < new Date();
   const depleted = vial.status === "depleted";
+  const totalLifeDays = totalStabilityCalendarDays(vial.reconstituted_at, vial.expires_at);
+  const remainingFrac = Math.min(1, Math.max(0, dr / totalLifeDays));
+  const urgency = urgencyFromLifeRemaining(remainingFrac);
+  const barFillPct = Math.min(100, Math.max(0, (1 - remainingFrac) * 100));
 
   async function saveLabel() {
     if (!canMutate || label.trim() === (vial.label ?? "").trim()) return;
     setSavingLabel(true);
-    await updateUserVial(vial.id, userId, { label: label.trim() || "Vial" });
+    await updateUserVial(vial.id, userId, profileId, { label: label.trim() || "Vial" });
     setSavingLabel(false);
     onReload();
   }
 
   async function markDepleted() {
     if (!canMutate) return;
-    await updateUserVial(vial.id, userId, { status: "depleted" });
+    await updateUserVial(vial.id, userId, profileId, { status: "depleted" });
     onReload();
   }
 
@@ -553,6 +951,7 @@ function VialRow({
     if (!rowDerivedMcg || rowDerivedMcg <= 0) return;
     const { error } = await insertDoseLog({
       user_id: userId,
+      profile_id: profileId,
       vial_id: vial.id,
       peptide_id: peptideId,
       dose_mcg: rowDerivedMcg,
@@ -566,93 +965,177 @@ function VialRow({
 
   function removeVial() {
     if (!canMutate) return;
-    if (!window.confirm(`Delete ${vial.label ?? "this vial"} and its dose history?`)) return;
-    void deleteUserVial(vial.id, userId).then(() => onReload());
+    if (
+      !window.confirm(
+        `Delete ${vial.label ?? "this vial"}? Your dose history for this peptide will stay saved.`
+      )
+    )
+      return;
+    void deleteUserVial(vial.id, userId, profileId).then(() => onReload());
   }
-
-  const cs = countdownStyle(dr, expired);
 
   return (
     <div
       style={{
         border: "1px solid #14202e",
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 10,
         background: "#07090e",
         marginBottom: 8,
         opacity: depleted ? 0.75 : 1,
       }}
     >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div style={{ flex: "1 1 140px", minWidth: 0 }}>
-          <input
-            className="form-input"
-            style={{ fontSize: 11, marginBottom: 6 }}
-            value={label}
-            disabled={!canMutate || savingLabel}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={() => void saveLabel()}
-          />
-          <div className="mono" style={{ fontSize: 10, color: "#a0a0b0" }}>
-            Reconstituted {formatShortDate(vial.reconstituted_at)}
-          </div>
-          <div className="mono" style={{ fontSize: 10, color: "#8fa5bf", marginTop: 4 }}>
-            Conc. {formatConc(vial.concentration_mcg_ml)}
-          </div>
-        </div>
-        <div style={{ textAlign: "right", minWidth: 120 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <VialPhotoThumb
+          vialId={vial.id}
+          r2Key={vial.vial_photo_r2_key}
+          workerConfigured={workerConfigured}
+          canMutate={canMutate}
+          onUpgrade={onUpgrade}
+          onUploaded={onReload}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+              <input
+                className="form-input"
+                style={{ fontSize: 13, marginBottom: 6 }}
+                value={label}
+                disabled={!canMutate || savingLabel}
+                onChange={(e) => setLabel(e.target.value)}
+                onBlur={() => void saveLabel()}
+              />
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
+                Reconstituted {formatShortDate(vial.reconstituted_at)}
+              </div>
+              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 4 }}>
+                Conc. {formatConc(vial.concentration_mcg_ml)}
+              </div>
+            </div>
+            <div style={{ textAlign: "right", minWidth: 120 }}>
           {expired ? (
-            <div className="mono" style={{ fontSize: 11, color: "#6b7280", textDecoration: "line-through" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#6b7280", textDecoration: "line-through" }}>
               EXPIRED
             </div>
           ) : depleted ? (
-            <div className="mono" style={{ fontSize: 11, color: "#6b7280" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#6b7280" }}>
               Depleted
             </div>
           ) : (
-            <div className="mono" style={{ fontSize: 11, ...cs }}>
-              Expires in {dr} day{dr === 1 ? "" : "s"}
-            </div>
-          )}
-          {stabilityNote && (
             <div
-              className="mono"
-              style={{
-                fontSize: 9,
-                color: "#4a6080",
-                marginTop: 6,
-                lineHeight: 1.45,
-                maxWidth: 220,
-                marginLeft: "auto",
-                textAlign: "right",
-              }}
+              ref={expiryDetailRef}
+              style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", width: "100%" }}
             >
-              {stabilityNote}
+              <button
+                type="button"
+                className="mono"
+                onClick={() => setExpiryDetailOpen((o) => !o)}
+                style={{
+                  fontSize: 13,
+                  borderRadius: 12,
+                  padding: "6px 12px",
+                  border: `1px solid ${urgency.badgeBorder}`,
+                  background: urgency.badgeBg,
+                  color: urgency.badgeText,
+                  cursor: "pointer",
+                  lineHeight: 1.25,
+                  display: "inline-flex",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                  maxWidth: 120,
+                }}
+              >
+                Expires in {dr} day{dr === 1 ? "" : "s"}
+              </button>
+              {expiryDetailOpen && (
+                <div
+                  role="region"
+                  aria-label="Expiry details"
+                  style={{
+                    marginTop: 8,
+                    width: "100%",
+                    maxWidth: 280,
+                    marginLeft: "auto",
+                    textAlign: "left",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid #14202e",
+                    background: "#0a0f16",
+                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+                  }}
+                >
+                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.45, marginBottom: 10 }}>
+                    {stabilityNote ||
+                      "Use within 28 days refrigerated. Conservative recommendation — some sources cite up to 60 days."}
+                  </div>
+                  <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
+                    Reconstituted {formatMediumDate(vial.reconstituted_at)}
+                  </div>
+                  <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
+                    Expires {formatMediumDate(vial.expires_at)}
+                  </div>
+                  <div className="mono" style={{ fontSize: 13, color: "#dde4ef", marginBottom: 10 }}>
+                    {dr} day{dr === 1 ? "" : "s"} remaining
+                  </div>
+                  <div
+                    aria-hidden
+                    style={{
+                      height: 8,
+                      borderRadius: 12,
+                      background: "#14202e",
+                      overflow: "hidden",
+                      border: "1px solid #1e2a38",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${barFillPct}%`,
+                        background: urgency.barColor,
+                        borderRadius: 12,
+                        transition: "width 0.2s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      </div>
+          </div>
 
-      {canMutate && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-          <button type="button" className="btn-teal" style={{ fontSize: 10, padding: "4px 10px" }} disabled={depleted} onClick={() => void markDepleted()}>
-            Mark as Depleted
-          </button>
-          <button type="button" className="btn-teal" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => onToggleLog(vial.id)}>
-            Log Dose
-          </button>
-          <button type="button" className="btn-red" style={{ fontSize: 10, padding: "4px 10px" }} onClick={() => removeVial()}>
-            Delete vial
-          </button>
-        </div>
-      )}
+          {canMutate && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+              <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} disabled={depleted} onClick={() => void markDepleted()}>
+                Mark as Depleted
+              </button>
+              <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => onToggleLog(vial.id)}>
+                Log Dose
+              </button>
+              <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
+                Delete vial
+              </button>
+            </div>
+          )}
 
-      {logOpen && canMutate && (
+          {logOpen && canMutate && (
         <form onSubmit={submitDose} style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #0e1822" }}>
-          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 6 }}>LOG DOSE</div>
+          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6 }}>LOG DOSE</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <button type="button" className="btn-teal"
-              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
               onClick={() => setDoseUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}>
               −
             </button>
@@ -660,36 +1143,40 @@ function VialRow({
               {doseUnits}
             </div>
             <button type="button" className="btn-teal"
-              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
               onClick={() => setDoseUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}>
               +
             </button>
-            <div className="mono" style={{ fontSize: 12, color: "#00d4aa" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa" }}>
               {rowDerivedMcg != null
                 ? `= ${rowDerivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
                 : "— mcg"}
             </div>
-            <input className="form-input" style={{ flex: "1 1 120px", fontSize: 11 }}
+            <input className="form-input" style={{ flex: "1 1 120px", fontSize: 13 }}
               placeholder="Optional notes"
               value={doseNotes} onChange={(e) => setDoseNotes(e.target.value)} />
-            <button type="submit" className="btn-teal" style={{ fontSize: 10, padding: "4px 12px" }}>
+            <button type="submit" className="btn-teal" style={{ fontSize: 13, padding: "4px 12px", borderRadius: 12 }}>
               Save dose
             </button>
           </div>
         </form>
-      )}
+          )}
 
-      {doses.length > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 4 }}>RECENT</div>
-          {doses.map((d) => (
-            <div key={d.id} className="mono" style={{ fontSize: 10, color: "#4a6080", padding: "2px 0" }}>
-              {formatShortDate(d.dosed_at)} — {Number(d.dose_mcg).toLocaleString()} mcg
-              {d.notes ? ` · ${d.notes}` : ""}
+          {doses.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 4 }}>
+                RECENT
+              </div>
+              {doses.map((d) => (
+                <div key={d.id} className="mono" style={{ fontSize: 13, color: "#4a6080", padding: "2px 0" }}>
+                  {formatShortDate(d.dosed_at)} — {Number(d.dose_mcg).toLocaleString()} mcg
+                  {d.notes ? ` · ${d.notes}` : ""}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -697,13 +1184,14 @@ function VialRow({
 /**
  * @param {{
  *   userId: string,
+ *   profileId: string,
  *   peptideId: string,
  *   catalogEntry: { name?: string, stabilityDays: number, stabilityNote?: string | null },
  *   canUse: boolean,
  *   onUpgrade: () => void,
  * }} props
  */
-export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade }) {
+export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade }) {
   const stabilityDays = catalogEntry?.stabilityDays;
   const stabilityNote = typeof catalogEntry?.stabilityNote === "string" ? catalogEntry.stabilityNote.trim() : "";
   const compoundName = (catalogEntry?.name && String(catalogEntry.name).trim()) || "this peptide";
@@ -730,33 +1218,43 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
   const [mgQuick, setMgQuick] = useState(null);
   const [mlQuick, setMlQuick] = useState(null);
   const [desiredQuick, setDesiredQuick] = useState(null);
+  const [stackShot1Key, setStackShot1Key] = useState(null);
+  const [stackShot2Key, setStackShot2Key] = useState(null);
 
   const canMutate = canUse && isSupabaseConfigured();
+  const workerConfigured = isApiWorkerConfigured();
 
   const reload = useCallback(async () => {
-    if (!userId || !peptideId || !isSupabaseConfigured() || !canUse) {
+    if (!userId || !profileId || !peptideId || !isSupabaseConfigured() || !canUse) {
       setVials([]);
       setDosesByVial({});
       setCalendarDoses([]);
+      setStackShot1Key(null);
+      setStackShot2Key(null);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const { vials: v } = await listVialsForPeptide(userId, peptideId);
+    const [{ vials: v }, keysRes] = await Promise.all([
+      listVialsForPeptide(userId, profileId, peptideId),
+      getProfileStackShotR2Keys(userId),
+    ]);
+    setStackShot1Key(keysRes.key1);
+    setStackShot2Key(keysRes.key2);
     setVials(v);
     const nextMap = {};
     await Promise.all(
       (v ?? []).map(async (row) => {
-        const { doses } = await listRecentDosesForVial(row.id, userId, 5);
+        const { doses } = await listRecentDosesForVial(row.id, userId, profileId, 5);
         nextMap[row.id] = doses ?? [];
       })
     );
     setDosesByVial(nextMap);
     const { startIso, endIso } = getDoseHistoryQueryRange(viewMonth, new Date());
-    const { doses: cal } = await listDoseLogsForPeptideRange(userId, peptideId, startIso, endIso);
+    const { doses: cal } = await listDoseLogsForPeptideRange(userId, profileId, peptideId, startIso, endIso);
     setCalendarDoses(cal ?? []);
     setLoading(false);
-  }, [userId, peptideId, canUse, viewMonth]);
+  }, [userId, profileId, peptideId, canUse, viewMonth]);
 
   useEffect(() => {
     void reload();
@@ -803,6 +1301,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
     const desiredDoseMcg = Number.isFinite(desired) && desired > 0 ? desired : null;
     const { error } = await insertUserVial({
       user_id: userId,
+      profile_id: profileId,
       peptide_id: peptideId,
       label: formLabel.trim() || nextVialLabel(vials),
       reconstituted_at: reconstitutedNoonIso(formRecon),
@@ -902,6 +1401,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
     const dosed_at = combineYmdAndTimeToIso(calLogYmd, calLogTime);
     const { error } = await insertDoseLog({
       user_id: userId,
+      profile_id: profileId,
       vial_id: calLogVialPick,
       peptide_id: peptideId,
       dose_mcg: calDerivedMcg,
@@ -935,7 +1435,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
         style={{
           marginTop: 10,
           padding: 12,
-          borderRadius: 8,
+          borderRadius: 12,
           border: "1px dashed #243040",
           background: "#07090e",
           opacity: 0.55,
@@ -946,7 +1446,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
         <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           VIALS
         </div>
-        <div className="mono" style={{ fontSize: 11, color: "#4a6080" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
           Upgrade to Pro to track your vials
         </div>
       </div>
@@ -960,10 +1460,40 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
       </div>
 
       {!isSupabaseConfigured() && (
-        <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
+        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
       )}
 
-      {loading && <div className="mono" style={{ fontSize: 10, color: "#a0a0b0" }}>Loading…</div>}
+      {canUse && (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginTop: 10,
+            marginBottom: 12,
+            alignItems: "stretch",
+            maxWidth: 520,
+          }}
+        >
+          <StackShotHeroSlot
+            kind="stack_shot_1"
+            r2Key={stackShot1Key}
+            workerConfigured={workerConfigured}
+            canMutate={canMutate}
+            onUpgrade={onUpgrade}
+            onUploaded={reload}
+          />
+          <StackShotHeroSlot
+            kind="stack_shot_2"
+            r2Key={stackShot2Key}
+            workerConfigured={workerConfigured}
+            canMutate={canMutate}
+            onUpgrade={onUpgrade}
+            onUploaded={reload}
+          />
+        </div>
+      )}
+
+      {loading && <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>Loading…</div>}
 
       <DoseHistoryCalendar
         doses={calendarDoses}
@@ -986,7 +1516,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             marginTop: 12,
             padding: 12,
             border: "1px solid #00d4aa44",
-            borderRadius: 8,
+            borderRadius: 12,
             background: "#0b0f17",
             maxWidth: 420,
             display: "flex",
@@ -994,16 +1524,16 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             gap: 10,
           }}
         >
-          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", letterSpacing: "0.1em", lineHeight: 1.4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.1em", lineHeight: 1.4 }}>
             LOG DOSE — {formatLogHeaderDate(calLogYmd)}
           </div>
           {calDetail.length > 0 && (
             <div style={{ paddingBottom: 10, borderBottom: "1px solid #14202e" }}>
-              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
                 EXISTING ON THIS DAY
               </div>
               {calDetail.map((log) => (
-                <div key={log.id} className="mono" style={{ fontSize: 10, color: "#dde4ef", padding: "3px 0" }}>
+                <div key={log.id} className="mono" style={{ fontSize: 13, color: "#dde4ef", padding: "3px 0" }}>
                   {new Date(log.dosed_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })} —{" "}
                   {Number(log.dose_mcg).toLocaleString()} mcg
                   {log.notes ? ` · ${log.notes}` : ""}
@@ -1012,12 +1542,12 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             </div>
           )}
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>UNITS DRAWN</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>UNITS DRAWN</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
                 className="btn-teal"
-                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
                 onClick={() => setCalLogUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}
               >
                 −
@@ -1035,7 +1565,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
               <button
                 type="button"
                 className="btn-teal"
-                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1 }}
+                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
                 onClick={() => setCalLogUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}
               >
                 +
@@ -1049,10 +1579,10 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           </div>
           {qualifyingVialsForCal.length > 1 && (
             <div>
-              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>WHICH VIAL</div>
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>WHICH VIAL</div>
               <select
                 className="form-input"
-                style={{ fontSize: 11, maxWidth: 280 }}
+                style={{ fontSize: 13, maxWidth: 280 }}
                 value={calLogVialPick}
                 onChange={(e) => {
                   const id = e.target.value;
@@ -1077,30 +1607,30 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             </div>
           )}
           {qualifyingVialsForCal.length === 1 && (
-            <div className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
               Vial: {qualifyingVialsForCal[0].label ?? "Vial 1"}
             </div>
           )}
           {qualifyingVialsForCal.length === 0 && (
-            <div className="mono" style={{ fontSize: 10, color: "#f59e0b" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#f59e0b" }}>
               No vial was active on this date — add a vial or adjust dates.
             </div>
           )}
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>TIME</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>TIME</div>
             <input
               className="form-input"
-              style={{ fontSize: 11, maxWidth: 160 }}
+              style={{ fontSize: 13, maxWidth: 160 }}
               type="time"
               value={calLogTime}
               onChange={(e) => setCalLogTime(e.target.value)}
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
             <input
               className="form-input"
-              style={{ fontSize: 11 }}
+              style={{ fontSize: 13 }}
               value={calLogNotes}
               onChange={(e) => setCalLogNotes(e.target.value)}
             />
@@ -1109,7 +1639,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             <button
               type="submit"
               className="btn-teal"
-              style={{ fontSize: 10, padding: "5px 14px" }}
+              style={{ fontSize: 13, padding: "5px 14px", borderRadius: 12 }}
               disabled={calLogSaving || qualifyingVialsForCal.length === 0 || !calLogVialPick}
             >
               Log Dose
@@ -1117,7 +1647,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             <button
               type="button"
               className="btn-teal"
-              style={{ fontSize: 10, padding: "5px 14px", opacity: 0.85 }}
+              style={{ fontSize: 13, padding: "5px 14px", opacity: 0.85, borderRadius: 12 }}
               onClick={() => setCalLogYmd(null)}
             >
               Cancel
@@ -1129,11 +1659,11 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
       {canMutate && (
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           {!showAdd ? (
-            <button type="button" className="btn-teal" style={{ fontSize: 10, padding: "5px 12px" }} onClick={() => openAddVial()}>
+            <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "5px 12px", borderRadius: 12 }} onClick={() => openAddVial()}>
               + Add vial
             </button>
           ) : (
-            <button type="button" className="btn-teal" style={{ fontSize: 10, padding: "5px 12px" }} onClick={() => setShowAdd(false)}>
+            <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "5px 12px", borderRadius: 12 }} onClick={() => setShowAdd(false)}>
               Cancel
             </button>
           )}
@@ -1147,7 +1677,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             marginTop: 10,
             padding: 12,
             border: "1px dashed #00d4aa55",
-            borderRadius: 8,
+            borderRadius: 12,
             background: "#0b0f17",
             display: "flex",
             flexDirection: "column",
@@ -1155,23 +1685,23 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             maxWidth: 400,
           }}
         >
-          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 0 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 0 }}>
             NEW VIAL
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
             <div>
-              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>LABEL</div>
-              <input className="form-input" style={{ fontSize: 11 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>LABEL</div>
+              <input className="form-input" style={{ fontSize: 13 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
             <div>
-              <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>RECONSTITUTION DATE</div>
-              <input className="form-input" style={{ fontSize: 11 }} type="date" value={formRecon} onChange={(e) => setFormRecon(e.target.value)} />
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>RECONSTITUTION DATE</div>
+              <input className="form-input" style={{ fontSize: 13 }} type="date" value={formRecon} onChange={(e) => setFormRecon(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>VIAL SIZE (mg)</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>VIAL SIZE (mg)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_MG_OPTIONS.map((o) => (
                 <SelectPill key={o.key} active={mgQuick === o.key} onClick={() => { setMgQuick(o.key); setFormMg(o.val); }}>
@@ -1185,7 +1715,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             {mgQuick === "other" && (
               <input
                 className="form-input"
-                style={{ fontSize: 11, marginTop: 8, maxWidth: 200 }}
+                style={{ fontSize: 13, marginTop: 8, maxWidth: 200 }}
                 inputMode="decimal"
                 placeholder="mg"
                 value={formMg}
@@ -1195,7 +1725,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>BAC WATER (mL)</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>BAC WATER (mL)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_ML_OPTIONS.map((o) => (
                 <SelectPill key={o.key} active={mlQuick === o.key} onClick={() => { setMlQuick(o.key); setFormMl(o.val); }}>
@@ -1209,7 +1739,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             {mlQuick === "other" && (
               <input
                 className="form-input"
-                style={{ fontSize: 11, marginTop: 8, maxWidth: 200 }}
+                style={{ fontSize: 13, marginTop: 8, maxWidth: 200 }}
                 inputMode="decimal"
                 placeholder="mL"
                 value={formMl}
@@ -1219,7 +1749,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           </div>
 
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 6 }}>DESIRED DOSE (mcg per injection)</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>DESIRED DOSE (mcg per injection)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_DOSE_OPTIONS.map((o) => (
                 <SelectPill
@@ -1240,7 +1770,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             {desiredQuick === "other" && (
               <input
                 className="form-input"
-                style={{ fontSize: 11, marginTop: 8, maxWidth: 200 }}
+                style={{ fontSize: 13, marginTop: 8, maxWidth: 200 }}
                 inputMode="decimal"
                 placeholder="mcg"
                 value={formDesiredMcg}
@@ -1253,39 +1783,39 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             <div
               style={{
                 padding: 10,
-                borderRadius: 8,
+                borderRadius: 12,
                 border: "1px solid #14202e",
                 background: "#07090e",
               }}
             >
-              <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
+              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
                 LIVE RESULTS
               </div>
-              <div className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
+              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
                 Concentration: {formatConc(addFormCalc.concentration)}
               </div>
               {addFormCalc.want != null && (
                 <>
-                  <div className="mono" style={{ fontSize: 10, color: "#8fa5bf", marginTop: 8 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 8 }}>
                     Volume to inject: {formatVolumeMl(addFormCalc.vol)} mL
                   </div>
                   <div
                     style={{
                       marginTop: 10,
                       padding: 10,
-                      borderRadius: 8,
+                      borderRadius: 12,
                       background: "#00d4aa14",
                       border: "1px solid #00d4aa",
                     }}
                   >
-                    <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.06em" }}>
+                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.06em" }}>
                       INSULIN SYRINGE
                     </div>
-                    <div className="mono" style={{ fontSize: 12, color: "#00d4aa", lineHeight: 1.45 }}>
+                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", lineHeight: 1.45 }}>
                       {addFormCalc.units.toFixed(1)} units on a 100-unit (1 mL) syringe
                     </div>
                   </div>
-                  <div className="mono" style={{ fontSize: 10, color: "#8fa5bf", marginTop: 8 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 8 }}>
                     Total doses per vial: {addFormCalc.totalDoses.toLocaleString()} dose{addFormCalc.totalDoses === 1 ? "" : "s"}
                   </div>
                   <div
@@ -1293,11 +1823,11 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
                     style={{
                       marginTop: 10,
                       padding: 10,
-                      borderRadius: 6,
+                      borderRadius: 12,
                       background: "#1a0f00",
                       border: "1px solid #b45309",
                       color: "#a06000",
-                      fontSize: 10,
+                      fontSize: 13,
                       lineHeight: 1.5,
                     }}
                   >
@@ -1313,10 +1843,10 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
           )}
 
           <div>
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
-            <input className="form-input" style={{ fontSize: 11 }} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
+            <input className="form-input" style={{ fontSize: 13 }} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
           </div>
-          <button type="submit" className="btn-teal" style={{ fontSize: 11, alignSelf: "flex-start" }}>
+          <button type="submit" className="btn-teal" style={{ fontSize: 13, alignSelf: "flex-start", borderRadius: 12 }}>
             Save vial
           </button>
         </form>
@@ -1328,6 +1858,7 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             key={v.id}
             vial={v}
             userId={userId}
+            profileId={profileId}
             peptideId={peptideId}
             canMutate={canMutate}
             doses={dosesByVial[v.id] ?? []}
@@ -1335,6 +1866,8 @@ export function VialTracker({ userId, peptideId, catalogEntry, canUse, onUpgrade
             logOpen={logVialId === v.id}
             onToggleLog={(id) => setLogVialId((x) => (x === id ? null : id))}
             stabilityNote={stabilityNote}
+            workerConfigured={workerConfigured}
+            onUpgrade={onUpgrade}
           />
         ))}
     </div>

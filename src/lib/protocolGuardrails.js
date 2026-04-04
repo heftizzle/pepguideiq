@@ -1,26 +1,26 @@
 export const TIMING_WARNINGS = {
   "nad-plus": {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Best taken before 2pm — stimulating effect may disrupt sleep.",
   },
   bromantane: {
-    avoid: ["afternoon", "night"],
+    avoid: ["afternoon", "evening", "night"],
     message: "// Morning only — dopaminergic stimulation will affect sleep if taken late.",
   },
   "methylene-blue": {
-    avoid: ["afternoon", "night"],
+    avoid: ["afternoon", "evening", "night"],
     message: "// Before noon only — MAO inhibition disrupts sleep architecture.",
   },
   semax: {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Morning preferred — nootropic/stimulating effect.",
   },
   "n-acetyl-semax-amidate": {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Morning preferred — nootropic/stimulating effect.",
   },
   "mots-c": {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Morning fasted preferred — exercise-mimetic metabolic activation.",
   },
   "ss-31": {
@@ -28,7 +28,7 @@ export const TIMING_WARNINGS = {
     message: null,
   },
   dsip: {
-    avoid: ["morning", "afternoon"],
+    avoid: ["morning", "afternoon", "evening"],
     message: "// Night only — sleep signal peptide, counterproductive earlier in the day.",
   },
   epithalon: {
@@ -72,8 +72,8 @@ export const TIMING_WARNINGS = {
     message: null,
   },
   "hgh-fragment-176-191": {
-    avoid: ["afternoon", "night"],
-    message: "// Morning fasted preferred — lipolytic effect is blunted post-meal and at night.",
+    avoid: ["afternoon", "evening", "night"],
+    message: "// Morning fasted preferred — lipolytic effect is blunted post-meal and in the evening or at night.",
   },
   "bpc-157": {
     avoid: [],
@@ -84,11 +84,11 @@ export const TIMING_WARNINGS = {
     message: null,
   },
   "nad-plus-subq": {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Best taken before 2pm — NAD+ is energizing and may disrupt sleep.",
   },
   "5-amino-1mq": {
-    avoid: ["night"],
+    avoid: ["evening", "night"],
     message: "// Morning preferred — NNMT inhibition has stimulating metabolic effect.",
   },
   retatrutide: {
@@ -110,7 +110,7 @@ export const TIMING_WARNINGS = {
  * or null if no conflict exists.
  *
  * @param {string} compoundId - peptide id from catalog
- * @param {"morning"|"afternoon"|"night"} session
+ * @param {"morning"|"afternoon"|"evening"|"night"} session
  * @returns {string|null}
  */
 export function getTimingWarning(compoundId, session) {
@@ -124,7 +124,7 @@ export function getTimingWarning(compoundId, session) {
  * with the given session.
  *
  * @param {string[]} compoundIds
- * @param {"morning"|"afternoon"|"night"} session
+ * @param {"morning"|"afternoon"|"evening"|"night"} session
  * @returns {boolean}
  */
 export function hasAnyTimingConflict(compoundIds, session) {

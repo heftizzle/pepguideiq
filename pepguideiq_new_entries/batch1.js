@@ -104,6 +104,22 @@ export const BATCH1 = [
     tier: "pro",
   },
   {
+    id: "klow",
+    name: "KLOW",
+    aliases: ["KLOW Blend", "GHK-Cu/TB-500/BPC-157/KPV", "KLOW 80mg"],
+    category: ["Healing / Recovery", "Skin / Hair / Nails"],
+    mechanism:
+      "4-in-1 regenerative blend: GHK-Cu drives collagen synthesis and antioxidant enzyme activity; TB-500 supports cell migration and angiogenesis; BPC-157 targets tissue repair, gut healing, and anti-inflammatory signaling; KPV adds NF-κB inhibition and gut mucosal repair. 80mg total per vial (component ratios per supplier blend).",
+    halfLife: "Variable per component",
+    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 80, typicalVolumeMl: 2 },
+    dosingRange: { low: "partial vial", medium: "full vial", high: "full vial", frequency: "Per target peptide within blend" },
+    tags: ["healing", "skin", "gut", "anti-inflammatory", "GHK-Cu", "TB-500", "BPC-157", "KPV", "regenerative", "blend"],
+    sourcingNotes:
+      "Penguin Peptides and other vendors as pre-blended vial. Sister blend to GLOW — KLOW adds KPV for gut/inflammation alongside the same core regenerative stack.",
+    warnings: ["Same angiogenesis caveat as BPC-157 — avoid with active malignancy", "Dose by individual peptide targets within blend"],
+    tier: "pro",
+  },
+  {
     id: "glp-1-cs",
     name: "CagriSema",
     aliases: ["GLP-1 C+S", "Semaglutide + Cagrilintide", "CagriSema Blend"],

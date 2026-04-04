@@ -12,7 +12,7 @@ const BILLING_ERROR_USER_MESSAGE = "Unable to load billing info. Please try agai
 const mutedDowngradeBtn = {
   width: "100%",
   padding: "10px 12px",
-  fontSize: 12,
+  fontSize: 13,
   borderRadius: 10,
   border: "1px solid #4a6080",
   color: "#8fa5bf",
@@ -129,7 +129,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           <div className="brand" style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", marginBottom: 10 }}>
             {isEntryTarget ? "⚠️  Moving to Entry (Free)" : "⏳  Confirm downgrade"}
           </div>
-          <div style={{ fontSize: 11, color: "#8fa5bf", lineHeight: 1.55, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55, marginBottom: 14 }}>
             {isEntryTarget ? (
               <>
                 You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
@@ -152,7 +152,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
             )}
           </div>
           {downgradeError && (
-            <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginBottom: 10 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 10 }}>
               {downgradeError}
             </div>
           )}
@@ -160,7 +160,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
             <button
               type="button"
               className="btn-teal btn-upgrade-ghost"
-              style={{ padding: "8px 12px", fontSize: 11 }}
+              style={{ padding: "8px 12px", fontSize: 13 }}
               disabled={downgradeSubmitting}
               onClick={() => {
                 setDowngradeFlow(null);
@@ -172,7 +172,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
             <button
               type="button"
               className="btn-teal"
-              style={{ padding: "8px 12px", fontSize: 11 }}
+              style={{ padding: "8px 12px", fontSize: 13 }}
               disabled={downgradeSubmitting}
               onClick={() => void confirmDowngrade(rowId)}
             >
@@ -189,7 +189,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           type="button"
           disabled
           className="btn-teal btn-upgrade-current"
-          style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+          style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
         >
           {subscriptionLoading ? "Loading…" : isSame ? "This is your current plan" : isUpgrade ? "Upgrade" : "Downgrade"}
         </button>
@@ -202,7 +202,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           type="button"
           disabled
           className="btn-teal btn-upgrade-current"
-          style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+          style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
         >
           This is your current plan
         </button>
@@ -216,7 +216,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         <button
           type="button"
           className={isNext ? "btn-teal btn-upgrade-cta" : "btn-teal btn-upgrade-ghost"}
-          style={{ width: "100%", padding: "10px 12px", fontSize: 12 }}
+          style={{ width: "100%", padding: "10px 12px", fontSize: 13 }}
           onClick={() => void tierAction(rowId)}
         >
           {label}
@@ -231,7 +231,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
             type="button"
             disabled
             className="btn-teal btn-upgrade-current"
-            style={{ width: "100%", padding: "10px 12px", fontSize: 12, opacity: 0.4, cursor: "default" }}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
           >
             {rowId === "entry" ? "Move to Free" : "Schedule Downgrade"}
           </button>
@@ -260,11 +260,11 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
         <div>
           <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Choose your plan</div>
-          <div className="mono" style={{ fontSize: 10, color: "#a0a0b0", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4 }}>
             Compare tiers — upgrade anytime. Cancel anytime.
           </div>
           {upgradeActionError && (
-            <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginTop: 8, maxWidth: 520 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginTop: 8, maxWidth: 520 }}>
               {upgradeActionError}
             </div>
           )}
@@ -288,21 +288,21 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           borderRadius: 8,
         }}
       >
-        <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
           // BILLING (STRIPE)
         </div>
         {subscriptionLoading && (
-          <div className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+          <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
             Loading subscription…
           </div>
         )}
         {!subscriptionLoading && subscriptionError && (
-          <div className="mono" style={{ fontSize: 11, color: "#f59e0b", lineHeight: 1.5 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#f59e0b", lineHeight: 1.5 }}>
             {BILLING_ERROR_USER_MESSAGE}
           </div>
         )}
         {subscriptionOk && (
-          <div style={{ fontSize: 11, color: "#8fa5bf", lineHeight: 1.55 }}>
+          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
             <div>
               <span className="mono" style={{ color: "#4a6080" }}>status</span> {subscriptionInfo.status}
             </div>
@@ -366,7 +366,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
               <div style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", lineHeight: 1.35 }}>{row.headline}</div>
 
-              <div style={{ fontSize: 11, color: "#6b8299", lineHeight: 1.5 }}>{row.subline}</div>
+              <div style={{ fontSize: 13, color: "#6b8299", lineHeight: 1.5 }}>{row.subline}</div>
 
               <div style={{ marginTop: "auto", paddingTop: 6 }}>{renderTierActions(row)}</div>
             </div>
@@ -374,7 +374,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         })}
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 10, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
+      <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
         Subscriptions billed monthly. Cancel anytime.
       </div>
 

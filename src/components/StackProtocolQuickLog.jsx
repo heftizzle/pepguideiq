@@ -43,14 +43,15 @@ function sessionFromLocalTime() {
   const h = new Date().getHours();
   if (h < 12) return "morning";
   if (h < 18) return "afternoon";
+  if (h < 21) return "evening";
   return "night";
 }
 
 /**
  * Saved-stack “morning protocol” quick log: one row per compound with an active vial today.
- * @param {{ userId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string }} props
+ * @param {{ userId: string, profileId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string }} props
  */
-export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade, userPlan = "entry" }) {
+export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse, onUpgrade, userPlan = "entry" }) {
   const [lines, setLines] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -58,21 +59,21 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
   const [streakDisplay, setStreakDisplay] = useState({ streakLine: null, milestoneLine: null });
 
   const load = useCallback(async () => {
-    if (!userId || !isSupabaseConfigured() || !canUse || protocolRows.length === 0) {
+    if (!userId || !profileId || !isSupabaseConfigured() || !canUse || protocolRows.length === 0) {
       setLines([]);
       return;
     }
     const ymd = todayYmd();
     const built = [];
     for (const row of protocolRows) {
-      const { vials } = await listVialsForPeptide(userId, row.peptideId);
+      const { vials } = await listVialsForPeptide(userId, profileId, row.peptideId);
       const q = (vials ?? []).filter((v) => vialActiveOnYmd(v, ymd));
       if (q.length === 0) continue;
       const pick =
         q.length === 1
           ? q[0]
           : (q.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) ?? q[0]);
-      const { doses } = await listRecentDosesForVial(pick.id, userId, 5);
+      const { doses } = await listRecentDosesForVial(pick.id, userId, profileId, 5);
       const recentDoses = doses ?? [];
       const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
       const units =
@@ -87,25 +88,25 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
       });
     }
     setLines(built);
-  }, [userId, canUse, protocolRows]);
+  }, [userId, profileId, canUse, protocolRows]);
 
   useEffect(() => {
     void load();
   }, [load, reloadTick]);
 
   useEffect(() => {
-    if (!userId) return;
-    listRecentDosedAtDates(userId).then(({ dates }) => {
+    if (!userId || !profileId) return;
+    listRecentDosedAtDates(userId, profileId).then(({ dates }) => {
       setStreak(calculateStreak(dates));
     });
-  }, [userId]);
+  }, [userId, profileId]);
 
   const bumpReload = () => setReloadTick((t) => t + 1);
 
   const onRowLoggedSuccess = useCallback(
     async (peptideId) => {
       setReloadTick((t) => t + 1);
-      const { dates } = await listRecentDosedAtDates(userId);
+      const { dates } = await listRecentDosedAtDates(userId, profileId);
       const newStreak = calculateStreak(dates);
       const wasZero = streak === 0;
       setStreak(newStreak);
@@ -121,7 +122,7 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
         setStreakDisplay({ streakLine: null, milestoneLine: null });
       }, 3500);
     },
-    [streak, userPlan, userId]
+    [streak, userPlan, userId, profileId]
   );
 
   if (!canUse) {
@@ -147,10 +148,10 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
         }}
         title="Upgrade to Pro for vial quick log"
       >
-        <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           MORNING PROTOCOL
         </div>
-        <div className="mono" style={{ fontSize: 11, color: "#4a6080" }}>Upgrade to Pro to log doses from your stack</div>
+        <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>Upgrade to Pro to log doses from your stack</div>
       </div>
     );
   }
@@ -161,17 +162,17 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
 
   if (lines === null) {
     return (
-      <div className="mono" style={{ fontSize: 10, color: "#a0a0b0", marginBottom: 16 }}>Loading protocol…</div>
+      <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 16 }}>Loading protocol…</div>
     );
   }
 
   if (lines.length === 0) {
     return (
       <div style={{ marginBottom: 16 }}>
-        <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 8 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 8 }}>
           {protocolHeaderDate()} — MORNING PROTOCOL
         </div>
-        <div className="mono" style={{ fontSize: 10, color: "#4a6080", lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.45 }}>
           No active vials today — add vials below or check reconstitution dates.
         </div>
       </div>
@@ -181,7 +182,7 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
   return (
     <>
       <div style={{ marginBottom: 20 }}>
-        <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
           {protocolHeaderDate()} — MORNING PROTOCOL
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -191,6 +192,7 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
               line={line}
               isLast={idx === lines.length - 1}
               userId={userId}
+              profileId={profileId}
               onLoggedSuccess={onRowLoggedSuccess}
             />
           ))}
@@ -255,7 +257,7 @@ export function StackProtocolQuickLog({ userId, protocolRows, canUse, onUpgrade,
           <div
             className="mono"
             style={{
-              fontSize: 10,
+              fontSize: 13,
               color: "#2e4055",
               marginTop: 16,
               letterSpacing: "0.1em",
@@ -284,6 +286,7 @@ function ProtocolLineRow({ line, isLast, userId, onLoggedSuccess }) {
     setLogging(true);
     const { error } = await insertDoseLog({
       user_id: userId,
+      profile_id: profileId,
       vial_id: line.vial.id,
       peptide_id: line.peptideId,
       dose_mcg: derivedMcg,
@@ -303,7 +306,7 @@ function ProtocolLineRow({ line, isLast, userId, onLoggedSuccess }) {
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{line.name}</div>
-        <div className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
           {line.vial.label ?? "Vial"} · {formatConcLine(line.vial.concentration_mcg_ml)}
         </div>
       </div>
@@ -345,7 +348,7 @@ function ProtocolLineRow({ line, isLast, userId, onLoggedSuccess }) {
         <button
           type="button"
           className="btn-teal"
-          style={{ fontSize: 11, padding: "6px 14px", fontWeight: 600 }}
+          style={{ fontSize: 13, padding: "6px 14px", fontWeight: 600 }}
           disabled={logging || derivedMcg == null || derivedMcg <= 0}
           onClick={() => void logDose()}
         >

@@ -58,6 +58,12 @@ export function getTier(plan) {
   return TIERS[plan] ?? TIERS.entry;
 }
 
+/** Sub-profiles (Netflix-style) allowed for this plan tier. */
+export function getMemberProfileSlotLimit(plan) {
+  const n = getTier(plan).profiles;
+  return typeof n === "number" && n > 0 ? n : 1;
+}
+
 export function formatPrice(plan) {
   const tier = getTier(plan);
   return `$${tier.price.toFixed(2)}`;

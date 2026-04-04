@@ -9,6 +9,7 @@ import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrail
 const SESSIONS = [
   { id: "morning", label: "🌞" },
   { id: "afternoon", label: "🌅" },
+  { id: "evening", label: "🌇" },
   { id: "night", label: "🌙" },
 ];
 
@@ -40,6 +41,7 @@ function sessionFromLocalTime() {
   const h = new Date().getHours();
   if (h < 12) return "morning";
   if (h < 18) return "afternoon";
+  if (h < 21) return "evening";
   return "night";
 }
 
@@ -57,15 +59,15 @@ function clampUnits(u) {
   return Math.max(0.5, Math.min(300, roundToHalf(Number(u) || 0.5)));
 }
 
-async function buildRowForPeptide(userId, peptideId, name, ymd) {
-  const { vials } = await listVialsForPeptide(userId, peptideId);
+async function buildRowForPeptide(userId, profileId, peptideId, name, ymd) {
+  const { vials } = await listVialsForPeptide(userId, profileId, peptideId);
   const active = (vials ?? []).filter((v) => vialActiveOnYmd(v, ymd));
   if (active.length === 0) return null;
   const pick =
     active.length === 1
       ? active[0]
       : (active.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) ?? active[0]);
-  const { doses } = await listRecentDosesForVial(pick.id, userId, 5);
+  const { doses } = await listRecentDosesForVial(pick.id, userId, profileId, 5);
   const recentDoses = doses ?? [];
   const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
   const units =
@@ -84,6 +86,7 @@ async function buildRowForPeptide(userId, peptideId, name, ymd) {
 /**
  * @param {{
  *   userId: string;
+ *   profileId: string;
  *   protocolBaseRows: { peptideId: string; name: string; sessions: string[] }[];
  *   canUse: boolean;
  *   onUpgrade: () => void;
@@ -95,6 +98,7 @@ async function buildRowForPeptide(userId, peptideId, name, ymd) {
  */
 export function ProtocolTab({
   userId,
+  profileId,
   protocolBaseRows,
   canUse,
   onUpgrade,
@@ -122,11 +126,11 @@ export function ProtocolTab({
   }, [initialSession, onDeepLinkConsumed]);
 
   useEffect(() => {
-    if (!userId) return;
-    listRecentDosedAtDates(userId).then(({ dates }) => {
+    if (!userId || !profileId) return;
+    listRecentDosedAtDates(userId, profileId).then(({ dates }) => {
       setStreak(calculateStreak(dates));
     });
-  }, [userId]);
+  }, [userId, profileId]);
 
   useEffect(() => {
     setProtocolLogGuardrailBanner(null);
@@ -139,18 +143,18 @@ export function ProtocolTab({
   );
 
   const load = useCallback(async () => {
-    if (!userId || !isSupabaseConfigured() || !canUse || protocolCandidates.length === 0) {
+    if (!userId || !profileId || !isSupabaseConfigured() || !canUse || protocolCandidates.length === 0) {
       setRows([]);
       return;
     }
     const ymd = todayYmd();
     const built = [];
     for (const row of protocolCandidates) {
-      const r = await buildRowForPeptide(userId, row.peptideId, row.name, ymd);
+      const r = await buildRowForPeptide(userId, profileId, row.peptideId, row.name, ymd);
       if (r) built.push(r);
     }
     setRows(built);
-  }, [userId, canUse, protocolCandidates]);
+  }, [userId, profileId, canUse, protocolCandidates]);
 
   useEffect(() => {
     void load();
@@ -167,8 +171,8 @@ export function ProtocolTab({
   const onVialSelect = async (peptideId, vialId) => {
     const row = (rows ?? []).find((r) => r.peptideId === peptideId);
     const vial = row?.vials.find((v) => v.id === vialId);
-    if (!vial || !userId) return;
-    const { doses } = await listRecentDosesForVial(vialId, userId, 5);
+    if (!vial || !userId || !profileId) return;
+    const { doses } = await listRecentDosesForVial(vialId, userId, profileId, 5);
     const recentDoses = doses ?? [];
     const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
     const units =
@@ -221,6 +225,7 @@ export function ProtocolTab({
       if (mcg == null || mcg <= 0) continue;
       const { error } = await insertDoseLog({
         user_id: userId,
+        profile_id: profileId,
         vial_id: vial.id,
         peptide_id: r.peptideId,
         dose_mcg: mcg,
@@ -232,7 +237,7 @@ export function ProtocolTab({
     setLogging(false);
     if (errors.length > 0) return;
     const loggedCompoundIds = list.map((r) => r.peptideId);
-    const { dates } = await listRecentDosedAtDates(userId);
+    const { dates } = await listRecentDosedAtDates(userId, profileId);
     const newStreak = calculateStreak(dates);
     const wasZero = streak === 0;
     setStreak(newStreak);
@@ -269,7 +274,7 @@ export function ProtocolTab({
   if (!canUse) {
     return (
       <div className="mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-        <div style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
           // PROTOCOL
         </div>
         <div
@@ -290,7 +295,7 @@ export function ProtocolTab({
             cursor: "pointer",
           }}
         >
-          <div style={{ fontSize: 11, color: "#4a6080", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>
             // Upgrade to Pro to run protocol logging with vials.
           </div>
         </div>
@@ -300,7 +305,7 @@ export function ProtocolTab({
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="mono" style={{ fontSize: 11, color: "#4a6080", fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="mono" style={{ fontSize: 13, color: "#4a6080", fontFamily: "'JetBrains Mono', monospace" }}>
         // Configure Supabase to use Protocol.
       </div>
     );
@@ -308,7 +313,7 @@ export function ProtocolTab({
 
   return (
     <div className="mono" style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 100, fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ fontSize: 11, color: "#a0a0b0", marginBottom: 16 }}>
+      <div style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 16 }}>
         // {protocolHeaderLine()}
       </div>
 
@@ -328,17 +333,17 @@ export function ProtocolTab({
       </div>
 
       {emptyBecauseNoStack && (
-        <div className="mono" style={{ fontSize: 11, color: "#4a6080", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.55 }}>
           No stack saved — build your stack in Saved Stacks first.
         </div>
       )}
 
       {!emptyBecauseNoStack && rows === null && (
-        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0" }}>Loading protocol…</div>
+        <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>Loading protocol…</div>
       )}
 
       {!emptyBecauseNoStack && rows !== null && rows.length === 0 && (
-        <div className="mono" style={{ fontSize: 11, color: "#4a6080", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.55 }}>
           No active vials for this session — add vials in Saved Stacks.
         </div>
       )}
@@ -369,8 +374,8 @@ export function ProtocolTab({
             >
               <div
                 style={{
-                  fontSize: 11,
-                  color: "#f59e0b",
+                  fontSize: 13,
+                  color: "#fbbf24",
                   lineHeight: 1.55,
                   letterSpacing: "0.03em",
                   whiteSpace: "pre-line",
@@ -383,7 +388,7 @@ export function ProtocolTab({
                 <button
                   type="button"
                   className="btn-teal"
-                  style={{ fontSize: 11, padding: "6px 12px" }}
+                  style={{ fontSize: 13, padding: "6px 12px" }}
                   onClick={() => setProtocolLogGuardrailBanner(null)}
                 >
                   Dismiss
@@ -391,7 +396,7 @@ export function ProtocolTab({
                 <button
                   type="button"
                   className="btn-teal"
-                  style={{ fontSize: 11, padding: "6px 12px", opacity: 0.92 }}
+                  style={{ fontSize: 13, padding: "6px 12px", opacity: 0.92 }}
                   onClick={() => {
                     skipProtocolGuardrailOnceRef.current = true;
                     setProtocolLogGuardrailBanner(null);
@@ -482,7 +487,7 @@ export function ProtocolTab({
           <div
             className="mono"
             style={{
-              fontSize: 10,
+              fontSize: 13,
               color: "#2e4055",
               marginTop: 16,
               letterSpacing: "0.1em",
@@ -520,7 +525,7 @@ function ProtocolCompoundRow({ row, session, onUnitsDelta, onVialSelect }) {
               value={row.selectedVialId}
               onChange={(e) => onVialSelect(e.target.value)}
               style={{
-                fontSize: 10,
+                fontSize: 13,
                 color: "#4a6080",
                 maxWidth: 220,
                 padding: "6px 8px",
@@ -538,7 +543,7 @@ function ProtocolCompoundRow({ row, session, onUnitsDelta, onVialSelect }) {
               })}
             </select>
           ) : (
-            <div style={{ fontSize: 10, color: "#4a6080" }}>
+            <div style={{ fontSize: 13, color: "#4a6080" }}>
               {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
             </div>
           )}
@@ -548,8 +553,8 @@ function ProtocolCompoundRow({ row, session, onUnitsDelta, onVialSelect }) {
         <div
           className="mono"
           style={{
-            fontSize: 11,
-            color: "#f59e0b",
+            fontSize: 13,
+            color: "#fbbf24",
             marginTop: 4,
             marginBottom: 4,
             lineHeight: 1.5,

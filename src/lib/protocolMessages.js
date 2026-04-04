@@ -65,6 +65,24 @@ export const AFTERNOON_MESSAGES = [
   "Logged. The compounding pharmacy understands.",
 ];
 
+export const EVENING_MESSAGES = [
+  "Evening stack logged. Wind-down mode engaged.",
+  "Golden hour protocol complete. Cells clocking out gracefully.",
+  "Logged. Transition dose deployed — night shift is next.",
+  "Evening optimization done. Dinner digesting, peptides working.",
+  "Stack logged. The day session closed; recovery preview loading.",
+  "Twilight protocol complete. Mitochondria switching shifts.",
+  "Logged. Evening dose in. Sunset approved.",
+  "Evening stack deployed. Big Pharma is stuck in rush hour.",
+  "Stack logged. Your PCP thinks you're just having dinner.",
+  "Logged. Off-label sunset special. Stack complete.",
+  "Evening protocol logged. Insurance still doesn't know.",
+  "Stack logged. The wellness rabbit hole has evening hours.",
+  "Logged. Crunchy sunset documented.",
+  "Evening dose logged. Seed oils avoided. Probably.",
+  "Stack complete. Your ancestors had evening routines too.",
+];
+
 export const NIGHT_MESSAGES = [
   "Sleep stack deployed. Recovery mode: activated.",
   "Night protocol logged. Let the night shift do its work.",
@@ -148,7 +166,9 @@ export function getConfirmationMessage(session, compoundIds = [], userPlan = "en
     session === "morning"
       ? MORNING_MESSAGES
       : session === "afternoon"
-      ? AFTERNOON_MESSAGES
-      : NIGHT_MESSAGES;
+        ? AFTERNOON_MESSAGES
+        : session === "evening"
+          ? EVENING_MESSAGES
+          : NIGHT_MESSAGES;
   return pool[Math.floor(Math.random() * pool.length)];
 }

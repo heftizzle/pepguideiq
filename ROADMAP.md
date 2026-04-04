@@ -15,16 +15,19 @@
 - 4 tiers: Free / Pro $8.99 / Elite $16.99 / GOAT $22.99
 - 8 Supabase migrations live (005 user_vials, 008 plan enforcement + R2)
 - LLC filed April 2, 2026 (ref: 100471015701)
+- Evening → night rename (running)
+- Multiple vials per stack compound in Protocol tab
+- BUILD / STACKS nav split (🏗️ BUILD + 📋 STACKS)
+- GitHub Actions secrets wired
+- Wrangler secrets (STRIPE_WEBHOOK_SECRET, ALLOWED_ORIGIN, ENVIRONMENT=production)
 
 ### Cursor Queue — In Progress
-- [ ] Evening → night rename (running)
-- [ ] Multiple vials per stack compound in Protocol tab
-- [ ] BUILD / STACKS nav split (🏗️ BUILD + 📋 STACKS)
+- Streak display persistent on Protocol tab home (not just post-log)
+- Daily check-in — how do you feel today (1–5) tied to dose history
+
 
 ### Pre-Launch Ops — Blocked / Pending
-- [ ] Wrangler secrets (STRIPE_WEBHOOK_SECRET, ALLOWED_ORIGIN, ENVIRONMENT=production)
 - [ ] Stripe webhook endpoint configured
-- [ ] GitHub Actions secrets wired
 - [ ] EIN — blocked until LLC arrives (~April 7)
 - [ ] Novo bank account — blocked until EIN
 - [ ] Supabase Pro upgrade (PITR/HA/DR)
@@ -36,8 +39,7 @@
 - Stack planner with reorder timing
 - Dosing guides per compound
 - Push notifications / dose reminders
-- Streak display persistent on Protocol tab home (not just post-log)
-- Daily check-in — how do you feel today (1–5) tied to dose history
+
 
 ### Medium Term
 - Save calculations — export dosing history, PDF reports
@@ -56,8 +58,14 @@
 - Language packs — Spanish first, then Portuguese, French, German, Japanese, Mandarin
 - NMN and NR entries (oral NAD+ precursors)
 
+### Stack Builder (Platform)
+- Dedicated BUILD tab — create/configure stacks independently 
+  of vials
+- Vials linked to stack compounds optionally, not required
+- Coach mode — build stacks for clients
+- Stack templates — save and reuse protocol frameworks
+
 ### Infrastructure
 - Supabase Pro upgrade (PITR/HA/DR) ← pre-launch gate
-- Code splitting / chunk size fix
 - Architecture review / API key verification (pre-charge gate)
 - LLC → EIN → Novo → Stripe ← in progress

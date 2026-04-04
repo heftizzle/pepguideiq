@@ -195,7 +195,7 @@ export function StackPhotoUpload({
       <div
         className="mono"
         style={{
-          fontSize: 11,
+          fontSize: 13,
           color: "#00d4aa",
           marginBottom: 6,
           letterSpacing: "0.12em",
@@ -252,7 +252,7 @@ export function StackPhotoUpload({
               alignItems: "center",
               justifyContent: "center",
               background: "rgba(7,9,14,0.75)",
-              fontSize: 10,
+              fontSize: 13,
               color: "#8fa5bf",
               zIndex: 2,
             }}
@@ -282,7 +282,7 @@ export function StackPhotoUpload({
                 right: 8,
                 zIndex: 1,
                 padding: "4px 10px",
-                fontSize: 10,
+                fontSize: 13,
                 pointerEvents: "auto",
               }}
               onClick={openPicker}
@@ -291,13 +291,13 @@ export function StackPhotoUpload({
             </button>
           </>
         ) : (
-          <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", padding: "12px 14px", textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", padding: "12px 14px", textAlign: "center" }}>
             Upload your stack photo
           </div>
         )}
       </div>
       {err && (
-        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
           {err}
         </div>
       )}

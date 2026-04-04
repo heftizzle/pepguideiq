@@ -1,20 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
 
-const SESSION_ORDER = { morning: 0, afternoon: 1, night: 2 };
+const SESSION_ORDER = { morning: 0, afternoon: 1, evening: 2, night: 3 };
 
-/** Default: compound appears in all three protocol sessions. */
-export const DEFAULT_STACK_SESSIONS = ["morning", "afternoon", "night"];
+/** Default: compound appears in all protocol sessions. */
+export const DEFAULT_STACK_SESSIONS = ["morning", "afternoon", "evening", "night"];
 
 /** @param {unknown} s */
 export function normalizeStackSessions(s) {
-  const allowed = new Set(["morning", "afternoon", "night"]);
+  const allowed = new Set(["morning", "afternoon", "evening", "night"]);
   if (!Array.isArray(s)) return [...DEFAULT_STACK_SESSIONS];
-  const f = [
-    ...new Set(
-      s.map((x) => (x === "evening" ? "night" : x)).filter((x) => allowed.has(x))
-    ),
-  ];
+  const f = [...new Set(s.filter((x) => allowed.has(x)))];
   return f.length ? f.sort((a, b) => SESSION_ORDER[a] - SESSION_ORDER[b]) : [...DEFAULT_STACK_SESSIONS];
 }
 
@@ -26,6 +22,7 @@ export function getStackRowListKey(item) {
 const SESSION_TOGGLES = [
   { id: "morning", icon: "🌞" },
   { id: "afternoon", icon: "🌅" },
+  { id: "evening", icon: "🌇" },
   { id: "night", icon: "🌙" },
 ];
 
@@ -76,13 +73,13 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 6 }}>
           <div>
             <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-            <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
           </div>
           <button type="button" className="btn-red" onClick={() => onRemove(rowKey)}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
           <div>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {SESSION_TOGGLES.map((t) => {
                 const on = sessions.includes(t.id);
@@ -128,8 +125,8 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
               >
                 <div
                   style={{
-                    fontSize: 11,
-                    color: "#f59e0b",
+                    fontSize: 13,
+                    color: "#fbbf24",
                     lineHeight: 1.5,
                     whiteSpace: "pre-line",
                     marginBottom: 8,
@@ -141,7 +138,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                   <button
                     type="button"
                     className="btn-teal"
-                    style={{ fontSize: 11, padding: "5px 10px" }}
+                    style={{ fontSize: 13, padding: "5px 10px" }}
                     onClick={() => setSessionTimingBannerDismissed(true)}
                   >
                     Dismiss
@@ -149,7 +146,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                   <button
                     type="button"
                     className="btn-teal"
-                    style={{ fontSize: 11, padding: "5px 10px", opacity: 0.92 }}
+                    style={{ fontSize: 13, padding: "5px 10px", opacity: 0.92 }}
                     onClick={() => setSessionTimingBannerDismissed(true)}
                   >
                     Keep sessions anyway
@@ -159,20 +156,20 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             )}
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
             <input
               className="form-input"
-              style={{ fontSize: 12 }}
+              style={{ fontSize: 13 }}
               value={dose}
               onChange={(e) => setDose(e.target.value)}
               onBlur={() => onUpdate(rowKey, { stackDose: dose })}
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
             <input
               className="form-input"
-              style={{ fontSize: 12 }}
+              style={{ fontSize: 13 }}
               value={frequency}
               placeholder="e.g. Daily, 2x/week"
               onChange={(e) => setFrequency(e.target.value)}
@@ -180,10 +177,10 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
             <textarea
               className="form-input"
-              style={{ fontSize: 12, minHeight: 56, resize: "vertical" }}
+              style={{ fontSize: 13, minHeight: 56, resize: "vertical" }}
               value={notes}
               placeholder="Optional notes…"
               onChange={(e) => setNotes(e.target.value)}

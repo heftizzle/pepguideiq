@@ -9,7 +9,7 @@ export function LegalDisclaimer() {
         marginTop: 24,
         padding: "14px 16px",
         borderTop: "1px solid #14202e",
-        fontSize: 10,
+        fontSize: 13,
         color: "#4a6080",
         lineHeight: 1.55,
         maxWidth: 1200,

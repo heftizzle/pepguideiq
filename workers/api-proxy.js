@@ -10,6 +10,14 @@
 const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
 const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
 
+/** Max Netflix-style member_profiles per account (Free/Pro: 1, Elite: 2, GOAT: 4). */
+function memberProfileSlotLimit(plan) {
+  const p = normalizePlanTier(plan);
+  if (p === "goat") return 4;
+  if (p === "elite") return 2;
+  return 1;
+}
+
 const DAILY_QUERY_LIMIT = {
   entry: 1,
   pro: 4,
@@ -31,7 +39,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 const CORS_BASE = {
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
@@ -307,6 +315,209 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
     body: JSON.stringify(patch),
   });
   return res.ok;
+}
+
+async function supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, patch) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(patch),
+    }
+  );
+  return res.ok;
+}
+
+async function supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, memberProfileId, patch) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(patch),
+    }
+  );
+  return res.ok;
+}
+
+/**
+ * Authenticated POST — delete the signed-in user via Supabase Auth Admin API (service role).
+ */
+async function handleDeleteAccount(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const delUrl = `${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`;
+  const res = await fetch(delUrl, {
+    method: "DELETE",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    log(env, "error", "admin_delete_user_failed", { status: res.status, body: String(t).slice(0, 240) });
+    return jsonResponse({ error: "Could not delete account" }, 502, cors);
+  }
+  return jsonResponse({ ok: true }, 200, cors);
+}
+
+/**
+ * Authenticated POST — create a member profile + empty user_stacks row; tier slot limit enforced.
+ * Body: { "display_name": "string" }
+ */
+async function handleCreateMemberProfile(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const displayName =
+    typeof body.display_name === "string" ? body.display_name.trim().slice(0, 120) : "";
+  if (!displayName) {
+    return jsonResponse({ error: "display_name is required" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+  const limit = memberProfileSlotLimit(plan);
+
+  const countRes = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const countRows = await countRes.json().catch(() => []);
+  const total = Array.isArray(countRows) ? countRows.length : 0;
+  if (!countRes.ok) {
+    log(env, "warn", "member_profile_list_failed", { userId, status: countRes.status });
+    return jsonResponse({ error: "Could not verify profile limit" }, 502, cors);
+  }
+  if (total >= limit) {
+    return jsonResponse({ error: "Upgrade your plan to add more profiles" }, 403, cors);
+  }
+
+  const insMp = await fetch(`${supabaseUrl}/rest/v1/member_profiles`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      display_name: displayName,
+      is_default: false,
+    }),
+  });
+  const mpRows = await insMp.json().catch(() => []);
+  const mp = Array.isArray(mpRows) ? mpRows[0] : null;
+  const profileId = mp && mp.id != null ? String(mp.id) : null;
+  if (!insMp.ok || !profileId) {
+    const t = await (async () => {
+      try {
+        return JSON.stringify(mpRows);
+      } catch {
+        return "";
+      }
+    })();
+    log(env, "error", "member_profile_insert_failed", { status: insMp.status, body: String(t).slice(0, 400) });
+    return jsonResponse({ error: "Could not create profile" }, 502, cors);
+  }
+
+  const insStack = await fetch(`${supabaseUrl}/rest/v1/user_stacks`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      profile_id: profileId,
+    }),
+  });
+  if (!insStack.ok) {
+    const errText = await insStack.text().catch(() => "");
+    let errDetail = errText.slice(0, 500);
+    try {
+      const j = JSON.parse(errText);
+      if (j && typeof j.message === "string") errDetail = j.message;
+      if (j && typeof j.details === "string" && j.details) errDetail = `${errDetail} — ${j.details}`.slice(0, 500);
+    } catch {
+      /* keep errDetail */
+    }
+    log(env, "error", "member_profile_stack_insert_failed", {
+      userId,
+      profileId,
+      status: insStack.status,
+      body: errDetail,
+    });
+    await fetch(
+      `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profileId)}`,
+      {
+        method: "DELETE",
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      }
+    ).catch(() => {});
+    let hint = "";
+    if (insStack.status === 409 || /unique|duplicate/i.test(errDetail)) {
+      if (/user_stacks_pkey/i.test(errDetail) && /\(user_id\)/i.test(errDetail)) {
+        hint =
+          " Run supabase/migrations/015_user_stacks_pkey_on_id.sql — PRIMARY KEY is on user_id; it must be on id, with UNIQUE (user_id, profile_id).";
+      } else {
+        hint =
+          " Ensure 014_user_stacks_profile_unique_fix.sql ran (drop legacy UNIQUE user_id only). If needed, also run 015_user_stacks_pkey_on_id.sql.";
+      }
+    }
+    return jsonResponse(
+      {
+        error: "Could not create stack for profile",
+        details: errDetail || undefined,
+        hint: hint || undefined,
+      },
+      502,
+      cors
+    );
+  }
+
+  return jsonResponse({ profile: mp }, 200, cors);
 }
 
 /**
@@ -605,19 +816,32 @@ async function handleGetStackPhoto(request, env, cors) {
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const reqUrl = new URL(request.url);
+  const keyParam = reqUrl.searchParams.get("key");
+  let key = "";
 
-  const pr = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stack_photo_r2_key`,
-    {
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-      },
+  if (keyParam != null && String(keyParam).trim() !== "") {
+    const trimmed = String(keyParam).trim();
+    const prefix = `${userId}/`;
+    if (!trimmed.startsWith(prefix) || trimmed.includes("..")) {
+      return new Response("Forbidden", { status: 403, headers: cors });
     }
-  );
-  const rows = await pr.json().catch(() => []);
-  const row = Array.isArray(rows) ? rows[0] : null;
-  const key = row && typeof row.stack_photo_r2_key === "string" ? row.stack_photo_r2_key.trim() : "";
+    key = trimmed;
+  } else {
+    const pr = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stack_photo_r2_key`,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      }
+    );
+    const rows = await pr.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    key = row && typeof row.stack_photo_r2_key === "string" ? row.stack_photo_r2_key.trim() : "";
+  }
+
   if (!key) {
     return new Response("Not found", { status: 404, headers: cors });
   }
@@ -640,6 +864,260 @@ async function handleGetStackPhoto(request, env, cors) {
     log(env, "error", "r2_get_failed", { message: String(e) });
     return new Response("Storage error", { status: 502, headers: cors });
   }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * PATCH /member-profiles/:profileId — body { display_name } (required, non-empty).
+ */
+async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const profileId = typeof profileIdRaw === "string" ? profileIdRaw.trim() : "";
+  if (!UUID_RE.test(profileId)) {
+    return jsonResponse({ error: "Invalid profile id" }, 400, cors);
+  }
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+  const displayName =
+    typeof body.display_name === "string" ? body.display_name.trim().slice(0, 120) : "";
+  if (!displayName) {
+    return jsonResponse({ error: "display_name is required" }, 400, cors);
+  }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const ok = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, {
+    display_name: displayName,
+  });
+  if (!ok) {
+    return jsonResponse({ error: "Could not update profile" }, 502, cors);
+  }
+  return jsonResponse({ ok: true }, 200, cors);
+}
+
+/**
+ * DELETE /member-profiles/:profileId — forbidden when is_default is true.
+ */
+async function handleDeleteMemberProfile(request, env, cors, profileIdRaw) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const profileId = typeof profileIdRaw === "string" ? profileIdRaw.trim() : "";
+  if (!UUID_RE.test(profileId)) {
+    return jsonResponse({ error: "Invalid profile id" }, 400, cors);
+  }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const sel = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profileId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,is_default`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await sel.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) {
+    return jsonResponse({ error: "Profile not found" }, 404, cors);
+  }
+  if (row.is_default === true) {
+    return jsonResponse({ error: "Cannot delete the default profile" }, 403, cors);
+  }
+  const del = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profileId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Prefer: "return=minimal",
+      },
+    }
+  );
+  if (!del.ok) {
+    const t = await del.text().catch(() => "");
+    log(env, "error", "member_profile_delete_failed", {
+      userId,
+      profileId,
+      status: del.status,
+      body: String(t).slice(0, 300),
+    });
+    return jsonResponse({ error: "Could not delete profile" }, 502, cors);
+  }
+  return jsonResponse({ ok: true }, 200, cors);
+}
+
+/**
+ * Authenticated POST — multipart: file + kind (stack_shot_1 | stack_shot_2 | vial).
+ * Vials tab hero shots and per-vial photos; Saved Stacks keep using POST /upload-stack-photo.
+ */
+async function handlePostStackPhoto(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return jsonResponse({ error: "R2 bucket STACK_PHOTOS is not bound on the Worker" }, 503, cors);
+  }
+
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return jsonResponse({ error: "Invalid multipart body" }, 400, cors);
+  }
+
+  const kindRaw = formData.get("kind");
+  const kind = typeof kindRaw === "string" ? kindRaw.trim().toLowerCase() : "";
+  const vialIdRaw = formData.get("vial_id");
+  const vialId = typeof vialIdRaw === "string" ? vialIdRaw.trim() : "";
+  const memberProfileIdRaw = formData.get("member_profile_id");
+  const memberProfileId =
+    typeof memberProfileIdRaw === "string" ? memberProfileIdRaw.trim() : "";
+
+  if (kind !== "avatar") {
+    const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+    if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+      return jsonResponse({ error: "Pro plan or higher required to upload stack photos" }, 403, cors);
+    }
+  }
+
+  if (!["stack_shot_1", "stack_shot_2", "vial", "avatar"].includes(kind)) {
+    return jsonResponse({ error: 'kind must be stack_shot_1, stack_shot_2, vial, or avatar' }, 400, cors);
+  }
+  if (kind === "vial") {
+    if (!UUID_RE.test(vialId)) {
+      return jsonResponse({ error: "Valid vial_id (UUID) required" }, 400, cors);
+    }
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+    return jsonResponse({ error: 'Expected multipart field "file"' }, 400, cors);
+  }
+
+  const size = typeof file.size === "number" ? file.size : 0;
+  if (size <= 0 || size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+  }
+
+  const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
+  if (!STACK_PHOTO_TYPES.has(mime)) {
+    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400, cors);
+  }
+
+  let key;
+  /** When set, avatar upload updates `member_profiles.avatar_url` (R2 key) instead of account `profiles.avatar_r2_key`. */
+  let avatarMemberProfileId = null;
+  if (kind === "stack_shot_1") key = `${userId}/stack-shot-1.jpg`;
+  else if (kind === "stack_shot_2") key = `${userId}/stack-shot-2.jpg`;
+  else if (kind === "avatar") {
+    if (memberProfileId && UUID_RE.test(memberProfileId)) {
+      const mr = await fetch(
+        `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+        {
+          headers: {
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+          },
+        }
+      );
+      const mrows = await mr.json().catch(() => []);
+      if (!Array.isArray(mrows) || mrows.length === 0) {
+        return jsonResponse({ error: "Member profile not found" }, 404, cors);
+      }
+      avatarMemberProfileId = memberProfileId;
+      key = `${userId}/member-profiles/${memberProfileId}/avatar.jpg`;
+    } else {
+      key = `${userId}/avatar.jpg`;
+    }
+  } else key = `${userId}/vials/${vialId}.jpg`;
+
+  let bytes;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return jsonResponse({ error: "Could not read file" }, 400, cors);
+  }
+  if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+  }
+
+  if (kind === "vial") {
+    const vr = await fetch(
+      `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      }
+    );
+    const vrows = await vr.json().catch(() => []);
+    if (!Array.isArray(vrows) || vrows.length === 0) {
+      return jsonResponse({ error: "Vial not found" }, 404, cors);
+    }
+  }
+
+  try {
+    await bucket.put(key, bytes, {
+      httpMetadata: { contentType: mime },
+    });
+  } catch (e) {
+    log(env, "error", "r2_put_failed", { message: String(e) });
+    return jsonResponse({ error: "Storage upload failed" }, 502, cors);
+  }
+
+  let patched = false;
+  if (kind === "stack_shot_1") {
+    patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_1_r2_key: key });
+  } else if (kind === "stack_shot_2") {
+    patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_2_r2_key: key });
+  } else if (kind === "avatar") {
+    if (avatarMemberProfileId) {
+      patched = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
+        avatar_url: key,
+      });
+    } else {
+      patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { avatar_r2_key: key });
+    }
+  } else {
+    patched = await supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, { vial_photo_r2_key: key });
+  }
+
+  if (!patched) {
+    return jsonResponse({ error: "Failed to update database" }, 502, cors);
+  }
+
+  return jsonResponse({ key, private: true }, 200, cors);
 }
 
 /**
@@ -797,6 +1275,29 @@ export default {
 
     if (url.pathname === "/upload-stack-photo" && request.method === "POST") {
       return handleUploadStackPhoto(request, env, cors);
+    }
+
+    if (url.pathname === "/account/delete" && request.method === "POST") {
+      return handleDeleteAccount(request, env, cors);
+    }
+
+    const memberProfilePathMatch = url.pathname.match(/^\/member-profiles\/([^/]+)\/?$/);
+    if (memberProfilePathMatch) {
+      const mpId = memberProfilePathMatch[1];
+      if (request.method === "PATCH") {
+        return handlePatchMemberProfile(request, env, cors, mpId);
+      }
+      if (request.method === "DELETE") {
+        return handleDeleteMemberProfile(request, env, cors, mpId);
+      }
+    }
+
+    if (url.pathname === "/member-profiles" && request.method === "POST") {
+      return handleCreateMemberProfile(request, env, cors);
+    }
+
+    if (url.pathname === "/stack-photo" && request.method === "POST") {
+      return handlePostStackPhoto(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "GET") {

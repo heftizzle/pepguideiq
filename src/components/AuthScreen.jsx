@@ -73,7 +73,7 @@ export function AuthScreen({ onAuth }) {
       >
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Logo style={{ marginBottom: 20 }} />
-          <div className="mono" style={{ fontSize: 11, color: "#4a6080", lineHeight: 1.6 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.6 }}>
             Copy <code style={{ color: "#00d4aa" }}>.env.example</code> to{" "}
             <code style={{ color: "#00d4aa" }}>.env.local</code> and set{" "}
             <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_URL</code> and{" "}
@@ -102,7 +102,7 @@ export function AuthScreen({ onAuth }) {
         <div
           className="mono"
           style={{
-            fontSize: 11,
+            fontSize: 13,
             color: "#a0a0b0",
             letterSpacing: ".2em",
             marginBottom: 28,
@@ -114,7 +114,7 @@ export function AuthScreen({ onAuth }) {
         {error && (
           <div
             style={{
-              fontSize: 11,
+              fontSize: 13,
               color: "#ef4444",
               marginBottom: 16,
               fontFamily: "'JetBrains Mono',monospace",
@@ -156,7 +156,7 @@ export function AuthScreen({ onAuth }) {
                     transform: "translateX(-50%)",
                     background: plan.color,
                     color: "#07090e",
-                    fontSize: 11,
+                    fontSize: 13,
                     fontWeight: 700,
                     fontFamily: "'JetBrains Mono',monospace",
                     padding: "2px 12px",
@@ -184,13 +184,13 @@ export function AuthScreen({ onAuth }) {
                 <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef" }}>
                   {plan.price}
                 </span>
-                <span style={{ fontSize: 10, color: "#4a6080", marginLeft: 4 }}>{plan.period}</span>
+                <span style={{ fontSize: 13, color: "#4a6080", marginLeft: 4 }}>{plan.period}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18, flex: 1 }}>
                 {plan.features.map((f) => (
                   <div key={f} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                    <span style={{ color: plan.color, fontSize: 10, marginTop: 2, flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 11, color: "#4a6080", lineHeight: 1.5 }}>{f}</span>
+                    <span style={{ color: plan.color, fontSize: 13, marginTop: 2, flexShrink: 0 }}>✓</span>
+                    <span style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>{f}</span>
                   </div>
                 ))}
               </div>
@@ -203,7 +203,7 @@ export function AuthScreen({ onAuth }) {
                   background: plan.color + "12",
                   width: "100%",
                   padding: "8px 0",
-                  fontSize: 12,
+                  fontSize: 13,
                   opacity: busy ? 0.6 : 1,
                 }}
                 disabled={busy}
@@ -214,7 +214,7 @@ export function AuthScreen({ onAuth }) {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16, fontSize: 11, color: "#a0a0b0" }}>
+        <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0" }}>
           Subscriptions managed via App Store / Google Play on mobile.
         </div>
       </div>
@@ -235,7 +235,7 @@ export function AuthScreen({ onAuth }) {
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Logo />
-          <div className="mono" style={{ fontSize: 11, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
             {mode === "login" ? "SIGN IN TO YOUR ACCOUNT" : "CREATE YOUR ACCOUNT"}
           </div>
         </div>
@@ -243,7 +243,7 @@ export function AuthScreen({ onAuth }) {
         <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
           {mode === "register" && (
             <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
                 NAME
               </div>
               <input
@@ -256,7 +256,7 @@ export function AuthScreen({ onAuth }) {
             </div>
           )}
           <div style={{ marginBottom: 14 }}>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               EMAIL
             </div>
             <input
@@ -270,7 +270,7 @@ export function AuthScreen({ onAuth }) {
             />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
             <input
@@ -284,7 +284,7 @@ export function AuthScreen({ onAuth }) {
             />
           </div>
           {error && (
-            <div style={{ fontSize: 11, color: "#ef4444", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>
+            <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>
               {error}
             </div>
           )}
@@ -298,7 +298,7 @@ export function AuthScreen({ onAuth }) {
             {busy ? "…" : mode === "login" ? "Sign In" : "Continue"}
           </button>
 
-          <div style={{ marginTop: 16, textAlign: "center", fontSize: 11, color: "#a0a0b0" }}>
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "#a0a0b0" }}>
             {mode === "login" ? (
               <>
                 Don&apos;t have an account?{" "}
@@ -309,7 +309,7 @@ export function AuthScreen({ onAuth }) {
                     border: "none",
                     color: "#00d4aa",
                     cursor: "pointer",
-                    fontSize: 11,
+                    fontSize: 13,
                     fontFamily: "'Outfit',sans-serif",
                   }}
                   onClick={() => {
@@ -330,7 +330,7 @@ export function AuthScreen({ onAuth }) {
                     border: "none",
                     color: "#00d4aa",
                     cursor: "pointer",
-                    fontSize: 11,
+                    fontSize: 13,
                     fontFamily: "'Outfit',sans-serif",
                   }}
                   onClick={() => {
