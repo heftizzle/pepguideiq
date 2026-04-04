@@ -193,7 +193,10 @@ async function checkRateLimit(env, kv, userId, plan) {
   const key = `rl:${userId}:${today}`;
 
   const raw = await kv.get(key);
-  const current = raw ? JSON.parse(raw) : { count: 0 };
+  let current = { count: 0 };
+  if (raw) {
+    try { current = JSON.parse(raw); } catch { /* corrupted KV entry — reset */ }
+  }
 
   if (current.count >= limit) {
     return { allowed: false, count: current.count, limit };
@@ -317,9 +320,11 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
   return res.ok;
 }
 
-async function supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, patch) {
+async function supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, patch, profileId) {
+  let qs = `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}`;
+  if (profileId) qs += `&profile_id=eq.${encodeURIComponent(profileId)}`;
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    qs,
     {
       method: "PATCH",
       headers: {
@@ -508,9 +513,7 @@ async function handleCreateMemberProfile(request, env, cors) {
     }
     return jsonResponse(
       {
-        error: "Could not create stack for profile",
-        details: errDetail || undefined,
-        hint: hint || undefined,
+        error: "Could not create stack for profile" + (hint ? ` —${hint}` : ""),
       },
       502,
       cors
@@ -999,6 +1002,8 @@ async function handlePostStackPhoto(request, env, cors) {
   const kind = typeof kindRaw === "string" ? kindRaw.trim().toLowerCase() : "";
   const vialIdRaw = formData.get("vial_id");
   const vialId = typeof vialIdRaw === "string" ? vialIdRaw.trim() : "";
+  const profileIdRaw = formData.get("profile_id");
+  const profileId = typeof profileIdRaw === "string" ? profileIdRaw.trim() : "";
   const memberProfileIdRaw = formData.get("member_profile_id");
   const memberProfileId =
     typeof memberProfileIdRaw === "string" ? memberProfileIdRaw.trim() : "";
@@ -1072,8 +1077,10 @@ async function handlePostStackPhoto(request, env, cors) {
   }
 
   if (kind === "vial") {
+    let vialQs = `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}&select=id`;
+    if (profileId) vialQs += `&profile_id=eq.${encodeURIComponent(profileId)}`;
     const vr = await fetch(
-      `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+      vialQs,
       {
         headers: {
           apikey: serviceKey,
@@ -1110,7 +1117,7 @@ async function handlePostStackPhoto(request, env, cors) {
       patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { avatar_r2_key: key });
     }
   } else {
-    patched = await supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, { vial_photo_r2_key: key });
+    patched = await supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, { vial_photo_r2_key: key }, profileId);
   }
 
   if (!patched) {

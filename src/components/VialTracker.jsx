@@ -211,7 +211,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
 /**
  * @param {{ vialId: string, r2Key: string | null | undefined, workerConfigured: boolean, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void }} props
  */
-function VialPhotoThumb({ vialId, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
+function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState(null);
@@ -255,6 +255,7 @@ function VialPhotoThumb({ vialId, r2Key, workerConfigured, canMutate, onUpgrade,
     fd.append("file", f);
     fd.append("kind", "vial");
     fd.append("vial_id", vialId);
+    if (profileId) fd.append("profile_id", profileId);
     setUploading(true);
     try {
       const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
@@ -988,6 +989,7 @@ function VialRow({
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <VialPhotoThumb
           vialId={vial.id}
+          profileId={profileId}
           r2Key={vial.vial_photo_r2_key}
           workerConfigured={workerConfigured}
           canMutate={canMutate}
