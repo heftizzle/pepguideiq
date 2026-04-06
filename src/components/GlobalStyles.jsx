@@ -73,6 +73,45 @@ export function GlobalStyles() {
         .guide-sidebar{display:none}
         .tab-btn{padding:10px 10px;font-size:13px}
       }
+      /* AI Guide full-screen takeover — open/close use same duration per breakpoint */
+      .guide-takeover-root{
+        position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;box-sizing:border-box;
+        padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+        background:rgba(5,10,18,.62);backdrop-filter:blur(2px);
+        animation:guideTakeoverInDesktop .28s ease;
+      }
+      .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutDesktop .28s ease forwards}
+      @keyframes guideTakeoverInDesktop{from{opacity:0}to{opacity:1}}
+      @keyframes guideTakeoverOutDesktop{from{opacity:1}to{opacity:0}}
+      .guide-takeover-close{
+        position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));
+        z-index:55;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;
+        display:flex;align-items:center;justify-content:center;
+        border:1px solid #243040;border-radius:12px;background:#0b0f17;color:#8fa5bf;
+        font-size:22px;line-height:1;cursor:pointer;font-family:'Outfit',sans-serif;
+        box-shadow:0 4px 20px rgba(0,0,0,.45);
+        transition:color .15s,border-color .15s,background .15s;
+      }
+      .guide-takeover-close:hover{color:#dde4ef;border-color:#3d5266;background:#14202e}
+      .guide-takeover-close:focus-visible{outline:2px solid #00d4aa;outline-offset:2px}
+      .guide-takeover-panel-wrap{
+        flex:1;min-height:0;display:flex;flex-direction:row;gap:16px;margin-top:2px;
+      }
+      @media (max-width:640px){
+        .guide-takeover-root{
+          padding-top:max(52px,env(safe-area-inset-top));
+          animation:guideTakeoverInMobile .34s ease;
+        }
+        .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutMobile .34s ease forwards}
+        @keyframes guideTakeoverInMobile{
+          from{opacity:0;transform:translateY(100%)}
+          to{opacity:1;transform:translateY(0)}
+        }
+        @keyframes guideTakeoverOutMobile{
+          from{opacity:1;transform:translateY(0)}
+          to{opacity:0;transform:translateY(100%)}
+        }
+      }
     `}</style>
   );
 }

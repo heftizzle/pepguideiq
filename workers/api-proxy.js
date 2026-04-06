@@ -448,6 +448,7 @@ async function handleCreateMemberProfile(request, env, cors) {
       user_id: userId,
       display_name: displayName,
       is_default: false,
+      language: "en",
     }),
   });
   const mpRows = await insMp.json().catch(() => []);
@@ -871,8 +872,129 @@ async function handleGetStackPhoto(request, env, cors) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const MEMBER_PROFILE_ALLOWED_LANGUAGES = new Set(["en", "es", "pt-BR", "fr", "de", "ja", "zh-Hans"]);
+
 /**
- * PATCH /member-profiles/:profileId — body { display_name } (required, non-empty).
+ * GET /member-profiles — list signed-in user's member_profiles (includes locale fields).
+ */
+async function handleGetMemberProfiles(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
+    userId
+  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language&order=created_at.asc`;
+  const res = await fetch(sel, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    log(env, "warn", "member_profile_get_list_failed", { userId, status: res.status });
+    return jsonResponse({ error: "Could not load profiles" }, 502, cors);
+  }
+  return jsonResponse({ profiles: rows }, 200, cors);
+}
+
+/**
+ * Build PATCH payload for member_profiles from JSON body.
+ * At least one of: display_name, city, state, country, language must be present.
+ * @returns {{ patch?: Record<string, unknown>, error?: string }}
+ */
+function parseMemberProfilePatchBody(body) {
+  if (body == null || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "Invalid body" };
+  }
+  /** @type {Record<string, unknown>} */
+  const patch = {};
+  let hasKey = false;
+
+  if (Object.prototype.hasOwnProperty.call(body, "display_name")) {
+    hasKey = true;
+    const displayName =
+      typeof body.display_name === "string" ? body.display_name.trim().slice(0, 120) : "";
+    if (!displayName) {
+      return { error: "display_name cannot be empty" };
+    }
+    patch.display_name = displayName;
+  }
+
+  const setNullableText = (key, maxLen) => {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) return null;
+    hasKey = true;
+    const v = body[key];
+    if (v === null) {
+      patch[key] = null;
+      return null;
+    }
+    if (typeof v !== "string") {
+      return `${key} must be a string or null`;
+    }
+    const t = v.trim().slice(0, maxLen);
+    patch[key] = t === "" ? null : t;
+    return null;
+  };
+
+  let err = setNullableText("city", 120);
+  if (err) return { error: err };
+  err = setNullableText("state", 120);
+  if (err) return { error: err };
+
+  if (Object.prototype.hasOwnProperty.call(body, "country")) {
+    hasKey = true;
+    const v = body.country;
+    if (v === null) {
+      patch.country = null;
+    } else if (typeof v === "string") {
+      const u = v.trim().toUpperCase();
+      if (u === "") {
+        patch.country = null;
+      } else if (!/^[A-Z]{2}$/.test(u)) {
+        return { error: "country must be ISO 3166-1 alpha-2 (e.g. US)" };
+      } else {
+        patch.country = u;
+      }
+    } else {
+      return { error: "country must be a string or null" };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "language")) {
+    hasKey = true;
+    const v = body.language;
+    if (v === null) {
+      patch.language = null;
+    } else if (typeof v === "string") {
+      const t = v.trim();
+      if (t === "") {
+        patch.language = null;
+      } else if (!MEMBER_PROFILE_ALLOWED_LANGUAGES.has(t)) {
+        return { error: "language is not an allowed BCP 47 tag" };
+      } else {
+        patch.language = t;
+      }
+    } else {
+      return { error: "language must be a string or null" };
+    }
+  }
+
+  if (!hasKey) {
+    return { error: "No supported fields to update" };
+  }
+  return { patch };
+}
+
+/**
+ * PATCH /member-profiles/:profileId — display_name and/or city, state, country, language.
  */
 async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
   if (!supabaseAuthReady(env)) {
@@ -893,16 +1015,13 @@ async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
   }
-  const displayName =
-    typeof body.display_name === "string" ? body.display_name.trim().slice(0, 120) : "";
-  if (!displayName) {
-    return jsonResponse({ error: "display_name is required" }, 400, cors);
+  const parsed = parseMemberProfilePatchBody(body);
+  if (parsed.error || !parsed.patch) {
+    return jsonResponse({ error: parsed.error ?? "Invalid body" }, 400, cors);
   }
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const ok = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, {
-    display_name: displayName,
-  });
+  const ok = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, parsed.patch);
   if (!ok) {
     return jsonResponse({ error: "Could not update profile" }, 502, cors);
   }
@@ -1286,6 +1405,10 @@ export default {
 
     if (url.pathname === "/account/delete" && request.method === "POST") {
       return handleDeleteAccount(request, env, cors);
+    }
+
+    if (url.pathname === "/member-profiles" && request.method === "GET") {
+      return handleGetMemberProfiles(request, env, cors);
     }
 
     const memberProfilePathMatch = url.pathname.match(/^\/member-profiles\/([^/]+)\/?$/);

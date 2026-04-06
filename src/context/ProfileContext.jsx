@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { getMemberProfileSlotLimit } from "../lib/tiers.js";
-import { listMemberProfiles } from "../lib/supabase.js";
+import { fetchMemberProfiles } from "../lib/supabase.js";
 
 const LS_KEY = (userId) => `pepguideiq.active_profile_id.${userId}`;
 
@@ -24,7 +24,7 @@ export function ProfileProvider({ userId, plan, children }) {
       setReady(true);
       return;
     }
-    const { profiles, error } = await listMemberProfiles(userId);
+    const { profiles, error } = await fetchMemberProfiles(userId);
     if (error) {
       setMemberProfiles([]);
       setActiveProfileIdState(null);

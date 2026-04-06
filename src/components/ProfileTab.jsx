@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { formatPlan } from "../lib/tiers.js";
@@ -18,6 +18,8 @@ import {
   upsertBodyMetrics,
 } from "../lib/supabase.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
+import { getCountriesForProfileForm } from "../data/countries.js";
+import { formatLanguageOptionLabel, PROFILE_LANGUAGE_OPTIONS } from "../data/profileLanguages.js";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
 
 const SECTION = {
@@ -313,6 +315,21 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut }) {
   const [renameProfileBusy, setRenameProfileBusy] = useState(false);
   const [avatarImageNonce, setAvatarImageNonce] = useState(0);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [localeCity, setLocaleCity] = useState("");
+  const [localeState, setLocaleState] = useState("");
+  const [localeCountryCode, setLocaleCountryCode] = useState("");
+  const [localeLanguageTag, setLocaleLanguageTag] = useState("en");
+  const [countryQuery, setCountryQuery] = useState("");
+  const [localeBusy, setLocaleBusy] = useState(false);
+
+  const sortedCountries = useMemo(() => getCountriesForProfileForm(), []);
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return sortedCountries;
+    return sortedCountries.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    );
+  }, [sortedCountries, countryQuery]);
 
   const memberAvatarSrc = useMemberAvatarSrc(
     user.id,
@@ -334,6 +351,20 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut }) {
     const n = activeProfile && typeof activeProfile.display_name === "string" ? activeProfile.display_name : "";
     setDisplayName(n);
   }, [activeProfile?.id, activeProfile?.display_name]);
+
+  useEffect(() => {
+    const p = activeProfile;
+    if (!p) return;
+    setLocaleCity(typeof p.city === "string" ? p.city : "");
+    setLocaleState(typeof p.state === "string" ? p.state : "");
+    const co = p.country;
+    setLocaleCountryCode(typeof co === "string" && /^[A-Za-z]{2}$/.test(co.trim()) ? co.trim().toUpperCase() : "");
+    const lang = p.language;
+    setLocaleLanguageTag(
+      typeof lang === "string" && PROFILE_LANGUAGE_OPTIONS.some((o) => o.tag === lang) ? lang : "en"
+    );
+    setCountryQuery("");
+  }, [activeProfile?.id, activeProfile?.city, activeProfile?.state, activeProfile?.country, activeProfile?.language]);
 
   useEffect(() => {
     if (!user?.id || !activeProfileId || !isSupabaseConfigured()) {
@@ -480,6 +511,30 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut }) {
       setErr(e instanceof Error ? e.message : "Rename failed");
     } finally {
       setRenameProfileBusy(false);
+    }
+  };
+
+  const saveLocale = async () => {
+    if (!activeProfileId) return;
+    if (!workerOk) {
+      setErr("Configure VITE_API_WORKER_URL to save locale.");
+      return;
+    }
+    setLocaleBusy(true);
+    setErr(null);
+    try {
+      const { error } = await patchMemberProfileViaWorker(activeProfileId, {
+        city: localeCity.trim() || null,
+        state: localeState.trim() || null,
+        country: localeCountryCode.trim() ? localeCountryCode.trim().toUpperCase() : null,
+        language: localeLanguageTag || "en",
+      });
+      if (error) setErr(error.message);
+      else await refreshMemberProfiles();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save locale");
+    } finally {
+      setLocaleBusy(false);
     }
   };
 
@@ -1143,6 +1198,144 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut }) {
               </button>
             </div>
           </div>
+
+          <div
+            className="mono"
+            style={{ fontSize: 12, color: "#6b7c8f", marginTop: 16, marginBottom: 8, letterSpacing: "0.06em" }}
+          >
+            Locale (stored on this profile)
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>City</div>
+              <input
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                value={localeCity}
+                onChange={(e) => setLocaleCity(e.target.value)}
+                disabled={localeBusy}
+                placeholder="City"
+                autoComplete="address-level2"
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>State / region</div>
+              <input
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                value={localeState}
+                onChange={(e) => setLocaleState(e.target.value)}
+                disabled={localeBusy}
+                placeholder="State or region"
+                autoComplete="address-level1"
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Country (ISO alpha-2)</div>
+              <input
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box", marginBottom: 8 }}
+                value={countryQuery}
+                onChange={(e) => setCountryQuery(e.target.value)}
+                disabled={localeBusy}
+                placeholder="Filter by name or code (e.g. US)…"
+              />
+              <div
+                style={{
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  borderRadius: 10,
+                  border: "1px solid #243040",
+                  background: "#07090e",
+                }}
+              >
+                {filteredCountries.length === 0 ? (
+                  <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", padding: "10px 12px" }}>
+                    No matches
+                  </div>
+                ) : (
+                  filteredCountries.map((c) => {
+                    const sel = c.code === localeCountryCode;
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => {
+                          setLocaleCountryCode(c.code);
+                          setCountryQuery("");
+                        }}
+                        disabled={localeBusy}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          fontSize: 13,
+                          padding: "8px 12px",
+                          border: "none",
+                          borderBottom: "1px solid #1a2430",
+                          background: sel ? "rgba(0,212,170,0.1)" : "transparent",
+                          color: sel ? "#00d4aa" : "#dde4ef",
+                          cursor: localeBusy ? "default" : "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {c.name} ({c.code})
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {localeCountryCode ? (
+                <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", marginTop: 6 }}>
+                  Selected: {localeCountryCode}
+                  <button
+                    type="button"
+                    onClick={() => setLocaleCountryCode("")}
+                    disabled={localeBusy}
+                    style={{
+                      marginLeft: 10,
+                      fontSize: 12,
+                      color: "#8fa5bf",
+                      background: "none",
+                      border: "none",
+                      cursor: localeBusy ? "default" : "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Language preference</div>
+              <select
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
+                value={localeLanguageTag}
+                onChange={(e) => setLocaleLanguageTag(e.target.value)}
+                disabled={localeBusy}
+              >
+                {PROFILE_LANGUAGE_OPTIONS.map((o) => (
+                  <option key={o.tag} value={o.tag}>
+                    {formatLanguageOptionLabel(o)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13, alignSelf: "flex-start" }}
+              disabled={localeBusy || !workerOk}
+              onClick={() => void saveLocale()}
+            >
+              {localeBusy ? "…" : "Save locale"}
+            </button>
+          </div>
+
           {!activeProfile?.is_default && (
             <button
               type="button"

@@ -209,10 +209,41 @@ export async function listMemberProfiles(userId) {
   if (!supabase || !userId) return { profiles: [], error: notConfiguredError() };
   const { data, error } = await supabase
     .from("member_profiles")
-    .select("id, user_id, display_name, avatar_url, is_default, created_at")
+    .select("id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   return { profiles: data ?? [], error: error ?? null };
+}
+
+/**
+ * Loads member profiles via Worker GET /member-profiles when configured; otherwise Supabase.
+ * @returns {Promise<{ profiles: object[], error: Error | null }>}
+ */
+export async function fetchMemberProfiles(userId) {
+  if (!userId) return { profiles: [], error: notConfiguredError() };
+  if (!isSupabaseConfigured() && !isApiWorkerConfigured()) {
+    return { profiles: [], error: notConfiguredError() };
+  }
+  if (isApiWorkerConfigured()) {
+    const token = await getSessionAccessToken();
+    if (token) {
+      try {
+        const res = await fetch(`${API_WORKER_URL}/member-profiles`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const j = await res.json();
+          if (j && typeof j === "object" && Array.isArray(j.profiles)) {
+            return { profiles: j.profiles, error: null };
+          }
+        }
+      } catch {
+        /* fall through to Supabase */
+      }
+    }
+  }
+  return listMemberProfiles(userId);
 }
 
 /**
@@ -274,7 +305,7 @@ export async function createMemberProfileViaWorker(displayName) {
   }
 }
 
-/** PATCH Worker /member-profiles/:profileId — body { display_name }. */
+/** PATCH Worker /member-profiles/:profileId — display_name and/or locale fields. */
 export async function patchMemberProfileViaWorker(profileId, body) {
   if (!isApiWorkerConfigured()) {
     return { error: new Error("API worker is not configured (VITE_API_WORKER_URL).") };

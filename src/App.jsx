@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
@@ -206,8 +206,68 @@ function PepGuideIQApp({ user, setUser }) {
   /** Protocol session from nav pills, URL, or localStorage; cleared when leaving Protocol tab. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
   const [narrowHeader, setNarrowHeader] = useState(false);
+  /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
+  const [guideExiting, setGuideExiting] = useState(false);
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
+  const prevTabRef = useRef(activeTab);
+
+  const resetGuideAiState = useCallback(() => {
+    setAiMsgs([]);
+    setAiInput("");
+    setGoals([]);
+    setAiQueryUsage(null);
+    setAiLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (prevTabRef.current === "guide" && activeTab !== "guide") {
+      resetGuideAiState();
+    }
+    prevTabRef.current = activeTab;
+  }, [activeTab, resetGuideAiState]);
+
+  useEffect(() => {
+    if (activeTab !== "guide" && !guideExiting) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [activeTab, guideExiting]);
+
+  const beginCloseGuide = useCallback(() => {
+    if (guideExiting || activeTab !== "guide") return;
+    setGuideExiting(true);
+  }, [guideExiting, activeTab]);
+
+  const handleGuideTakeoverAnimationEnd = useCallback(
+    (e) => {
+      if (e.target !== e.currentTarget) return;
+      if (!guideExiting) return;
+      setActiveTab("library");
+      setGuideExiting(false);
+    },
+    [guideExiting]
+  );
+
+  const onGuideTakeoverRootClick = useCallback(
+    (e) => {
+      if (e.target === e.currentTarget) beginCloseGuide();
+    },
+    [beginCloseGuide]
+  );
+
+  useEffect(() => {
+    if (activeTab !== "guide" && !guideExiting) return;
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      beginCloseGuide();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeTab, guideExiting, beginCloseGuide]);
+
   const workerOkHeader = isApiWorkerConfigured();
   const rawHeaderMemberAvatar =
     activeProfile && typeof activeProfile.avatar_url === "string" ? activeProfile.avatar_url.trim() : "";
@@ -978,100 +1038,6 @@ function PepGuideIQApp({ user, setUser }) {
             />
           )}
 
-          {activeTab === "guide" && (
-            <div style={{ display:"flex",gap:16,height:"calc(100vh - 170px)",flexDirection:"row" }}>
-              <div style={{ width:190,flexShrink:0,overflowY:"auto",display:"flex",flexDirection:"column",gap:5 }} className="guide-sidebar">
-                <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// GOALS <span style={{ color:"#a0a0b0" }}>(optional)</span></div>
-                {GOALS.map((g) => (
-                  <button type="button" key={g} className={`goal-chip ${goals.includes(g)?"on":""}`}
-                    onClick={() => setGoals((prev) => prev.includes(g) ? prev.filter((x)=>x!==g) : [...prev,g])}>
-                    {g}
-                  </button>
-                ))}
-                {myStack.length > 0 && (
-                  <div style={{ marginTop:14,paddingTop:14,borderTop:"1px solid #0e1822" }}>
-                    <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:6 }}>// SAVED STACK LOADED</div>
-                    {myStack.map((p) => <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 13,color:"#2e4055",padding:"2px 0" }}>→ {p.name}</div>)}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ flex:1,display:"flex",flexDirection:"column",background:"#0b0f17",border:"1px solid #14202e",borderRadius:10,overflow:"hidden",minWidth:0 }}>
-                <div style={{ padding:"12px 16px",borderBottom:"1px solid #0e1822",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap" }}>
-                  <div className={aiLoading?"pulse":""} style={{ width:7,height:7,borderRadius:"50%",background:aiLoading?"#f59e0b":"#00d4aa",flexShrink:0 }} />
-                  <div className="brand" style={{ fontSize: 13,color:"#a0a0b0",letterSpacing:".06em" }}>
-                    <span style={{ color:"#00d4aa" }}>Pep</span>GuideIQ INTELLIGENCE
-                  </div>
-                  {goals.length > 0 && <span className="mono" style={{ fontSize: 13,color:"#a0a0b0" }}>{goals.length} goal{goals.length>1?"s":""} active</span>}
-                  {!canAI && <span className="pill" style={{ background:"#f59e0b15",color:"#f59e0b",border:"1px solid #f59e0b30",fontSize: 13,marginLeft:"auto" }}>Upgrade to unlock AI</span>}
-                </div>
-
-                <div style={{ flex:1,overflowY:"auto",padding:14 }}>
-                  {aiMsgs.length === 0 && (
-                    <div style={{ textAlign:"center",padding:"32px 16px" }}>
-                      <div style={{ fontSize:28,opacity:.2,marginBottom:10 }}>⬡</div>
-                      <div className="mono" style={{ color:"#a0a0b0",fontSize: 13,marginBottom:18 }}>
-                        // Optional: select goals above, then ask anything.
-                      </div>
-                      <div style={{ display:"flex",flexDirection:"column",gap:7,maxWidth:360,margin:"0 auto" }}>
-                        {[
-                          "Build me a longevity stack from scratch",
-                          "Best sleep peptide protocol and timing?",
-                          "How do I stack Semax and Selank safely?",
-                          "Explain SS-31's mechanism of action",
-                          "What's the mitochondrial trinity protocol?",
-                        ].map((s) => (
-                          <button type="button" key={s} className="sugg-btn" onClick={() => canAI ? setAiInput(s) : openUpgradeModal()}>{s}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {aiMsgs.map((msg,i) => (
-                    <div key={i} className={`ai-msg ${msg.role==="user"?"ai-user":"ai-bot"}`}>
-                      {msg.role === "assistant" && (
-                        <div className="mono" style={{ fontSize: 13,color:"#00d4aa",marginBottom:5,letterSpacing:".15em" }}>
-                          <span style={{ color:"#00d4aa" }}>Pep</span>GuideIQ
-                        </div>
-                      )}
-                      <div style={{ whiteSpace:"pre-wrap",color:msg.role==="user"?"#dde4ef":"#8fa5bf" }}>{msg.content}</div>
-                      {msg.role === "assistant" && msg.limitReached && (
-                        <button type="button" className="btn-teal" onClick={openUpgradeModal} style={{ marginTop:10, fontSize: 13, padding:"6px 12px" }}>
-                          Upgrade for more queries
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {aiLoading && (
-                    <div className="ai-msg ai-bot">
-                      <div className="mono pulse" style={{ fontSize: 13,color:"#00d4aa" }}>// Analyzing protocol data…</div>
-                    </div>
-                  )}
-                  <div ref={msgEnd} />
-                </div>
-
-                <div style={{ padding:10,borderTop:"1px solid #0e1822",display:"flex",flexDirection:"column",gap:4 }}>
-                  <div style={{ display:"flex",gap:8 }}>
-                    <textarea className="ai-input" rows={2} placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
-                      value={aiInput} onChange={(e) => setAiInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendAI(); } }}
-                    />
-                    <button type="button" className="btn-teal" onClick={sendAI} disabled={aiLoading||!aiInput.trim()} style={{ padding:"0 18px",alignSelf:"stretch",fontSize:16 }}>
-                      {aiLoading?"…":"→"}
-                    </button>
-                  </div>
-                  {canAI && aiQueryUsage != null && (
-                    <div style={{ fontSize: 13,color:"#8fa5bf",textAlign:"right",marginTop:4 }}>
-                      {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
-                      {aiQueryUsage.today >= aiQueryUsage.limit && (
-                        <span style={{ color:"#f97316",marginLeft:8 }}>· Limit reached</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === "profile" && user?.id && (
             <div>
               <div className="brand" style={{ fontSize: 17, fontWeight: 700, marginBottom: 18 }}>
@@ -1086,6 +1052,209 @@ function PepGuideIQApp({ user, setUser }) {
             </div>
           )}
         </div>
+
+        {(activeTab === "guide" || guideExiting) && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="AI Guide"
+            className={`guide-takeover-root${guideExiting ? " guide-takeover-root--exit" : ""}`}
+            onClick={onGuideTakeoverRootClick}
+            onAnimationEnd={handleGuideTakeoverAnimationEnd}
+          >
+            <button
+              type="button"
+              className="guide-takeover-close"
+              aria-label="Close AI Guide"
+              onClick={(e) => {
+                e.stopPropagation();
+                beginCloseGuide();
+              }}
+            >
+              ×
+            </button>
+            <div className="guide-takeover-panel-wrap" onClick={(e) => e.stopPropagation()}>
+              <div
+                style={{
+                  width: 190,
+                  flexShrink: 0,
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 5,
+                }}
+                className="guide-sidebar"
+              >
+                <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
+                  // GOALS <span style={{ color: "#a0a0b0" }}>(optional)</span>
+                </div>
+                {GOALS.map((g) => (
+                  <button
+                    type="button"
+                    key={g}
+                    className={`goal-chip ${goals.includes(g) ? "on" : ""}`}
+                    onClick={() =>
+                      setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
+                    }
+                  >
+                    {g}
+                  </button>
+                ))}
+                {myStack.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #0e1822" }}>
+                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
+                      // SAVED STACK LOADED
+                    </div>
+                    {myStack.map((p) => (
+                      <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 13, color: "#2e4055", padding: "2px 0" }}>
+                        → {p.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  background: "#0b0f17",
+                  border: "1px solid #14202e",
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    borderBottom: "1px solid #0e1822",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    className={aiLoading ? "pulse" : ""}
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: aiLoading ? "#f59e0b" : "#00d4aa",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div className="brand" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".06em" }}>
+                    <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ INTELLIGENCE
+                  </div>
+                  {goals.length > 0 && (
+                    <span className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
+                      {goals.length} goal{goals.length > 1 ? "s" : ""} active
+                    </span>
+                  )}
+                  {!canAI && (
+                    <span
+                      className="pill"
+                      style={{
+                        background: "#f59e0b15",
+                        color: "#f59e0b",
+                        border: "1px solid #f59e0b30",
+                        fontSize: 13,
+                        marginLeft: "auto",
+                      }}
+                    >
+                      Upgrade to unlock AI
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+                  {aiMsgs.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "32px 16px" }}>
+                      <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
+                      <div className="mono" style={{ color: "#a0a0b0", fontSize: 13, marginBottom: 18 }}>
+                        // Optional: select goals above, then ask anything.
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
+                        {[
+                          "Build me a longevity stack from scratch",
+                          "Best sleep peptide protocol and timing?",
+                          "How do I stack Semax and Selank safely?",
+                          "Explain SS-31's mechanism of action",
+                          "What's the mitochondrial trinity protocol?",
+                        ].map((s) => (
+                          <button type="button" key={s} className="sugg-btn" onClick={() => (canAI ? setAiInput(s) : openUpgradeModal())}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {aiMsgs.map((msg, i) => (
+                    <div key={i} className={`ai-msg ${msg.role === "user" ? "ai-user" : "ai-bot"}`}>
+                      {msg.role === "assistant" && (
+                        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".15em" }}>
+                          <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
+                        </div>
+                      )}
+                      <div style={{ whiteSpace: "pre-wrap", color: msg.role === "user" ? "#dde4ef" : "#8fa5bf" }}>{msg.content}</div>
+                      {msg.role === "assistant" && msg.limitReached && (
+                        <button type="button" className="btn-teal" onClick={openUpgradeModal} style={{ marginTop: 10, fontSize: 13, padding: "6px 12px" }}>
+                          Upgrade for more queries
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {aiLoading && (
+                    <div className="ai-msg ai-bot">
+                      <div className="mono pulse" style={{ fontSize: 13, color: "#00d4aa" }}>
+                        // Analyzing protocol data…
+                      </div>
+                    </div>
+                  )}
+                  <div ref={msgEnd} />
+                </div>
+
+                <div style={{ padding: 10, borderTop: "1px solid #0e1822", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <textarea
+                      className="ai-input"
+                      rows={2}
+                      placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendAI();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      onClick={sendAI}
+                      disabled={aiLoading || !aiInput.trim()}
+                      style={{ padding: "0 18px", alignSelf: "stretch", fontSize: 16 }}
+                    >
+                      {aiLoading ? "…" : "→"}
+                    </button>
+                  </div>
+                  {canAI && aiQueryUsage != null && (
+                    <div style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", marginTop: 4 }}>
+                      {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
+                      {aiQueryUsage.today >= aiQueryUsage.limit && (
+                        <span style={{ color: "#f97316", marginLeft: 8 }}>· Limit reached</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {selPeptide && (() => {
           const p = selPeptide;
