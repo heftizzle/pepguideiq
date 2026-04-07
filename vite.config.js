@@ -4,19 +4,13 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          const n = id.replace(/\\/g, "/");
-          if (n.includes("/node_modules/react/") || n.includes("/node_modules/react-dom/")) {
-            return "vendor-react";
-          }
-          if (n.includes("/node_modules/@supabase/")) {
-            return "supabase";
-          }
-          if (n.includes("/src/data/catalog")) {
-            return "catalog";
-          }
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-zxcvbn": ["zxcvbn"],
         },
       },
     },

@@ -1078,7 +1078,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             </button>
             {pwdResetSent && (
               <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginTop: 8 }}>
-                If an account exists, a reset link was sent to {user.email}.
+                If that email is registered, a reset link is on the way.
               </div>
             )}
           </div>

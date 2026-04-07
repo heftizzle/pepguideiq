@@ -7,6 +7,15 @@
  *       ENVIRONMENT=production (strict: require Supabase + KV for /v1/chat, fail closed on rate limit)
  */
 
+// ─── Enumeration Hardening — routes patched: (none) ───
+// Audit: This Worker does not define any HTTP routes for login, signup, forgot-password,
+// password-reset, magic-link, or OTP. Those flows use Supabase Auth from the browser
+// (see src/lib/supabase.js); no Worker-side responses vary on “email/user exists” for
+// those operations. IP rate limiting uses pathname prefixes /auth, /login, /signup for
+// classification only — there are no matching route handlers here.
+// Auth-adjacent endpoints that do exist (e.g. POST /account/delete, member_profiles) use
+// session-backed identity only and were left unchanged per scope.
+
 const VALID_PLAN_TIERS = new Set(["entry", "pro", "elite", "goat"]);
 const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
 
@@ -43,6 +52,117 @@ const CORS_BASE = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
+
+// ─── Security Headers ───
+const SECURITY_HEADERS = {
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Content-Security-Policy":
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; " +
+    "connect-src 'self' https://api.anthropic.com https://*.supabase.co; " +
+    "frame-src https://challenges.cloudflare.com; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'",
+};
+
+// ─── Rate Limiting ───
+const RATE_LIMIT_STORE = new Map();
+
+const RATE_LIMITS = {
+  auth: { windowMs: 60_000, max: 10 },
+  api: { windowMs: 60_000, max: 60 },
+};
+
+// ─── Turnstile ───
+const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+/**
+ * @param {string} token
+ * @param {Record<string, string | undefined>} env
+ * @returns {Promise<{ success: boolean }>}
+ */
+async function verifyTurnstile(token, env) {
+  const secret = env.TURNSTILE_SECRET_KEY ?? "";
+  if (!secret || !token) {
+    return { success: false };
+  }
+  try {
+    const body = new URLSearchParams();
+    body.set("secret", secret);
+    body.set("response", token);
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    if (!res.ok) {
+      return { success: false };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (data && data.success === true) {
+      return { success: true };
+    }
+    return { success: false };
+  } catch {
+    return { success: false };
+  }
+}
+
+/**
+ * @param {string} ip
+ * @param {"auth" | "api"} type
+ */
+function checkRateLimit(ip, type) {
+  const cfg = RATE_LIMITS[type] ?? RATE_LIMITS.api;
+  const key = `${type}:${ip}`;
+  const now = Date.now();
+  let entry = RATE_LIMIT_STORE.get(key);
+  if (!entry || now > entry.windowStart + cfg.windowMs) {
+    entry = { count: 0, windowStart: now };
+  }
+  entry.count += 1;
+  RATE_LIMIT_STORE.set(key, entry);
+  if (entry.count > cfg.max) {
+    const retryAfter = Math.max(1, Math.ceil((entry.windowStart + cfg.windowMs - now) / 1000));
+    return { limited: true, retryAfter };
+  }
+  return { limited: false };
+}
+
+/** @param {number} retryAfter seconds until the client may retry */
+function rateLimitResponse(retryAfter) {
+  const sec = Math.max(1, Math.floor(Number(retryAfter)) || 1);
+  return new Response(JSON.stringify({ error: "Too many requests", retryAfter: sec }), {
+    status: 429,
+    headers: {
+      "Content-Type": "application/json",
+      "Retry-After": String(sec),
+    },
+  });
+}
+
+/**
+ * Clones the response and merges SECURITY_HEADERS onto it (Worker exit hardening).
+ * @param {Response} response
+ */
+function applySecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 /** @param {Record<string, string | undefined>} env */
 function isProduction(env) {
@@ -172,7 +292,7 @@ function modelForPlan(plan) {
  * @param {string | null} userId
  * @param {string} plan
  */
-async function checkRateLimit(env, kv, userId, plan) {
+async function checkDailyQueryRateLimit(env, kv, userId, plan) {
   const production = isProduction(env);
   if (!kv) {
     const msg = "RATE_LIMIT_KV not bound — rate limiting disabled";
@@ -1575,8 +1695,19 @@ async function handleStripeWebhook(request, env) {
   });
 }
 
-export default {
-  async fetch(request, env) {
+async function handleRequest(request, env) {
+    const url = new URL(request.url);
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const pathname = url.pathname;
+    const rlType =
+      pathname.startsWith("/auth") || pathname.startsWith("/login") || pathname.startsWith("/signup")
+        ? "auth"
+        : "api";
+    const ipRl = checkRateLimit(ip, rlType);
+    if (ipRl.limited) {
+      return rateLimitResponse(ipRl.retryAfter);
+    }
+
     const cors = corsHeaders(env, request);
     if (request.method === "OPTIONS") {
       if (!cors) {
@@ -1585,14 +1716,27 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    const url = new URL(request.url);
-
     if (url.pathname === "/stripe/webhook" && request.method === "POST") {
       return handleStripeWebhook(request, env);
     }
 
     if (!cors) {
       return new Response("Forbidden", { status: 403 });
+    }
+
+    if (url.pathname === "/turnstile/verify" && request.method === "POST") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+      }
+      const token = typeof body.token === "string" ? body.token.trim() : "";
+      if (!token) {
+        return jsonResponse({ error: "Missing token" }, 400, cors);
+      }
+      const { success } = await verifyTurnstile(token, env);
+      return jsonResponse({ success }, 200, cors);
     }
 
     if (url.pathname === "/stripe/subscription" && request.method === "GET") {
@@ -1688,7 +1832,7 @@ export default {
       log(env, "warn", "dev_mode_chat_without_supabase", {});
     }
 
-    const rl = await checkRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
+    const rl = await checkDailyQueryRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
     if (rl.error) {
       return jsonResponse({ error: rl.error }, 503, cors);
     }
@@ -1764,5 +1908,10 @@ export default {
       200,
       cors
     );
+}
+
+export default {
+  async fetch(request, env) {
+    return applySecurityHeaders(await handleRequest(request, env));
   },
 };

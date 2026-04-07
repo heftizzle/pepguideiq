@@ -16,6 +16,7 @@ import { VialTracker } from "./components/VialTracker.jsx";
 import { StackProfileShots } from "./components/StackProfileShots.jsx";
 import { StackProtocolQuickLog } from "./components/StackProtocolQuickLog.jsx";
 import { NetworkTab } from "./components/NetworkTab.jsx";
+import { DoseLogFAB } from "./components/DoseLogFAB.jsx";
 import { StackShareControls } from "./components/StackShareControls.jsx";
 import { BuildTab } from "./components/BuildTab.jsx";
 import { ProfileTab } from "./components/ProfileTab.jsx";
@@ -1854,6 +1855,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
             user={user}
             upgradeFocusTier={upgradeFocusTier}
             setUser={setUser}
+          />
+        )}
+
+        {user?.id && activeProfileId && activeTab !== "guide" && !guideExiting && (
+          <DoseLogFAB
+            onSessionPicked={(sid) => {
+              setProtocolDeepLink(sid);
+              setActiveTab("protocol");
+            }}
           />
         )}
 

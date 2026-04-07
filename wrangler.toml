@@ -8,6 +8,9 @@
 #    npx wrangler secret put STRIPE_SECRET_KEY
 #    npx wrangler secret put STRIPE_WEBHOOK_SECRET
 #
+# Turnstile (bot check on login/signup — set when using VITE_TURNSTILE_SITE_KEY in the app):
+#    npx wrangler secret put TURNSTILE_SECRET_KEY
+#
 # 3. Deploy:
 #    npx wrangler deploy
 #

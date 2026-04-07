@@ -35,16 +35,132 @@ function notConfiguredError() {
   return new Error("Supabase is not configured (set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).");
 }
 
+// ─── Password policy ───────────────────────────────────────────────────────
+
+const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/;
+
+/**
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validatePassword(password) {
+  const s = typeof password === "string" ? password : "";
+  const errors = [];
+  if (s.length < 12) {
+    errors.push("Use at least 12 characters.");
+  }
+  if (!/[A-Z]/.test(s)) {
+    errors.push("Include at least one uppercase letter.");
+  }
+  if (!/[a-z]/.test(s)) {
+    errors.push("Include at least one lowercase letter.");
+  }
+  if (!/[0-9]/.test(s)) {
+    errors.push("Include at least one number.");
+  }
+  if (!PASSWORD_SPECIAL_RE.test(s)) {
+    errors.push("Include at least one special character (!@#$%^&* etc.).");
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * @returns {Promise<{ pwned: boolean }>}
+ */
+// k-anonymity: only 5-char SHA-1 prefix sent, full password never leaves client
+export async function checkPwnedPassword(password) {
+  if (typeof password !== "string" || password.length === 0) {
+    return { pwned: false };
+  }
+  try {
+    const enc = new TextEncoder().encode(password);
+    const buf = await crypto.subtle.digest("SHA-1", enc);
+    const bytes = new Uint8Array(buf);
+    const hash = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    const prefix = hash.slice(0, 5);
+    const suffix = hash.slice(5);
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+    if (!res.ok) {
+      return { pwned: false };
+    }
+    const text = await res.text();
+    const lines = text.split(/\n/);
+    for (const line of lines) {
+      const trimmed = line.replace(/\r$/, "");
+      if (!trimmed) continue;
+      const colon = trimmed.indexOf(":");
+      const suf = colon === -1 ? trimmed : trimmed.slice(0, colon);
+      if (suf.toUpperCase() === suffix) {
+        return { pwned: true };
+      }
+    }
+    return { pwned: false };
+  } catch {
+    return { pwned: false };
+  }
+}
+
 // ─── Auth ───────────────────────────────────────────────────────────────────
+
+/**
+ * @returns {{ user: import('@supabase/supabase-js').User | null, session: import('@supabase/supabase-js').Session | null, error: Error | null }}
+ */
+// enumeration-safe: always returns generic message regardless of supabase error
+export async function authSignIn(email, password) {
+  if (!supabase) return { user: null, session: null, error: notConfiguredError() };
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    return { user: null, session: null, error: new Error("Invalid email or password") };
+  }
+  return { user: data?.user ?? null, session: data?.session ?? null, error: null };
+}
+
+/**
+ * @param {{ name?: string, plan?: string }} [meta]
+ * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
+ */
+// enumeration-safe: always returns generic message regardless of supabase error
+export async function authSignUp(email, password, meta = {}) {
+  if (!supabase) return { user: null, error: notConfiguredError() };
+  const policy = validatePassword(password);
+  if (!policy.valid) {
+    return { user: null, error: new Error(policy.errors[0] ?? "Password does not meet requirements.") };
+  }
+  const name = typeof meta.name === "string" ? meta.name : "";
+  const plan = typeof meta.plan === "string" ? meta.plan : "entry";
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { name, plan } },
+  });
+  if (error) {
+    return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
+  }
+  return { user: data?.user ?? null, error: null };
+}
+
+/**
+ * @param {string} [redirectTo]
+ * @returns {{ error: Error | null }} `error` is only set when Supabase is not configured.
+ */
+// enumeration-safe: always returns generic message regardless of supabase error
+export async function authResetPassword(email, redirectTo) {
+  if (!supabase) return { error: notConfiguredError() };
+  try {
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo ?? (typeof window !== "undefined" ? `${window.location.origin}/` : undefined),
+    });
+  } catch {
+    /* swallow — caller treats as success for enumeration safety */
+  }
+  return { error: null };
+}
 
 /**
  * Sign in with email + password.
  * @returns {{ user: import('@supabase/supabase-js').User | null, session: import('@supabase/supabase-js').Session | null, error: Error | null }}
  */
 export async function signIn(email, password) {
-  if (!supabase) return { user: null, session: null, error: notConfiguredError() };
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  return { user: data?.user ?? null, session: data?.session ?? null, error: error ?? null };
+  return authSignIn(email, password);
 }
 
 /**
@@ -52,13 +168,7 @@ export async function signIn(email, password) {
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
 export async function signUp(name, email, password, plan = "entry") {
-  if (!supabase) return { user: null, error: notConfiguredError() };
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name, plan } },
-  });
-  return { user: data?.user ?? null, error: error ?? null };
+  return authSignUp(email, password, { name, plan });
 }
 
 export async function signOut() {
@@ -428,11 +538,7 @@ export async function deleteMemberProfileViaWorker(profileId) {
 }
 
 export async function sendPasswordResetEmail(email, redirectTo) {
-  if (!supabase) return { error: notConfiguredError() };
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectTo ?? (typeof window !== "undefined" ? `${window.location.origin}/` : undefined),
-  });
-  return { error: error ?? null };
+  return authResetPassword(email, redirectTo);
 }
 
 export async function updateAuthEmail(newEmail) {

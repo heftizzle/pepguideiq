@@ -1,28 +1,228 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PLANS } from "../data/catalog.js";
-import { isSupabaseConfigured } from "../lib/config.js";
-import { fetchMemberProfiles, getCurrentUser, incrementMemberProfileDemoSessions, signIn, signUp } from "../lib/supabase.js";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import {
+  authResetPassword,
+  checkPwnedPassword,
+  fetchMemberProfiles,
+  getCurrentUser,
+  incrementMemberProfileDemoSessions,
+  signIn,
+  signUp,
+  validatePassword,
+} from "../lib/supabase.js";
 import { getTier } from "../lib/tiers.js";
 import { Logo } from "./Logo.jsx";
+
+const ZXCVBN_STRENGTH_COLORS = ["#ef4444", "#ef4444", "#f97316", "#eab308", "#22c55e"];
+const ZXCVBN_STRENGTH_LABELS = ["Weak", "Weak", "Fair", "Strong", "Very Strong"];
+
+const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
+const turnstileRequired = Boolean(TURNSTILE_SITE_KEY);
+
+async function verifyTokenWithWorker(token) {
+  if (!token || !isApiWorkerConfigured()) return false;
+  const res = await fetch(`${API_WORKER_URL}/turnstile/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  const data = await res.json().catch(() => ({}));
+  return data.success === true;
+}
+
+function waitTurnstileReady(maxMs = 15000) {
+  return new Promise((resolve) => {
+    if (typeof window !== "undefined" && window.turnstile) {
+      resolve();
+      return;
+    }
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      if (typeof window !== "undefined" && window.turnstile) {
+        window.clearInterval(id);
+        resolve();
+      } else if (Date.now() - start > maxMs) {
+        window.clearInterval(id);
+        resolve();
+      }
+    }, 50);
+  });
+}
 
 export function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [forgotSubmitted, setForgotSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
+  /** Set from dynamic `zxcvbn` (register password strength meter). */
+  const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
+  const mainWidgetIdRef = useRef(null);
+  const plansWidgetIdRef = useRef(null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const onPasswordChange = (e) => {
+    setForm((f) => ({ ...f, password: e.target.value }));
+    setSignupPolicyErrors([]);
+    setError("");
+  };
+
+  useEffect(() => {
+    if (mode !== "register" || form.password.trim() === "") {
+      setRegisterStrengthScore(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { default: zxcvbn } = await import("zxcvbn");
+      const result = zxcvbn(form.password);
+      if (!cancelled) setRegisterStrengthScore(result.score);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, form.password]);
+
+  const resetMainTurnstile = () => {
+    const id = mainWidgetIdRef.current;
+    if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
+      try {
+        window.turnstile.reset(id);
+      } catch {
+        /* ignore */
+      }
+    }
+    setTurnstileToken(null);
+  };
+
+  const resetPlansTurnstile = () => {
+    const id = plansWidgetIdRef.current;
+    if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
+      try {
+        window.turnstile.reset(id);
+      } catch {
+        /* ignore */
+      }
+    }
+    setTurnstileToken(null);
+  };
+
+  useEffect(() => {
+    if (mode !== "login" && mode !== "register") return;
+    if (!turnstileRequired) return;
+    let cancelled = false;
+    mainWidgetIdRef.current = null;
+    (async () => {
+      await waitTurnstileReady();
+      if (cancelled) return;
+      const el = document.getElementById("turnstile-widget");
+      if (!el || !window.turnstile) return;
+      el.innerHTML = "";
+      const widgetId = window.turnstile.render("#turnstile-widget", {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (t) => setTurnstileToken(t),
+        "expired-callback": () => setTurnstileToken(null),
+        "error-callback": () => setTurnstileToken(null),
+        theme: "dark",
+      });
+      if (cancelled) {
+        if (window.turnstile?.remove) {
+          try {
+            window.turnstile.remove(widgetId);
+          } catch {
+            /* ignore */
+          }
+        }
+        return;
+      }
+      mainWidgetIdRef.current = widgetId;
+    })();
+    return () => {
+      cancelled = true;
+      const id = mainWidgetIdRef.current;
+      mainWidgetIdRef.current = null;
+      if (id != null && window.turnstile?.remove) {
+        try {
+          window.turnstile.remove(id);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "plans") return;
+    if (!turnstileRequired) return;
+    let cancelled = false;
+    plansWidgetIdRef.current = null;
+    (async () => {
+      await waitTurnstileReady();
+      if (cancelled) return;
+      const el = document.getElementById("turnstile-widget-plans");
+      if (!el || !window.turnstile) return;
+      el.innerHTML = "";
+      const widgetId = window.turnstile.render("#turnstile-widget-plans", {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (t) => setTurnstileToken(t),
+        "expired-callback": () => setTurnstileToken(null),
+        "error-callback": () => setTurnstileToken(null),
+        theme: "dark",
+      });
+      if (cancelled) {
+        if (window.turnstile?.remove) {
+          try {
+            window.turnstile.remove(widgetId);
+          } catch {
+            /* ignore */
+          }
+        }
+        return;
+      }
+      plansWidgetIdRef.current = widgetId;
+    })();
+    return () => {
+      cancelled = true;
+      const id = plansWidgetIdRef.current;
+      plansWidgetIdRef.current = null;
+      if (id != null && window.turnstile?.remove) {
+        try {
+          window.turnstile.remove(id);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [mode]);
 
   const submit = async () => {
     setError("");
     setBusy(true);
     try {
       if (mode === "login") {
+        if (turnstileRequired) {
+          if (!turnstileToken) {
+            setError("Bot verification failed. Please try again.");
+            return;
+          }
+          const ok = await verifyTokenWithWorker(turnstileToken);
+          if (!ok) {
+            setError("Bot verification failed. Please try again.");
+            resetMainTurnstile();
+            return;
+          }
+        }
         const { error: err } = await signIn(form.email, form.password);
         if (err) {
           setError(err.message || "Sign in failed.");
+          resetMainTurnstile();
           return;
         }
+        resetMainTurnstile();
         const u = await getCurrentUser();
         if (u) {
           try {
@@ -37,10 +237,54 @@ export function AuthScreen({ onAuth }) {
       } else {
         if (!form.name?.trim() || !form.email?.trim() || !form.password) {
           setError("All fields required.");
+          setSignupPolicyErrors([]);
           return;
         }
+        setSignupPolicyErrors([]);
+        const policy = validatePassword(form.password);
+        if (!policy.valid) {
+          setSignupPolicyErrors(policy.errors);
+          setError("");
+          return;
+        }
+        const { default: zxcvbn } = await import("zxcvbn");
+        const zx = zxcvbn(form.password);
+        if (zx.score < 2) {
+          setError("Password is too common or predictable. Try a passphrase.");
+          return;
+        }
+        const { pwned } = await checkPwnedPassword(form.password);
+        if (pwned) {
+          setError("This password has appeared in a known data breach. Please choose a different one.");
+          return;
+        }
+        if (turnstileRequired) {
+          if (!turnstileToken) {
+            setError("Bot verification failed. Please try again.");
+            return;
+          }
+          const ok = await verifyTokenWithWorker(turnstileToken);
+          if (!ok) {
+            setError("Bot verification failed. Please try again.");
+            resetMainTurnstile();
+            return;
+          }
+        }
+        setTurnstileToken(null);
         setMode("plans");
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitForgot = async () => {
+    if (!form.email?.trim()) return;
+    setError("");
+    setBusy(true);
+    try {
+      await authResetPassword(form.email.trim());
+      setForgotSubmitted(true);
     } finally {
       setBusy(false);
     }
@@ -50,11 +294,25 @@ export function AuthScreen({ onAuth }) {
     setError("");
     setBusy(true);
     try {
+      if (turnstileRequired) {
+        if (!turnstileToken) {
+          setError("Bot verification failed. Please try again.");
+          return;
+        }
+        const ok = await verifyTokenWithWorker(turnstileToken);
+        if (!ok) {
+          setError("Bot verification failed. Please try again.");
+          resetPlansTurnstile();
+          return;
+        }
+      }
       const { error: err } = await signUp(form.name.trim(), form.email.trim(), form.password, planId);
       if (err) {
         setError(err.message || "Sign up failed.");
+        resetPlansTurnstile();
         return;
       }
+      resetPlansTurnstile();
       const u = await getCurrentUser();
       if (u) {
         try {
@@ -73,6 +331,10 @@ export function AuthScreen({ onAuth }) {
       setBusy(false);
     }
   };
+
+  const authSubmitDisabled =
+    busy || (turnstileRequired && !turnstileToken && (mode === "login" || mode === "register"));
+  const plansSelectDisabled = busy || (turnstileRequired && !turnstileToken);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -94,6 +356,104 @@ export function AuthScreen({ onAuth }) {
             <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_URL</code> and{" "}
             <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_ANON_KEY</code>, then restart{" "}
             <code style={{ color: "#00d4aa" }}>npm run dev</code>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === "forgot") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#07090e",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20,
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <Logo />
+            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
+              RESET PASSWORD
+            </div>
+          </div>
+          <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
+            {forgotSubmitted ? (
+              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", lineHeight: 1.55, textAlign: "center" }}>
+                If that email is registered, a reset link is on the way.
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+                    EMAIL
+                  </div>
+                  <input
+                    className="form-input"
+                    style={{ width: "100%" }}
+                    type="email"
+                    value={form.email}
+                    placeholder="you@email.com"
+                    onChange={set("email")}
+                    onKeyDown={(e) => e.key === "Enter" && submitForgot()}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: busy ? 0.6 : 1 }}
+                  onClick={() => void submitForgot()}
+                  disabled={busy}
+                >
+                  {busy ? "…" : "Send reset link"}
+                </button>
+              </>
+            )}
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#00d4aa",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontFamily: "'Outfit',sans-serif",
+                }}
+                onClick={() => {
+                  setMode("login");
+                  setForgotSubmitted(false);
+                  setError("");
+                }}
+              >
+                Back to sign in
+              </button>
+            </div>
+          </div>
+          <div
+            style={{
+              marginTop: 20,
+              textAlign: "center",
+              fontSize: 12,
+              color: "#5c6b7e",
+              lineHeight: 1.6,
+            }}
+          >
+            <a href="/legal#privacy" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+              Privacy Policy
+            </a>
+            <span aria-hidden> · </span>
+            <a href="/legal#terms" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+              Terms of Service
+            </a>
+            <span aria-hidden> · </span>
+            <a href="/legal#waiver" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+              Research Waiver
+            </a>
           </div>
         </div>
       </div>
@@ -126,6 +486,12 @@ export function AuthScreen({ onAuth }) {
         >
           SELECT YOUR PLAN
         </div>
+        {turnstileRequired && (
+          <div
+            id="turnstile-widget-plans"
+            style={{ display: "flex", justifyContent: "center", marginBottom: 20, minHeight: 65 }}
+          />
+        )}
         {error && (
           <div
             style={{
@@ -219,9 +585,9 @@ export function AuthScreen({ onAuth }) {
                   width: "100%",
                   padding: "8px 0",
                   fontSize: 13,
-                  opacity: busy ? 0.6 : 1,
+                  opacity: plansSelectDisabled ? 0.5 : 1,
                 }}
-                disabled={busy}
+                disabled={plansSelectDisabled}
                 onClick={() => selectPlan(plan.id)}
               >
                 {busy ? "…" : plan.id === "entry" ? `Start ${getTier("entry").label}` : `Get ${plan.label}`}
@@ -231,6 +597,34 @@ export function AuthScreen({ onAuth }) {
         </div>
         <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0" }}>
           Subscriptions managed via App Store / Google Play on mobile.
+        </div>
+      </div>
+    );
+  }
+
+  let registerPasswordStrength = null;
+  if (mode === "register" && form.password.trim() !== "" && registerStrengthScore != null) {
+    const score = registerStrengthScore;
+    const color = ZXCVBN_STRENGTH_COLORS[score] ?? "#1e293b";
+    const label = ZXCVBN_STRENGTH_LABELS[score] ?? "";
+    const filled = Math.min(score + 1, 4);
+    registerPasswordStrength = (
+      <div style={{ marginBottom: signupPolicyErrors.length > 0 ? 10 : 14 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                height: 6,
+                borderRadius: 2,
+                background: i < filled ? color : "#1e293b",
+              }}
+            />
+          ))}
+        </div>
+        <div className="mono" style={{ fontSize: 12, color, marginTop: 6, letterSpacing: "0.04em" }}>
+          {label}
         </div>
       </div>
     );
@@ -284,7 +678,7 @@ export function AuthScreen({ onAuth }) {
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: mode === "register" ? 8 : 20 }}>
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
@@ -294,10 +688,55 @@ export function AuthScreen({ onAuth }) {
               type="password"
               value={form.password}
               placeholder="••••••••"
-              onChange={set("password")}
+              onChange={onPasswordChange}
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
+          {registerPasswordStrength}
+          {mode === "register" && signupPolicyErrors.length > 0 && (
+            <ul
+              style={{
+                margin: "0 0 14px 0",
+                paddingLeft: 18,
+                fontSize: 12,
+                color: "#ef4444",
+                fontFamily: "'JetBrains Mono',monospace",
+                lineHeight: 1.5,
+              }}
+            >
+              {signupPolicyErrors.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          )}
+          {mode === "login" && (
+            <div style={{ marginBottom: 14, textAlign: "right" }}>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#00d4aa",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontFamily: "'Outfit',sans-serif",
+                }}
+                onClick={() => {
+                  setMode("forgot");
+                  setForgotSubmitted(false);
+                  setError("");
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+          {turnstileRequired && (
+            <div
+              id="turnstile-widget"
+              style={{ display: "flex", justifyContent: "center", marginBottom: 16, minHeight: 65 }}
+            />
+          )}
           {error && (
             <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>
               {error}
@@ -306,9 +745,9 @@ export function AuthScreen({ onAuth }) {
           <button
             type="button"
             className="btn-teal"
-            style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: busy ? 0.6 : 1 }}
+            style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: authSubmitDisabled ? 0.5 : 1 }}
             onClick={submit}
-            disabled={busy}
+            disabled={authSubmitDisabled}
           >
             {busy ? "…" : mode === "login" ? "Sign In" : "Continue"}
           </button>
@@ -330,6 +769,7 @@ export function AuthScreen({ onAuth }) {
                   onClick={() => {
                     setMode("register");
                     setError("");
+                    setSignupPolicyErrors([]);
                   }}
                 >
                   Sign up
@@ -351,6 +791,7 @@ export function AuthScreen({ onAuth }) {
                   onClick={() => {
                     setMode("login");
                     setError("");
+                    setSignupPolicyErrors([]);
                   }}
                 >
                   Sign in
