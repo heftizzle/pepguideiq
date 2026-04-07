@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PLANS } from "../data/catalog.js";
 import { isSupabaseConfigured } from "../lib/config.js";
-import { getCurrentUser, signIn, signUp } from "../lib/supabase.js";
+import { fetchMemberProfiles, getCurrentUser, incrementMemberProfileDemoSessions, signIn, signUp } from "../lib/supabase.js";
 import { getTier } from "../lib/tiers.js";
 import { Logo } from "./Logo.jsx";
 
@@ -24,8 +24,16 @@ export function AuthScreen({ onAuth }) {
           return;
         }
         const u = await getCurrentUser();
-        if (u) onAuth(u);
-        else setError("Could not load profile.");
+        if (u) {
+          try {
+            const { profiles } = await fetchMemberProfiles(u.id);
+            const pid = profiles?.find((p) => p.is_default)?.id ?? profiles?.[0]?.id;
+            if (pid) await incrementMemberProfileDemoSessions(pid);
+          } catch {
+            /* demo counter is best-effort */
+          }
+          onAuth(u);
+        } else setError("Could not load profile.");
       } else {
         if (!form.name?.trim() || !form.email?.trim() || !form.password) {
           setError("All fields required.");
@@ -49,6 +57,13 @@ export function AuthScreen({ onAuth }) {
       }
       const u = await getCurrentUser();
       if (u) {
+        try {
+          const { profiles } = await fetchMemberProfiles(u.id);
+          const pid = profiles?.find((p) => p.is_default)?.id ?? profiles?.[0]?.id;
+          if (pid) await incrementMemberProfileDemoSessions(pid);
+        } catch {
+          /* demo counter is best-effort */
+        }
         onAuth(u);
         return;
       }
@@ -343,6 +358,28 @@ export function AuthScreen({ onAuth }) {
               </>
             )}
           </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            textAlign: "center",
+            fontSize: 12,
+            color: "#5c6b7e",
+            lineHeight: 1.6,
+          }}
+        >
+          <a href="/legal#privacy" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Privacy Policy
+          </a>
+          <span aria-hidden> · </span>
+          <a href="/legal#terms" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Terms of Service
+          </a>
+          <span aria-hidden> · </span>
+          <a href="/legal#waiver" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+            Research Waiver
+          </a>
         </div>
       </div>
     </div>

@@ -1,0 +1,256 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import { getProfileStackShotR2Keys, getSessionAccessToken } from "../lib/supabase.js";
+
+const VIAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const VIAL_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const VIAL_PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+
+function useWorkerObjectUrl(r2Key, workerConfigured) {
+  const [objectUrl, setObjectUrl] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let revoke = null;
+
+    async function run() {
+      if (!r2Key || !workerConfigured) {
+        setObjectUrl(null);
+        return;
+      }
+      const token = await getSessionAccessToken();
+      if (!token || cancelled) {
+        setObjectUrl(null);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) {
+          setObjectUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        const u = URL.createObjectURL(blob);
+        revoke = u;
+        if (!cancelled) setObjectUrl(u);
+      } catch {
+        if (!cancelled) setObjectUrl(null);
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [r2Key, workerConfigured]);
+
+  return objectUrl;
+}
+
+/**
+ * @param {{ kind: "stack_shot_1" | "stack_shot_2", r2Key: string | null, workerConfigured: boolean, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void }} props
+ */
+function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState(null);
+  const imgUrl = useWorkerObjectUrl(r2Key, workerConfigured);
+  const showImage = Boolean(r2Key && imgUrl);
+
+  function openPicker() {
+    if (uploading) return;
+    if (!canMutate) {
+      onUpgrade();
+      return;
+    }
+    if (!workerConfigured) {
+      setErr("// Configure VITE_API_WORKER_URL");
+      return;
+    }
+    setErr(null);
+    inputRef.current?.click();
+  }
+
+  async function onInputChange(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setErr(null);
+    if (!VIAL_PHOTO_TYPES.has(f.type)) {
+      setErr("// JPEG, PNG, or WebP only");
+      return;
+    }
+    if (f.size > VIAL_PHOTO_MAX_BYTES) {
+      setErr("// Max 5MB");
+      return;
+    }
+    const token = await getSessionAccessToken();
+    if (!token) {
+      setErr("// Sign in required");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", f);
+    fd.append("kind", kind);
+    setUploading(true);
+    try {
+      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
+        setErr(`// ${msg}`);
+        return;
+      }
+      await onUploaded();
+    } catch {
+      setErr("// Network error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept={VIAL_PHOTO_ACCEPT}
+        style={{ display: "none" }}
+        onChange={(e) => void onInputChange(e)}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={uploading}
+        style={{
+          width: "100%",
+          aspectRatio: "3 / 4",
+          maxHeight: 220,
+          borderRadius: 12,
+          border: showImage ? "1px solid #1e2a38" : "2px dashed #243040",
+          background: "#07090e",
+          cursor: uploading ? "wait" : "pointer",
+          padding: 0,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {showImage ? (
+          <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : r2Key ? (
+          <span className="mono" style={{ fontSize: 12, color: "#4a6080" }}>
+            Loading…
+          </span>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+            <span style={{ fontSize: 32, lineHeight: 1, opacity: 0.8 }} aria-hidden>
+              📷
+            </span>
+            <span className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.08em" }}>
+              STACK SHOT
+            </span>
+          </div>
+        )}
+      </button>
+      <div
+        className="mono"
+        style={{
+          fontSize: 11,
+          color: "#7a8694",
+          textAlign: "center",
+          letterSpacing: "0.06em",
+          lineHeight: 1.35,
+          maxWidth: "100%",
+        }}
+      >
+        STACK SHOT
+      </div>
+      {err && (
+        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", textAlign: "center" }}>
+          {err}
+        </div>
+      )}
+      {uploading && (
+        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0" }}>
+          Uploading…
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Profile-level stack reference photos (Stacks tab territory — not vial inventory).
+ * @param {{ userId: string, canUse: boolean, onUpgrade: () => void }} props
+ */
+export function StackProfileShots({ userId, canUse, onUpgrade }) {
+  const [key1, setKey1] = useState(null);
+  const [key2, setKey2] = useState(null);
+  const canMutate = canUse && isSupabaseConfigured();
+  const workerConfigured = isApiWorkerConfigured();
+
+  const reload = useCallback(async () => {
+    if (!userId || !isSupabaseConfigured() || !canUse) {
+      setKey1(null);
+      setKey2(null);
+      return;
+    }
+    const keysRes = await getProfileStackShotR2Keys(userId);
+    setKey1(keysRes.key1);
+    setKey2(keysRes.key2);
+  }, [userId, canUse]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  if (!canUse) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        marginTop: 10,
+        marginBottom: 12,
+        alignItems: "stretch",
+        maxWidth: 520,
+      }}
+    >
+      <StackShotHeroSlot
+        kind="stack_shot_1"
+        r2Key={key1}
+        workerConfigured={workerConfigured}
+        canMutate={canMutate}
+        onUpgrade={onUpgrade}
+        onUploaded={reload}
+      />
+      <StackShotHeroSlot
+        kind="stack_shot_2"
+        r2Key={key2}
+        workerConfigured={workerConfigured}
+        canMutate={canMutate}
+        onUpgrade={onUpgrade}
+        onUploaded={reload}
+      />
+    </div>
+  );
+}

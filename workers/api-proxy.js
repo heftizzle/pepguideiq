@@ -339,21 +339,74 @@ async function supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, pa
   return res.ok;
 }
 
+/**
+ * PATCH member_profiles row; requires exactly one row updated (avoids silent 0-row "success").
+ * @returns {Promise<{ ok: true } | { ok: false, status: number, parsed: unknown, bodyText: string }>}
+ */
 async function supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, memberProfileId, patch) {
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
     {
       method: "PATCH",
       headers: {
         apikey: serviceKey,
         Authorization: `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
-        Prefer: "return=minimal",
+        Prefer: "return=representation",
       },
       body: JSON.stringify(patch),
     }
   );
-  return res.ok;
+  const bodyText = await res.text().catch(() => "");
+  let parsed = null;
+  try {
+    parsed = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    parsed = null;
+  }
+  if (!res.ok) {
+    return { ok: false, status: res.status, parsed, bodyText };
+  }
+  if (!Array.isArray(parsed) || parsed.length !== 1) {
+    return { ok: false, status: res.status, parsed, bodyText };
+  }
+  return { ok: true };
+}
+
+/**
+ * @param {{ ok: false, status: number, parsed: unknown, bodyText: string }} result
+ * @param {Record<string, unknown>} patch
+ */
+function memberProfilePatchFailureMessage(result, patch) {
+  const p = result.parsed;
+  if (p && typeof p === "object" && !Array.isArray(p)) {
+    const code = "code" in p ? String(p.code) : "";
+    const message = "message" in p && typeof p.message === "string" ? p.message : "";
+    const details = "details" in p && typeof p.details === "string" ? p.details : "";
+    const combined = `${message} ${details}`;
+    if (
+      code === "23505" ||
+      /duplicate key|unique constraint/i.test(message) ||
+      /already exists/i.test(details)
+    ) {
+      if (Object.prototype.hasOwnProperty.call(patch, "handle")) {
+        return { msg: "This handle is already taken", status: 409 };
+      }
+      return { msg: "This update conflicts with existing data", status: 409 };
+    }
+    if (code === "23514" || /violates check constraint/i.test(message)) {
+      if (Object.prototype.hasOwnProperty.call(patch, "handle")) {
+        return {
+          msg: "Handle must be 3–20 characters: lowercase letters, numbers, and underscores only",
+          status: 400,
+        };
+      }
+    }
+  }
+  if (Array.isArray(result.parsed) && result.parsed.length === 0) {
+    return { msg: "Member profile not found", status: 404 };
+  }
+  return { msg: "Could not update profile", status: 502 };
 }
 
 /**
@@ -449,6 +502,7 @@ async function handleCreateMemberProfile(request, env, cors) {
       display_name: displayName,
       is_default: false,
       language: "en",
+      shift_schedule: "days",
     }),
   });
   const mpRows = await insMp.json().catch(() => []);
@@ -874,6 +928,81 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 const MEMBER_PROFILE_ALLOWED_LANGUAGES = new Set(["en", "es", "pt-BR", "fr", "de", "ja", "zh-Hans"]);
 
+const MEMBER_PROFILE_SHIFT_SCHEDULES = new Set(["days", "swings", "mids", "nights", "rotating"]);
+
+const MEMBER_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+
+/** @param {string} v */
+function normalizeHandleForPatch(v) {
+  let t = String(v).trim().toLowerCase();
+  if (t.startsWith("@")) t = t.slice(1);
+  return t;
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} handle
+ * @param {string} excludeProfileId
+ */
+async function isHandleTakenElsewhere(supabaseUrl, serviceKey, handle, excludeProfileId) {
+  const url = `${supabaseUrl}/rest/v1/member_profiles?handle=eq.${encodeURIComponent(handle)}&select=id`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const rows = await res.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+  const id = rows[0].id != null ? String(rows[0].id) : "";
+  if (excludeProfileId && id === String(excludeProfileId)) return false;
+  return true;
+}
+
+/**
+ * GET /member-profiles/handle-available?handle=foo&exclude=uuid — authenticated.
+ */
+async function handleCheckHandleAvailability(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const url = new URL(request.url);
+  const raw = url.searchParams.get("handle") ?? url.searchParams.get("h") ?? "";
+  let h = normalizeHandleForPatch(raw);
+  const excludeRaw = url.searchParams.get("exclude") ?? "";
+  const excludeProfileId = UUID_RE.test(excludeRaw) ? excludeRaw : undefined;
+  if (!h) {
+    return jsonResponse({ available: false, reason: "empty" }, 200, cors);
+  }
+  if (!MEMBER_HANDLE_RE.test(h)) {
+    return jsonResponse({ available: false, reason: "invalid_format" }, 200, cors);
+  }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, h, excludeProfileId ?? "");
+  if (taken) {
+    return jsonResponse({ available: false, reason: "taken" }, 200, cors);
+  }
+  return jsonResponse({ available: true }, 200, cors);
+}
+
+/** @param {string} s */
+function normalizeWakeTimeForPatch(s) {
+  const m = String(s).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  const sec = m[3] != null ? Number(m[3]) : 0;
+  if (!Number.isFinite(h) || !Number.isFinite(min) || !Number.isFinite(sec)) return null;
+  if (h < 0 || h > 23 || min < 0 || min > 59 || sec < 0 || sec > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 /**
  * GET /member-profiles — list signed-in user's member_profiles (includes locale fields).
  */
@@ -890,7 +1019,7 @@ async function handleGetMemberProfiles(request, env, cors) {
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
     userId
-  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language&order=created_at.asc`;
+  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,demo_sessions_shown&order=created_at.asc`;
   const res = await fetch(sel, {
     headers: {
       apikey: serviceKey,
@@ -907,7 +1036,7 @@ async function handleGetMemberProfiles(request, env, cors) {
 
 /**
  * Build PATCH payload for member_profiles from JSON body.
- * At least one of: display_name, city, state, country, language must be present.
+ * At least one supported field must be present (display_name, locale, shift_schedule, wake_time, …).
  * @returns {{ patch?: Record<string, unknown>, error?: string }}
  */
 function parseMemberProfilePatchBody(body) {
@@ -987,6 +1116,67 @@ function parseMemberProfilePatchBody(body) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, "shift_schedule")) {
+    hasKey = true;
+    const v = body.shift_schedule;
+    if (v === null) {
+      patch.shift_schedule = null;
+    } else if (typeof v === "string") {
+      const t = v.trim();
+      if (t === "") {
+        patch.shift_schedule = null;
+      } else if (!MEMBER_PROFILE_SHIFT_SCHEDULES.has(t)) {
+        return { error: "shift_schedule must be days, swings, mids, nights, or rotating" };
+      } else {
+        patch.shift_schedule = t;
+      }
+    } else {
+      return { error: "shift_schedule must be a string or null" };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "wake_time")) {
+    hasKey = true;
+    const v = body.wake_time;
+    if (v === null) {
+      patch.wake_time = null;
+    } else if (typeof v === "string") {
+      const t = v.trim();
+      if (t === "") {
+        patch.wake_time = null;
+      } else {
+        const norm = normalizeWakeTimeForPatch(t);
+        if (!norm) {
+          return { error: "wake_time must be a valid time (HH:MM or HH:MM:SS)" };
+        }
+        patch.wake_time = norm;
+      }
+    } else {
+      return { error: "wake_time must be a string or null" };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "handle")) {
+    hasKey = true;
+    const v = body.handle;
+    if (v === null) {
+      patch.handle = null;
+    } else if (typeof v === "string") {
+      const t = normalizeHandleForPatch(v);
+      if (t === "") {
+        patch.handle = null;
+      } else if (!MEMBER_HANDLE_RE.test(t)) {
+        return {
+          error: "handle must be 3–20 characters: lowercase letters, numbers, and underscores only",
+        };
+      } else {
+        patch.handle = t;
+      }
+    } else {
+      return { error: "handle must be a string or null" };
+    }
+  }
+
   if (!hasKey) {
     return { error: "No supported fields to update" };
   }
@@ -1021,9 +1211,22 @@ async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
   }
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const ok = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, parsed.patch);
-  if (!ok) {
-    return jsonResponse({ error: "Could not update profile" }, 502, cors);
+  if (parsed.patch.handle != null && typeof parsed.patch.handle === "string") {
+    const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, parsed.patch.handle, profileId);
+    if (taken) {
+      return jsonResponse({ error: "This handle is already taken" }, 409, cors);
+    }
+  }
+  const patchResult = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, parsed.patch);
+  if (!patchResult.ok) {
+    const { msg, status } = memberProfilePatchFailureMessage(patchResult, parsed.patch);
+    log(env, "warn", "member_profile_patch_failed", {
+      profileId,
+      status: patchResult.status,
+      httpStatus: status,
+      snippet: String(patchResult.bodyText ?? "").slice(0, 200),
+    });
+    return jsonResponse({ error: msg }, status, cors);
   }
   return jsonResponse({ ok: true }, 200, cors);
 }
@@ -1229,9 +1432,10 @@ async function handlePostStackPhoto(request, env, cors) {
     patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_2_r2_key: key });
   } else if (kind === "avatar") {
     if (avatarMemberProfileId) {
-      patched = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
+      const avatarPatch = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
         avatar_url: key,
       });
+      patched = avatarPatch.ok;
     } else {
       patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { avatar_r2_key: key });
     }
@@ -1405,6 +1609,10 @@ export default {
 
     if (url.pathname === "/account/delete" && request.method === "POST") {
       return handleDeleteAccount(request, env, cors);
+    }
+
+    if (url.pathname === "/member-profiles/handle-available" && request.method === "GET") {
+      return handleCheckHandleAvailability(request, env, cors);
     }
 
     if (url.pathname === "/member-profiles" && request.method === "GET") {

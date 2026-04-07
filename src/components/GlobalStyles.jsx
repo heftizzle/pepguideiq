@@ -2,6 +2,51 @@ export function GlobalStyles() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap');
+      :root{--bg-primary:#07090e}
+      html{
+        min-height:100%;
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+      }
+      body{
+        min-height:100vh;
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+      }
+      #root{
+        min-height:100%;
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+      }
+      .pepv-app-shell{
+        min-height:100vh;
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+      }
+      .pepv-main-scroll{
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+        min-height:100vh;
+        box-sizing:border-box;
+      }
+      .pepv-profile-route{
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+        min-height:100vh;
+        box-sizing:border-box;
+      }
+      @supports (min-height:100dvh){
+        body{min-height:100dvh}
+        .pepv-app-shell{min-height:100dvh}
+        .pepv-main-scroll{min-height:100dvh}
+        .pepv-profile-route{min-height:100dvh}
+      }
+      .pepv-profile-tab{
+        background-color:var(--bg-primary);
+        background:var(--bg-primary);
+        min-height:100%;
+        box-sizing:border-box;
+      }
       *{box-sizing:border-box;margin:0;padding:0}
       ::-webkit-scrollbar{width:3px}
       ::-webkit-scrollbar-thumb{background:#00d4aa30;border-radius:2px}
@@ -26,6 +71,11 @@ export function GlobalStyles() {
       .cat-btn.active{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
       .cat-btn:hover:not(.active){border-color:#243040;color:#8fa5bf}
       .mono{font-family:'JetBrains Mono',monospace}
+      /* JetBrains Mono has no color emoji glyphs — force system emoji fonts for these spans */
+      .pepv-emoji{
+        font-family:"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",sans-serif;
+        font-style:normal;font-weight:400;line-height:1;
+      }
       .brand{font-family:'Oxanium',sans-serif}
       .drow{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid #0e1822;align-items:flex-start}
       .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:#00d4aa;text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0}
@@ -111,6 +161,36 @@ export function GlobalStyles() {
           from{opacity:1;transform:translateY(0)}
           to{opacity:0;transform:translateY(100%)}
         }
+      }
+      [data-demo-highlight="1"]{
+        animation:pepvDemoPulse 2.2s ease-in-out infinite;
+        border-radius:12px;
+        outline:2px solid rgba(0,212,170,0.5);
+        outline-offset:2px;
+      }
+      @keyframes pepvDemoPulse{
+        0%,100%{outline-color:rgba(0,212,170,0.35);box-shadow:0 0 0 0 rgba(0,212,170,0.08)}
+        50%{outline-color:rgba(0,212,170,0.9);box-shadow:0 0 18px rgba(0,212,170,0.18)}
+      }
+      @keyframes pepv-dose-toast-anim{
+        0%{opacity:0;transform:translateY(10px)}
+        12%{opacity:1;transform:translateY(0)}
+        72%{opacity:1;transform:translateY(0)}
+        100%{opacity:0;transform:translateY(4px)}
+      }
+      .pepv-dose-toast-wrap{
+        position:fixed;left:50%;bottom:80px;
+        transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),440px);
+        pointer-events:none;box-sizing:border-box;padding:0 12px;
+      }
+      .pepv-dose-toast-inner{
+        animation:pepv-dose-toast-anim 2.5s cubic-bezier(0.22,1,0.36,1) forwards;
+        background:#0e1520;border:1px solid #00d4aa;color:#00d4aa;min-height:44px;
+        padding:12px 20px;border-radius:10px;font-size:14px;line-height:1.45;text-align:center;
+        box-shadow:0 10px 40px rgba(0,0,0,0.5);
+        font-family:'Outfit',sans-serif,"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif;
+        font-weight:500;
+        letter-spacing:0.02em;
       }
     `}</style>
   );

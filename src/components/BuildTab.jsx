@@ -1,0 +1,713 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
+import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
+
+const FREQ_OPTIONS = [
+  { id: "daily", label: "Daily" },
+  { id: "eod", label: "EOD" },
+  { id: "3x", label: "3x/week" },
+  { id: "2x", label: "2x/week" },
+  { id: "weekly", label: "Weekly" },
+  { id: "custom", label: "Custom" },
+];
+
+function parseDoseToMg(input) {
+  const s = String(input ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/,/g, "");
+  if (!s) return null;
+  const m = s.match(/^([\d.]+)\s*(mcg|µg|ug|mg|g)\b/i);
+  if (m) {
+    const v = parseFloat(m[1]);
+    if (!Number.isFinite(v)) return null;
+    const u = m[2].toLowerCase();
+    if (u === "mg") return v;
+    if (u === "mcg" || u === "µg" || u === "ug") return v / 1000;
+    if (u === "g") return v * 1000;
+    return null;
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+function defaultVialSizeMg(peptide) {
+  const opts = peptide?.vialSizeOptions;
+  if (Array.isArray(opts) && opts.length > 0) {
+    const t = Number(opts[0]?.totalMg);
+    if (Number.isFinite(t) && t > 0) return t;
+  }
+  const r = peptide?.reconstitution;
+  if (typeof r === "string") {
+    const m = r.match(/(\d+(?:\.\d+)?)\s*mg\b/i);
+    if (m) {
+      const v = parseFloat(m[1]);
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+  }
+  return 5;
+}
+
+function injectionsPerWeek(freqKey, customPerWeek) {
+  switch (freqKey) {
+    case "daily":
+      return 7;
+    case "eod":
+      return 3.5;
+    case "3x":
+      return 3;
+    case "2x":
+      return 2;
+    case "weekly":
+      return 1;
+    case "custom": {
+      const n = parseFloat(String(customPerWeek ?? "").replace(/,/g, ""));
+      return Number.isFinite(n) && n >= 0 ? n : 0;
+    }
+    default:
+      return 0;
+  }
+}
+
+function formatFrequencyLabel(freqKey, customPerWeek) {
+  switch (freqKey) {
+    case "daily":
+      return "Daily";
+    case "eod":
+      return "EOD";
+    case "3x":
+      return "3x/week";
+    case "2x":
+      return "2x/week";
+    case "weekly":
+      return "Weekly";
+    case "custom":
+      return customPerWeek ? `${String(customPerWeek).trim()}x/week` : "Custom";
+    default:
+      return "";
+  }
+}
+
+function parseFreqFromStack(stackFrequency) {
+  const s = String(stackFrequency || "").trim().toLowerCase();
+  if (!s) return { freqKey: "daily", customPerWeek: "" };
+  const cm = s.match(/^(\d+(?:\.\d+)?)\s*x\/?\s*week/i);
+  if (cm) return { freqKey: "custom", customPerWeek: cm[1] };
+  if (/eod|every other/.test(s)) return { freqKey: "eod", customPerWeek: "" };
+  if (/3\s*x|three times/.test(s)) return { freqKey: "3x", customPerWeek: "" };
+  if (/2\s*x|twice/.test(s)) return { freqKey: "2x", customPerWeek: "" };
+  if (/weekly|once a week/.test(s)) return { freqKey: "weekly", customPerWeek: "" };
+  if (/daily|every day|qd\b/.test(s)) return { freqKey: "daily", customPerWeek: "" };
+  return { freqKey: "daily", customPerWeek: "" };
+}
+
+function useWideLayout() {
+  const [wide, setWide] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 900px)").matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 900px)");
+    const fn = () => setWide(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return wide;
+}
+
+export function BuildTab({
+  activeTab,
+  catalog,
+  myStack,
+  stackName,
+  setStackName,
+  setMyStack,
+  savedStackLimit,
+  onUpgrade,
+  getCatColor,
+  primaryCategory,
+}) {
+  const wide = useWideLayout();
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchInputKey, setSearchInputKey] = useState(0);
+  const [localName, setLocalName] = useState(stackName);
+  const [rows, setRows] = useState([]);
+  const [vialOverrides, setVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
+  const [cycleWeeks, setCycleWeeks] = useState(8);
+  const prevTabRef = useRef(activeTab);
+
+  const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
+
+  useEffect(() => {
+    if (activeTab === "build" && prevTabRef.current !== "build") {
+      setLocalName(stackName);
+      setRows(
+        myStack.map((item) => {
+          const freq = parseFreqFromStack(item.stackFrequency);
+          return {
+            key: item.stackRowKey ?? (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random())),
+            peptideId: item.id,
+            dose: item.stackDose ?? item.startDose ?? "",
+            freqKey: freq.freqKey,
+            customPerWeek: freq.customPerWeek,
+            addedDate: item.addedDate,
+          };
+        })
+      );
+      setVialOverrides({});
+    }
+    prevTabRef.current = activeTab;
+  }, [activeTab, myStack, stackName]);
+
+  const filteredSearch = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return [];
+    return catalog
+      .filter((p) => {
+        if (p.name.toLowerCase().includes(q)) return true;
+        if (p.aliases?.some((a) => String(a).toLowerCase().includes(q))) return true;
+        if (p.tags?.some((t) => String(t).toLowerCase().includes(q))) return true;
+        return false;
+      })
+      .slice(0, 24);
+  }, [catalog, searchQ]);
+
+  const addCompound = useCallback(
+    (p) => {
+      if (rows.some((r) => r.peptideId === p.id)) return;
+      if (rows.length >= savedStackLimit) {
+        onUpgrade();
+        return;
+      }
+      const key = typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now());
+      setRows((prev) => [
+        ...prev,
+        {
+          key,
+          peptideId: p.id,
+          dose: p.startDose ?? "",
+          freqKey: "daily",
+          customPerWeek: "",
+          addedDate: new Date().toLocaleDateString(),
+        },
+      ]);
+      setSearchQ("");
+      setSearchInputKey((k) => k + 1);
+    },
+    [rows, savedStackLimit, onUpgrade]
+  );
+
+  const moveRow = (idx, dir) => {
+    setRows((prev) => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  };
+
+  const removeRow = (key) => {
+    setRows((prev) => prev.filter((r) => r.key !== key));
+    setVialOverrides((o) => {
+      const n = { ...o };
+      delete n[key];
+      return n;
+    });
+  };
+
+  const updateRow = (key, patch) => {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  };
+
+  const saveStack = () => {
+    if (rows.length > savedStackLimit) {
+      onUpgrade();
+      return;
+    }
+    if (rows.length === 0) {
+      setStackName(localName.trim());
+      setMyStack([]);
+      return;
+    }
+    const built = rows
+      .map((row) => {
+        const p = catalogById.get(row.peptideId);
+        if (!p) return null;
+        return {
+          ...p,
+          stackRowKey: row.key,
+          stackDose: row.dose,
+          stackFrequency: formatFrequencyLabel(row.freqKey, row.customPerWeek),
+          stackNotes: "",
+          sessions: [...DEFAULT_STACK_SESSIONS],
+          addedDate: row.addedDate ?? new Date().toLocaleDateString(),
+        };
+      })
+      .filter(Boolean);
+    setStackName(localName.trim());
+    setMyStack(built);
+  };
+
+  const cycleLines = useMemo(() => {
+    const w = Math.max(1, Number(cycleWeeks) || 1);
+    return rows.map((row) => {
+      const p = catalogById.get(row.peptideId);
+      const name = p?.name ?? row.peptideId;
+      const doseMg = parseDoseToMg(row.dose);
+      const inj = injectionsPerWeek(row.freqKey, row.customPerWeek);
+      const totalMg = doseMg != null && inj > 0 ? doseMg * inj * w : null;
+      const defVial = p ? defaultVialSizeMg(p) : 5;
+      const vialStr = vialOverrides[row.key];
+      const vialMg = parseFloat(String(vialStr ?? "").replace(/,/g, ""));
+      const vialSize = Number.isFinite(vialMg) && vialMg > 0 ? vialMg : defVial;
+      const vials =
+        totalMg != null && vialSize > 0 ? Math.ceil(totalMg / vialSize) : null;
+      return {
+        key: row.key,
+        name,
+        dose: row.dose,
+        freqLabel: formatFrequencyLabel(row.freqKey, row.customPerWeek),
+        doseMg,
+        totalMg,
+        vialSize,
+        vials,
+        defVial,
+      };
+    });
+  }, [rows, catalogById, cycleWeeks, vialOverrides]);
+
+  const copyShoppingList = async () => {
+    const w = Math.max(1, Number(cycleWeeks) || 1);
+    const lines = [
+      `pepguideIQ — cycle shopping list (${w} week${w !== 1 ? "s" : ""})`,
+      "",
+      ...cycleLines.map((L) => {
+        if (L.totalMg == null || L.vials == null) {
+          return `${L.name}: (set parseable dose, e.g. 250mcg or 5mg)`;
+        }
+        const mgRounded = Math.round(L.totalMg * 1000) / 1000;
+        return `${L.name} · ${L.dose} · ${L.freqLabel} · ~${mgRounded}mg total · ${L.vials}× ${L.vialSize}mg vials`;
+      }),
+      "",
+      "Estimates only — verify with your supplier and clinician.",
+    ];
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const sectionCard = {
+    border: "1px solid #1e2a38",
+    borderRadius: 12,
+    background: "rgba(14, 21, 32, 0.55)",
+    padding: 16,
+  };
+
+  const builder = (
+    <div style={sectionCard}>
+      <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.1em", marginBottom: 12 }}>
+        COMPOUND BUILDER
+      </div>
+      <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginBottom: 6 }}>
+        STACK NAME
+      </div>
+      <input
+        className="form-input"
+        style={{ width: "100%", marginBottom: 14, fontSize: 13 }}
+        placeholder="Name your protocol..."
+        value={localName}
+        onChange={(e) => setLocalName(e.target.value)}
+        aria-label="Stack name"
+      />
+      <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginBottom: 6 }}>
+        ADD COMPOUND
+      </div>
+      <LibrarySearchInput
+        key={searchInputKey}
+        placeholder="Search catalog…"
+        onDebouncedChange={setSearchQ}
+        style={{ width: "100%", marginBottom: 10 }}
+      />
+      {filteredSearch.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            marginBottom: 14,
+            maxHeight: 220,
+            overflowY: "auto",
+          }}
+        >
+          {filteredSearch.map((p) => {
+            const cat0 = primaryCategory(p);
+            const cc = getCatColor(cat0);
+            const inList = rows.some((r) => r.peptideId === p.id);
+            return (
+              <div
+                key={p.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #14202e",
+                  background: "rgba(7, 9, 14, 0.6)",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div className="brand" style={{ fontWeight: 600, fontSize: 13, color: "#dde4ef" }}>
+                    {p.name}
+                  </div>
+                  <span
+                    className="pill"
+                    style={{
+                      marginTop: 4,
+                      display: "inline-block",
+                      background: cc + "20",
+                      color: cc,
+                      border: `1px solid ${cc}35`,
+                      fontSize: 11,
+                    }}
+                  >
+                    {cat0}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0, opacity: inList ? 0.45 : 1 }}
+                  disabled={inList}
+                  onClick={() => addCompound(p)}
+                >
+                  {inList ? "Added" : "+ Add"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {rows.length === 0 ? (
+          <div className="mono" style={{ color: "#5c6d82", fontSize: 13, padding: "12px 0" }}>
+            // Add compounds from search above
+          </div>
+        ) : (
+          rows.map((row, idx) => {
+            const p = catalogById.get(row.peptideId);
+            if (!p) return null;
+            const cat0 = primaryCategory(p);
+            const cc = getCatColor(cat0);
+            return (
+              <div
+                key={row.key}
+                style={{
+                  border: "1px solid #14202e",
+                  borderRadius: 10,
+                  padding: 12,
+                  background: "rgba(7, 9, 14, 0.45)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>
+                      {p.name}
+                    </div>
+                    <span
+                      className="pill"
+                      style={{
+                        marginTop: 6,
+                        display: "inline-block",
+                        background: cc + "20",
+                        color: cc,
+                        border: `1px solid ${cc}35`,
+                        fontSize: 11,
+                      }}
+                    >
+                      {cat0}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className="form-input"
+                      style={{ padding: "4px 8px", fontSize: 12, cursor: "pointer", minWidth: 36 }}
+                      aria-label="Move up"
+                      onClick={() => moveRow(idx, -1)}
+                      disabled={idx === 0}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="form-input"
+                      style={{ padding: "4px 8px", fontSize: 12, cursor: "pointer", minWidth: 36 }}
+                      aria-label="Move down"
+                      onClick={() => moveRow(idx, 1)}
+                      disabled={idx === rows.length - 1}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-red"
+                      style={{ padding: "4px 10px", fontSize: 13 }}
+                      aria-label="Remove"
+                      onClick={() => removeRow(row.key)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4 }}>
+                    DOSE
+                  </div>
+                  <input
+                    className="form-input"
+                    style={{ width: "100%", fontSize: 13 }}
+                    placeholder="e.g. 250mcg"
+                    value={row.dose}
+                    onChange={(e) => updateRow(row.key, { dose: e.target.value })}
+                  />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4 }}>
+                    FREQUENCY
+                  </div>
+                  <select
+                    className="form-input"
+                    style={{ width: "100%", fontSize: 13, cursor: "pointer" }}
+                    value={row.freqKey}
+                    onChange={(e) => updateRow(row.key, { freqKey: e.target.value })}
+                  >
+                    {FREQ_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  {row.freqKey === "custom" && (
+                    <input
+                      className="form-input"
+                      style={{ width: "100%", fontSize: 13, marginTop: 8 }}
+                      placeholder="Injections per week (e.g. 5)"
+                      value={row.customPerWeek}
+                      onChange={(e) => updateRow(row.key, { customPerWeek: e.target.value })}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <button
+        type="button"
+        className="btn-teal"
+        style={{ width: "100%", marginTop: 16, fontSize: 13 }}
+        onClick={saveStack}
+      >
+        Save Stack
+      </button>
+    </div>
+  );
+
+  const calculatorInner = (
+    <>
+      <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em", marginBottom: 12 }}>
+        HOW MUCH DO I NEED?
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginBottom: 4 }}>
+          CYCLE LENGTH (WEEKS)
+        </div>
+        <input
+          className="form-input"
+          type="number"
+          min={1}
+          step={1}
+          style={{ width: "100%", fontSize: 13 }}
+          value={cycleWeeks}
+          onChange={(e) => setCycleWeeks(Math.max(1, parseInt(e.target.value, 10) || 1))}
+        />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {rows.length === 0 ? (
+          <div className="mono" style={{ color: "#5c6d82", fontSize: 13 }}>// Add compounds to calculate</div>
+        ) : (
+          cycleLines.map((L) => (
+            <div
+              key={L.key}
+              style={{
+                border: "1px solid #14202e",
+                borderRadius: 8,
+                padding: 10,
+                fontSize: 13,
+                color: "#cbd5e1",
+                lineHeight: 1.5,
+              }}
+            >
+              <div className="brand" style={{ fontWeight: 600, marginBottom: 6 }}>
+                {L.name}
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ display: "block" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>
+                    Dose (builder)
+                  </span>
+                  <input
+                    className="form-input"
+                    style={{ width: "100%", marginTop: 4, fontSize: 12 }}
+                    value={rows.find((r) => r.key === L.key)?.dose ?? ""}
+                    onChange={(e) => updateRow(L.key, { dose: e.target.value })}
+                  />
+                </label>
+                <div>
+                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>Frequency</span>
+                  <div style={{ marginTop: 4 }}>{L.freqLabel}</div>
+                </div>
+                <label style={{ display: "block" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>
+                    Vial size (mg)
+                  </span>
+                  <input
+                    className="form-input"
+                    style={{ width: "100%", marginTop: 4, fontSize: 12 }}
+                    placeholder={`default ${L.defVial}`}
+                    value={vialOverrides[L.key] ?? ""}
+                    onChange={(e) =>
+                      setVialOverrides((o) => ({
+                        ...o,
+                        [L.key]: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <div className="mono" style={{ fontSize: 12, color: "#8fa5bf" }}>
+                  {L.totalMg != null ? (
+                    <>
+                      ~{Math.round(L.totalMg * 1000) / 1000}mg for cycle
+                      {L.vials != null ? (
+                        <>
+                          {" "}
+                          · {L.vials}× {L.vialSize}mg vials
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>Enter a dose with units (e.g. 250mcg, 5mg)</>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+      {rows.length > 0 && (
+        <div
+          style={{
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: "1px solid #1e2a38",
+            fontSize: 13,
+            color: "#dde4ef",
+          }}
+        >
+          <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 8 }}>
+            TOTALS
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
+            {cycleLines.map((L) => (
+              <li key={L.key}>
+                {L.name}
+                {L.totalMg != null && L.vials != null
+                  ? ` · ~${Math.round(L.totalMg * 1000) / 1000}mg · ${L.vials}× ${L.vialSize}mg vials`
+                  : " · —"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn-teal"
+        style={{ width: "100%", marginTop: 14, fontSize: 13 }}
+        onClick={() => void copyShoppingList()}
+        disabled={rows.length === 0}
+      >
+        Copy Shopping List
+      </button>
+    </>
+  );
+
+  const calculator = wide ? (
+    <div style={{ ...sectionCard, position: wide ? "sticky" : undefined, top: wide ? 12 : undefined, alignSelf: "start" }}>
+      {calculatorInner}
+    </div>
+  ) : (
+    <div style={sectionCard}>{calculatorInner}</div>
+  );
+
+  return (
+    <div>
+      <div className="brand" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
+        BUILD A STACK
+      </div>
+      <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 18, maxWidth: 560, lineHeight: 1.45 }}>
+        Plan compounds, dosing, and frequency — then estimate vials for your cycle length.
+      </div>
+
+      {wide ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 16,
+            alignItems: "start",
+          }}
+        >
+          {builder}
+          {calculator}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {builder}
+          <div>
+            <button
+              type="button"
+              className="form-input"
+              onClick={() => setCalcOpen((o) => !o)}
+              style={{
+                width: "100%",
+                cursor: "pointer",
+                fontSize: 13,
+                fontFamily: "'Outfit', sans-serif",
+                color: "#00d4aa",
+                border: "1px solid #243040",
+                background: "rgba(0, 212, 170, 0.08)",
+                padding: "12px 14px",
+                borderRadius: 10,
+                textAlign: "left",
+              }}
+            >
+              <span className="pepv-emoji" aria-hidden>
+                📦{" "}
+              </span>
+              Calculate How Much I Need {calcOpen ? "▼" : "→"}
+            </button>
+            {calcOpen && <div style={{ marginTop: 12 }}>{calculator}</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

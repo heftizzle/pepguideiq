@@ -1,5 +1,6 @@
 import { sanitizeVendorRefs, neutralSourcingFallback } from "./catalogVendorSanitize.js";
 import { resolveStability, resolveStabilityDays } from "./catalogStability.js";
+import { normalizeFinnrickProductUrl } from "./finnrickUrl.js";
 
 function formatReconstitution(r) {
   if (r == null) return "Per supplier / protocol";
@@ -71,6 +72,12 @@ function tagToBenefitPhrase(tag) {
  */
 export function normalizeNewCatalogEntry(raw) {
   const { primary, extraTags } = mergeCategory(raw);
+  const mechanismSource =
+    raw.mechanism != null && String(raw.mechanism).trim()
+      ? String(raw.mechanism)
+      : raw.description != null && String(raw.description).trim()
+        ? String(raw.description)
+        : "";
   const categories = Array.isArray(raw.category)
     ? raw.category.map(String)
     : primary != null
@@ -99,10 +106,13 @@ export function normalizeNewCatalogEntry(raw) {
         ? `Per ${dosing.titrationNote}`
         : "Per protocol / research context";
 
+  const rawForRoute = { ...raw, mechanism: mechanismSource };
   const routes =
     Array.isArray(raw.route) && raw.route.length > 0
       ? raw.route.map((r) => String(r))
-      : inferRoute(raw);
+      : typeof raw.route === "string" && raw.route.trim()
+        ? [raw.route.trim()]
+        : inferRoute(rawForRoute);
   const oralOnly = routes.length === 1 && routes[0] === "oral";
   const topicalOnly = routes.length === 1 && routes[0] === "topical";
   const storageDefault = topicalOnly
@@ -130,13 +140,50 @@ export function normalizeNewCatalogEntry(raw) {
       ? sanitizeVendorRefs(raw.reconstitution)
       : formatReconstitution(raw.reconstitution);
 
+  const normalizedComponents =
+    Array.isArray(raw.components) && raw.components.length > 0
+      ? raw.components
+          .map((c) => ({
+            name: typeof c?.name === "string" ? c.name.trim() : "",
+            mg: Number(c?.mg),
+          }))
+          .filter((c) => c.name && Number.isFinite(c.mg) && c.mg >= 0)
+      : [];
+  const componentsField = normalizedComponents.length ? { components: normalizedComponents } : {};
+
+  const reconVol = Number(raw.reconstitutionVolumeMl);
+  const reconstitutionVolumeField =
+    Number.isFinite(reconVol) && reconVol > 0 ? { reconstitutionVolumeMl: reconVol } : {};
+
+  const normalizedVialSizeOptions =
+    Array.isArray(raw.vialSizeOptions) && raw.vialSizeOptions.length > 0
+      ? raw.vialSizeOptions
+          .map((o) => ({
+            label: typeof o?.label === "string" ? o.label.trim() : "",
+            totalMg: Number(o?.totalMg),
+            bacWaterMl: Number(o?.bacWaterMl),
+          }))
+          .filter(
+            (o) =>
+              o.label &&
+              Number.isFinite(o.totalMg) &&
+              o.totalMg > 0 &&
+              Number.isFinite(o.bacWaterMl) &&
+              o.bacWaterMl > 0
+          )
+      : [];
+  const vialSizeOptionsField = normalizedVialSizeOptions.length ? { vialSizeOptions: normalizedVialSizeOptions } : {};
+
+  const finnrickHref = normalizeFinnrickProductUrl(raw.finnrickUrl);
+  const finnrickUrlField = finnrickHref ? { finnrickUrl: finnrickHref } : {};
+
   const entry = {
     id: String(raw.id),
     name: String(raw.name),
     category: primary,
     categories,
     aliases: Array.isArray(raw.aliases) ? raw.aliases.map(String) : [],
-    mechanism: sanitizeVendorRefs(String(raw.mechanism ?? "")),
+    mechanism: sanitizeVendorRefs(mechanismSource),
     halfLife: String(raw.halfLife ?? ""),
     route: routes,
     typicalDose,
@@ -150,11 +197,25 @@ export function normalizeNewCatalogEntry(raw) {
     reconstitution,
     notes: notesJoined || neutralSourcingFallback(raw.sourcingNotes),
     tags,
+    ...componentsField,
+    ...reconstitutionVolumeField,
+    ...vialSizeOptionsField,
+    ...finnrickUrlField,
     ...(raw.variantOf ? { variantOf: String(raw.variantOf) } : {}),
     ...(raw.variantNote ? { variantNote: sanitizeVendorRefs(String(raw.variantNote)) } : {}),
     ...(raw.tier != null ? { tier: String(raw.tier) } : {}),
     ...(raw.bioavailabilityNote != null && String(raw.bioavailabilityNote).trim()
       ? { bioavailabilityNote: sanitizeVendorRefs(String(raw.bioavailabilityNote)) }
+      : {}),
+    ...(raw.bioavailability != null && String(raw.bioavailability).trim()
+      ? { bioavailability: sanitizeVendorRefs(String(raw.bioavailability)) }
+      : {}),
+    ...(raw.bioavailabilityWarning === true ? { bioavailabilityWarning: true } : {}),
+    ...(raw.subtitle != null && String(raw.subtitle).trim()
+      ? { subtitle: sanitizeVendorRefs(String(raw.subtitle).trim()) }
+      : {}),
+    ...(typeof raw.popularityRank === "number" && Number.isFinite(raw.popularityRank)
+      ? { popularityRank: raw.popularityRank }
       : {}),
   };
   const merged = { ...entry };

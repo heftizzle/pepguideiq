@@ -4,22 +4,40 @@ import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { LibrarySearchInput } from "./components/LibrarySearchInput.jsx";
 import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
+import { getProtocolSessionsOrdered } from "./data/protocolSessions.js";
 import { ProtocolTab } from "./components/ProtocolTab.jsx";
 import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
 import { StackPhotoUpload } from "./components/StackPhotoUpload.jsx";
 import { VialTracker } from "./components/VialTracker.jsx";
+import { StackProfileShots } from "./components/StackProfileShots.jsx";
 import { StackProtocolQuickLog } from "./components/StackProtocolQuickLog.jsx";
+import { NetworkTab } from "./components/NetworkTab.jsx";
 import { StackShareControls } from "./components/StackShareControls.jsx";
+import { BuildTab } from "./components/BuildTab.jsx";
 import { ProfileTab } from "./components/ProfileTab.jsx";
 import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
+import { LegalPage } from "./components/LegalPage.jsx";
 import { ProfileProvider, useActiveProfile } from "./context/ProfileContext.jsx";
+import { DoseToastProvider } from "./context/DoseToastContext.jsx";
+import {
+  DemoTourProvider,
+  DEMO_TARGET,
+  NETWORK_TAB_EMOJI,
+  demoHighlightProps,
+  demoNavProtocolTarget,
+  useDemoTour,
+} from "./context/DemoTourContext.jsx";
+import { DemoTourBar, DemoTourHelpButton } from "./components/DemoTourChrome.jsx";
 import { getNextTierId, getTier, hasAccess } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import { resolveStability } from "./lib/catalogStability.js";
+import { hasInjectableRoute } from "./lib/doseRouteKind.js";
+import { findCatalogPeptideForStackRow } from "./lib/resolveStackCatalogPeptide.js";
 import {
   getCurrentUser,
   getSessionAccessToken,
@@ -29,6 +47,9 @@ import {
   signOut,
 } from "./lib/supabase.js";
 import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
+import { formatHandleDisplay } from "./lib/memberProfileHandle.js";
+import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
+import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
 
@@ -81,7 +102,7 @@ function peptideMatchesRouteFilter(p, routeKey) {
 }
 
 const SORT_OPTIONS = [
-  { value: "default", label: "Default" },
+  { value: "popular", label: "Popular" },
   { value: "az", label: "A → Z" },
   { value: "za", label: "Z → A" },
   { value: "category", label: "Category" },
@@ -179,17 +200,20 @@ function tierHeaderPill(plan) {
   }
 }
 
+const NAV_PROTOCOL_SESSIONS = getProtocolSessionsOrdered();
+
 function PepGuideIQApp({ user, setUser }) {
   const { activeProfileId, activeProfile, memberProfilesVersion } = useActiveProfile();
   const [activeTab, setActiveTab] = useState("library");
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
-  const [sortMode, setSortMode]   = useState("default");
+  const [sortMode, setSortMode]   = useState("popular");
   const [search, setSearch]       = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
   const [stackShareId, setStackShareId] = useState(null);
+  const [stackFeedVisible, setStackFeedVisible] = useState(false);
   const [showAdd, setShowAdd]     = useState(false);
   const [addTarget, setAddTarget] = useState(null);
   const [aiMsgs, setAiMsgs]       = useState([]);
@@ -203,7 +227,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
   /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
-  /** Protocol session from nav pills, URL, or localStorage; cleared when leaving Protocol tab. */
+  /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
   const [narrowHeader, setNarrowHeader] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
@@ -288,11 +312,10 @@ function PepGuideIQApp({ user, setUser }) {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "protocol") setProtocolDeepLink(null);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!user?.id) setStackShareId(null);
+    if (!user?.id) {
+      setStackShareId(null);
+      setStackFeedVisible(false);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -356,6 +379,9 @@ function PepGuideIQApp({ user, setUser }) {
           ? s.shareId.trim()
           : null
       );
+      setStackFeedVisible(
+        Boolean(s && typeof s === "object" && !Array.isArray(s) && s.feedVisible === true)
+      );
       stackHydrated.current = true;
     });
     return () => {
@@ -402,7 +428,11 @@ function PepGuideIQApp({ user, setUser }) {
 
   const sortedPeptides = useMemo(() => {
     const base = [...filtered];
+    const rankOf = (p) =>
+      typeof p.popularityRank === "number" && Number.isFinite(p.popularityRank) ? p.popularityRank : 999;
     switch (sortMode) {
+      case "popular":
+        return base.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
       case "az":
         return base.sort((a, b) => a.name.localeCompare(b.name));
       case "za":
@@ -414,13 +444,13 @@ function PepGuideIQApp({ user, setUser }) {
           return catA.localeCompare(catB) || a.name.localeCompare(b.name);
         });
       default:
-        return base;
+        return base.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
     }
   }, [filtered, sortMode]);
 
   const handleCategorySelect = (cat) => {
     setSelCat(cat);
-    setSortMode("default");
+    setSortMode("popular");
   };
 
   const savedStackLimit = getTier(user?.plan ?? "entry").stackLimit;
@@ -430,29 +460,17 @@ function PepGuideIQApp({ user, setUser }) {
   const canVialTracker = hasAccess(user?.plan ?? "entry", "pro");
 
   const protocolRows = useMemo(
-    () =>
-      myStack.flatMap((p) => {
-        const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
-        const stab = resolveStability(catalogPeptide ?? p);
-        return stab.stabilityDays != null ? [{ peptideId: p.id, name: p.name }] : [];
-      }),
+    () => myStack.map((p) => ({ peptideId: p.id, name: p.name })),
     [myStack]
   );
 
   const protocolBaseRows = useMemo(
     () =>
-      myStack.flatMap((p) => {
-        const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
-        const stab = resolveStability(catalogPeptide ?? p);
-        if (stab.stabilityDays == null) return [];
-        return [
-          {
-            peptideId: p.id,
-            name: p.name,
-            sessions: normalizeStackSessions(p.sessions),
-          },
-        ];
-      }),
+      myStack.map((p) => ({
+        peptideId: p.id,
+        name: p.name,
+        sessions: normalizeStackSessions(p.sessions),
+      })),
     [myStack]
   );
 
@@ -579,55 +597,267 @@ function PepGuideIQApp({ user, setUser }) {
   useEffect(() => { msgEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [aiMsgs]);
 
   const handleSignOut = async () => {
+    try {
+      if (user?.id && typeof localStorage !== "undefined") {
+        localStorage.removeItem(`pepguideiq.handlePromptDismissed.${user.id}`);
+      }
+    } catch {
+      /* ignore */
+    }
     await signOut();
     stackHydrated.current = false;
     setMyStack([]);
     setStackName("");
     setAiQueryUsage(null);
+    setProtocolDeepLink(null);
     setUser(null);
   };
 
+  const [showHandlePrompt, setShowHandlePrompt] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id || !activeProfile) {
+      setShowHandlePrompt(false);
+      return;
+    }
+    let dismissed = false;
+    try {
+      dismissed = typeof localStorage !== "undefined" && localStorage.getItem(`pepguideiq.handlePromptDismissed.${user.id}`) === "1";
+    } catch {
+      dismissed = false;
+    }
+    if (dismissed) {
+      setShowHandlePrompt(false);
+      return;
+    }
+    const hasHandle = typeof activeProfile.handle === "string" && activeProfile.handle.length > 0;
+    setShowHandlePrompt(!hasHandle);
+  }, [user?.id, activeProfile?.id, activeProfile?.handle]);
+
+  const dismissHandlePrompt = useCallback(() => {
+    setShowHandlePrompt(false);
+    try {
+      if (user?.id && typeof localStorage !== "undefined") {
+        localStorage.setItem(`pepguideiq.handlePromptDismissed.${user.id}`, "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [user?.id]);
+
+  const mainUiRef = useRef({});
+
+  mainUiRef.current = {
+    user,
+    setUser,
+    activeProfileId,
+    activeProfile,
+    memberProfilesVersion,
+    activeTab,
+    setActiveTab,
+    selCat,
+    routeFilter,
+    sortMode,
+    setSortMode,
+    search,
+    setSearch,
+    selPeptide,
+    setSelPeptide,
+    myStack,
+    setMyStack,
+    stackName,
+    setStackName,
+    stackShareId,
+    setStackShareId,
+    stackFeedVisible,
+    setStackFeedVisible,
+    showAdd,
+    setShowAdd,
+    addTarget,
+    setAddTarget,
+    aiMsgs,
+    aiInput,
+    setAiInput,
+    aiLoading,
+    aiQueryUsage,
+    goals,
+    setGoals,
+    showUpgrade,
+    upgradeFocusTier,
+    variantNoteExpandedById,
+    setVariantNoteExpandedById,
+    protocolDeepLink,
+    setProtocolDeepLink,
+    narrowHeader,
+    guideExiting,
+    msgEnd,
+    beginCloseGuide,
+    handleGuideTakeoverAnimationEnd,
+    onGuideTakeoverRootClick,
+    workerOkHeader,
+    resolvedHeaderMemberAvatar,
+    sortedPeptides,
+    handleCategorySelect,
+    savedStackLimit,
+    canAddToStack,
+    canAI,
+    canUploadStackPhoto,
+    canVialTracker,
+    protocolRows,
+    protocolBaseRows,
+    openUpgradeModal,
+    closeUpgradeModal,
+    openAdd,
+    confirmAdd,
+    updateStackItem,
+    removeFromStack,
+    sendAI,
+    handleSignOut,
+    showHandlePrompt,
+    dismissHandlePrompt,
+    setRouteFilter,
+  };
+
+  return (
+    <DemoTourProvider
+      setActiveTab={setActiveTab}
+      setProtocolDeepLink={setProtocolDeepLink}
+      firstProtocolSessionId={NAV_PROTOCOL_SESSIONS[0]?.id ?? "morning"}
+    >
+      <DoseToastProvider>
+        <PepGuideIQMainTree mainUiRef={mainUiRef} />
+        <DemoTourBar />
+      </DoseToastProvider>
+    </DemoTourProvider>
+  );
+}
+
+function PepGuideIQMainTree({ mainUiRef }) {
+  const { isHighlighted, stripVisible, firstProtocolSessionId } = useDemoTour();
+  const {
+    user,
+    setUser,
+    activeProfileId,
+    activeProfile,
+    memberProfilesVersion,
+    activeTab,
+    setActiveTab,
+    selCat,
+    routeFilter,
+    sortMode,
+    setSortMode,
+    search,
+    setSearch,
+    selPeptide,
+    setSelPeptide,
+    myStack,
+    setMyStack,
+    stackName,
+    setStackName,
+    stackShareId,
+    setStackShareId,
+    stackFeedVisible,
+    setStackFeedVisible,
+    showAdd,
+    setShowAdd,
+    addTarget,
+    setAddTarget,
+    aiMsgs,
+    aiInput,
+    setAiInput,
+    aiLoading,
+    aiQueryUsage,
+    goals,
+    setGoals,
+    showUpgrade,
+    upgradeFocusTier,
+    variantNoteExpandedById,
+    setVariantNoteExpandedById,
+    protocolDeepLink,
+    setProtocolDeepLink,
+    narrowHeader,
+    guideExiting,
+    msgEnd,
+    beginCloseGuide,
+    handleGuideTakeoverAnimationEnd,
+    onGuideTakeoverRootClick,
+    workerOkHeader,
+    resolvedHeaderMemberAvatar,
+    sortedPeptides,
+    handleCategorySelect,
+    savedStackLimit,
+    canAddToStack,
+    canAI,
+    canUploadStackPhoto,
+    canVialTracker,
+    protocolRows,
+    protocolBaseRows,
+    openUpgradeModal,
+    closeUpgradeModal,
+    openAdd,
+    confirmAdd,
+    updateStackItem,
+    removeFromStack,
+    sendAI,
+    handleSignOut,
+    showHandlePrompt,
+    dismissHandlePrompt,
+    setRouteFilter,
+  } = mainUiRef.current;
+
+  const libraryNavActive = activeTab === "library" || activeTab === "protocol";
+  const libraryProtocolActiveSession = protocolDeepLink ?? user?.defaultSession ?? "morning";
+
   return (
     <>
-      <GlobalStyles />
-      <div style={{ minHeight:"100vh",background:"#07090e",color:"#dde4ef",fontFamily:"'Outfit',sans-serif" }}>
+        <GlobalStyles />
+        <div
+          className="pepv-app-shell"
+          style={{
+            color: "#dde4ef",
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
 
-        <div className="grid-bg" style={{ borderBottom:"1px solid #0e1822" }}>
-          <div style={{ maxWidth:1200,margin:"0 auto",padding:"0 16px" }}>
-            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
-              <Logo />
-              <div
-                id="nav-account-anchor"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  overflowX: "auto",
-                  marginLeft: "auto",
-                  flexWrap: "wrap",
-                }}
-              >
-                {(() => {
-                  const guideOn = activeTab === "guide";
-                  const tier = tierHeaderPill(user.plan);
-                  const memberDisplayRaw = String(activeProfile?.display_name ?? "").trim() || "—";
-                  const memberNameShown = narrowHeader
-                    ? (memberDisplayRaw.split(/\s+/)[0] || memberDisplayRaw).trim() || "—"
-                    : memberDisplayRaw;
-                  return (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("guide")}
-                        style={{
-                          ...HEADER_ACCOUNT_PILL_BASE,
-                          cursor: "pointer",
-                          border: guideOn ? "1px solid rgba(0, 212, 170, 0.55)" : HEADER_ACCOUNT_PILL_BASE.border,
-                          background: guideOn ? "rgba(0, 212, 170, 0.14)" : HEADER_ACCOUNT_PILL_BASE.background,
-                          boxShadow: guideOn ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
-                          color: guideOn ? "#00d4aa" : "#5c6d82",
-                        }}
-                      >
+          <div className="grid-bg" style={{ borderBottom:"1px solid #0e1822" }}>
+            <div style={{ maxWidth:1200,margin:"0 auto",padding:"0 16px" }}>
+              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
+                <Logo />
+                <div
+                  id="nav-account-anchor"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    overflowX: "auto",
+                    marginLeft: "auto",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(() => {
+                    const guideOn = activeTab === "guide";
+                    const tier = tierHeaderPill(user.plan);
+                    const memberDisplayRaw = String(activeProfile?.display_name ?? "").trim() || "—";
+                    const memberNameShown = narrowHeader
+                      ? (memberDisplayRaw.split(/\s+/)[0] || memberDisplayRaw).trim() || "—"
+                      : memberDisplayRaw;
+                    return (
+                      <>
+                        <DemoTourHelpButton />
+                        <button
+                          type="button"
+                          data-demo-target={DEMO_TARGET.nav_guide}
+                          {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_guide))}
+                          onClick={() => setActiveTab("guide")}
+                          style={{
+                            ...HEADER_ACCOUNT_PILL_BASE,
+                            cursor: "pointer",
+                            border: guideOn ? "1px solid rgba(0, 212, 170, 0.55)" : HEADER_ACCOUNT_PILL_BASE.border,
+                            background: guideOn ? "rgba(0, 212, 170, 0.14)" : HEADER_ACCOUNT_PILL_BASE.background,
+                            boxShadow: guideOn ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                            color: guideOn ? "#00d4aa" : "#5c6d82",
+                          }}
+                        >
                         <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
                           🧙
                         </span>
@@ -670,14 +900,21 @@ function PepGuideIQApp({ user, setUser }) {
                           ...HEADER_ACCOUNT_PILL_BASE,
                           color: "#8fa5bf",
                           maxWidth: narrowHeader ? 180 : 260,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          minWidth: 0,
                         }}
-                        title={memberDisplayRaw !== "—" ? memberDisplayRaw : undefined}
+                        title={
+                          memberDisplayRaw !== "—"
+                            ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle)}` : ""}`
+                            : undefined
+                        }
                         aria-label={
                           memberDisplayRaw !== "—"
-                            ? `Active profile: ${memberDisplayRaw}`
+                            ? `Active profile: ${memberDisplayRaw}${
+                                activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle)}` : ""
+                              }`
                             : "Active profile"
                         }
                       >
@@ -717,7 +954,22 @@ function PepGuideIQApp({ user, setUser }) {
                             {headerMemberAvatarInitial(memberDisplayRaw)}
                           </span>
                         )}
-                        {memberNameShown}
+                        <span
+                          style={{
+                            flex: "1 1 auto",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {memberNameShown}
+                        </span>
+                        {activeProfile?.handle ? (
+                          <span className="mono" style={{ fontSize: 12, color: "#00d4aa", opacity: 0.9, flexShrink: 0 }}>
+                            {formatHandleDisplay(activeProfile.handle)}
+                          </span>
+                        ) : null}
                       </span>
                       <button
                         type="button"
@@ -743,12 +995,23 @@ function PepGuideIQApp({ user, setUser }) {
           </div>
         </div>
 
-        <div style={{ maxWidth:1200,margin:"0 auto",padding:"20px 16px 88px" }}>
+        <div
+          className="pepv-main-scroll"
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "20px 16px 88px",
+          }}
+        >
 
           {activeTab === "library" && (
             <div>
               <div style={{ display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center" }}>
-                <input className="search-input" style={{ maxWidth:280,flex:"1 1 200px" }} placeholder="Search by name, alias, tag…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <LibrarySearchInput
+                  onDebouncedChange={setSearch}
+                  style={{ maxWidth: 280, flex: "1 1 200px" }}
+                  placeholder="Search by name, alias, tag…"
+                />
                 <div style={{ display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"center",overflowX:"auto",paddingBottom:2,minWidth:0 }}>
                   {CATEGORIES.map((cat) => (
                     <button
@@ -784,6 +1047,98 @@ function PepGuideIQApp({ user, setUser }) {
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "#ffffff",
+                      fontSize: 13,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 500,
+                      letterSpacing: "0.06em",
+                      alignSelf: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    PROTOCOL
+                  </span>
+                  <div
+                    role="group"
+                    aria-label="Protocol session"
+                    style={{
+                      display: "flex",
+                      alignItems: "stretch",
+                      gap: 6,
+                      flex: "1 1 200px",
+                      minWidth: 0,
+                    }}
+                  >
+                    {NAV_PROTOCOL_SESSIONS.map(({ id: session, emoji, navLabel: label, pillLabel }) => {
+                      const isActive = libraryProtocolActiveSession === session;
+                      const protoTarget = demoNavProtocolTarget(session);
+                      return (
+                        <button
+                          key={session}
+                          type="button"
+                          aria-label={pillLabel}
+                          aria-pressed={isActive}
+                          data-demo-target={protoTarget}
+                          {...demoHighlightProps(
+                            isHighlighted(DEMO_TARGET.protocol_log_dose) && session === firstProtocolSessionId
+                          )}
+                          onClick={() => {
+                            setProtocolDeepLink(session);
+                            setActiveTab("protocol");
+                          }}
+                          style={{
+                            flex: "1 1 0",
+                            minWidth: 0,
+                            minHeight: 44,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 2,
+                            padding: "6px 4px",
+                            borderRadius: 12,
+                            cursor: "pointer",
+                            fontFamily: "'JetBrains Mono', monospace",
+                            border: isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
+                            background: isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
+                            boxShadow: isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                          }}
+                        >
+                          <span
+                            className="pepv-emoji"
+                            style={{ fontSize: 18, lineHeight: 1, opacity: isActive ? 1 : 0.72 }}
+                            aria-hidden
+                          >
+                            {emoji}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              lineHeight: 1.15,
+                              letterSpacing: "0.06em",
+                              color: isActive ? "#00d4aa" : "#5c6d82",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   {ROUTE_FILTERS.map((r) => (
                     <button
@@ -801,10 +1156,11 @@ function PepGuideIQApp({ user, setUser }) {
                 </div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14 }}>
-                {sortedPeptides.map((p) => {
+                {sortedPeptides.map((p, cardIdx) => {
                   const cat0 = primaryCategory(p);
                   const cc = getCatColor(cat0);
                   const inStack = myStack.some((s) => s.id === p.id);
+                  const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
                   return (
                     <div key={p.id} className="pcard" style={{ "--cc":cc }} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
@@ -867,6 +1223,27 @@ function PepGuideIQApp({ user, setUser }) {
                       <div style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
                         {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
                       </div>
+                      {(() => {
+                        const ba = resolvePeptideBioavailability(p);
+                        if (!ba) return null;
+                        return (
+                          <div
+                            className="mono"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontSize: 13,
+                              color: ba.warn ? "#f59e0b" : "#6b7c8f",
+                              marginBottom: 10,
+                              lineHeight: 1.45,
+                            }}
+                            title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
+                          >
+                            {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
+                            <span style={{ color: ba.warn ? "#fbbf24" : "#8fa5bf" }}>Bioavailability: </span>
+                            {ba.text}
+                          </div>
+                        );
+                      })()}
                       {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
                         <div
                           className="mono"
@@ -878,11 +1255,39 @@ function PepGuideIQApp({ user, setUser }) {
                       )}
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                         <div className="mono" style={{ fontSize: 13,color:"#a0a0b0" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
-                        <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ padding:"5px 10px",fontSize: 13 }}
-                          onClick={(e) => { e.stopPropagation(); if (!inStack) openAdd(p); }}>
+                        <button
+                          type="button"
+                          className={inStack?"btn-green":"btn-teal"}
+                          style={{ padding:"5px 10px",fontSize: 13 }}
+                          data-demo-target={cardIdx === 0 ? DEMO_TARGET.library_add_stack : undefined}
+                          {...demoHighlightProps(cardIdx === 0 && isHighlighted(DEMO_TARGET.library_add_stack))}
+                          onClick={(e) => { e.stopPropagation(); if (!inStack) openAdd(p); }}
+                        >
                           {inStack ? "✓ Saved" : "+ Saved Stack"}
                         </button>
                       </div>
+                      {finnrickHref ? (
+                        <a
+                          href={finnrickHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mono"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          style={{
+                            display: "block",
+                            marginTop: 10,
+                            fontSize: 12,
+                            color: "#00d4aa",
+                            textDecoration: "none",
+                            letterSpacing: "0.02em",
+                            lineHeight: 1.35,
+                            WebkitTapHighlightColor: "transparent",
+                          }}
+                        >
+                          Verified by Finnrick ↗
+                        </a>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -927,6 +1332,9 @@ function PepGuideIQApp({ user, setUser }) {
                     }}
                   />
                 </div>
+                {user?.id && (
+                  <StackProfileShots userId={user.id} canUse={canVialTracker} onUpgrade={openUpgradeModal} />
+                )}
               </div>
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed #14202e",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
@@ -947,6 +1355,8 @@ function PepGuideIQApp({ user, setUser }) {
                         stackName={stackName}
                         initialShareId={stackShareId}
                         onShareIdChange={setStackShareId}
+                        feedVisible={stackFeedVisible}
+                        onFeedVisibleChange={setStackFeedVisible}
                         disabled={!isSupabaseConfigured()}
                       />
                     )}
@@ -958,38 +1368,20 @@ function PepGuideIQApp({ user, setUser }) {
                       protocolRows={protocolRows}
                       canUse={canVialTracker}
                       onUpgrade={openUpgradeModal}
-                      userPlan={user?.plan ?? "entry"}
+                      wakeTime={activeProfile?.wake_time ?? null}
                     />
                   )}
-                  {myStack.map((p) => {
-                    const catalogPeptide = PEPTIDES.find((c) => c.id === p.id);
-                    const stab = resolveStability(catalogPeptide ?? p);
-                    return (
-                      <div key={getStackRowListKey(p)} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                        <SavedStackEntryRow
-                          item={p}
-                          catColor={getCatColor(primaryCategory(p))}
-                          catLabel={primaryCategory(p)}
-                          onUpdate={updateStackItem}
-                          onRemove={removeFromStack}
-                        />
-                        {stab.stabilityDays != null && user?.id && activeProfileId && (
-                          <VialTracker
-                            userId={user.id}
-                            profileId={activeProfileId}
-                            peptideId={p.id}
-                            catalogEntry={{
-                              name: p.name,
-                              stabilityDays: stab.stabilityDays,
-                              stabilityNote: stab.stabilityNote,
-                            }}
-                            canUse={canVialTracker}
-                            onUpgrade={openUpgradeModal}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                  {myStack.map((p) => (
+                    <div key={getStackRowListKey(p)} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      <SavedStackEntryRow
+                        item={p}
+                        catColor={getCatColor(primaryCategory(p))}
+                        catLabel={primaryCategory(p)}
+                        onUpdate={updateStackItem}
+                        onRemove={removeFromStack}
+                      />
+                    </div>
+                  ))}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
                     <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
@@ -1023,6 +1415,89 @@ function PepGuideIQApp({ user, setUser }) {
             </div>
           )}
 
+          {activeTab === "build" && (
+            <BuildTab
+              activeTab={activeTab}
+              catalog={PEPTIDES}
+              myStack={myStack}
+              stackName={stackName}
+              setStackName={setStackName}
+              setMyStack={setMyStack}
+              savedStackLimit={savedStackLimit}
+              onUpgrade={openUpgradeModal}
+              getCatColor={getCatColor}
+              primaryCategory={primaryCategory}
+            />
+          )}
+
+          {activeTab === "vials" && (
+            <div>
+              <div style={{ marginBottom: 18 }}>
+                <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
+                  VIAL INVENTORY
+                </div>
+                <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4, maxWidth: 520, lineHeight: 1.45 }}>
+                  Physical vials only (injectables). Log doses from Protocol or Stacks. Oral / nasal / topical compounds do not appear here.
+                </div>
+              </div>
+              {myStack.length === 0 ? (
+                <div style={{ border: "1px dashed #14202e", borderRadius: 10, padding: "60px 0", textAlign: "center" }}>
+                  <div className="mono" style={{ color: "#a0a0b0", fontSize: 13 }}>
+                    // Save injectable compounds to your stack first, then manage vials here.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {(() => {
+                    const injectableRows = myStack.filter((p) => {
+                      const catalogPeptide = findCatalogPeptideForStackRow(p);
+                      const stab = resolveStability(catalogPeptide ?? p);
+                      return hasInjectableRoute(catalogPeptide ?? p) && stab.stabilityDays != null;
+                    });
+                    if (injectableRows.length === 0) {
+                      return (
+                        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>
+                          No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
+                        </div>
+                      );
+                    }
+                    if (!user?.id || !activeProfileId) return null;
+                    return injectableRows.map((p, vialIdx) => {
+                      const catalogPeptide = findCatalogPeptideForStackRow(p);
+                      const stab = resolveStability(catalogPeptide ?? p);
+                      return (
+                        <VialTracker
+                          key={getStackRowListKey(p)}
+                          userId={user.id}
+                          profileId={activeProfileId}
+                          peptideId={p.id}
+                          catalogEntry={
+                            catalogPeptide
+                              ? {
+                                  ...catalogPeptide,
+                                  stabilityDays: stab.stabilityDays,
+                                  stabilityNote: stab.stabilityNote,
+                                }
+                              : {
+                                  name: p.name,
+                                  stabilityDays: stab.stabilityDays,
+                                  stabilityNote: stab.stabilityNote,
+                                }
+                          }
+                          canUse={canVialTracker}
+                          onUpgrade={openUpgradeModal}
+                          demoAnchorFirst={vialIdx === 0}
+                        />
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "network" && <NetworkTab userId={user?.id} />}
+
           {activeTab === "protocol" && user?.id && activeProfileId && protocolDeepLink && (
             <ProtocolTab
               key={protocolDeepLink}
@@ -1032,6 +1507,7 @@ function PepGuideIQApp({ user, setUser }) {
               canUse={canVialTracker}
               onUpgrade={openUpgradeModal}
               initialSession={protocolDeepLink}
+              wakeTime={activeProfile?.wake_time ?? null}
               onDeepLinkConsumed={() => {}}
               onLoggedNavigateLibrary={() => setActiveTab("library")}
               userPlan={user?.plan ?? "entry"}
@@ -1039,15 +1515,13 @@ function PepGuideIQApp({ user, setUser }) {
           )}
 
           {activeTab === "profile" && user?.id && (
-            <div>
-              <div className="brand" style={{ fontSize: 17, fontWeight: 700, marginBottom: 18 }}>
-                Profile
-              </div>
+            <div className="pepv-profile-route">
               <ProfileTab
                 user={user}
                 setUser={setUser}
                 onOpenUpgrade={openUpgradeModal}
                 onSignOut={handleSignOut}
+                canUseProgressPhotos={canVialTracker}
               />
             </div>
           )}
@@ -1261,6 +1735,7 @@ function PepGuideIQApp({ user, setUser }) {
           const pCat = primaryCategory(p);
           const cc = getCatColor(pCat);
           const inStack = myStack.some((s)=>s.id===p.id);
+          const baDetail = resolvePeptideBioavailability(p);
           return (
             <Modal onClose={() => setSelPeptide(null)} label={p.name}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14 }}>
@@ -1291,12 +1766,32 @@ function PepGuideIQApp({ user, setUser }) {
                 </div>
               </div>
               <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize: 13,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
+              {baDetail && (
+                <div
+                  className="mono"
+                  style={{ fontSize: 13, color: baDetail.warn ? "#f59e0b" : "#8fa5bf", marginBottom: 12, lineHeight: 1.45 }}
+                  title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
+                >
+                  {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
+                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#6b7c8f" }}>Bioavailability: </span>
+                  {baDetail.text}
+                </div>
+              )}
               {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
                 <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 12, lineHeight: 1.45 }}>
                   ⚠ {p.bioavailabilityNote}
                 </div>
               )}
-              {[["Typical Dose",p.typicalDose],["Start Dose",p.startDose],["Titration",p.titrationNote],["Half-life",p.halfLife],["Route",p.route.join(", ")],["Cycle",p.cycle],["Storage",p.storage],["Reconstitution",p.reconstitution]].map(([l,v]) => (
+              {[
+                ["Typical Dose", p.typicalDose],
+                ["Start Dose", p.startDose],
+                ["Titration", p.titrationNote],
+                ["Half-life", p.halfLife],
+                ["Route", p.route.join(", ")],
+                ["Cycle", p.cycle],
+                ["Storage", p.storage],
+                ["Reconstitution", p.reconstitution],
+              ].map(([l, v]) => (
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
               <div style={{ marginTop:12 }}>
@@ -1386,6 +1881,8 @@ function PepGuideIQApp({ user, setUser }) {
             <button
               type="button"
               aria-label={`Library, ${PEPTIDES.length} compounds`}
+              data-demo-target={DEMO_TARGET.nav_library}
+              {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_library))}
               onClick={() => setActiveTab("library")}
               style={{
                 flex: "1 1 0",
@@ -1400,12 +1897,16 @@ function PepGuideIQApp({ user, setUser }) {
                 borderRadius: 12,
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
-                border: activeTab === "library" ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-                background: activeTab === "library" ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                boxShadow: activeTab === "library" ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                border: libraryNavActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
+                background: libraryNavActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
+                boxShadow: libraryNavActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
               }}
             >
-              <span style={{ fontSize: 18, lineHeight: 1, opacity: activeTab === "library" ? 1 : 0.72 }} aria-hidden>
+              <span
+                className="pepv-emoji"
+                style={{ fontSize: 18, lineHeight: 1, opacity: libraryNavActive ? 1 : 0.72 }}
+                aria-hidden
+              >
                 🧬
               </span>
               <span
@@ -1435,7 +1936,7 @@ function PepGuideIQApp({ user, setUser }) {
                   style={{
                     fontSize: 13,
                     letterSpacing: "0.06em",
-                    color: activeTab === "library" ? "#00d4aa" : "#5c6d82",
+                    color: libraryNavActive ? "#00d4aa" : "#5c6d82",
                     fontWeight: 500,
                   }}
                 >
@@ -1443,96 +1944,44 @@ function PepGuideIQApp({ user, setUser }) {
                 </span>
               </span>
             </button>
-            <div
-              role="group"
-              aria-label="Protocol session"
-              style={{
-                flex: "1.45 1 0",
-                minWidth: 0,
-                display: "flex",
-                alignItems: "stretch",
-                gap: 3,
-              }}
-            >
-              {[
-                { session: "morning", emoji: "🌅", label: "MORNING" },
-                { session: "afternoon", emoji: "☀️", label: "AFTERNOON" },
-                { session: "evening", emoji: "🌇", label: "EVENING" },
-                { session: "night", emoji: "🌙", label: "NIGHT" },
-              ].map(({ session, emoji, label }) => {
-                const isActive = activeTab === "protocol" && protocolDeepLink === session;
-                const ariaLabel =
-                  session === "morning"
-                    ? "Morning"
-                    : session === "afternoon"
-                      ? "Afternoon"
-                      : session === "evening"
-                        ? "Evening"
-                        : "Night";
-                return (
-                  <button
-                    key={session}
-                    type="button"
-                    aria-label={ariaLabel}
-                    onClick={() => {
-                      setActiveTab("protocol");
-                      setProtocolDeepLink(session);
-                    }}
-                    style={{
-                      flex: "1 1 0",
-                      minWidth: 0,
-                      minHeight: 44,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 2,
-                      padding: "6px 0",
-                      borderRadius: 12,
-                      cursor: "pointer",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      border: isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-                      background: isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                      boxShadow: isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
-                    }}
-                  >
-                    <span style={{ fontSize: 18, lineHeight: 1, opacity: isActive ? 1 : 0.72 }} aria-hidden>
-                      {emoji}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        lineHeight: 1.15,
-                        letterSpacing: "0.06em",
-                        color: isActive ? "#00d4aa" : "#5c6d82",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
             {[
               {
                 tabId: "vials",
                 emoji: "🧪",
                 label: "VIALS",
-                isActive: activeTab === "stack",
-                onClick: () => setActiveTab("stack"),
+                demoTarget: DEMO_TARGET.nav_vials,
+                isActive: activeTab === "vials",
+                onClick: () => setActiveTab("vials"),
+              },
+              {
+                tabId: "build",
+                emoji: "🏗️",
+                label: "BUILD",
+                demoTarget: DEMO_TARGET.nav_build,
+                isActive: activeTab === "build",
+                onClick: () => setActiveTab("build"),
               },
               {
                 tabId: "stacks",
                 emoji: "📋",
                 label: "STACKS",
+                demoTarget: DEMO_TARGET.nav_stacks,
                 isActive: activeTab === "stack",
                 onClick: () => setActiveTab("stack"),
+              },
+              {
+                tabId: "network",
+                emoji: NETWORK_TAB_EMOJI,
+                label: "NETWORK",
+                demoTarget: DEMO_TARGET.nav_network,
+                isActive: activeTab === "network",
+                onClick: () => setActiveTab("network"),
               },
               {
                 tabId: "profile",
                 emoji: "👤",
                 label: "PROFILE",
+                demoTarget: DEMO_TARGET.nav_profile,
                 isActive: activeTab === "profile",
                 onClick: () => setActiveTab("profile"),
               },
@@ -1540,6 +1989,8 @@ function PepGuideIQApp({ user, setUser }) {
               <button
                 key={item.tabId}
                 type="button"
+                data-demo-target={item.demoTarget}
+                {...demoHighlightProps(isHighlighted(item.demoTarget))}
                 onClick={item.onClick}
                 style={{
                   flex: "1 1 0",
@@ -1559,7 +2010,11 @@ function PepGuideIQApp({ user, setUser }) {
                   boxShadow: item.isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
                 }}
               >
-                <span style={{ fontSize: 18, lineHeight: 1, opacity: item.isActive ? 1 : 0.72 }} aria-hidden>
+                <span
+                  className="pepv-emoji"
+                  style={{ fontSize: 18, lineHeight: 1, opacity: item.isActive ? 1 : 0.72 }}
+                  aria-hidden
+                >
                   {item.emoji}
                 </span>
                 <span
@@ -1580,7 +2035,44 @@ function PepGuideIQApp({ user, setUser }) {
 
         <ProfileSwitcher onOpenUpgrade={openUpgradeModal} />
 
-        <div style={{ paddingBottom: 72 }}>
+        {showHandlePrompt && (
+          <Modal onClose={dismissHandlePrompt} maxWidth={440} label="Set your public handle">
+            <div style={{ color: "#dde4ef", fontSize: 15, lineHeight: 1.5, marginBottom: 16 }}>
+              Choose a unique public handle (shown as <span className="mono">@username</span>). It helps identify your profile
+              across the app.
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <button
+                type="button"
+                className="btn-teal"
+                style={{ fontSize: 14, flex: "1 1 140px" }}
+                onClick={() => {
+                  setShowHandlePrompt(false);
+                  setActiveTab("profile");
+                }}
+              >
+                Open Profile
+              </button>
+              <button
+                type="button"
+                className="form-input"
+                style={{
+                  fontSize: 14,
+                  cursor: "pointer",
+                  flex: "1 1 140px",
+                  border: "1px solid #243040",
+                  background: "rgba(255,255,255,0.04)",
+                  color: "#8fa5bf",
+                }}
+                onClick={dismissHandlePrompt}
+              >
+                Later
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        <div style={{ paddingBottom: stripVisible ? 168 : 72 }}>
           <LegalDisclaimer />
         </div>
 
@@ -1589,9 +2081,21 @@ function PepGuideIQApp({ user, setUser }) {
   );
 }
 
+function getNormalizedPathname() {
+  if (typeof window === "undefined") return "/";
+  return (window.location.pathname || "/").replace(/\/$/, "") || "/";
+}
+
 export default function PepGuideIQ() {
+  const [legalRoute, setLegalRoute] = useState(() => getNormalizedPathname() === "/legal");
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const onPop = () => setLegalRoute(getNormalizedPathname() === "/legal");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -1615,6 +2119,15 @@ export default function PepGuideIQ() {
       subscription.unsubscribe();
     };
   }, []);
+
+  if (legalRoute) {
+    return (
+      <>
+        <GlobalStyles />
+        <LegalPage />
+      </>
+    );
+  }
 
   if (!authReady) {
     return (

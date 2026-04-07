@@ -79,13 +79,23 @@ export const BATCH1 = [
     mechanism:
       "BPC-157 + TB-500 combination targeting complementary healing pathways. BPC-157 drives angiogenesis and NO signaling; TB-500 handles actin-binding, cell migration, and systemic anti-inflammation. Together they cover soft tissue, tendon, ligament, and systemic recovery.",
     halfLife: "BPC-157 ~4-6hrs, TB-500 days",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 10, typicalVolumeMl: 2 },
+    reconstitution:
+      "Bacteriostatic Water. Standard 10mg vial → 1mL BAC. Each 0.1mL (10 units) = 1mg total (BPC-157 500mcg · TB-500 500mcg). Large 20mg vial → 2mL BAC, same concentration. Dose 250–500mcg each, 1–2x daily.",
     dosingRange: { low: "250/2.5mg", medium: "500/5mg", high: "1000/10mg", frequency: "Daily BPC / Twice weekly TB" },
     tags: ["healing", "recovery", "blend", "BPC-157", "TB-500", "tendon", "anti-inflammatory", "synergy"],
     sourcingNotes:
       "Available pre-blended from multiple vendors. Penguin carries BPC+TB combo. Named 'Wolverine' in the community for rapid recovery association.",
     warnings: ["Same angiogenesis caveat as BPC-157 — avoid with active malignancy", "TB-500 long half-life — don't over-frequency dose"],
     tier: "entry",
+    components: [
+      { name: "BPC-157", mg: 5 },
+      { name: "TB-500", mg: 5 },
+    ],
+    reconstitutionVolumeMl: 1,
+    vialSizeOptions: [
+      { label: "5mg + 5mg (10mg total)", totalMg: 10, bacWaterMl: 1 },
+      { label: "10mg + 10mg (20mg total)", totalMg: 20, bacWaterMl: 2 },
+    ],
   },
   {
     id: "glow",
@@ -93,61 +103,106 @@ export const BATCH1 = [
     aliases: ["GLOW Blend", "GHK-Cu/TB-500/BPC-157"],
     category: ["Healing / Recovery", "Skin / Hair / Nails", "Longevity"],
     mechanism:
-      "3-in-1 regenerative blend: GHK-Cu (50mg) drives collagen synthesis, antioxidant enzyme upregulation, and skin regeneration; TB-500 (10mg) handles cell migration and angiogenesis; BPC-157 (10mg) targets tissue repair, gut healing, and anti-inflammatory action. 70mg total per vial.",
+      "3-in-1 regenerative blend: GHK-Cu 50mg · BPC-157 10mg · TB-500 10mg (70mg total per vial). GHK-Cu drives collagen synthesis, antioxidant enzyme upregulation, and skin regeneration; TB-500 handles cell migration and angiogenesis; BPC-157 targets tissue repair, gut healing, and anti-inflammatory action.",
     halfLife: "GHK-Cu ~30min, TB-500 days, BPC-157 ~4-6hrs",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 70, typicalVolumeMl: 2 },
+    reconstitution:
+      "Bacteriostatic Water. 70mg vial → 3mL BAC water. Each 0.1mL (10 units) = ~2.33mg total (GHK-Cu ~1.67mg · BPC-157 ~0.33mg · TB-500 ~0.33mg). GHK-Cu injection site sting is normal.",
     dosingRange: { low: "partial vial", medium: "full vial", high: "full vial", frequency: "Weekly or biweekly" },
     tags: ["healing", "skin", "anti-aging", "collagen", "GHK-Cu", "TB-500", "BPC-157", "regenerative", "blend"],
     sourcingNotes:
       "Penguin Peptides $124/vial. >98% purity. Sister blend to KLOW — GLOW is skin/regen focused (high GHK-Cu), KLOW is gut/inflammation focused (KPV + even split).",
     warnings: ["Same angiogenesis caveat as BPC-157", "High GHK-Cu dose — both topical and subQ viable"],
     tier: "pro",
+    components: [
+      { name: "GHK-Cu", mg: 50 },
+      { name: "BPC-157", mg: 10 },
+      { name: "TB-500", mg: 10 },
+    ],
+    reconstitutionVolumeMl: 3,
   },
   {
     id: "klow",
     name: "KLOW",
-    aliases: ["KLOW Blend", "GHK-Cu/TB-500/BPC-157/KPV", "KLOW 80mg"],
+    aliases: [
+      "KLOW Blend",
+      "GHK-Cu/TB-500/BPC-157/KPV",
+      "KLOW 80mg",
+      "klow",
+      "klow blend",
+      "ghk tb bpc kpv",
+      "ghk-cu tb-500 bpc-157 kpv",
+    ],
     category: ["Healing / Recovery", "Skin / Hair / Nails"],
     mechanism:
-      "4-in-1 regenerative blend: GHK-Cu drives collagen synthesis and antioxidant enzyme activity; TB-500 supports cell migration and angiogenesis; BPC-157 targets tissue repair, gut healing, and anti-inflammatory signaling; KPV adds NF-κB inhibition and gut mucosal repair. 80mg total per vial (component ratios per supplier blend).",
-    halfLife: "Variable per component",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 80, typicalVolumeMl: 2 },
+      "4-in-1 regenerative blend: GHK-Cu 50mg · BPC-157 10mg · TB-500 10mg · KPV 10mg (80mg total per vial). GHK-Cu drives collagen synthesis and antioxidant enzyme upregulation; BPC-157 targets tissue repair, gut healing, and anti-inflammatory signaling; TB-500 supports cell migration and angiogenesis; KPV adds NF-kB inhibition and gut mucosal repair.",
+    halfLife: "GHK-Cu ~30 min · TB-500 days · BPC-157 ~4 hrs · KPV hours",
+    reconstitution:
+      "Bacteriostatic Water. Typical 80mg vial → 3mL BAC water. Each 0.1mL (100 units on syringe) = ~2.67mg total blend (GHK-Cu ~1.67mg · BPC-157 ~0.33mg · TB-500 ~0.33mg · KPV ~0.33mg per 0.1mL).",
+    typicalDose: "0.1–0.3mL per injection (10–30 units). Start low — GHK-Cu injection site sting is normal and expected.",
+    startDose: "0.1mL (10 units). Assess tolerance before increasing — GHK-Cu sting at injection site is common.",
+    titrationNote: "Increase by 0.05mL every 3–5 days based on tolerance and target goals.",
+    cycle: "Per target peptide within blend. Typically 4–8 weeks on, followed by a break.",
     dosingRange: { low: "partial vial", medium: "full vial", high: "full vial", frequency: "Per target peptide within blend" },
     tags: ["healing", "skin", "gut", "anti-inflammatory", "GHK-Cu", "TB-500", "BPC-157", "KPV", "regenerative", "blend"],
     sourcingNotes:
       "Penguin Peptides and other vendors as pre-blended vial. Sister blend to GLOW — KLOW adds KPV for gut/inflammation alongside the same core regenerative stack.",
     warnings: ["Same angiogenesis caveat as BPC-157 — avoid with active malignancy", "Dose by individual peptide targets within blend"],
     tier: "pro",
+    components: [
+      { name: "GHK-Cu", mg: 50 },
+      { name: "BPC-157", mg: 10 },
+      { name: "TB-500", mg: 10 },
+      { name: "KPV", mg: 10 },
+    ],
+    reconstitutionVolumeMl: 3,
   },
   {
     id: "glp-1-cs",
     name: "CagriSema",
-    aliases: ["GLP-1 C+S", "Semaglutide + Cagrilintide", "CagriSema Blend"],
+    aliases: ["GLP-1 C+S", "Semaglutide + Cagrilintide", "CagriSema Blend", "cagrsema"],
     category: ["GLP / Metabolic"],
     mechanism:
       "Dual-mechanism obesity research blend: Semaglutide (GLP-1 agonist) reduces appetite and slows gastric emptying; Cagrilintide (long-acting amylin analogue) adds complementary satiety signaling via amylin/CGRP receptors. Novo Nordisk's Phase 3 clinical combination (REDEFINE trials). Synergistic weight reduction exceeding either monotherapy.",
     halfLife: "Semaglutide ~7 days; Cagrilintide ~7 days",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 5, typicalVolumeMl: 1 },
+    reconstitution:
+      "Bacteriostatic Water. Standard 5mg vial → 2mL BAC. Each 0.1mL (10 units) = 0.25mg total (Semaglutide 125mcg · Cagrilintide 125mcg). Large 10mg vial → 2mL BAC, double concentration. Dose once weekly. Dual GI pathway — start very low and titrate slowly.",
     dosingRange: { low: "0.25/0.25mg", medium: "1/1mg", high: "2.4/2.4mg", frequency: "Weekly" },
     tags: ["weight loss", "metabolic", "GLP-1", "amylin", "dual agonist", "satiety", "blend", "Novo Nordisk"],
     sourcingNotes: "Penguin Peptides carries as 'GLP-1 C + GLP-1 S'. Clinical trial combination — significant research demand.",
     warnings: ["Titrate each component separately before combining", "GI side effects additive", "Not for use with other GLP-1 agents"],
     tier: "elite",
+    components: [
+      { name: "Semaglutide", mg: 2.5 },
+      { name: "Cagrilintide", mg: 2.5 },
+    ],
+    reconstitutionVolumeMl: 2,
+    vialSizeOptions: [
+      { label: "2.5mg + 2.5mg (5mg total)", totalMg: 5, bacWaterMl: 2 },
+      { label: "5mg + 5mg (10mg total)", totalMg: 10, bacWaterMl: 2 },
+    ],
   },
   {
     id: "cjc-ipa-combo",
     name: "CJC-1295 No DAC + Ipamorelin",
-    aliases: ["CJC/Ipa", "Mod GRF + Ipamorelin", "GH Stack Blend"],
+    aliases: ["CJC/Ipa", "Mod GRF + Ipamorelin", "GH Stack Blend", "cjc-ipa", "cjc-1295-ipamorelin"],
     category: ["GH Peptides"],
     mechanism:
       "Gold standard GH pulse stack: CJC-1295 No DAC (GHRH analogue) triggers the somatotroph to release GH; Ipamorelin (selective GHRP) amplifies pulse magnitude without significant cortisol/prolactin bleed. Mimics natural GH pulsatility. Most popular GH peptide combination in research.",
     halfLife: "CJC No DAC ~30min, Ipamorelin ~2hrs",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 10, typicalVolumeMl: 2 },
+    reconstitution:
+      "Bacteriostatic Water. 10mg vial → 2mL BAC water. Each 0.1mL (10 units) = 0.5mg total (CJC-1295 No DAC 250mcg · Ipamorelin 250mcg). Inject fasted. 1–3x daily before bed or upon waking.",
+    typicalDose: "100–300mcg of each per injection. Most common: 200mcg each once daily before bed.",
+    startDose: "100mcg each (0.02mL at 2mL recon). Titrate up by 50mcg every 1–2 weeks.",
     dosingRange: { low: "100/100mcg", medium: "200/200mcg", high: "300/300mcg", frequency: "2-3x daily, fasted, pre-sleep" },
     tags: ["GH", "growth hormone", "GHRH", "GHRP", "muscle", "recovery", "anti-aging", "blend", "pulse"],
     sourcingNotes: "Penguin carries as 'CJC no DAC + IPA' pre-blended at $72. Most popular GH peptide stack in the community.",
     warnings: ["Dose pre-sleep for maximal GH release alignment", "Avoid within 2hrs of eating or insulin release", "May cause water retention"],
     tier: "pro",
+    components: [
+      { name: "CJC-1295 No DAC", mg: 5 },
+      { name: "Ipamorelin", mg: 5 },
+    ],
+    reconstitutionVolumeMl: 2,
   },
   {
     id: "cagrilintide",

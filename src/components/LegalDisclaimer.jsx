@@ -20,6 +20,28 @@ export function LegalDisclaimer() {
       PepGuideIQ provides educational information and software tools only. AI outputs may be inaccurate or incomplete.
       Peptides discussed may be regulated or require a prescription where you live. Consult a qualified clinician before
       use; you are responsible for compliance with applicable laws.
+      <div
+        style={{
+          marginTop: 10,
+          textAlign: "center",
+          fontSize: 12,
+          color: "#5c6b7e",
+          lineHeight: 1.6,
+          fontFamily: "'Outfit', sans-serif",
+        }}
+      >
+        <a href="/legal#privacy" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+          Privacy Policy
+        </a>
+        <span aria-hidden> · </span>
+        <a href="/legal#terms" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+          Terms of Service
+        </a>
+        <span aria-hidden> · </span>
+        <a href="/legal#waiver" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+          Research Waiver
+        </a>
+      </div>
     </div>
   );
 }

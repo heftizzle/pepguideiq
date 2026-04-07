@@ -1,17 +1,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { mcgToUnits, roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import {
   deleteUserVial,
-  getProfileStackShotR2Keys,
   getSessionAccessToken,
-  insertDoseLog,
   insertUserVial,
-  listDoseLogsForPeptideRange,
+  listDoseLogsForPeptideIdsRange,
   listRecentDosesForVial,
-  listVialsForPeptide,
+  listVialsForPeptideIds,
   updateUserVial,
 } from "../lib/supabase.js";
+import { persistVialPeptideId, vialQueryPeptideIds } from "../lib/resolveStackCatalogPeptide.js";
+import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { blendConcentrationsMgPerMl, calculateBlendDose, scaleBlendComponentsToVial } from "../lib/peptideMath.js";
+
+const BLEND_DRAW_MIN = 0.05;
+const BLEND_DRAW_MAX = 0.5;
+
+function clampBlendDrawMl(v) {
+  const x = Number(v);
+  if (!Number.isFinite(x)) return 0.1;
+  return Math.min(BLEND_DRAW_MAX, Math.max(BLEND_DRAW_MIN, x));
+}
+
+function formatBlendMgDraw(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 0 });
+}
+
+function formatBlendMcgDraw(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 });
+}
+
+/** @param {{ name: string, mgPerMl: number }[] | null | undefined} parts */
+function formatBlendConcMgPerMl(parts) {
+  if (!parts || parts.length === 0) return "—";
+  return parts.map((p) => `${p.name} ${p.mgPerMl.toFixed(2)}mg/mL`).join(" · ");
+}
+
+/** Multi-component catalog row (vial tile shows per-component conc., not DB aggregate). */
+function isBlendCatalogComponents(components) {
+  return Array.isArray(components) && components.length >= 2;
+}
 
 const VIAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const VIAL_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -59,153 +91,6 @@ function useWorkerObjectUrl(r2Key, workerConfigured) {
   }, [r2Key, workerConfigured]);
 
   return objectUrl;
-}
-
-/**
- * @param {{ kind: "stack_shot_1" | "stack_shot_2", r2Key: string | null, workerConfigured: boolean, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void }} props
- */
-function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade, onUploaded }) {
-  const inputRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-  const [err, setErr] = useState(null);
-  const imgUrl = useWorkerObjectUrl(r2Key, workerConfigured);
-  const showImage = Boolean(r2Key && imgUrl);
-
-  function openPicker() {
-    if (uploading) return;
-    if (!canMutate) {
-      onUpgrade();
-      return;
-    }
-    if (!workerConfigured) {
-      setErr("// Configure VITE_API_WORKER_URL");
-      return;
-    }
-    setErr(null);
-    inputRef.current?.click();
-  }
-
-  async function onInputChange(e) {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    setErr(null);
-    if (!VIAL_PHOTO_TYPES.has(f.type)) {
-      setErr("// JPEG, PNG, or WebP only");
-      return;
-    }
-    if (f.size > VIAL_PHOTO_MAX_BYTES) {
-      setErr("// Max 5MB");
-      return;
-    }
-    const token = await getSessionAccessToken();
-    if (!token) {
-      setErr("// Sign in required");
-      return;
-    }
-    const fd = new FormData();
-    fd.append("file", f);
-    fd.append("kind", kind);
-    setUploading(true);
-    try {
-      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
-        setErr(`// ${msg}`);
-        return;
-      }
-      await onUploaded();
-    } catch {
-      setErr("// Network error");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return (
-    <div
-      style={{
-        flex: "1 1 0",
-        minWidth: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept={VIAL_PHOTO_ACCEPT}
-        style={{ display: "none" }}
-        onChange={(e) => void onInputChange(e)}
-      />
-      <button
-        type="button"
-        onClick={openPicker}
-        disabled={uploading}
-        style={{
-          width: "100%",
-          aspectRatio: "3 / 4",
-          maxHeight: 220,
-          borderRadius: 12,
-          border: showImage ? "1px solid #1e2a38" : "2px dashed #243040",
-          background: "#07090e",
-          cursor: uploading ? "wait" : "pointer",
-          padding: 0,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {showImage ? (
-          <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        ) : r2Key ? (
-          <span className="mono" style={{ fontSize: 12, color: "#4a6080" }}>
-            Loading…
-          </span>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
-            <span style={{ fontSize: 32, lineHeight: 1, opacity: 0.8 }} aria-hidden>
-              📷
-            </span>
-            <span className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.08em" }}>
-              STACK SHOT
-            </span>
-          </div>
-        )}
-      </button>
-      <div
-        className="mono"
-        style={{
-          fontSize: 11,
-          color: "#7a8694",
-          textAlign: "center",
-          letterSpacing: "0.06em",
-          lineHeight: 1.35,
-          maxWidth: "100%",
-        }}
-      >
-        STACK SHOT
-      </div>
-      {err && (
-        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", textAlign: "center" }}>
-          {err}
-        </div>
-      )}
-      {uploading && (
-        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0" }}>
-          Uploading…
-        </div>
-      )}
-    </div>
-  );
 }
 
 /**
@@ -390,6 +275,17 @@ function daysRemaining(expiresAtIsoStr) {
 
 function formatShortDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Injectable (mcg) vs oral/nasal/topical count logs. */
+function formatDoseLogLine(d) {
+  if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
+    return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
+  }
+  if (d.dose_mcg != null && Number.isFinite(Number(d.dose_mcg))) {
+    return `${Number(d.dose_mcg).toLocaleString()} mcg`;
+  }
+  return "—";
 }
 
 function formatMediumDate(iso) {
@@ -580,52 +476,9 @@ function clampViewMonth(ym, now = new Date()) {
   return ym;
 }
 
-function vialActiveOnYmd(vial, ymd) {
-  const [Y, Mo, D] = ymd.split("-").map((x) => parseInt(x, 10));
-  if (!Y || !Mo || !D) return false;
-  const dayStart = new Date(Y, Mo - 1, D, 0, 0, 0, 0);
-  const dayEnd = new Date(Y, Mo - 1, D, 23, 59, 59, 999);
-  const reconDay = stripTimeLocal(new Date(vial.reconstituted_at)).getTime();
-  if (reconDay > dayEnd.getTime()) return false;
-  if (vial.status === "depleted") return true;
-  const expDay = stripTimeLocal(new Date(vial.expires_at)).getTime();
-  if (expDay < dayStart.getTime()) return false;
-  return true;
-}
-
-function combineYmdAndTimeToIso(ymd, timeHHMM) {
-  const [Y, Mo, D] = ymd.split("-").map((x) => parseInt(x, 10));
-  const parts = String(timeHHMM || "08:00").split(":");
-  const hh = parseInt(parts[0], 10) || 0;
-  const mm = parseInt(parts[1], 10) || 0;
-  return new Date(Y, Mo - 1, D, hh, mm, 0, 0).toISOString();
-}
-
-function formatLogHeaderDate(ymd) {
-  const [Y, Mo, D] = ymd.split("-").map((x) => parseInt(x, 10));
-  if (!Y || !Mo || !D) return ymd;
-  return new Date(Y, Mo - 1, D).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).toUpperCase();
-}
-
 const DOW_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function DoseHistoryCalendar({
-  doses,
-  viewMonth,
-  canGoPrev,
-  canGoNext,
-  onPrevMonth,
-  onNextMonth,
-  selectedYmd,
-  onSelectDay,
-}) {
-  const [hoverYmd, setHoverYmd] = useState(null);
-
+function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMonth, onNextMonth }) {
   const byDay = useMemo(() => {
     const m = new Map();
     for (const log of doses) {
@@ -765,7 +618,6 @@ function DoseHistoryCalendar({
           const dayLogs = byDay.get(ymd) ?? [];
           const has = dayLogs.length > 0;
           const isToday = ymd === todayStr;
-          const sel = selectedYmd === ymd;
 
           let inContent;
           let isFutureNoClick;
@@ -823,19 +675,14 @@ function DoseHistoryCalendar({
 
           const isPast = t < today.getTime() && !isToday;
           const baseBg = isToday ? "rgba(0, 212, 170, 0.14)" : "#07090e";
-          const hoverBg = isToday ? "rgba(0, 212, 170, 0.2)" : "#0e1822";
           const numColor = isPast ? "#5a6d82" : "#8fa5bf";
-          const borderColor = sel || isToday ? "#00d4aa" : "#14202e";
-          const borderWidth = isToday || sel ? 2 : 1;
+          const borderColor = isToday ? "#00d4aa" : "#14202e";
+          const borderWidth = isToday ? 2 : 1;
 
           return (
-            <button
+            <div
               key={ymd}
-              type="button"
-              title={has ? `${dayLogs.length} dose(s) — ${ymd}` : `Log dose — ${ymd}`}
-              onClick={() => onSelectDay(ymd)}
-              onMouseEnter={() => setHoverYmd(ymd)}
-              onMouseLeave={() => setHoverYmd(null)}
+              title={has ? `${dayLogs.length} dose(s) — ${ymd}` : ymd}
               style={{
                 minWidth: 36,
                 minHeight: 36,
@@ -850,9 +697,8 @@ function DoseHistoryCalendar({
                 fontSize: 12,
                 lineHeight: 1,
                 color: numColor,
-                background: hoverYmd === ymd ? hoverBg : baseBg,
+                background: baseBg,
                 border: `${borderWidth}px solid ${borderColor}`,
-                cursor: "pointer",
                 boxSizing: "border-box",
               }}
             >
@@ -869,7 +715,7 @@ function DoseHistoryCalendar({
                   }}
                 />
               )}
-            </button>
+            </div>
           );
         })}
       </div>
@@ -881,33 +727,22 @@ function VialRow({
   vial,
   userId,
   profileId,
-  peptideId,
   canMutate,
   doses,
   onReload,
-  logOpen,
-  onToggleLog,
   stabilityNote,
   workerConfigured,
   onUpgrade,
+  catalogBlendComponents,
 }) {
   const [label, setLabel] = useState(vial.label ?? "Vial 1");
-  const [doseUnits, setDoseUnits] = useState(10);
-  const [doseNotes, setDoseNotes] = useState("");
   const [savingLabel, setSavingLabel] = useState(false);
   const [expiryDetailOpen, setExpiryDetailOpen] = useState(false);
   const expiryDetailRef = useRef(null);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
-    const recentForVial = doses ?? [];
-    const lastMcg = recentForVial.length > 0 ? recentForVial[0].dose_mcg : null;
-    const units =
-      mcgToUnits(lastMcg, vial.concentration_mcg_ml) ??
-      mcgToUnits(vial.desired_dose_mcg, vial.concentration_mcg_ml) ??
-      10;
-    setDoseUnits(Math.max(0.5, Math.min(300, units)));
-  }, [vial.id, vial.label, vial.concentration_mcg_ml, vial.desired_dose_mcg, doses]);
+  }, [vial.id, vial.label]);
 
   useEffect(() => {
     if (!expiryDetailOpen) return;
@@ -919,11 +754,6 @@ function VialRow({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [expiryDetailOpen]);
 
-  const rowDerivedMcg = useMemo(
-    () => unitsToMcg(doseUnits, vial.concentration_mcg_ml),
-    [doseUnits, vial.concentration_mcg_ml]
-  );
-
   const dr = daysRemaining(vial.expires_at);
   const expired = dr < 0 || new Date(vial.expires_at) < new Date();
   const depleted = vial.status === "depleted";
@@ -931,6 +761,23 @@ function VialRow({
   const remainingFrac = Math.min(1, Math.max(0, dr / totalLifeDays));
   const urgency = urgencyFromLifeRemaining(remainingFrac);
   const barFillPct = Math.min(100, Math.max(0, (1 - remainingFrac) * 100));
+
+  const vialMgNum = Number(vial.vial_size_mg);
+  const bacMlNum = Number(vial.bac_water_ml);
+  const recipeSum =
+    Array.isArray(catalogBlendComponents) && catalogBlendComponents.length > 0
+      ? catalogBlendComponents.reduce((s, c) => s + (Number.isFinite(Number(c?.mg)) ? Number(c.mg) : 0), 0)
+      : 0;
+  const scaledForConc =
+    recipeSum > 0 && Number.isFinite(vialMgNum) && vialMgNum > 0
+      ? scaleBlendComponentsToVial(catalogBlendComponents, recipeSum, vialMgNum)
+      : [];
+  const blendConcParts =
+    scaledForConc.length > 0 && Number.isFinite(bacMlNum) && bacMlNum > 0
+      ? blendConcentrationsMgPerMl(scaledForConc, bacMlNum)
+      : [];
+
+  const blendTileCatalog = isBlendCatalogComponents(catalogBlendComponents);
 
   async function saveLabel() {
     if (!canMutate || label.trim() === (vial.label ?? "").trim()) return;
@@ -944,24 +791,6 @@ function VialRow({
     if (!canMutate) return;
     await updateUserVial(vial.id, userId, profileId, { status: "depleted" });
     onReload();
-  }
-
-  async function submitDose(e) {
-    e.preventDefault();
-    if (!canMutate) return;
-    if (!rowDerivedMcg || rowDerivedMcg <= 0) return;
-    const { error } = await insertDoseLog({
-      user_id: userId,
-      profile_id: profileId,
-      vial_id: vial.id,
-      peptide_id: peptideId,
-      dose_mcg: rowDerivedMcg,
-      notes: doseNotes.trim() || null,
-    });
-    if (!error) {
-      setDoseNotes("");
-      onReload();
-    }
   }
 
   function removeVial() {
@@ -1018,8 +847,31 @@ function VialRow({
               <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
                 Reconstituted {formatShortDate(vial.reconstituted_at)}
               </div>
-              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 4 }}>
-                Conc. {formatConc(vial.concentration_mcg_ml)}
+              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 4, lineHeight: 1.45, wordBreak: "break-word" }}>
+                {blendTileCatalog ? (
+                  blendConcParts.length > 0 ? (
+                    blendConcParts.map((p, idx) => {
+                      const label = typeof p.name === "string" ? p.name.trim() : "";
+                      const mcgPerMl = Number(p.mgPerMl) * 1000;
+                      return (
+                        <div key={`${label || "c"}-${idx}`}>
+                          {label || "—"}: {formatConc(mcgPerMl)}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    catalogBlendComponents.map((c, idx) => {
+                      const label = typeof c?.name === "string" ? c.name.trim() : "";
+                      return (
+                        <div key={`${label || "c"}-${idx}`}>
+                          {label || "—"}: —
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  <>Conc. {formatConc(vial.concentration_mcg_ml)}</>
+                )}
               </div>
             </div>
             <div style={{ textAlign: "right", minWidth: 120 }}>
@@ -1123,45 +975,10 @@ function VialRow({
               <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} disabled={depleted} onClick={() => void markDepleted()}>
                 Mark as Depleted
               </button>
-              <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => onToggleLog(vial.id)}>
-                Log Dose
-              </button>
               <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
                 Delete vial
               </button>
             </div>
-          )}
-
-          {logOpen && canMutate && (
-        <form onSubmit={submitDose} style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #0e1822" }}>
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6 }}>LOG DOSE</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <button type="button" className="btn-teal"
-              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
-              onClick={() => setDoseUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}>
-              −
-            </button>
-            <div className="mono" style={{ fontSize: 16, color: "#dde4ef", minWidth: 50, textAlign: "center" }}>
-              {doseUnits}
-            </div>
-            <button type="button" className="btn-teal"
-              style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
-              onClick={() => setDoseUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}>
-              +
-            </button>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa" }}>
-              {rowDerivedMcg != null
-                ? `= ${rowDerivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
-                : "— mcg"}
-            </div>
-            <input className="form-input" style={{ flex: "1 1 120px", fontSize: 13 }}
-              placeholder="Optional notes"
-              value={doseNotes} onChange={(e) => setDoseNotes(e.target.value)} />
-            <button type="submit" className="btn-teal" style={{ fontSize: 13, padding: "4px 12px", borderRadius: 12 }}>
-              Save dose
-            </button>
-          </div>
-        </form>
           )}
 
           {doses.length > 0 && (
@@ -1171,7 +988,7 @@ function VialRow({
               </div>
               {doses.map((d) => (
                 <div key={d.id} className="mono" style={{ fontSize: 13, color: "#4a6080", padding: "2px 0" }}>
-                  {formatShortDate(d.dosed_at)} — {Number(d.dose_mcg).toLocaleString()} mcg
+                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d)}
                   {d.notes ? ` · ${d.notes}` : ""}
                 </div>
               ))}
@@ -1188,12 +1005,13 @@ function VialRow({
  *   userId: string,
  *   profileId: string,
  *   peptideId: string,
- *   catalogEntry: { name?: string, stabilityDays: number, stabilityNote?: string | null },
+ *   catalogEntry: { id?: string, name?: string, stabilityDays: number, stabilityNote?: string | null, components?: { name: string, mg: number }[], reconstitutionVolumeMl?: number, vialSizeOptions?: { label: string, totalMg: number, bacWaterMl: number }[] },
  *   canUse: boolean,
  *   onUpgrade: () => void,
+ *   demoAnchorFirst?: boolean,
  * }} props
  */
-export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade }) {
+export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade, demoAnchorFirst = false }) {
   const stabilityDays = catalogEntry?.stabilityDays;
   const stabilityNote = typeof catalogEntry?.stabilityNote === "string" ? catalogEntry.stabilityNote.trim() : "";
   const compoundName = (catalogEntry?.name && String(catalogEntry.name).trim()) || "this peptide";
@@ -1202,14 +1020,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const [calendarDoses, setCalendarDoses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [logVialId, setLogVialId] = useState(null);
   const [viewMonth, setViewMonth] = useState(() => currentViewMonth());
-  const [calLogYmd, setCalLogYmd] = useState(null);
-  const [calLogUnits, setCalLogUnits] = useState(10);
-  const [calLogTime, setCalLogTime] = useState("08:00");
-  const [calLogNotes, setCalLogNotes] = useState("");
-  const [calLogVialPick, setCalLogVialPick] = useState("");
-  const [calLogSaving, setCalLogSaving] = useState(false);
 
   const [formLabel, setFormLabel] = useState("");
   const [formRecon, setFormRecon] = useState(todayYmd);
@@ -1220,29 +1031,98 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const [mgQuick, setMgQuick] = useState(null);
   const [mlQuick, setMlQuick] = useState(null);
   const [desiredQuick, setDesiredQuick] = useState(null);
-  const [stackShot1Key, setStackShot1Key] = useState(null);
-  const [stackShot2Key, setStackShot2Key] = useState(null);
+  const [blendDrawMl, setBlendDrawMl] = useState(0.1);
+  const [vialSizeOptionIndex, setVialSizeOptionIndex] = useState(0);
+
+  const vialSizeOptionsList = useMemo(() => {
+    const o = catalogEntry?.vialSizeOptions;
+    return Array.isArray(o) && o.length > 0 ? o : null;
+  }, [catalogEntry?.vialSizeOptions]);
+
+  const blendComponents = useMemo(() => {
+    const c = catalogEntry?.components;
+    if (!Array.isArray(c) || c.length === 0) return null;
+    const rows = c
+      .map((x) => ({
+        name: typeof x?.name === "string" ? x.name.trim() : "",
+        mg: Number(x?.mg),
+      }))
+      .filter((x) => x.name && Number.isFinite(x.mg) && x.mg >= 0);
+    return rows.length ? rows : null;
+  }, [catalogEntry?.components]);
+
+  const blendTotalMg = useMemo(
+    () => (blendComponents ? blendComponents.reduce((s, x) => s + x.mg, 0) : 0),
+    [blendComponents]
+  );
+
+  const effectiveBlendComponents = useMemo(() => {
+    if (!blendComponents?.length || blendTotalMg <= 0) return null;
+    const mg = parseFloat(String(formMg).replace(/,/g, ""));
+    if (!Number.isFinite(mg) || mg <= 0) return null;
+    const scale = mg / blendTotalMg;
+    return blendComponents.map((c) => ({ name: c.name, mg: c.mg * scale }));
+  }, [blendComponents, blendTotalMg, formMg]);
+
+  const effectiveBlendTotalMg = useMemo(
+    () => (effectiveBlendComponents ? effectiveBlendComponents.reduce((s, x) => s + x.mg, 0) : 0),
+    [effectiveBlendComponents]
+  );
+
+  const blendCalc = useMemo(() => {
+    if (!effectiveBlendComponents || effectiveBlendTotalMg <= 0) return null;
+    const bac = parseFloat(String(formMl).replace(/,/g, ""));
+    const draw = clampBlendDrawMl(blendDrawMl);
+    if (!Number.isFinite(bac) || bac <= 0) return null;
+    return calculateBlendDose(effectiveBlendComponents, effectiveBlendTotalMg, bac, draw);
+  }, [effectiveBlendComponents, effectiveBlendTotalMg, formMl, blendDrawMl]);
+
+  const liveBlendConcParts = useMemo(() => {
+    if (!effectiveBlendComponents?.length) return [];
+    const ml = parseFloat(String(formMl).replace(/,/g, ""));
+    if (!Number.isFinite(ml) || ml <= 0) return [];
+    return blendConcentrationsMgPerMl(effectiveBlendComponents, ml);
+  }, [effectiveBlendComponents, formMl]);
 
   const canMutate = canUse && isSupabaseConfigured();
   const workerConfigured = isApiWorkerConfigured();
+  const demo = useDemoTourOptional();
+  const highlightTarget = demo?.highlightTarget;
+
+  const catalogIdKey =
+    catalogEntry != null && catalogEntry.id != null && String(catalogEntry.id).trim()
+      ? String(catalogEntry.id).trim()
+      : "";
+  const vialLookupIds = useMemo(
+    () => vialQueryPeptideIds(peptideId, catalogEntry),
+    [peptideId, catalogIdKey]
+  );
+
+  const reloadGen = useRef(0);
+
+  useEffect(() => {
+    if (highlightTarget === DEMO_TARGET.vial_reconstitute && canMutate && demoAnchorFirst) setShowAdd(true);
+  }, [highlightTarget, canMutate, demoAnchorFirst]);
 
   const reload = useCallback(async () => {
-    if (!userId || !profileId || !peptideId || !isSupabaseConfigured() || !canUse) {
+    const gen = ++reloadGen.current;
+    if (!userId || !profileId || !isSupabaseConfigured() || !canUse) {
       setVials([]);
       setDosesByVial({});
       setCalendarDoses([]);
-      setStackShot1Key(null);
-      setStackShot2Key(null);
+      setLoading(false);
+      return;
+    }
+    if (vialLookupIds.length === 0) {
+      setVials([]);
+      setDosesByVial({});
+      setCalendarDoses([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const [{ vials: v }, keysRes] = await Promise.all([
-      listVialsForPeptide(userId, profileId, peptideId),
-      getProfileStackShotR2Keys(userId),
-    ]);
-    setStackShot1Key(keysRes.key1);
-    setStackShot2Key(keysRes.key2);
+    const { vials: v } = await listVialsForPeptideIds(userId, profileId, vialLookupIds);
+    if (gen !== reloadGen.current) return;
     setVials(v);
     const nextMap = {};
     await Promise.all(
@@ -1251,12 +1131,24 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         nextMap[row.id] = doses ?? [];
       })
     );
+    if (gen !== reloadGen.current) return;
     setDosesByVial(nextMap);
+    const fromVials = (v ?? [])
+      .map((row) => row.peptide_id)
+      .filter((x) => typeof x === "string" && String(x).trim());
+    const calendarPeptideIds = [...new Set([...vialLookupIds, ...fromVials])];
     const { startIso, endIso } = getDoseHistoryQueryRange(viewMonth, new Date());
-    const { doses: cal } = await listDoseLogsForPeptideRange(userId, profileId, peptideId, startIso, endIso);
+    const { doses: cal } = await listDoseLogsForPeptideIdsRange(
+      userId,
+      profileId,
+      calendarPeptideIds,
+      startIso,
+      endIso
+    );
+    if (gen !== reloadGen.current) return;
     setCalendarDoses(cal ?? []);
     setLoading(false);
-  }, [userId, profileId, peptideId, canUse, viewMonth]);
+  }, [userId, profileId, vialLookupIds, canUse, viewMonth]);
 
   useEffect(() => {
     void reload();
@@ -1265,12 +1157,31 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   function openAddVial() {
     setFormLabel(nextVialLabel(vials));
     setFormRecon(todayYmd());
-    setFormMg("");
-    setFormMl("");
+    setBlendDrawMl(0.1);
+    if (vialSizeOptionsList && vialSizeOptionsList.length > 0) {
+      setVialSizeOptionIndex(0);
+      const o = vialSizeOptionsList[0];
+      setFormMg(String(o.totalMg));
+      setFormMl(String(o.bacWaterMl));
+      setMgQuick("other");
+      const match = ADD_VIAL_ML_OPTIONS.find((x) => x.val === String(o.bacWaterMl));
+      setMlQuick(match ? match.key : "other");
+    } else if (blendComponents && blendTotalMg > 0) {
+      setFormMg(String(blendTotalMg));
+      setMgQuick("other");
+      const defMl = catalogEntry?.reconstitutionVolumeMl;
+      const mlStr = Number.isFinite(defMl) && defMl > 0 ? String(defMl) : "3";
+      setFormMl(mlStr);
+      const match = ADD_VIAL_ML_OPTIONS.find((o) => o.val === mlStr);
+      setMlQuick(match ? match.key : "other");
+    } else {
+      setFormMg("");
+      setFormMl("");
+      setMgQuick(null);
+      setMlQuick(null);
+    }
     setFormDesiredMcg("");
     setFormNotes("");
-    setMgQuick(null);
-    setMlQuick(null);
     setDesiredQuick(null);
     setShowAdd(true);
   }
@@ -1304,7 +1215,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     const { error } = await insertUserVial({
       user_id: userId,
       profile_id: profileId,
-      peptide_id: peptideId,
+      peptide_id: persistVialPeptideId(peptideId, catalogEntry),
       label: formLabel.trim() || nextVialLabel(vials),
       reconstituted_at: reconstitutedNoonIso(formRecon),
       vial_size_mg: mg,
@@ -1330,56 +1241,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     }
   }
 
-  const calDetail = useMemo(() => {
-    if (!calLogYmd) return [];
-    return calendarDoses.filter((l) => localYmdFromIso(l.dosed_at) === calLogYmd);
-  }, [calLogYmd, calendarDoses]);
-
-  const qualifyingVialsForCal = useMemo(() => {
-    if (!calLogYmd) return [];
-    return (vials ?? []).filter((v) => vialActiveOnYmd(v, calLogYmd));
-  }, [calLogYmd, vials]);
-
-  const calSelectedVial = useMemo(
-    () => qualifyingVialsForCal.find((v) => v.id === calLogVialPick),
-    [qualifyingVialsForCal, calLogVialPick]
-  );
-
-  const calDerivedMcg = useMemo(
-    () => unitsToMcg(calLogUnits, calSelectedVial?.concentration_mcg_ml),
-    [calLogUnits, calSelectedVial]
-  );
-
   const canCalGoPrev = cmpViewMonth(viewMonth, minViewMonth()) > 0;
   const canCalGoNext = cmpViewMonth(viewMonth, currentViewMonth()) < 0;
 
-  useEffect(() => {
-    if (!calLogYmd) return;
-    setCalLogTime("08:00");
-    setCalLogNotes("");
-    const q = (vials ?? []).filter((v) => vialActiveOnYmd(v, calLogYmd));
-    if (q.length === 0) {
-      setCalLogVialPick("");
-      setCalLogUnits(10);
-      return;
-    }
-    const pick =
-      q.length === 1
-        ? q[0]
-        : (q.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) ?? q[0]);
-    setCalLogVialPick(pick.id);
-    // Prefer most recent actual log, fall back to desired_dose_mcg, fall back to 10
-    const recentDoses = dosesByVial[pick.id] ?? [];
-    const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
-    const units =
-      mcgToUnits(lastMcg, pick.concentration_mcg_ml) ??
-      mcgToUnits(pick.desired_dose_mcg, pick.concentration_mcg_ml) ??
-      10;
-    setCalLogUnits(Math.max(0.5, Math.min(300, units)));
-  }, [calLogYmd, vials, dosesByVial]);
-
   function goCalPrevMonth() {
-    setCalLogYmd(null);
     setViewMonth((v) => {
       const d = new Date(v.y, v.m - 1, 1);
       return clampViewMonth({ y: d.getFullYear(), m: d.getMonth() });
@@ -1387,37 +1252,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   }
 
   function goCalNextMonth() {
-    setCalLogYmd(null);
     setViewMonth((v) => {
       const d = new Date(v.y, v.m + 1, 1);
       return clampViewMonth({ y: d.getFullYear(), m: d.getMonth() });
     });
-  }
-
-  async function submitCalendarDoseLog(e) {
-    e.preventDefault();
-    if (!canMutate || !calLogYmd) return;
-    if (!calDerivedMcg || calDerivedMcg <= 0) return;
-    if (!calLogVialPick) return;
-    setCalLogSaving(true);
-    const dosed_at = combineYmdAndTimeToIso(calLogYmd, calLogTime);
-    const { error } = await insertDoseLog({
-      user_id: userId,
-      profile_id: profileId,
-      vial_id: calLogVialPick,
-      peptide_id: peptideId,
-      dose_mcg: calDerivedMcg,
-      notes: calLogNotes.trim() || null,
-      dosed_at,
-    });
-    setCalLogSaving(false);
-    if (import.meta.env.DEV && error) {
-      console.error("[VialTracker submitCalendarDoseLog]", error.message ?? error, error);
-    }
-    if (!error) {
-      setCalLogYmd(null);
-      void reload();
-    }
   }
 
   if (stabilityDays == null) return null;
@@ -1458,42 +1296,16 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   return (
     <div style={{ marginTop: 10 }}>
       <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
-        VIALS
+        {compoundName}
       </div>
 
       {!isSupabaseConfigured() && (
         <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
       )}
 
-      {canUse && (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginTop: 10,
-            marginBottom: 12,
-            alignItems: "stretch",
-            maxWidth: 520,
-          }}
-        >
-          <StackShotHeroSlot
-            kind="stack_shot_1"
-            r2Key={stackShot1Key}
-            workerConfigured={workerConfigured}
-            canMutate={canMutate}
-            onUpgrade={onUpgrade}
-            onUploaded={reload}
-          />
-          <StackShotHeroSlot
-            kind="stack_shot_2"
-            r2Key={stackShot2Key}
-            workerConfigured={workerConfigured}
-            canMutate={canMutate}
-            onUpgrade={onUpgrade}
-            onUploaded={reload}
-          />
-        </div>
-      )}
+      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginBottom: 8, lineHeight: 1.45 }}>
+        Inventory and history only — log doses from Protocol or Stacks quick log.
+      </div>
 
       {loading && <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>Loading…</div>}
 
@@ -1504,164 +1316,21 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         canGoNext={canCalGoNext}
         onPrevMonth={goCalPrevMonth}
         onNextMonth={goCalNextMonth}
-        selectedYmd={calLogYmd}
-        onSelectDay={(ymd) => {
-          if (!canMutate) return;
-          setCalLogYmd((prev) => (prev === ymd ? null : ymd));
-        }}
       />
-
-      {calLogYmd && canMutate && (
-        <form
-          onSubmit={submitCalendarDoseLog}
-          style={{
-            marginTop: 12,
-            padding: 12,
-            border: "1px solid #00d4aa44",
-            borderRadius: 12,
-            background: "#0b0f17",
-            maxWidth: 420,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.1em", lineHeight: 1.4 }}>
-            LOG DOSE — {formatLogHeaderDate(calLogYmd)}
-          </div>
-          {calDetail.length > 0 && (
-            <div style={{ paddingBottom: 10, borderBottom: "1px solid #14202e" }}>
-              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
-                EXISTING ON THIS DAY
-              </div>
-              {calDetail.map((log) => (
-                <div key={log.id} className="mono" style={{ fontSize: 13, color: "#dde4ef", padding: "3px 0" }}>
-                  {new Date(log.dosed_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })} —{" "}
-                  {Number(log.dose_mcg).toLocaleString()} mcg
-                  {log.notes ? ` · ${log.notes}` : ""}
-                </div>
-              ))}
-            </div>
-          )}
-          <div>
-            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>UNITS DRAWN</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                type="button"
-                className="btn-teal"
-                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
-                onClick={() => setCalLogUnits((u) => Math.max(0.5, roundToHalf(u - 0.5)))}
-              >
-                −
-              </button>
-              <div className="mono" style={{
-                fontSize: 16,
-                color: "#dde4ef",
-                minWidth: 60,
-                textAlign: "center",
-                padding: "6px 0",
-                borderBottom: "1px solid #14202e",
-              }}>
-                {calLogUnits}
-              </div>
-              <button
-                type="button"
-                className="btn-teal"
-                style={{ fontSize: 16, padding: "0px 12px", minHeight: 36, minWidth: 36, lineHeight: 1, borderRadius: 12 }}
-                onClick={() => setCalLogUnits((u) => Math.min(300, roundToHalf(u + 0.5)))}
-              >
-                +
-              </button>
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginLeft: 6 }}>
-                {calDerivedMcg != null
-                  ? `= ${calDerivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
-                  : "— mcg"}
-              </div>
-            </div>
-          </div>
-          {qualifyingVialsForCal.length > 1 && (
-            <div>
-              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>WHICH VIAL</div>
-              <select
-                className="form-input"
-                style={{ fontSize: 13, maxWidth: 280 }}
-                value={calLogVialPick}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setCalLogVialPick(id);
-                  const v = qualifyingVialsForCal.find((x) => x.id === id);
-                  if (!v) return;
-                  const recentDoses = dosesByVial[v.id] ?? [];
-                  const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;
-                  const units =
-                    mcgToUnits(lastMcg, v.concentration_mcg_ml) ??
-                    mcgToUnits(v.desired_dose_mcg, v.concentration_mcg_ml) ??
-                    10;
-                  setCalLogUnits(Math.max(0.5, Math.min(300, units)));
-                }}
-              >
-                {qualifyingVialsForCal.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.label ?? "Vial"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {qualifyingVialsForCal.length === 1 && (
-            <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
-              Vial: {qualifyingVialsForCal[0].label ?? "Vial 1"}
-            </div>
-          )}
-          {qualifyingVialsForCal.length === 0 && (
-            <div className="mono" style={{ fontSize: 13, color: "#f59e0b" }}>
-              No vial was active on this date — add a vial or adjust dates.
-            </div>
-          )}
-          <div>
-            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>TIME</div>
-            <input
-              className="form-input"
-              style={{ fontSize: 13, maxWidth: 160 }}
-              type="time"
-              value={calLogTime}
-              onChange={(e) => setCalLogTime(e.target.value)}
-            />
-          </div>
-          <div>
-            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>NOTES (optional)</div>
-            <input
-              className="form-input"
-              style={{ fontSize: 13 }}
-              value={calLogNotes}
-              onChange={(e) => setCalLogNotes(e.target.value)}
-            />
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <button
-              type="submit"
-              className="btn-teal"
-              style={{ fontSize: 13, padding: "5px 14px", borderRadius: 12 }}
-              disabled={calLogSaving || qualifyingVialsForCal.length === 0 || !calLogVialPick}
-            >
-              Log Dose
-            </button>
-            <button
-              type="button"
-              className="btn-teal"
-              style={{ fontSize: 13, padding: "5px 14px", opacity: 0.85, borderRadius: 12 }}
-              onClick={() => setCalLogYmd(null)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
 
       {canMutate && (
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           {!showAdd ? (
-            <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "5px 12px", borderRadius: 12 }} onClick={() => openAddVial()}>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13, padding: "5px 12px", borderRadius: 12, minHeight: 44 }}
+              data-demo-target={demoAnchorFirst ? DEMO_TARGET.vial_add : undefined}
+              {...demoHighlightProps(
+                demoAnchorFirst && demo?.isHighlighted(DEMO_TARGET.vial_add)
+              )}
+              onClick={() => openAddVial()}
+            >
               + Add vial
             </button>
           ) : (
@@ -1696,7 +1365,12 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>LABEL</div>
               <input className="form-input" style={{ fontSize: 13 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
-            <div>
+            <div
+              data-demo-target={demoAnchorFirst ? DEMO_TARGET.vial_reconstitute : undefined}
+              {...demoHighlightProps(
+                demoAnchorFirst && demo?.isHighlighted(DEMO_TARGET.vial_reconstitute)
+              )}
+            >
               <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 2 }}>RECONSTITUTION DATE</div>
               <input className="form-input" style={{ fontSize: 13 }} type="date" value={formRecon} onChange={(e) => setFormRecon(e.target.value)} />
             </div>
@@ -1726,6 +1400,30 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             )}
           </div>
 
+          {vialSizeOptionsList && (
+            <div>
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>VIAL SIZE</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {vialSizeOptionsList.map((opt, idx) => (
+                  <SelectPill
+                    key={opt.label}
+                    active={vialSizeOptionIndex === idx}
+                    onClick={() => {
+                      setVialSizeOptionIndex(idx);
+                      setFormMg(String(opt.totalMg));
+                      setFormMl(String(opt.bacWaterMl));
+                      setMgQuick("other");
+                      const match = ADD_VIAL_ML_OPTIONS.find((x) => x.val === String(opt.bacWaterMl));
+                      setMlQuick(match ? match.key : "other");
+                    }}
+                  >
+                    {opt.label}
+                  </SelectPill>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>BAC WATER (mL)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1749,6 +1447,90 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               />
             )}
           </div>
+
+          {blendComponents && (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 12,
+                border: "1px solid #1e3a32",
+                background: "rgba(0, 212, 170, 0.06)",
+              }}
+            >
+              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
+                BLEND CALCULATOR
+              </div>
+              <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginBottom: 12, lineHeight: 1.45 }}>
+                Uses vial total and BAC water (mL) above. Adjust draw volume to see each component per injection.
+              </div>
+              <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
+                DRAW VOLUME (mL) — {BLEND_DRAW_MIN}–{BLEND_DRAW_MAX}
+              </div>
+              <input
+                type="range"
+                min={BLEND_DRAW_MIN}
+                max={BLEND_DRAW_MAX}
+                step={0.01}
+                value={blendDrawMl}
+                onChange={(e) => setBlendDrawMl(clampBlendDrawMl(parseFloat(e.target.value)))}
+                aria-label="Draw volume in milliliters"
+                style={{ width: "100%", maxWidth: 320, display: "block", marginBottom: 8 }}
+              />
+              <input
+                className="form-input"
+                style={{ fontSize: 13, maxWidth: 120 }}
+                type="number"
+                min={BLEND_DRAW_MIN}
+                max={BLEND_DRAW_MAX}
+                step={0.01}
+                value={blendDrawMl}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) setBlendDrawMl(clampBlendDrawMl(v));
+                }}
+                onBlur={() => setBlendDrawMl((d) => clampBlendDrawMl(d))}
+                aria-label="Draw volume numeric"
+              />
+              {blendCalc && blendCalc.rows.length > 0 && (
+                <div style={{ marginTop: 14, overflowX: "auto" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontFamily: "JetBrains Mono, monospace",
+                      fontSize: 12,
+                      color: "#dde4ef",
+                    }}
+                  >
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #1e2a38", color: "#8fa5bf" }}>
+                        <th style={{ textAlign: "left", padding: "8px 6px 8px 0" }}>Component</th>
+                        <th style={{ textAlign: "right", padding: "8px 6px" }}>mg / vial</th>
+                        <th style={{ textAlign: "right", padding: "8px 6px" }}>mg / draw</th>
+                        <th style={{ textAlign: "right", padding: "8px 6px 8px 0" }}>mcg / draw</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {blendCalc.rows.map((r) => (
+                        <tr key={r.name} style={{ borderBottom: "1px solid #14202e" }}>
+                          <td style={{ padding: "6px 6px 6px 0" }}>{r.name}</td>
+                          <td style={{ textAlign: "right", padding: "6px 6px" }}>{r.mgPerVial.toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "6px 6px" }}>{formatBlendMgDraw(r.mgPerDraw)}</td>
+                          <td style={{ textAlign: "right", padding: "6px 6px 6px 0" }}>{formatBlendMcgDraw(r.mcgPerDraw)}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ fontWeight: 600, color: "#00d4aa" }}>
+                        <td style={{ padding: "8px 6px 0 0" }}>Total blend</td>
+                        <td style={{ textAlign: "right", padding: "8px 6px 0" }}>{effectiveBlendTotalMg.toLocaleString()}</td>
+                        <td style={{ textAlign: "right", padding: "8px 6px 0" }}>{formatBlendMgDraw(blendCalc.totalMgPerDraw)}</td>
+                        <td style={{ textAlign: "right", padding: "8px 6px 0 0" }}>{formatBlendMcgDraw(blendCalc.totalMcgPerDraw)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>DESIRED DOSE (mcg per injection)</div>
@@ -1793,9 +1575,15 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
                 LIVE RESULTS
               </div>
-              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
-                Concentration: {formatConc(addFormCalc.concentration)}
-              </div>
+              {effectiveBlendComponents ? (
+                <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5, wordBreak: "break-word" }}>
+                  <span style={{ color: "#a0a0b0" }}>Blend conc.</span> {formatBlendConcMgPerMl(liveBlendConcParts)}
+                </div>
+              ) : (
+                <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+                  Concentration: {formatConc(addFormCalc.concentration)}
+                </div>
+              )}
               {addFormCalc.want != null && (
                 <>
                   <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 8 }}>
@@ -1861,15 +1649,13 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             vial={v}
             userId={userId}
             profileId={profileId}
-            peptideId={peptideId}
             canMutate={canMutate}
             doses={dosesByVial[v.id] ?? []}
             onReload={reload}
-            logOpen={logVialId === v.id}
-            onToggleLog={(id) => setLogVialId((x) => (x === id ? null : id))}
             stabilityNote={stabilityNote}
             workerConfigured={workerConfigured}
             onUpgrade={onUpgrade}
+            catalogBlendComponents={blendComponents ?? undefined}
           />
         ))}
     </div>

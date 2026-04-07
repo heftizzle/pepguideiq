@@ -209,7 +209,9 @@ export async function listMemberProfiles(userId) {
   if (!supabase || !userId) return { profiles: [], error: notConfiguredError() };
   const { data, error } = await supabase
     .from("member_profiles")
-    .select("id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language")
+    .select(
+      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, demo_sessions_shown"
+    )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   return { profiles: data ?? [], error: error ?? null };
@@ -266,6 +268,27 @@ export async function updateMemberProfile(profileId, patch) {
   return { error: error ?? null };
 }
 
+/** Dev / testing: set `demo_sessions_shown` to 0 for the signed-in user's profile row. */
+export async function resetMemberProfileDemoSessions(profileId) {
+  return updateMemberProfile(profileId, { demo_sessions_shown: 0 });
+}
+
+/**
+ * Atomically increment demo_sessions_shown for the active member profile (call after successful sign-in).
+ * @param {string} profileId — member_profiles.id
+ * @returns {Promise<{ count: number, error: Error | null }>}
+ */
+export async function incrementMemberProfileDemoSessions(profileId) {
+  if (!supabase) return { count: 0, error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { count: 0, error: new Error("Missing profile") };
+  const { data, error } = await supabase.rpc("increment_member_profile_demo_sessions", {
+    p_profile_id: pid,
+  });
+  const n = typeof data === "number" ? data : Number(data);
+  return { count: Number.isFinite(n) ? n : 0, error: error ?? null };
+}
+
 /** POST Worker /member-profiles — tier slot enforcement server-side. */
 export async function createMemberProfileViaWorker(displayName) {
   if (!isApiWorkerConfigured()) {
@@ -305,7 +328,7 @@ export async function createMemberProfileViaWorker(displayName) {
   }
 }
 
-/** PATCH Worker /member-profiles/:profileId — display_name and/or locale fields. */
+/** PATCH Worker /member-profiles/:profileId — display_name, locale, schedule, handle, etc. */
 export async function patchMemberProfileViaWorker(profileId, body) {
   if (!isApiWorkerConfigured()) {
     return { error: new Error("API worker is not configured (VITE_API_WORKER_URL).") };
@@ -333,6 +356,46 @@ export async function patchMemberProfileViaWorker(profileId, body) {
     return { error: new Error(msg) };
   }
   return { error: null };
+}
+
+/**
+ * GET Worker /member-profiles/handle-available?handle=…&exclude=…
+ * @returns {Promise<{ available: boolean, reason?: string, error: Error | null }>}
+ */
+export async function checkMemberProfileHandleAvailable(handle, excludeProfileId) {
+  if (!isApiWorkerConfigured()) {
+    return { available: false, error: new Error("API worker is not configured (VITE_API_WORKER_URL).") };
+  }
+  const token = await getSessionAccessToken();
+  if (!token) return { available: false, error: new Error("Not signed in") };
+  const raw = String(handle ?? "").trim();
+  if (!raw) {
+    return { available: false, reason: "empty", error: null };
+  }
+  const params = new URLSearchParams({ handle: raw });
+  if (excludeProfileId) params.set("exclude", excludeProfileId);
+  try {
+    const res = await fetch(`${API_WORKER_URL}/member-profiles/handle-available?${params.toString()}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      let msg = "Could not check handle";
+      try {
+        const j = await res.json();
+        if (j && typeof j.error === "string") msg = j.error;
+      } catch {
+        /* ignore */
+      }
+      return { available: false, error: new Error(msg) };
+    }
+    const j = await res.json();
+    const available = j && typeof j === "object" && j.available === true;
+    const reason = j && typeof j === "object" && typeof j.reason === "string" ? j.reason : undefined;
+    return { available, reason, error: null };
+  } catch (e) {
+    return { available: false, error: e instanceof Error ? e : new Error("Network error") };
+  }
 }
 
 /** DELETE Worker /member-profiles/:profileId (default profile rejected server-side). */
@@ -422,19 +485,52 @@ export function onAuthStateChange(callback) {
  * @returns {Promise<{ stack: unknown[], shareId: string | null }>}
  */
 export async function loadStack(userId, profileId) {
-  if (!supabase || !profileId) return { stack: [], shareId: null };
+  if (!supabase || !profileId) return { stack: [], shareId: null, feedVisible: false };
   const { data, error } = await supabase
     .from("user_stacks")
-    .select("stack, share_id")
+    .select("stack, share_id, feed_visible")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .maybeSingle();
-  if (error || !data) return { stack: [], shareId: null };
+  if (error || !data) return { stack: [], shareId: null, feedVisible: false };
   const stack = Array.isArray(data.stack) ? data.stack : [];
   const shareRaw = data.share_id;
   const shareId =
     typeof shareRaw === "string" && shareRaw.trim() ? shareRaw.trim() : null;
-  return { stack, shareId };
+  const feedVisible = Boolean(data.feed_visible);
+  return { stack, shareId, feedVisible };
+}
+
+/**
+ * Partial update of `user_stacks` (RLS: own row). Used for feed_visible, etc.
+ * @param {string} userId
+ * @param {string} profileId
+ * @param {Record<string, unknown>} patch
+ */
+export async function updateStack(userId, profileId, patch) {
+  if (!supabase) return { error: notConfiguredError() };
+  if (!userId || !profileId) return { error: new Error("Missing user or profile") };
+  const { error } = await supabase
+    .from("user_stacks")
+    .update(patch)
+    .eq("user_id", userId)
+    .eq("profile_id", profileId);
+  return { error: error ?? null };
+}
+
+/**
+ * Authenticated network feed: stacks with feed_visible and share_id (RPC get_network_feed).
+ * @returns {Promise<object[]>}
+ */
+export async function fetchNetworkFeed() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc("get_network_feed");
+    if (error) return [];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -551,18 +647,29 @@ export async function getProfileStackShotR2Keys(userId) {
 /**
  * @param {string} userId
  * @param {string} profileId
- * @param {string} peptideId
+ * @param {string[]} peptideIds — deduped non-empty strings; single id uses `.eq`, multiple uses `.in`
  */
-export async function listVialsForPeptide(userId, profileId, peptideId) {
+export async function listVialsForPeptideIds(userId, profileId, peptideIds) {
+  const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { vials: [], error: notConfiguredError() };
-  const { data, error } = await supabase
+  if (ids.length === 0) return { vials: [], error: null };
+  let q = supabase
     .from("user_vials")
     .select("*")
     .eq("user_id", userId)
-    .eq("profile_id", profileId)
-    .eq("peptide_id", peptideId)
-    .order("created_at", { ascending: true });
+    .eq("profile_id", profileId);
+  q = ids.length === 1 ? q.eq("peptide_id", ids[0]) : q.in("peptide_id", ids);
+  const { data, error } = await q.order("created_at", { ascending: true });
   return { vials: data ?? [], error: error ?? null };
+}
+
+/**
+ * @param {string} userId
+ * @param {string} profileId
+ * @param {string} peptideId
+ */
+export async function listVialsForPeptide(userId, profileId, peptideId) {
+  return listVialsForPeptideIds(userId, profileId, [peptideId]);
 }
 
 /** @param {Record<string, unknown>} row */
@@ -638,13 +745,39 @@ export async function listDoseLogsForPeptideLast30Days(userId, profileId, peptid
   start.setDate(start.getDate() - 29);
   const { data, error } = await supabase
     .from("dose_logs")
-    .select("id, vial_id, dosed_at, dose_mcg, notes")
+    .select("id, vial_id, dosed_at, dose_mcg, notes, dose_count, dose_unit, protocol_session")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .eq("peptide_id", peptideId)
     .gte("dosed_at", start.toISOString())
     .order("dosed_at", { ascending: false });
   return { doses: data ?? [], error: error ?? null };
+}
+
+/**
+ * Distinct peptide_ids with any dose on a local calendar day (Protocol "already logged today").
+ * @param {string} ymd `YYYY-MM-DD` (use same local Y/M/D as `todayYmd()` in the app)
+ */
+export async function listPeptideIdsWithDosesOnLocalDay(userId, profileId, ymd) {
+  if (!supabase || !profileId) return { peptideIds: [], error: notConfiguredError() };
+  const [Y, Mo, D] = String(ymd)
+    .split("-")
+    .map((x) => parseInt(x, 10));
+  if (!Y || !Mo || !D) return { peptideIds: [], error: null };
+  const start = new Date(Y, Mo - 1, D, 0, 0, 0, 0);
+  const end = new Date(Y, Mo - 1, D, 23, 59, 59, 999);
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("peptide_id")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .gte("dosed_at", start.toISOString())
+    .lte("dosed_at", end.toISOString());
+  if (error) return { peptideIds: [], error };
+  const peptideIds = [
+    ...new Set((data ?? []).map((r) => r.peptide_id).filter((id) => typeof id === "string" && id)),
+  ];
+  return { peptideIds, error: null };
 }
 
 /**
@@ -655,22 +788,33 @@ export async function listDoseLogsForPeptideLast30Days(userId, profileId, peptid
  * @param {string} startIso
  * @param {string} endIso
  */
-export async function listDoseLogsForPeptideRange(userId, profileId, peptideId, startIso, endIso) {
+/**
+ * @param {string[]} peptideIds
+ */
+export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideIds, startIso, endIso) {
+  const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };
-  const { data, error } = await supabase
+  if (ids.length === 0) return { doses: [], error: null };
+  let q = supabase
     .from("dose_logs")
-    .select("id, vial_id, dosed_at, dose_mcg, notes")
+    .select("id, vial_id, dosed_at, dose_mcg, notes, dose_count, dose_unit, protocol_session")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
-    .eq("peptide_id", peptideId)
     .gte("dosed_at", startIso)
-    .lte("dosed_at", endIso)
-    .order("dosed_at", { ascending: false });
+    .lte("dosed_at", endIso);
+  q = ids.length === 1 ? q.eq("peptide_id", ids[0]) : q.in("peptide_id", ids);
+  const { data, error } = await q.order("dosed_at", { ascending: false });
   return { doses: data ?? [], error: error ?? null };
 }
 
+export async function listDoseLogsForPeptideRange(userId, profileId, peptideId, startIso, endIso) {
+  return listDoseLogsForPeptideIdsRange(userId, profileId, [peptideId], startIso, endIso);
+}
+
 /**
- * @param {{ user_id: string, vial_id: string, peptide_id: string, dose_mcg: number, notes?: string | null, dosed_at?: string }} row
+ * Injectable: vial_id + dose_mcg required (profile_id when using member profiles).
+ * Non-injectable: vial_id null, dose_mcg null, dose_count + dose_unit + protocol_session (optional).
+ * @param {{ user_id: string, profile_id?: string | null, vial_id?: string | null, peptide_id: string, dose_mcg?: number | null, dose_count?: number | null, dose_unit?: string | null, protocol_session?: string | null, notes?: string | null, dosed_at?: string }} row
  */
 export async function insertDoseLog(row) {
   if (!supabase) return { error: notConfiguredError() };

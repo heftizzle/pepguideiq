@@ -8,6 +8,7 @@ export const BATCH5 = [
     mechanism:
       "Oral ghrelin receptor agonist (not technically a SARM). Stimulates GH and IGF-1 secretion without affecting cortisol. Oral GH secretagogue — only option for oral GH axis stimulation. Significantly increases appetite. 24-hour half-life enables once-daily dosing.",
     halfLife: "~24 hours",
+    bioavailability: "~60–70% (oral)",
     reconstitution: { solvent: "Oral capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "10mg", medium: "20mg", high: "25mg", frequency: "Daily oral, pre-sleep" },
     tags: ["GH", "IGF-1", "oral", "ghrelin", "muscle", "anti-aging", "appetite", "secretagogue"],

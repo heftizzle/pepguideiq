@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PROTOCOL_SESSION_IDS, PROTOCOL_SESSION_UI } from "../data/protocolSessions.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
 
 const SESSION_ORDER = { morning: 0, afternoon: 1, evening: 2, night: 3 };
@@ -18,13 +19,6 @@ export function normalizeStackSessions(s) {
 export function getStackRowListKey(item) {
   return item.stackRowKey ?? item.id;
 }
-
-const SESSION_TOGGLES = [
-  { id: "morning", icon: "🌞" },
-  { id: "afternoon", icon: "🌅" },
-  { id: "evening", icon: "🌇" },
-  { id: "night", icon: "🌙" },
-];
 
 export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemove }) {
   const rowKey = getStackRowListKey(item);
@@ -81,16 +75,17 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
           <div>
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {SESSION_TOGGLES.map((t) => {
-                const on = sessions.includes(t.id);
-                const sessionWarning = getTimingWarning(peptideId, t.id);
+              {PROTOCOL_SESSION_IDS.map((sid) => {
+                const on = sessions.includes(sid);
+                const sessionWarning = getTimingWarning(peptideId, sid);
                 const warnSelected = on && sessionWarning;
+                const emoji = PROTOCOL_SESSION_UI[sid].emoji;
                 return (
                   <button
-                    key={t.id}
+                    key={sid}
                     type="button"
-                    title={sessionWarning ? sessionWarning : t.id}
-                    onClick={() => toggleSession(t.id)}
+                    title={sessionWarning ? sessionWarning : sid}
+                    onClick={() => toggleSession(sid)}
                     style={{
                       minWidth: 40,
                       minHeight: 40,
@@ -107,7 +102,9 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                       opacity: on ? 1 : 0.45,
                     }}
                   >
-                    {t.icon}
+                    <span className="pepv-emoji" aria-hidden>
+                      {emoji}
+                    </span>
                   </button>
                 );
               })}

@@ -46,6 +46,7 @@ const NULL_IDS = new Set([
   "snap-8",
   "ru58841",
   "os-01",
+  "testosterone-topical",
 ]);
 
 const DAYS_7 = new Set([]);
@@ -86,10 +87,17 @@ const DAYS_28 = new Set([
   "ara-290",
   "pt-141",
   "gonadorelin",
+  "tesofensine-ipamorelin",
+  "triple-gh-cjc-ipa-ghrp",
   "ss-31",
   "mots-c",
   "humanin",
   "pinealon",
+  "testosterone-cypionate",
+  "testosterone-enanthate",
+  "testosterone-propionate",
+  "testosterone-undecanoate",
+  "nandrolone-decanoate",
 ]);
 
 const DAYS_60 = new Set(["ghk-cu", "ghk-cu-skin", "glow"]);

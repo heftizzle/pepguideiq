@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
+import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
+import { isApiWorkerConfigured } from "../lib/config.js";
 import { createMemberProfileViaWorker } from "../lib/supabase.js";
 import { useFocusTrap } from "./useFocusTrap.js";
+import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 
 function initialLetter(displayName) {
   const s = String(displayName || "").trim();
@@ -17,10 +20,22 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
     activeProfileId,
     activeProfile,
     memberProfiles,
+    memberProfilesVersion,
     switchProfile,
     canAddProfile,
     refreshMemberProfiles,
   } = useActiveProfile();
+  const workerOk = isApiWorkerConfigured();
+  const avatarUserId =
+    (typeof activeProfile?.user_id === "string" && activeProfile.user_id) ||
+    (typeof memberProfiles[0]?.user_id === "string" && memberProfiles[0].user_id) ||
+    "";
+  const floatingAvatarSrc = useMemberAvatarSrc(
+    avatarUserId,
+    activeProfile?.avatar_url,
+    memberProfilesVersion,
+    workerOk
+  );
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -139,8 +154,25 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
                   >
                     {initialLetter(p.display_name)}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.display_name}
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>
+                      {p.display_name}
+                    </span>
+                    {typeof p.handle === "string" && p.handle ? (
+                      <span className="mono" style={{ fontSize: 11, color: "#00d4aa", opacity: 0.9 }}>
+                        {formatHandleDisplay(p.handle)}
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               );
@@ -208,11 +240,43 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
             fontWeight: 700,
             color: "#00d4aa",
             flexShrink: 0,
+            overflow: "hidden",
           }}
         >
-          {initialLetter(label)}
+          {floatingAvatarSrc ? (
+            <img
+              src={floatingAvatarSrc}
+              alt=""
+              draggable={false}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          ) : (
+            initialLetter(label)
+          )}
         </span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{label}</span>
+        <span
+          style={{
+            overflow: "hidden",
+            textAlign: "left",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            minWidth: 0,
+            gap: 2,
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>{label}</span>
+          {typeof activeProfile?.handle === "string" && activeProfile.handle ? (
+            <span className="mono" style={{ fontSize: 11, color: "#00d4aa", opacity: 0.9, lineHeight: 1.2 }}>
+              {formatHandleDisplay(activeProfile.handle)}
+            </span>
+          ) : null}
+        </span>
       </button>
     </div>
   );

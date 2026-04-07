@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ensureUserStackShareId } from "../lib/supabase.js";
+import { ensureUserStackShareId, updateStack } from "../lib/supabase.js";
+import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { buildStackShareSmsUrl, buildStackShareUrl } from "../lib/stackShare.js";
 
 function canUseWebShare() {
@@ -14,6 +15,8 @@ function canUseWebShare() {
  *   stackName?: string,
  *   initialShareId: string | null,
  *   onShareIdChange: (shareId: string) => void,
+ *   feedVisible?: boolean,
+ *   onFeedVisibleChange?: (visible: boolean) => void,
  *   disabled?: boolean,
  * }} props
  */
@@ -23,13 +26,17 @@ export function StackShareControls({
   stackName = "",
   initialShareId,
   onShareIdChange,
+  feedVisible = false,
+  onFeedVisibleChange,
   disabled = false,
 }) {
+  const demo = useDemoTourOptional();
   const [open, setOpen] = useState(false);
   const [shareId, setShareId] = useState(initialShareId ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [showCopied, setShowCopied] = useState(false);
+  const [feedBusy, setFeedBusy] = useState(false);
   const copyResetTimer = useRef(null);
 
   useEffect(() => {
@@ -92,6 +99,25 @@ export function StackShareControls({
     window.location.href = buildStackShareSmsUrl(url);
   }
 
+  async function toggleNetworkFeed() {
+    if (disabled || !userId || !profileId || feedBusy) return;
+    const sid = shareId ?? initialShareId ?? null;
+    if (!sid || !String(sid).trim()) return;
+    const next = !feedVisible;
+    setFeedBusy(true);
+    setErr(null);
+    try {
+      const { error } = await updateStack(userId, profileId, { feed_visible: next });
+      if (error) {
+        setErr(typeof error.message === "string" ? error.message : "Could not update Network");
+        return;
+      }
+      onFeedVisibleChange?.(next);
+    } finally {
+      setFeedBusy(false);
+    }
+  }
+
   async function nativeShare() {
     const sid = shareId ?? (await resolveShareId());
     if (!sid) return;
@@ -112,9 +138,35 @@ export function StackShareControls({
   const fullUrl = shareId ? buildStackShareUrl(shareId) : "";
   const displayUrl =
     fullUrl.length > 56 ? `${fullUrl.slice(0, 28)}…${fullUrl.slice(-22)}` : fullUrl;
+  const hasShareId = Boolean((shareId ?? initialShareId ?? "").toString().trim());
 
   return (
-    <div style={{ marginTop: 10 }}>
+    <div
+      style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}
+      data-demo-target={DEMO_TARGET.stack_share}
+      {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.stack_share)))}
+    >
+      {hasShareId ? (
+        <button
+          type="button"
+          className="btn-teal"
+          disabled={disabled || !userId || !profileId || feedBusy}
+          onClick={() => void toggleNetworkFeed()}
+          style={{
+            fontSize: 13,
+            padding: "5px 12px",
+            borderRadius: 12,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            color: feedVisible ? "#00d4aa" : undefined,
+            border: feedVisible ? "1px solid rgba(0, 212, 170, 0.45)" : undefined,
+            background: feedVisible ? "rgba(0, 212, 170, 0.1)" : undefined,
+          }}
+        >
+          {feedBusy ? "…" : feedVisible ? "Shared to Network ✓" : "Post to Network"}
+        </button>
+      ) : null}
       <button
         type="button"
         className="btn-teal"
