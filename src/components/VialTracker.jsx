@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PEPTIDES } from "../data/catalog.js";
+import { PROTOCOL_SESSION_UI } from "../data/protocolSessions.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import {
   deleteUserVial,
@@ -288,6 +290,37 @@ function formatDoseLogLine(d) {
   return "—";
 }
 
+/** Calendar detail: prefer mg when ≥ 1000 mcg. */
+function formatCalendarDoseAmount(d) {
+  if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
+    return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
+  }
+  const mcg = Number(d.dose_mcg);
+  if (!Number.isFinite(mcg)) return "—";
+  if (mcg >= 1000) {
+    const mg = mcg / 1000;
+    const t =
+      mg % 1 === 0 ? mg.toLocaleString() : mg.toLocaleString(undefined, { maximumFractionDigits: 3 });
+    return `${t} mg`;
+  }
+  return `${mcg.toLocaleString()} mcg`;
+}
+
+function formatDoseTimeLocal(iso) {
+  if (typeof iso !== "string" || !iso) return "";
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "";
+  return t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function protocolSessionPillLabel(session) {
+  if (session == null || typeof session !== "string") return null;
+  const id = session.trim();
+  if (!id) return null;
+  const u = PROTOCOL_SESSION_UI[id];
+  return u ? u.pillLabel : null;
+}
+
 function formatMediumDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
@@ -478,7 +511,9 @@ function clampViewMonth(ym, now = new Date()) {
 
 const DOW_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMonth, onNextMonth }) {
+function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMonth, onNextMonth, resolvePeptideName }) {
+  const [selectedYmd, setSelectedYmd] = useState(null);
+
   const byDay = useMemo(() => {
     const m = new Map();
     for (const log of doses) {
@@ -488,6 +523,20 @@ function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMon
     }
     return m;
   }, [doses]);
+
+  useEffect(() => {
+    setSelectedYmd(null);
+  }, [viewMonth.y, viewMonth.m]);
+
+  useEffect(() => {
+    if (!selectedYmd) return;
+    const still = doses.some((d) => localYmdFromIso(d.dosed_at) === selectedYmd);
+    if (!still) setSelectedYmd(null);
+  }, [doses, selectedYmd]);
+
+  const toggleDay = useCallback((ymd) => {
+    setSelectedYmd((prev) => (prev === ymd ? null : ymd));
+  }, []);
 
   const now = new Date();
   const today = stripTimeLocal(now);
@@ -633,42 +682,69 @@ function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMon
 
           const isPadding = !inContent;
 
+          const paddingCellStyle = {
+            minWidth: 36,
+            minHeight: 36,
+            borderRadius: 12,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 8,
+            color: "#2e4055",
+            background: "#06080c",
+            border: "1px solid #0e1822",
+            fontSize: 12,
+            boxSizing: "border-box",
+            ...(has && selectedYmd === ymd
+              ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+              : {}),
+          };
+
           if (isPadding || isFutureNoClick) {
-            return (
-              <div
-                key={ymd}
-                aria-hidden={isPadding}
-                className="mono"
+            const dot = has ? (
+              <span
                 style={{
-                  minWidth: 36,
-                  minHeight: 36,
-                  borderRadius: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 8,
-                  color: "#2e4055",
-                  background: "#06080c",
-                  border: "1px solid #0e1822",
-                  fontSize: 12,
-                  boxSizing: "border-box",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "#00d4aa",
+                  boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+                  flexShrink: 0,
+                  marginTop: 4,
                 }}
-              >
+              />
+            ) : null;
+
+            if (has) {
+              return (
+                <button
+                  key={ymd}
+                  type="button"
+                  className="mono"
+                  aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
+                  aria-pressed={selectedYmd === ymd}
+                  title={`${dayLogs.length} dose(s) — ${ymd}`}
+                  onClick={() => toggleDay(ymd)}
+                  style={{
+                    ...paddingCellStyle,
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    fontFamily: "inherit",
+                    margin: 0,
+                  }}
+                >
+                  <span>{d.getDate()}</span>
+                  {dot}
+                </button>
+              );
+            }
+
+            return (
+              <div key={ymd} aria-hidden={isPadding} className="mono" style={paddingCellStyle}>
                 <span>{d.getDate()}</span>
-                {has && (
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: "#00d4aa",
-                      boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
-                      flexShrink: 0,
-                      marginTop: 4,
-                    }}
-                  />
-                )}
+                {dot}
               </div>
             );
           }
@@ -679,46 +755,126 @@ function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMon
           const borderColor = isToday ? "#00d4aa" : "#14202e";
           const borderWidth = isToday ? 2 : 1;
 
-          return (
-            <div
-              key={ymd}
-              title={has ? `${dayLogs.length} dose(s) — ${ymd}` : ymd}
+          const contentCellStyle = {
+            minWidth: 36,
+            minHeight: 36,
+            borderRadius: 12,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+            padding: "8px 6px",
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: 12,
+            lineHeight: 1,
+            color: numColor,
+            background: baseBg,
+            border: `${borderWidth}px solid ${borderColor}`,
+            boxSizing: "border-box",
+            ...(has && selectedYmd === ymd
+              ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+              : {}),
+          };
+
+          const contentDot = has ? (
+            <span
               style={{
-                minWidth: 36,
-                minHeight: 36,
-                borderRadius: 12,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                padding: "8px 6px",
-                fontFamily: "JetBrains Mono, monospace",
-                fontSize: 12,
-                lineHeight: 1,
-                color: numColor,
-                background: baseBg,
-                border: `${borderWidth}px solid ${borderColor}`,
-                boxSizing: "border-box",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#00d4aa",
+                boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+                flexShrink: 0,
               }}
-            >
+            />
+          ) : null;
+
+          if (has) {
+            return (
+              <button
+                key={ymd}
+                type="button"
+                aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
+                aria-pressed={selectedYmd === ymd}
+                title={`${dayLogs.length} dose(s) — ${ymd}`}
+                onClick={() => toggleDay(ymd)}
+                style={{
+                  ...contentCellStyle,
+                  cursor: "pointer",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  margin: 0,
+                }}
+              >
+                <span>{d.getDate()}</span>
+                {contentDot}
+              </button>
+            );
+          }
+
+          return (
+            <div key={ymd} title={ymd} style={contentCellStyle}>
               <span>{d.getDate()}</span>
-              {has && (
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#00d4aa",
-                    boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
-                    flexShrink: 0,
-                  }}
-                />
-              )}
+              {contentDot}
             </div>
           );
         })}
       </div>
+      {selectedYmd && byDay.has(selectedYmd) ? (
+        <div
+          style={{
+            marginTop: 14,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid #14202e",
+            background: "#07090e",
+            maxWidth: 420,
+          }}
+        >
+          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 10, letterSpacing: "0.06em" }}>
+            {(() => {
+              const hd = new Date(`${selectedYmd}T12:00:00`);
+              return Number.isNaN(hd.getTime())
+                ? selectedYmd
+                : hd.toLocaleDateString(undefined, {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+            })()}
+          </div>
+          {[...(byDay.get(selectedYmd) ?? [])]
+            .sort((a, b) => new Date(a.dosed_at).getTime() - new Date(b.dosed_at).getTime())
+            .map((log, i) => {
+              const name = resolvePeptideName(log.peptide_id);
+              const amount = formatCalendarDoseAmount(log);
+              const timeStr = formatDoseTimeLocal(log.dosed_at);
+              const sess = protocolSessionPillLabel(log.protocol_session);
+              const meta = [timeStr, sess].filter(Boolean).join(" · ");
+              return (
+                <div
+                  key={log.id}
+                  className="mono"
+                  style={{
+                    padding: "10px 0",
+                    borderTop: i > 0 ? "1px solid #0e1822" : "none",
+                    fontSize: 13,
+                    color: "#dde4ef",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <div style={{ color: "#dde4ef", marginBottom: meta ? 4 : 0 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: "#8fa5bf" }}>
+                    {amount}
+                    {meta ? ` · ${meta}` : ""}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1015,6 +1171,14 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const stabilityDays = catalogEntry?.stabilityDays;
   const stabilityNote = typeof catalogEntry?.stabilityNote === "string" ? catalogEntry.stabilityNote.trim() : "";
   const compoundName = (catalogEntry?.name && String(catalogEntry.name).trim()) || "this peptide";
+  const peptideNameById = useMemo(() => new Map(PEPTIDES.map((p) => [p.id, p.name])), []);
+  const resolvePeptideName = useCallback(
+    (id) => {
+      if (id && typeof id === "string" && peptideNameById.has(id)) return peptideNameById.get(id);
+      return compoundName;
+    },
+    [peptideNameById, compoundName]
+  );
   const [vials, setVials] = useState([]);
   const [dosesByVial, setDosesByVial] = useState({});
   const [calendarDoses, setCalendarDoses] = useState([]);
@@ -1316,6 +1480,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         canGoNext={canCalGoNext}
         onPrevMonth={goCalPrevMonth}
         onNextMonth={goCalNextMonth}
+        resolvePeptideName={resolvePeptideName}
       />
 
       {canMutate && (

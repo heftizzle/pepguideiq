@@ -54,10 +54,39 @@ export function GlobalStyles() {
       .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#4a6080;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
       .tab-btn:hover{color:#8fa5bf}
       .tab-btn.active{color:#00d4aa;border-bottom-color:#00d4aa}
-      .pcard{background:#0e1520;border:1px solid #1a2d40;border-radius:10px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+      .pcard{
+        background:#0e1520;
+        border-top:1px solid rgb(30,52,74);
+        border-left:1px solid #1a2d40;
+        border-right:1px solid #1a2d40;
+        border-bottom:1px solid #1a2d40;
+        border-radius:10px;
+        padding:20px;
+        cursor:pointer;
+        transition:transform 0.18s ease,box-shadow 0.18s ease,border-color 0.18s ease;
+        position:relative;
+        overflow:hidden;
+        box-shadow:0 1px 3px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.25);
+      }
       .pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,#00d4aa);opacity:.5}
-      .pcard:hover{border-color:var(--cc,#00d4aa);transform:translateY(-2px);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+      .pcard:hover{
+        transform:translateY(-2px);
+        box-shadow:0 4px 16px rgba(0,0,0,0.5),0 1px 4px rgba(0,0,0,0.3);
+        border-top-color:rgb(40,68,96);
+        transition:transform 0.18s ease,box-shadow 0.18s ease,border-color 0.18s ease;
+      }
+      .pcard:active{transform:translateY(-1px)}
       .pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+      .pill--category{
+        background:linear-gradient(135deg,rgba(var(--cc-rgb,0,212,170),0.20) 0%,rgba(var(--cc-rgb,0,212,170),0.08) 100%);
+        color:var(--cc,#00d4aa);
+        border:1px solid rgba(var(--cc-rgb,0,212,170),0.21);
+      }
+      .pcard .pill--category{font-size:13px}
+      .build-tab-compound-meta .pill--category{font-size:11px;margin-top:4px;display:inline-block}
+      .pepv-protocol-session-pill--active{
+        box-shadow:0 0 0 1px rgba(0,212,170,0.5),0 0 14px rgba(0,212,170,0.22),0 0 4px rgba(0,212,170,0.15);
+      }
       .search-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:10px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%}
       .search-input:focus{border-color:#00d4aa50}
       .search-input::placeholder{color:#a0a0b0}

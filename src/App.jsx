@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS } from "./data/catalog.js";
+import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
@@ -1086,6 +1086,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         <button
                           key={session}
                           type="button"
+                          className={isActive ? "pepv-protocol-session-pill--active" : undefined}
                           aria-label={pillLabel}
                           aria-pressed={isActive}
                           data-demo-target={protoTarget}
@@ -1111,7 +1112,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             fontFamily: "'JetBrains Mono', monospace",
                             border: isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
                             background: isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                            boxShadow: isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
                           }}
                         >
                           <span
@@ -1162,7 +1162,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   const inStack = myStack.some((s) => s.id === p.id);
                   const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
                   return (
-                    <div key={p.id} className="pcard" style={{ "--cc":cc }} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
+                    <div key={p.id} className="pcard" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
                         <div>
                           <div className="brand" style={{ fontWeight:700,fontSize:14,color:"#dde4ef" }}>{p.name}</div>
@@ -1218,7 +1218,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           )}
                           {p.aliases[0] && <div className="mono" style={{ fontSize: 13,color:"#a0a0b0",marginTop:1 }}>{p.aliases[0]}</div>}
                         </div>
-                        <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35`,fontSize: 13 }}>{cat0}</span>
+                        <span className="pill pill--category">{cat0}</span>
                       </div>
                       <div style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
                         {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
@@ -1425,7 +1425,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
               setMyStack={setMyStack}
               savedStackLimit={savedStackLimit}
               onUpgrade={openUpgradeModal}
-              getCatColor={getCatColor}
               primaryCategory={primaryCategory}
             />
           )}
@@ -1738,7 +1737,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
           const baDetail = resolvePeptideBioavailability(p);
           return (
             <Modal onClose={() => setSelPeptide(null)} label={p.name}>
-              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14 }}>
+              <div
+                className="pepv-peptide-modal-head"
+                style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,...getCategoryCssVars(pCat) }}
+              >
                 <div>
                   <div className="brand" style={{ fontSize:20,fontWeight:800,color:"#dde4ef" }}>{p.name}</div>
                   {p.variantOf && (
@@ -1761,7 +1763,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <div className="mono" style={{ fontSize: 13,color:"#a0a0b0",marginTop:3 }}>{p.aliases.join(" · ")}</div>
                 </div>
                 <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                  <span className="pill" style={{ background:cc+"20",color:cc,border:`1px solid ${cc}35` }}>{pCat}</span>
+                  <span className="pill pill--category">{pCat}</span>
                   <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>

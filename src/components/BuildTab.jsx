@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCategoryCssVars } from "../data/catalog.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
 
@@ -123,7 +124,6 @@ export function BuildTab({
   setMyStack,
   savedStackLimit,
   onUpgrade,
-  getCatColor,
   primaryCategory,
 }) {
   const wide = useWideLayout();
@@ -345,11 +345,11 @@ export function BuildTab({
         >
           {filteredSearch.map((p) => {
             const cat0 = primaryCategory(p);
-            const cc = getCatColor(cat0);
             const inList = rows.some((r) => r.peptideId === p.id);
             return (
               <div
                 key={p.id}
+                className="build-tab-compound-meta"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -359,25 +359,14 @@ export function BuildTab({
                   borderRadius: 8,
                   border: "1px solid #14202e",
                   background: "rgba(7, 9, 14, 0.6)",
+                  ...getCategoryCssVars(cat0),
                 }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div className="brand" style={{ fontWeight: 600, fontSize: 13, color: "#dde4ef" }}>
                     {p.name}
                   </div>
-                  <span
-                    className="pill"
-                    style={{
-                      marginTop: 4,
-                      display: "inline-block",
-                      background: cc + "20",
-                      color: cc,
-                      border: `1px solid ${cc}35`,
-                      fontSize: 11,
-                    }}
-                  >
-                    {cat0}
-                  </span>
+                  <span className="pill pill--category">{cat0}</span>
                 </div>
                 <button
                   type="button"
@@ -404,15 +393,16 @@ export function BuildTab({
             const p = catalogById.get(row.peptideId);
             if (!p) return null;
             const cat0 = primaryCategory(p);
-            const cc = getCatColor(cat0);
             return (
               <div
                 key={row.key}
+                className="build-tab-compound-meta"
                 style={{
                   border: "1px solid #14202e",
                   borderRadius: 10,
                   padding: 12,
                   background: "rgba(7, 9, 14, 0.45)",
+                  ...getCategoryCssVars(cat0),
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -420,19 +410,7 @@ export function BuildTab({
                     <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>
                       {p.name}
                     </div>
-                    <span
-                      className="pill"
-                      style={{
-                        marginTop: 6,
-                        display: "inline-block",
-                        background: cc + "20",
-                        color: cc,
-                        border: `1px solid ${cc}35`,
-                        fontSize: 11,
-                      }}
-                    >
-                      {cat0}
-                    </span>
+                    <span className="pill pill--category">{cat0}</span>
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                     <button

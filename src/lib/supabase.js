@@ -797,7 +797,7 @@ export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideI
   if (ids.length === 0) return { doses: [], error: null };
   let q = supabase
     .from("dose_logs")
-    .select("id, vial_id, dosed_at, dose_mcg, notes, dose_count, dose_unit, protocol_session")
+    .select("id, vial_id, peptide_id, dosed_at, dose_mcg, notes, dose_count, dose_unit, protocol_session")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .gte("dosed_at", startIso)

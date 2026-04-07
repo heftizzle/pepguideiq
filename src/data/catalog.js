@@ -269,6 +269,27 @@ export const CAT_COLORS = {
   "Khavinson Bioregulators": "#6366f1",
 };
 
+/** `r, g, b` for CSS `rgba(var(--cc-rgb), a)` on category pills. */
+export function hexToRgbCsv(hex) {
+  const raw = String(hex ?? "")
+    .trim()
+    .replace(/^#/, "");
+  if (!raw) return "0, 212, 170";
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  if (full.length !== 6) return "0, 212, 170";
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return "0, 212, 170";
+  return `${r}, ${g}, ${b}`;
+}
+
+/** Custom properties for `.pcard` / category row + `.pill--category`. */
+export function getCategoryCssVars(cat) {
+  const cc = CAT_COLORS[cat] || "#00d4aa";
+  return { "--cc": cc, "--cc-rgb": hexToRgbCsv(cc) };
+}
+
 const PLAN_CONFIG = [
   {
     id: "entry",
