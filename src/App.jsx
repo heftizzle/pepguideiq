@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { PEPTIDES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
@@ -182,6 +182,113 @@ const LIBRARY_CAT_SCROLL_INNER = {
   gap: 6,
   width: "max-content",
 };
+
+const LIBRARY_CAT_CHEV_BTN = {
+  position: "absolute",
+  top: "50%",
+  transform: "translateY(-50%)",
+  width: 28,
+  height: 28,
+  borderRadius: "50%",
+  border: "none",
+  background: "rgba(0,0,0,0.6)",
+  color: "#00d4aa",
+  fontSize: 16,
+  lineHeight: 1,
+  cursor: "pointer",
+  zIndex: 10,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+};
+
+/**
+ * @param {{ cats: string[]; selCat: string; onSelect: (cat: string) => void; marginBottom: number }} props
+ */
+function LibraryCategoryPillScrollRow({ cats, selCat, onSelect, marginBottom }) {
+  const scrollRef = useRef(null);
+  const [showLeft, setShowLeft] = useState(false);
+  const [showRight, setShowRight] = useState(false);
+
+  const updateChevrons = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setShowLeft(scrollLeft > 2);
+    setShowRight(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useLayoutEffect(() => {
+    updateChevrons();
+  }, [updateChevrons, cats]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateChevrons();
+    const onScroll = () => updateChevrons();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", updateChevrons);
+    const ro = new ResizeObserver(updateChevrons);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", updateChevrons);
+      ro.disconnect();
+    };
+  }, [updateChevrons]);
+
+  return (
+    <div style={{ position: "relative", marginBottom, width: "100%", minWidth: 0 }}>
+      <div
+        ref={scrollRef}
+        className="pepv-library-cat-scroll"
+        style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 0 }}
+      >
+        <div style={LIBRARY_CAT_SCROLL_INNER}>
+          {cats.map((cat) => (
+            <button
+              type="button"
+              key={cat}
+              onClick={() => onSelect(cat)}
+              style={{
+                ...LIBRARY_FILTER_PILL_BASE,
+                flexShrink: 0,
+                whiteSpace: "nowrap",
+                ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+      {showLeft ? (
+        <button
+          type="button"
+          className="pepv-library-cat-chev"
+          aria-label="Scroll categories left"
+          onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })}
+          style={{ ...LIBRARY_CAT_CHEV_BTN, left: 0 }}
+        >
+          ‹
+        </button>
+      ) : null}
+      {showRight ? (
+        <button
+          type="button"
+          className="pepv-library-cat-chev"
+          aria-label="Scroll categories right"
+          onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })}
+          style={{ ...LIBRARY_CAT_CHEV_BTN, right: 0 }}
+        >
+          ›
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 /** Top-right header: member profile avatar initial (no image). */
 function headerMemberAvatarInitial(displayName) {
@@ -1081,50 +1188,18 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
           {activeTab === "library" && (
             <div style={{ width: "100%", minWidth: 0 }}>
-              <div
-                className="pepv-library-cat-scroll"
-                style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 6 }}
-              >
-                <div style={LIBRARY_CAT_SCROLL_INNER}>
-                  {LIBRARY_CATEGORY_ROW_1.map((cat) => (
-                    <button
-                      type="button"
-                      key={cat}
-                      onClick={() => handleCategorySelect(cat)}
-                      style={{
-                        ...LIBRARY_FILTER_PILL_BASE,
-                        flexShrink: 0,
-                        whiteSpace: "nowrap",
-                        ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div
-                className="pepv-library-cat-scroll"
-                style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 12 }}
-              >
-                <div style={LIBRARY_CAT_SCROLL_INNER}>
-                  {LIBRARY_CATEGORY_ROW_2.map((cat) => (
-                    <button
-                      type="button"
-                      key={cat}
-                      onClick={() => handleCategorySelect(cat)}
-                      style={{
-                        ...LIBRARY_FILTER_PILL_BASE,
-                        flexShrink: 0,
-                        whiteSpace: "nowrap",
-                        ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <LibraryCategoryPillScrollRow
+                cats={LIBRARY_CATEGORY_ROW_1}
+                selCat={selCat}
+                onSelect={handleCategorySelect}
+                marginBottom={6}
+              />
+              <LibraryCategoryPillScrollRow
+                cats={LIBRARY_CATEGORY_ROW_2}
+                selCat={selCat}
+                onSelect={handleCategorySelect}
+                marginBottom={12}
+              />
               <div
                 style={{
                   display: "flex",

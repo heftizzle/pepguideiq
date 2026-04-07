@@ -48,7 +48,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 
 const CORS_BASE = {
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
@@ -187,6 +187,14 @@ function corsHeaders(env, request) {
     return { ...CORS_BASE, "Access-Control-Allow-Origin": allowed, Vary: "Origin" };
   }
   return null;
+}
+
+/** CORS for public avatar images (<img src cross-origin); not gated on ALLOWED_ORIGIN. */
+function publicAvatarCorsHeaders() {
+  return {
+    ...CORS_BASE,
+    "Access-Control-Allow-Origin": "*",
+  };
 }
 
 /** @param {Record<string, string | undefined>} env */
@@ -1066,7 +1074,12 @@ function publicMemberAvatarUrl(request, key) {
 async function handleGetAvatar(request, env, cors) {
   const bucket = env.STACK_PHOTOS;
   if (!bucket) {
-    return new Response("Not configured", { status: 503, headers: cors });
+    log(env, "error", "avatar_r2_bucket_missing", {});
+    return jsonResponse(
+      { error: "R2 bucket STACK_PHOTOS is not bound on the Worker" },
+      503,
+      cors
+    );
   }
   const url = new URL(request.url);
   const prefix = "/avatars/";
@@ -1083,7 +1096,8 @@ async function handleGetAvatar(request, env, cors) {
       return new Response("Not found", { status: 404, headers: cors });
     }
     const ct = obj.httpMetadata?.contentType ?? "image/jpeg";
-    return new Response(obj.body, {
+    const isHead = request.method === "HEAD";
+    return new Response(isHead ? null : obj.body, {
       status: 200,
       headers: {
         ...cors,
@@ -1751,13 +1765,34 @@ async function handleRequest(request, env) {
     const url = new URL(request.url);
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
     const pathname = url.pathname;
-    const rlType =
-      pathname.startsWith("/auth") || pathname.startsWith("/login") || pathname.startsWith("/signup")
-        ? "auth"
-        : "api";
-    const ipRl = checkRateLimit(ip, rlType);
-    if (ipRl.limited) {
-      return rateLimitResponse(ipRl.retryAfter);
+
+    const skipRateLimitPublicAvatar =
+      pathname.startsWith("/avatars/") &&
+      (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS");
+
+    if (!skipRateLimitPublicAvatar) {
+      const rlType =
+        pathname.startsWith("/auth") || pathname.startsWith("/login") || pathname.startsWith("/signup")
+          ? "auth"
+          : "api";
+      const ipRl = checkRateLimit(ip, rlType);
+      if (ipRl.limited) {
+        return rateLimitResponse(ipRl.retryAfter);
+      }
+    }
+
+    if (url.pathname === "/stripe/webhook" && request.method === "POST") {
+      return handleStripeWebhook(request, env);
+    }
+
+    const pubAvatarCors = publicAvatarCorsHeaders();
+    if (pathname.startsWith("/avatars/")) {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: pubAvatarCors });
+      }
+      if (request.method === "GET" || request.method === "HEAD") {
+        return handleGetAvatar(request, env, pubAvatarCors);
+      }
     }
 
     const cors = corsHeaders(env, request);
@@ -1768,12 +1803,13 @@ async function handleRequest(request, env) {
       return new Response(null, { headers: cors });
     }
 
-    if (url.pathname === "/stripe/webhook" && request.method === "POST") {
-      return handleStripeWebhook(request, env);
-    }
-
     if (!cors) {
       return new Response("Forbidden", { status: 403 });
+    }
+
+    const isAvatarsUploadPath = pathname === "/avatars" || pathname === "/avatars/";
+    if (isAvatarsUploadPath && (request.method === "POST" || request.method === "PUT")) {
+      return handlePostStackPhoto(request, env, cors);
     }
 
     if (url.pathname === "/turnstile/verify" && request.method === "POST") {
@@ -1832,10 +1868,6 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {
       return handlePostStackPhoto(request, env, cors);
-    }
-
-    if (request.method === "GET" && url.pathname.startsWith("/avatars/")) {
-      return handleGetAvatar(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "GET") {

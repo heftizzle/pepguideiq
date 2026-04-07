@@ -55,6 +55,9 @@ export function GlobalStyles() {
         -ms-overflow-style:none;
       }
       .pepv-library-cat-scroll::-webkit-scrollbar{display:none}
+      @media (max-width:768px){
+        .pepv-library-cat-chev{display:none!important}
+      }
       .grid-bg{background-image:linear-gradient(rgba(0,212,170,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,.025) 1px,transparent 1px);background-size:48px 48px}
       .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#4a6080;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
       .tab-btn:hover{color:#8fa5bf}

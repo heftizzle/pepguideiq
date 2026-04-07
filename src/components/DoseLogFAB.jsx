@@ -8,21 +8,44 @@ const FAB_BODY_MIN_HEIGHT = 72;
 const FAB_BOTTOM_CSS = "calc(80px + env(safe-area-inset-bottom, 0px))";
 const EDGE = 16;
 const TAP_MAX_PX = 10;
+/** Below this horizontal drag distance, snap back to the edge for the side we started on. */
+const COMMIT_DRAG_PX = 40;
 const TOUR_STRIP_ID = "pepv-demo-tour-strip";
 const TOUR_GAP_PX = 8;
+
+/** Bottom-right default: same as `right: 16px` intent for the centered-transform layout. */
+function defaultOffsetXBottomRight() {
+  if (typeof window === "undefined") return 0;
+  return window.innerWidth / 2 - FAB_SIZE - EDGE;
+}
+
+/** @param {"left" | "right"} side */
+function snapOffsetXForSide(side) {
+  const w = window.innerWidth;
+  const centerLeft = w / 2 - FAB_SIZE / 2;
+  const minOff = EDGE - centerLeft;
+  const maxOff = w - FAB_SIZE - EDGE - centerLeft;
+  return side === "left" ? minOff : maxOff;
+}
+
+/** @param {number} offsetX */
+function sideFromOffsetX(offsetX) {
+  const w = window.innerWidth;
+  return w / 2 + offsetX < w / 2 ? "left" : "right";
+}
 
 /** @param {{ onSessionPicked: (session: "morning"|"afternoon"|"evening"|"night") => void }} props */
 export function DoseLogFAB({ onSessionPicked }) {
   const demoTour = useDemoTourOptional();
   const stripVisible = Boolean(demoTour?.stripVisible);
 
-  const [offsetX, setOffsetX] = useState(0);
+  const [offsetX, setOffsetX] = useState(defaultOffsetXBottomRight);
   const [transition, setTransition] = useState("transform 0.2s ease");
   const [expanded, setExpanded] = useState(false);
   const [fabBottomPx, setFabBottomPx] = useState(null);
 
   const draggingRef = useRef(false);
-  const offsetXRef = useRef(0);
+  const offsetXRef = useRef(defaultOffsetXBottomRight());
   const dragRef = useRef({
     startX: 0,
     startY: 0,
@@ -121,7 +144,7 @@ export function DoseLogFAB({ onSessionPicked }) {
   }, [expanded]);
 
   const finishDrag = useCallback((clientX, clientY) => {
-    const { startX, startY } = dragRef.current;
+    const { startX, startY, startOffsetX } = dragRef.current;
     const dx = clientX - startX;
     const dy = clientY - startY;
     const dist = Math.hypot(dx, dy);
@@ -135,8 +158,22 @@ export function DoseLogFAB({ onSessionPicked }) {
     }
 
     setExpanded(false);
-    setOffsetX(0);
-    offsetXRef.current = 0;
+
+    const w = typeof window !== "undefined" ? window.innerWidth : 0;
+    const startSide = sideFromOffsetX(startOffsetX);
+
+    if (Math.abs(dx) < COMMIT_DRAG_PX) {
+      const snap = snapOffsetXForSide(startSide);
+      setOffsetX(snap);
+      offsetXRef.current = snap;
+      return;
+    }
+
+    const currentCenterX = w / 2 + offsetXRef.current;
+    const nextSide = currentCenterX < w / 2 ? "left" : "right";
+    const snap = snapOffsetXForSide(nextSide);
+    setOffsetX(snap);
+    offsetXRef.current = snap;
   }, []);
 
   const onPointerDown = (e) => {
