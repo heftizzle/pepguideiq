@@ -31,23 +31,18 @@ async function verifyTokenWithWorker(token) {
   return data.success === true;
 }
 
-function waitTurnstileReady(maxMs = 15000) {
-  return new Promise((resolve) => {
-    if (typeof window !== "undefined" && window.turnstile) {
-      resolve();
-      return;
+function waitForTurnstile(callback, maxWait = 5000) {
+  const start = Date.now();
+  const interval = setInterval(() => {
+    if (typeof window.turnstile !== "undefined") {
+      clearInterval(interval);
+      callback();
+    } else if (Date.now() - start > maxWait) {
+      clearInterval(interval);
+      // turnstile never loaded — leave turnstileReady false, allow login
     }
-    const start = Date.now();
-    const id = window.setInterval(() => {
-      if (typeof window !== "undefined" && window.turnstile) {
-        window.clearInterval(id);
-        resolve();
-      } else if (Date.now() - start > maxMs) {
-        window.clearInterval(id);
-        resolve();
-      }
-    }, 50);
-  });
+  }, 100);
+  return () => clearInterval(interval);
 }
 
 export function AuthScreen({ onAuth }) {
@@ -57,6 +52,8 @@ export function AuthScreen({ onAuth }) {
   const [busy, setBusy] = useState(false);
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  /** True only after Turnstile `render()` succeeds; skip enforcement when false (widget never mounted). */
+  const [turnstileReady, setTurnstileReady] = useState(false);
   const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
   /** Set from dynamic `zxcvbn` (register password strength meter). */
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
@@ -116,19 +113,27 @@ export function AuthScreen({ onAuth }) {
     if (!turnstileRequired) return;
     let cancelled = false;
     mainWidgetIdRef.current = null;
-    (async () => {
-      await waitTurnstileReady();
+    setTurnstileReady(false);
+    const stopPolling = waitForTurnstile(() => {
       if (cancelled) return;
       const el = document.getElementById("turnstile-widget");
-      if (!el || !window.turnstile) return;
+      if (!el || typeof window.turnstile === "undefined") return;
       el.innerHTML = "";
-      const widgetId = window.turnstile.render("#turnstile-widget", {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: (t) => setTurnstileToken(t),
-        "expired-callback": () => setTurnstileToken(null),
-        "error-callback": () => setTurnstileToken(null),
-        theme: "dark",
-      });
+      let widgetId;
+      try {
+        widgetId = window.turnstile.render("#turnstile-widget", {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (t) => setTurnstileToken(t),
+          "expired-callback": () => setTurnstileToken(null),
+          "error-callback": () => {
+            setTurnstileToken(null);
+            setTurnstileReady(false);
+          },
+          theme: "dark",
+        });
+      } catch {
+        return;
+      }
       if (cancelled) {
         if (window.turnstile?.remove) {
           try {
@@ -140,9 +145,12 @@ export function AuthScreen({ onAuth }) {
         return;
       }
       mainWidgetIdRef.current = widgetId;
-    })();
+      setTurnstileReady(true);
+    });
     return () => {
       cancelled = true;
+      stopPolling();
+      setTurnstileReady(false);
       const id = mainWidgetIdRef.current;
       mainWidgetIdRef.current = null;
       if (id != null && window.turnstile?.remove) {
@@ -160,19 +168,27 @@ export function AuthScreen({ onAuth }) {
     if (!turnstileRequired) return;
     let cancelled = false;
     plansWidgetIdRef.current = null;
-    (async () => {
-      await waitTurnstileReady();
+    setTurnstileReady(false);
+    const stopPolling = waitForTurnstile(() => {
       if (cancelled) return;
       const el = document.getElementById("turnstile-widget-plans");
-      if (!el || !window.turnstile) return;
+      if (!el || typeof window.turnstile === "undefined") return;
       el.innerHTML = "";
-      const widgetId = window.turnstile.render("#turnstile-widget-plans", {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: (t) => setTurnstileToken(t),
-        "expired-callback": () => setTurnstileToken(null),
-        "error-callback": () => setTurnstileToken(null),
-        theme: "dark",
-      });
+      let widgetId;
+      try {
+        widgetId = window.turnstile.render("#turnstile-widget-plans", {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (t) => setTurnstileToken(t),
+          "expired-callback": () => setTurnstileToken(null),
+          "error-callback": () => {
+            setTurnstileToken(null);
+            setTurnstileReady(false);
+          },
+          theme: "dark",
+        });
+      } catch {
+        return;
+      }
       if (cancelled) {
         if (window.turnstile?.remove) {
           try {
@@ -184,9 +200,12 @@ export function AuthScreen({ onAuth }) {
         return;
       }
       plansWidgetIdRef.current = widgetId;
-    })();
+      setTurnstileReady(true);
+    });
     return () => {
       cancelled = true;
+      stopPolling();
+      setTurnstileReady(false);
       const id = plansWidgetIdRef.current;
       plansWidgetIdRef.current = null;
       if (id != null && window.turnstile?.remove) {
@@ -204,7 +223,7 @@ export function AuthScreen({ onAuth }) {
     setBusy(true);
     try {
       if (mode === "login") {
-        if (turnstileRequired) {
+        if (turnstileRequired && turnstileReady) {
           if (!turnstileToken) {
             setError("Bot verification failed. Please try again.");
             return;
@@ -258,7 +277,7 @@ export function AuthScreen({ onAuth }) {
           setError("This password has appeared in a known data breach. Please choose a different one.");
           return;
         }
-        if (turnstileRequired) {
+        if (turnstileRequired && turnstileReady) {
           if (!turnstileToken) {
             setError("Bot verification failed. Please try again.");
             return;
@@ -294,7 +313,7 @@ export function AuthScreen({ onAuth }) {
     setError("");
     setBusy(true);
     try {
-      if (turnstileRequired) {
+      if (turnstileRequired && turnstileReady) {
         if (!turnstileToken) {
           setError("Bot verification failed. Please try again.");
           return;
@@ -333,8 +352,9 @@ export function AuthScreen({ onAuth }) {
   };
 
   const authSubmitDisabled =
-    busy || (turnstileRequired && !turnstileToken && (mode === "login" || mode === "register"));
-  const plansSelectDisabled = busy || (turnstileRequired && !turnstileToken);
+    busy ||
+    (turnstileRequired && turnstileReady && !turnstileToken && (mode === "login" || mode === "register"));
+  const plansSelectDisabled = busy || (turnstileRequired && turnstileReady && !turnstileToken);
 
   if (!isSupabaseConfigured()) {
     return (

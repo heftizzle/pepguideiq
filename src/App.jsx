@@ -1962,7 +1962,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 className="btn-teal"
                 style={{ fontSize: 14, flex: "1 1 140px" }}
                 onClick={() => {
-                  setShowHandlePrompt(false);
+                  dismissHandlePrompt();
                   setActiveTab("profile");
                 }}
               >
