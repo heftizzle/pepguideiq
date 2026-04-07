@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
 
 const FAB_SIZE = 56;
+const FAB_BODY_MIN_HEIGHT = 72;
 const EDGE = 16;
 const TAP_MAX_PX = 10;
 const COMMIT_DRAG_PX = 40;
@@ -239,18 +240,20 @@ export function DoseLogFAB({ onSessionPicked }) {
         onPointerCancel={onPointerCancel}
         style={{
           width: FAB_SIZE,
-          height: FAB_SIZE,
           minWidth: FAB_SIZE,
-          minHeight: FAB_SIZE,
-          borderRadius: "50%",
+          minHeight: FAB_BODY_MIN_HEIGHT,
+          height: "auto",
+          borderRadius: FAB_SIZE / 2,
           border: "1px solid rgba(0, 212, 170, 0.55)",
           background: "linear-gradient(145deg, rgba(0, 212, 170, 0.22), rgba(7, 9, 14, 0.95))",
           boxShadow: "0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 212, 170, 0.12)",
           cursor: expanded ? "default" : "grab",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: 0,
+          gap: 2,
+          padding: "6px 4px",
           margin: 0,
           fontSize: 26,
           lineHeight: 1,
@@ -258,6 +261,21 @@ export function DoseLogFAB({ onSessionPicked }) {
       >
         <span className="pepv-emoji" aria-hidden style={{ pointerEvents: "none" }}>
           💉
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            lineHeight: 1.15,
+            color: "#ffffff",
+            maxWidth: FAB_SIZE,
+            textAlign: "center",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 500,
+            letterSpacing: "0.06em",
+            pointerEvents: "none",
+          }}
+        >
+          Log Dose
         </span>
       </button>
     </div>

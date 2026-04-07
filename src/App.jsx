@@ -7,7 +7,6 @@ import { Modal } from "./components/Modal.jsx";
 import { LibrarySearchInput } from "./components/LibrarySearchInput.jsx";
 import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
-import { getProtocolSessionsOrdered } from "./data/protocolSessions.js";
 import { ProtocolTab } from "./components/ProtocolTab.jsx";
 import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
@@ -30,7 +29,6 @@ import {
   DEMO_TARGET,
   NETWORK_TAB_EMOJI,
   demoHighlightProps,
-  demoNavProtocolTarget,
   useDemoTour,
 } from "./context/DemoTourContext.jsx";
 import { DemoTourBar, DemoTourHelpButton } from "./components/DemoTourChrome.jsx";
@@ -200,8 +198,6 @@ function tierHeaderPill(plan) {
       };
   }
 }
-
-const NAV_PROTOCOL_SESSIONS = getProtocolSessionsOrdered();
 
 function PepGuideIQApp({ user, setUser }) {
   const { activeProfileId, activeProfile, memberProfilesVersion } = useActiveProfile();
@@ -723,7 +719,7 @@ function PepGuideIQApp({ user, setUser }) {
     <DemoTourProvider
       setActiveTab={setActiveTab}
       setProtocolDeepLink={setProtocolDeepLink}
-      firstProtocolSessionId={NAV_PROTOCOL_SESSIONS[0]?.id ?? "morning"}
+      firstProtocolSessionId="morning"
     >
       <DoseToastProvider>
         <PepGuideIQMainTree mainUiRef={mainUiRef} />
@@ -734,7 +730,7 @@ function PepGuideIQApp({ user, setUser }) {
 }
 
 function PepGuideIQMainTree({ mainUiRef }) {
-  const { isHighlighted, stripVisible, firstProtocolSessionId } = useDemoTour();
+  const { isHighlighted, stripVisible } = useDemoTour();
   const {
     user,
     setUser,
@@ -807,7 +803,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
   } = mainUiRef.current;
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
-  const libraryProtocolActiveSession = protocolDeepLink ?? user?.defaultSession ?? "morning";
 
   return (
     <>
@@ -1044,98 +1039,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </button>
                       ))}
                     </div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    flexWrap: "wrap",
-                    alignItems: "stretch",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "#ffffff",
-                      fontSize: 13,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontWeight: 500,
-                      letterSpacing: "0.06em",
-                      alignSelf: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    PROTOCOL
-                  </span>
-                  <div
-                    role="group"
-                    aria-label="Protocol session"
-                    style={{
-                      display: "flex",
-                      alignItems: "stretch",
-                      gap: 6,
-                      flex: "1 1 200px",
-                      minWidth: 0,
-                    }}
-                  >
-                    {NAV_PROTOCOL_SESSIONS.map(({ id: session, emoji, navLabel: label, pillLabel }) => {
-                      const isActive = libraryProtocolActiveSession === session;
-                      const protoTarget = demoNavProtocolTarget(session);
-                      return (
-                        <button
-                          key={session}
-                          type="button"
-                          className={isActive ? "pepv-protocol-session-pill--active" : undefined}
-                          aria-label={pillLabel}
-                          aria-pressed={isActive}
-                          data-demo-target={protoTarget}
-                          {...demoHighlightProps(
-                            isHighlighted(DEMO_TARGET.protocol_log_dose) && session === firstProtocolSessionId
-                          )}
-                          onClick={() => {
-                            setProtocolDeepLink(session);
-                            setActiveTab("protocol");
-                          }}
-                          style={{
-                            flex: "1 1 0",
-                            minWidth: 0,
-                            minHeight: 44,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 2,
-                            padding: "6px 4px",
-                            borderRadius: 12,
-                            cursor: "pointer",
-                            fontFamily: "'JetBrains Mono', monospace",
-                            border: isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-                            background: isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                          }}
-                        >
-                          <span
-                            className="pepv-emoji"
-                            style={{ fontSize: 18, lineHeight: 1, opacity: isActive ? 1 : 0.72 }}
-                            aria-hidden
-                          >
-                            {emoji}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 10,
-                              lineHeight: 1.15,
-                              letterSpacing: "0.06em",
-                              color: isActive ? "#00d4aa" : "#5c6d82",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {label}
-                          </span>
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
               </div>
