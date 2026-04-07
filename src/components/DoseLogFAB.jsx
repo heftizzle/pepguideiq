@@ -1,48 +1,113 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
+import { useDemoTourOptional } from "../context/DemoTourContext.jsx";
 
 const FAB_SIZE = 56;
 const FAB_BODY_MIN_HEIGHT = 72;
+/** Clears bottom nav; safe-area keeps FAB above home indicator on notched phones. */
+const FAB_BOTTOM_CSS = "calc(80px + env(safe-area-inset-bottom, 0px))";
 const EDGE = 16;
 const TAP_MAX_PX = 10;
-const COMMIT_DRAG_PX = 40;
-const LS_KEY = "fabSide";
+const TOUR_STRIP_ID = "pepv-demo-tour-strip";
+const TOUR_GAP_PX = 8;
 
 /** @param {{ onSessionPicked: (session: "morning"|"afternoon"|"evening"|"night") => void }} props */
 export function DoseLogFAB({ onSessionPicked }) {
-  const [side, setSide] = useState(() => readStoredSide());
-  const [leftPx, setLeftPx] = useState(() => safeComputeLeftPx(readStoredSide()));
-  const [transition, setTransition] = useState("left 0.2s ease");
+  const demoTour = useDemoTourOptional();
+  const stripVisible = Boolean(demoTour?.stripVisible);
+
+  const [offsetX, setOffsetX] = useState(0);
+  const [transition, setTransition] = useState("transform 0.2s ease");
   const [expanded, setExpanded] = useState(false);
+  const [fabBottomPx, setFabBottomPx] = useState(null);
 
   const draggingRef = useRef(false);
-  const leftPxRef = useRef(leftPx);
+  const offsetXRef = useRef(0);
   const dragRef = useRef({
     startX: 0,
     startY: 0,
-    startLeft: 0,
-    startSide: "right",
+    startOffsetX: 0,
   });
   const fabRef = useRef(null);
 
   useEffect(() => {
-    leftPxRef.current = leftPx;
-  }, [leftPx]);
+    offsetXRef.current = offsetX;
+  }, [offsetX]);
 
-  const syncLeftToSide = useCallback((s) => {
-    const next = safeComputeLeftPx(s);
-    leftPxRef.current = next;
-    setLeftPx(next);
+  const recomputeBottomAboveTour = useCallback(() => {
+    const el = document.getElementById(TOUR_STRIP_ID);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.round(window.innerHeight - r.top + TOUR_GAP_PX));
   }, []);
+
+  useLayoutEffect(() => {
+    if (!stripVisible) {
+      setFabBottomPx(null);
+      return;
+    }
+    let cancelled = false;
+    const el = document.getElementById(TOUR_STRIP_ID);
+    if (!el) {
+      setFabBottomPx(null);
+      const t = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        const next = recomputeBottomAboveTour();
+        if (next != null) setFabBottomPx(next);
+      });
+      return () => {
+        cancelled = true;
+        window.cancelAnimationFrame(t);
+      };
+    }
+
+    const apply = () => {
+      const next = recomputeBottomAboveTour();
+      if (next != null) setFabBottomPx(next);
+    };
+    apply();
+
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, [stripVisible, recomputeBottomAboveTour, demoTour?.showCollapsedTeaser, demoTour?.showFullPanel]);
+
+  const clampOffsetX = useCallback((raw) => {
+    if (typeof window === "undefined") return raw;
+    const centerLeft = window.innerWidth / 2 - FAB_SIZE / 2;
+    const minOff = EDGE - centerLeft;
+    const maxOff = window.innerWidth - FAB_SIZE - EDGE - centerLeft;
+    return Math.min(maxOff, Math.max(minOff, raw));
+  }, []);
+
+  const syncOffsetAfterResize = useCallback(() => {
+    if (draggingRef.current) return;
+    const next = clampOffsetX(offsetXRef.current);
+    offsetXRef.current = next;
+    setOffsetX(next);
+  }, [clampOffsetX]);
+
+  useLayoutEffect(() => {
+    syncOffsetAfterResize();
+  }, [syncOffsetAfterResize]);
 
   useEffect(() => {
     const onResize = () => {
       if (draggingRef.current) return;
-      syncLeftToSide(side);
+      syncOffsetAfterResize();
+      if (stripVisible) {
+        const next = recomputeBottomAboveTour();
+        if (next != null) setFabBottomPx(next);
+      }
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [side, syncLeftToSide]);
+  }, [stripVisible, syncOffsetAfterResize, recomputeBottomAboveTour]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -55,55 +120,31 @@ export function DoseLogFAB({ onSessionPicked }) {
     return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, [expanded]);
 
-  const finishDrag = useCallback(
-    (clientX, clientY) => {
-      const { startX, startY, startLeft, startSide } = dragRef.current;
-      const dx = clientX - startX;
-      const dy = clientY - startY;
-      const dist = Math.hypot(dx, dy);
-      const maxL = window.innerWidth - FAB_SIZE - EDGE;
-      const currentLeft = leftPxRef.current;
+  const finishDrag = useCallback((clientX, clientY) => {
+    const { startX, startY } = dragRef.current;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    const dist = Math.hypot(dx, dy);
 
-      draggingRef.current = false;
-      setTransition("left 0.2s ease");
+    draggingRef.current = false;
+    setTransition("transform 0.2s ease");
 
-      if (dist < TAP_MAX_PX) {
-        setExpanded((v) => !v);
-        setSide(startSide);
-        persistSide(startSide);
-        syncLeftToSide(startSide);
-        return;
-      }
+    if (dist < TAP_MAX_PX) {
+      setExpanded((v) => !v);
+      return;
+    }
 
-      setExpanded(false);
-
-      const hMove = Math.abs(dx);
-      if (hMove < COMMIT_DRAG_PX) {
-        setSide(startSide);
-        persistSide(startSide);
-        setLeftPx(startSide === "left" ? EDGE : maxL);
-        leftPxRef.current = startSide === "left" ? EDGE : maxL;
-        return;
-      }
-
-      const centerX = currentLeft + FAB_SIZE / 2;
-      const nextSide = centerX < window.innerWidth / 2 ? "left" : "right";
-      setSide(nextSide);
-      persistSide(nextSide);
-      const nextLeft = nextSide === "left" ? EDGE : maxL;
-      setLeftPx(nextLeft);
-      leftPxRef.current = nextLeft;
-    },
-    [syncLeftToSide]
-  );
+    setExpanded(false);
+    setOffsetX(0);
+    offsetXRef.current = 0;
+  }, []);
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      startLeft: leftPxRef.current,
-      startSide: side,
+      startOffsetX: offsetXRef.current,
     };
     draggingRef.current = true;
     setTransition("none");
@@ -116,12 +157,11 @@ export function DoseLogFAB({ onSessionPicked }) {
 
   const onPointerMove = (e) => {
     if (!draggingRef.current) return;
-    const { startX, startLeft } = dragRef.current;
+    const { startX, startOffsetX } = dragRef.current;
     const dx = e.clientX - startX;
-    const maxL = window.innerWidth - FAB_SIZE - EDGE;
-    const next = Math.min(maxL, Math.max(EDGE, startLeft + dx));
-    leftPxRef.current = next;
-    setLeftPx(next);
+    const next = clampOffsetX(startOffsetX + dx);
+    offsetXRef.current = next;
+    setOffsetX(next);
   };
 
   const onPointerUp = (e) => {
@@ -137,8 +177,10 @@ export function DoseLogFAB({ onSessionPicked }) {
   const onPointerCancel = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    setTransition("left 0.2s ease");
-    syncLeftToSide(side);
+    setTransition("transform 0.2s ease");
+    const { startOffsetX } = dragRef.current;
+    setOffsetX(startOffsetX);
+    offsetXRef.current = startOffsetX;
   };
 
   const sessions = getProtocolSessionsOrdered();
@@ -148,19 +190,20 @@ export function DoseLogFAB({ onSessionPicked }) {
     onSessionPicked(id);
   };
 
-  const inside = side === "right" ? { right: "100%", marginRight: 12 } : { left: "100%", marginLeft: 12 };
-  const slideFrom = side === "right" ? 14 : -14;
+  const bottomStyle = fabBottomPx != null ? `${fabBottomPx}px` : FAB_BOTTOM_CSS;
 
   return (
     <div
       ref={fabRef}
       style={{
         position: "fixed",
-        zIndex: 199,
-        left: leftPx,
-        top: "50%",
+        zIndex: 38,
+        left: "50%",
+        right: "auto",
+        bottom: bottomStyle,
+        top: "auto",
         width: FAB_SIZE,
-        transform: "translateY(-50%)",
+        transform: `translateX(calc(-50% + ${offsetX}px))`,
         transition,
         pointerEvents: "auto",
         touchAction: "none",
@@ -172,13 +215,15 @@ export function DoseLogFAB({ onSessionPicked }) {
           aria-hidden
           style={{
             position: "absolute",
-            ...inside,
-            top: "50%",
-            transform: "translateY(-50%)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: "100%",
+            marginBottom: 12,
+            top: "auto",
             display: "flex",
             flexDirection: "column",
             gap: 8,
-            alignItems: side === "right" ? "flex-end" : "flex-start",
+            alignItems: "center",
             pointerEvents: "auto",
           }}
         >
@@ -220,11 +265,11 @@ export function DoseLogFAB({ onSessionPicked }) {
         @keyframes pepvFabPillIn {
           from {
             opacity: 0;
-            transform: translateX(${slideFrom}px);
+            transform: translateY(10px);
           }
           to {
             opacity: 1;
-            transform: translateX(0);
+            transform: translateY(0);
           }
         }
       `}</style>
@@ -280,28 +325,4 @@ export function DoseLogFAB({ onSessionPicked }) {
       </button>
     </div>
   );
-}
-
-function readStoredSide() {
-  try {
-    const s = localStorage.getItem(LS_KEY);
-    if (s === "left" || s === "right") return s;
-  } catch {
-    /* ignore */
-  }
-  return "right";
-}
-
-function persistSide(s) {
-  try {
-    localStorage.setItem(LS_KEY, s);
-  } catch {
-    /* ignore */
-  }
-}
-
-function safeComputeLeftPx(s) {
-  if (typeof window === "undefined") return EDGE;
-  const maxL = window.innerWidth - FAB_SIZE - EDGE;
-  return s === "left" ? EDGE : maxL;
 }

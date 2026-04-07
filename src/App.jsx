@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { PEPTIDES, CATEGORIES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
+import { PEPTIDES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
-import { LibrarySearchInput } from "./components/LibrarySearchInput.jsx";
+import { LibraryMobileSearchIcon, LibraryMobileSearchPanel } from "./components/LibraryMobileSearch.jsx";
 import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
 import { ProtocolTab } from "./components/ProtocolTab.jsx";
@@ -136,6 +136,53 @@ const LIBRARY_FILTER_PILL_ACTIVE = {
   color: "#00d4aa",
 };
 
+/** Library category pills — two horizontal scroll rows (order is intentional). */
+const LIBRARY_CATEGORY_ROW_1 = [
+  "All",
+  "Anabolics / HRT",
+  "Sexual Health",
+  "GH Peptides",
+  "Sleep",
+  "Healing / Recovery",
+  "Longevity",
+  "Nootropic",
+  "Immune",
+];
+
+const LIBRARY_CATEGORY_ROW_2 = [
+  "GLP / Metabolic",
+  "Skin / Hair / Nails",
+  "Mitochondrial",
+  "Relational Performance",
+  "Estrogen Control",
+  "Testosterone Support",
+  "Thyroid Support",
+  "SARMs",
+  "Khavinson Bioregulators",
+];
+
+const LIBRARY_CAT_SCROLL_OUTER = {
+  overflowX: "auto",
+  overflowY: "hidden",
+  WebkitOverflowScrolling: "touch",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
+  width: "100%",
+  maxWidth: "100%",
+  minWidth: 0,
+  touchAction: "pan-x",
+  overscrollBehaviorX: "contain",
+};
+
+const LIBRARY_CAT_SCROLL_INNER = {
+  display: "flex",
+  flexDirection: "row",
+  flexWrap: "nowrap",
+  alignItems: "center",
+  gap: 6,
+  width: "max-content",
+};
+
 /** Top-right header: member profile avatar initial (no image). */
 function headerMemberAvatarInitial(displayName) {
   const s = String(displayName || "").trim();
@@ -227,6 +274,7 @@ function PepGuideIQApp({ user, setUser }) {
   /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
   const [narrowHeader, setNarrowHeader] = useState(false);
+  const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
   const [guideExiting, setGuideExiting] = useState(false);
   const msgEnd = useRef(null);
@@ -307,6 +355,15 @@ function PepGuideIQApp({ user, setUser }) {
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "library") setLibrarySearchOpen(false);
+  }, [activeTab]);
+
+  const dismissLibrarySearch = useCallback(() => {
+    setLibrarySearchOpen(false);
+    setSearch("");
+  }, [setSearch]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -713,6 +770,9 @@ function PepGuideIQApp({ user, setUser }) {
     showHandlePrompt,
     dismissHandlePrompt,
     setRouteFilter,
+    librarySearchOpen,
+    setLibrarySearchOpen,
+    dismissLibrarySearch,
   };
 
   return (
@@ -800,6 +860,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
     showHandlePrompt,
     dismissHandlePrompt,
     setRouteFilter,
+    librarySearchOpen,
+    setLibrarySearchOpen,
+    dismissLibrarySearch,
   } = mainUiRef.current;
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
@@ -817,8 +880,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
           <div className="grid-bg" style={{ borderBottom:"1px solid #0e1822" }}>
             <div style={{ maxWidth:1200,margin:"0 auto",padding:"0 16px" }}>
-              <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
+              <div style={{ display:"flex",alignItems:"center",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
                 <Logo />
+                {activeTab === "library" && (
+                  <LibraryMobileSearchIcon
+                    open={librarySearchOpen}
+                    onOpen={() => setLibrarySearchOpen(true)}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 8 }} aria-hidden />
                 <div
                   id="nav-account-anchor"
                   style={{
@@ -826,7 +896,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     alignItems: "center",
                     gap: 6,
                     overflowX: "auto",
-                    marginLeft: "auto",
                     flexWrap: "wrap",
                   }}
                 >
@@ -987,6 +1056,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   );
                 })()}
               </div>
+              {activeTab === "library" && librarySearchOpen && (
+                <LibraryMobileSearchPanel
+                  initialSearch={search}
+                  onDismiss={dismissLibrarySearch}
+                  setSearch={setSearch}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -997,49 +1073,92 @@ function PepGuideIQMainTree({ mainUiRef }) {
             maxWidth: 1200,
             margin: "0 auto",
             padding: "20px 16px 88px",
+            width: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
           }}
         >
 
           {activeTab === "library" && (
-            <div>
-              <div style={{ display:"flex",gap:10,marginBottom:16,flexWrap:"wrap",alignItems:"center" }}>
-                <LibrarySearchInput
-                  onDebouncedChange={setSearch}
-                  style={{ maxWidth: 280, flex: "1 1 200px" }}
-                  placeholder="Search by name, alias, tag…"
-                />
-                <div style={{ display:"flex",gap:6,flex:1,flexWrap:"wrap",alignItems:"center",overflowX:"auto",paddingBottom:2,minWidth:0 }}>
-                  {CATEGORIES.map((cat) => (
+            <div style={{ width: "100%", minWidth: 0 }}>
+              <div
+                className="pepv-library-cat-scroll"
+                style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 6 }}
+              >
+                <div style={LIBRARY_CAT_SCROLL_INNER}>
+                  {LIBRARY_CATEGORY_ROW_1.map((cat) => (
                     <button
                       type="button"
                       key={cat}
                       onClick={() => handleCategorySelect(cat)}
                       style={{
                         ...LIBRARY_FILTER_PILL_BASE,
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
                         ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
                       }}
                     >
                       {cat}
                     </button>
                   ))}
-                  <div style={{ display:"flex",alignItems:"center",gap:8,marginLeft:"auto",flexWrap:"wrap" }}>
-                    <span style={{ color:"#ffffff",fontSize: 13,fontFamily:"'JetBrains Mono',monospace",fontWeight:500,letterSpacing:"0.06em" }}>Sort</span>
-                    <div style={{ display:"flex",gap:6,alignItems:"center",flexWrap:"wrap" }}>
-                      {SORT_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setSortMode(opt.value)}
-                          style={{
-                            ...LIBRARY_FILTER_PILL_BASE,
-                            ...(sortMode === opt.value ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                          }}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                </div>
+              </div>
+              <div
+                className="pepv-library-cat-scroll"
+                style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 12 }}
+              >
+                <div style={LIBRARY_CAT_SCROLL_INNER}>
+                  {LIBRARY_CATEGORY_ROW_2.map((cat) => (
+                    <button
+                      type="button"
+                      key={cat}
+                      onClick={() => handleCategorySelect(cat)}
+                      style={{
+                        ...LIBRARY_FILTER_PILL_BASE,
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                        ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <span
+                  style={{
+                    color: "#ffffff",
+                    fontSize: 13,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 500,
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  Sort
+                </span>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setSortMode(opt.value)}
+                      style={{
+                        ...LIBRARY_FILTER_PILL_BASE,
+                        ...(sortMode === opt.value ? LIBRARY_FILTER_PILL_ACTIVE : {}),
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div style={{ marginBottom: 16 }}>
@@ -1059,7 +1178,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   ))}
                 </div>
               </div>
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
+                  gap: 14,
+                  width: "100%",
+                  minWidth: 0,
+                }}
+              >
                 {sortedPeptides.map((p, cardIdx) => {
                   const cat0 = primaryCategory(p);
                   const cc = getCatColor(cat0);
@@ -1818,6 +1945,19 @@ function PepGuideIQMainTree({ mainUiRef }) {
               }}
             >
               <span
+                className="mono"
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1,
+                  letterSpacing: "0.03em",
+                  color: "#7a8694",
+                  fontWeight: 500,
+                }}
+                aria-hidden
+              >
+                {PEPTIDES.length}
+              </span>
+              <span
                 className="pepv-emoji"
                 style={{ fontSize: 18, lineHeight: 1, opacity: libraryNavActive ? 1 : 0.72 }}
                 aria-hidden
@@ -1826,37 +1966,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
               </span>
               <span
                 style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "baseline",
-                  justifyContent: "center",
-                  gap: 6,
+                  fontSize: 13,
                   lineHeight: 1.15,
+                  letterSpacing: "0.06em",
+                  color: libraryNavActive ? "#00d4aa" : "#5c6d82",
+                  fontWeight: 500,
+                  textAlign: "center",
                 }}
               >
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: "0.03em",
-                    color: "#7a8694",
-                    fontWeight: 500,
-                    flexShrink: 0,
-                  }}
-                  aria-hidden
-                >
-                  {PEPTIDES.length}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    letterSpacing: "0.06em",
-                    color: libraryNavActive ? "#00d4aa" : "#5c6d82",
-                    fontWeight: 500,
-                  }}
-                >
-                  LIBRARY
-                </span>
+                LIBRARY
               </span>
             </button>
             {[

@@ -1046,6 +1046,57 @@ async function handleGetStackPhoto(request, env, cors) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** R2 keys allowed for public GET /avatars/{key} (member profile or legacy account avatar JPEG). */
+const AVATAR_R2_KEY_RE = new RegExp(
+  `^${UUID_RE.source}/(?:member-profiles/${UUID_RE.source}/avatar\\.jpg|avatar\\.jpg)$`,
+  "i"
+);
+
+/**
+ * @param {Request} request
+ * @param {string} key
+ */
+function publicMemberAvatarUrl(request, key) {
+  return `${new URL(request.url).origin}/avatars/${key}`;
+}
+
+/**
+ * Public GET — stream avatar from R2 for use in <img src> (key must match AVATAR_R2_KEY_RE).
+ */
+async function handleGetAvatar(request, env, cors) {
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return new Response("Not configured", { status: 503, headers: cors });
+  }
+  const url = new URL(request.url);
+  const prefix = "/avatars/";
+  if (!url.pathname.startsWith(prefix)) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+  const key = url.pathname.slice(prefix.length);
+  if (!key || key.includes("..") || !AVATAR_R2_KEY_RE.test(key)) {
+    return new Response("Forbidden", { status: 403, headers: cors });
+  }
+  try {
+    const obj = await bucket.get(key);
+    if (!obj) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+    const ct = obj.httpMetadata?.contentType ?? "image/jpeg";
+    return new Response(obj.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": ct,
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  } catch (e) {
+    log(env, "error", "r2_avatar_get_failed", { message: String(e) });
+    return new Response("Storage error", { status: 502, headers: cors });
+  }
+}
+
 const MEMBER_PROFILE_ALLOWED_LANGUAGES = new Set(["en", "es", "pt-BR", "fr", "de", "ja", "zh-Hans"]);
 
 const MEMBER_PROFILE_SHIFT_SCHEDULES = new Set(["days", "swings", "mids", "nights", "rotating"]);
@@ -1552,8 +1603,9 @@ async function handlePostStackPhoto(request, env, cors) {
     patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_2_r2_key: key });
   } else if (kind === "avatar") {
     if (avatarMemberProfileId) {
+      const avatarPublicUrl = publicMemberAvatarUrl(request, key);
       const avatarPatch = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
-        avatar_url: key,
+        avatar_url: avatarPublicUrl,
       });
       patched = avatarPatch.ok;
     } else {
@@ -1780,6 +1832,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {
       return handlePostStackPhoto(request, env, cors);
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith("/avatars/")) {
+      return handleGetAvatar(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "GET") {

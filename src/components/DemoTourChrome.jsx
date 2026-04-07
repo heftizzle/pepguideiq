@@ -193,6 +193,7 @@ export function DemoTourBar() {
   if (showCollapsedTeaser) {
     return (
       <div
+        id="pepv-demo-tour-strip"
         style={{
           position: "fixed",
           left: 0,
@@ -248,6 +249,7 @@ export function DemoTourBar() {
 
   return (
     <div
+      id="pepv-demo-tour-strip"
       style={{
         position: "fixed",
         left: 0,

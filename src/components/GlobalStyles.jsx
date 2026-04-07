@@ -50,6 +50,11 @@ export function GlobalStyles() {
       *{box-sizing:border-box;margin:0;padding:0}
       ::-webkit-scrollbar{width:3px}
       ::-webkit-scrollbar-thumb{background:#00d4aa30;border-radius:2px}
+      .pepv-library-cat-scroll{
+        scrollbar-width:none;
+        -ms-overflow-style:none;
+      }
+      .pepv-library-cat-scroll::-webkit-scrollbar{display:none}
       .grid-bg{background-image:linear-gradient(rgba(0,212,170,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,.025) 1px,transparent 1px);background-size:48px 48px}
       .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#4a6080;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
       .tab-btn:hover{color:#8fa5bf}
