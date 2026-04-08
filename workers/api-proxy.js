@@ -34,6 +34,13 @@ const DAILY_QUERY_LIMIT = {
   goat: 16,
 };
 
+const DAILY_ADVISOR_LIMIT = {
+  entry: 5,
+  pro: 30,
+  elite: 60,
+  goat: 120,
+};
+
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
 const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
 
@@ -62,8 +69,14 @@ const ANTHROPIC_VERSION = "2023-06-01";
 
 const CORS_BASE = {
   "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-User-Id, X-User-Plan",
   "Access-Control-Max-Age": "86400",
+};
+
+/** Permissive CORS — edge may answer OPTIONS before Worker; POST/OPTIONS responses must still carry ACAO. */
+const PERMISSIVE_CORS_HEADERS = {
+  ...CORS_BASE,
+  "Access-Control-Allow-Origin": "*",
 };
 
 // ─── Security Headers ───
@@ -210,10 +223,7 @@ function corsHeaders(env, request) {
 
 /** CORS for public avatar images (<img src cross-origin); not gated on ALLOWED_ORIGIN. */
 function publicAvatarCorsHeaders() {
-  return {
-    ...CORS_BASE,
-    "Access-Control-Allow-Origin": "*",
-  };
+  return PERMISSIVE_CORS_HEADERS;
 }
 
 /** @param {Record<string, string | undefined>} env */
@@ -306,6 +316,140 @@ function normalizeMessages(messages) {
           ? m.content
           : String(m.content ?? ""),
   }));
+}
+
+// ─── AI STACK ADVISOR ───────────────────────────────────────────────────────
+/**
+ * POST /ai-stack-advisor — Build-tab stack suggestions (permissive CORS; empty 200 on parse/upstream failure).
+ * @param {Request} request
+ * @param {Record<string, string | undefined>} env
+ */
+async function handleStackAdvisor(request, env) {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-User-Id, X-User-Plan",
+  };
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { currentStack, catalog } = await request.json();
+
+    if (!currentStack?.length) {
+      return new Response(JSON.stringify({ error: "No stack provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!Array.isArray(catalog)) {
+      return new Response(JSON.stringify({ error: "Invalid catalog" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = request.headers.get("X-User-Id") ?? "anon";
+    const planRaw = request.headers.get("X-User-Plan") ?? "entry";
+    const plan = String(planRaw).toLowerCase();
+    const dailyLimit = DAILY_ADVISOR_LIMIT[plan] ?? DAILY_ADVISOR_LIMIT.entry;
+
+    if (dailyLimit < 999 && env.RATE_LIMIT_KV) {
+      const today = new Date().toISOString().split("T")[0];
+      const kvKey = `advisor:${userId}:${today}`;
+      const count = parseInt((await env.RATE_LIMIT_KV.get(kvKey)) ?? "0", 10);
+
+      if (count >= dailyLimit) {
+        return new Response(
+          JSON.stringify({
+            insight: "",
+            recommendations: [],
+            rateLimited: true,
+            limitMessage: `You've used your ${dailyLimit} daily AI advisor calls on the ${planRaw} plan.`,
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await env.RATE_LIMIT_KV.put(kvKey, String(count + 1), { expirationTtl: 86400 });
+    }
+
+    const stackIds = new Set(
+      currentStack.map((c) => (c && typeof c.id === "string" ? c.id : "")).filter(Boolean)
+    );
+    const compactCatalog = catalog
+      .filter((c) => c && typeof c.id === "string" && !stackIds.has(c.id))
+      .map((c) => ({
+        id: c.id,
+        name: typeof c.name === "string" ? c.name : c.id,
+        category: typeof c.category === "string" ? c.category : "",
+        brief: typeof c.brief === "string" ? c.brief : "",
+      }));
+
+    const systemPrompt = `You are an expert peptide and biohacking protocol advisor. The user is building a research stack and needs synergistic compound recommendations. You MUST only recommend compounds that exist in the provided catalog — never invent compounds not in the list. Be specific about mechanism synergies. Return ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON. Exact shape required:
+{
+  "insight": "1-2 sentences assessing the current stack and what dimension is missing",
+  "recommendations": [
+    { "catalogId": "exact_id_from_catalog", "name": "Exact Name", "rationale": "One sentence on why it pairs with this stack." }
+  ]
+}
+Return 2-3 recommendations maximum. Only use catalogId values from the provided catalog.`;
+
+    const userMessage = `Current stack: ${JSON.stringify(currentStack)}
+
+Available catalog (filtered, not in stack already):
+${JSON.stringify(compactCatalog)}
+
+Assess the stack and recommend 2-3 compounds to add.`;
+
+    const apiKey = env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return new Response(JSON.stringify({ insight: "", recommendations: [] }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const anthropicRes = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: MODEL_ENTRY_PRO,
+        max_tokens: 400,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      throw new Error(`Anthropic API error: ${anthropicRes.status}`);
+    }
+
+    const anthropicData = await anthropicRes.json();
+    const rawText = anthropicData.content?.[0]?.text ?? "";
+    const cleaned = rawText.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    const catalogIdSet = new Set(catalog.map((c) => (c && c.id ? String(c.id) : "")).filter(Boolean));
+    const safeRecs = (parsed.recommendations ?? []).filter((r) => r && catalogIdSet.has(r.catalogId)).slice(0, 3);
+
+    return new Response(JSON.stringify({ insight: parsed.insight ?? "", recommendations: safeRecs }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    log(env, "error", "stack_advisor_error", { message: String(err) });
+    return new Response(JSON.stringify({ insight: "", recommendations: [] }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 }
 
 function modelForPlan(plan) {
@@ -1085,7 +1229,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 /** R2 keys allowed for public GET /avatars/{key} (member profile or legacy account avatar JPEG). */
 const AVATAR_R2_KEY_RE = new RegExp(
-  `^${UUID_RE.source}/(?:member-profiles/${UUID_RE.source}/avatar\\.jpg|avatar\\.jpg)$`,
+  `^${UUID_RE.source.slice(1, -1)}/(?:member-profiles/${UUID_RE.source.slice(1, -1)}/avatar\\.jpg|avatar\\.jpg)$`,
   "i"
 );
 
@@ -1817,6 +1961,13 @@ async function handleStripeWebhook(request, env) {
 }
 
 async function handleRequest(request, env) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: PERMISSIVE_CORS_HEADERS,
+      });
+    }
+
     const url = new URL(request.url);
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
     const pathname = url.pathname;
@@ -1869,35 +2020,19 @@ async function handleRequest(request, env) {
     const isAvatarsUploadPath = pathname === "/avatars" || pathname === "/avatars/";
     const pubAvatarCors = publicAvatarCorsHeaders();
     if (!isAvatarsUploadPath && pathname.startsWith("/avatars/")) {
-      if (request.method === "OPTIONS") {
-        return new Response(null, { headers: pubAvatarCors });
-      }
       if (request.method === "GET" || request.method === "HEAD") {
         return handleGetAvatar(request, env, pubAvatarCors);
       }
     }
 
     const cors = corsHeaders(env, request);
-    if (isAvatarsUploadPath && request.method === "OPTIONS") {
-      if (!cors) {
-        return new Response(null, { status: 403 });
-      }
-      return new Response(null, { headers: cors });
-    }
 
-    if (request.method === "OPTIONS") {
-      if (!cors) {
-        return new Response(null, { status: 403 });
-      }
-      return new Response(null, { headers: cors });
+    if (isAvatarsUploadPath && (request.method === "POST" || request.method === "PUT")) {
+      return handlePostStackPhoto(request, env, PERMISSIVE_CORS_HEADERS);
     }
 
     if (!cors) {
       return new Response("Forbidden", { status: 403 });
-    }
-
-    if (isAvatarsUploadPath && (request.method === "POST" || request.method === "PUT")) {
-      return handlePostStackPhoto(request, env, cors);
     }
 
     if (url.pathname === "/turnstile/verify" && request.method === "POST") {
@@ -1960,6 +2095,11 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/stack-photo" && request.method === "GET") {
       return handleGetStackPhoto(request, env, cors);
+    }
+
+    // ─── AI STACK ADVISOR ────────────────────────────────────────────────
+    if (url.pathname === "/ai-stack-advisor" && request.method === "POST") {
+      return handleStackAdvisor(request, env);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {

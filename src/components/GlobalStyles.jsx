@@ -101,6 +101,27 @@ export function GlobalStyles() {
       .btn-teal{background:#00d4aa14;border:1px solid #00d4aa;color:#00d4aa;padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;transition:all .2s}
       .btn-teal:hover{background:#00d4aa22}
       .btn-teal:disabled{opacity:.4;cursor:not-allowed}
+      @keyframes pepvBtnSavedPulse{
+        0%{border-color:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,0.45)}
+        40%{border-color:#4ade80;box-shadow:0 0 20px rgba(34,197,94,0.42)}
+        100%{border-color:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,0)}
+      }
+      .btn-teal.btn-saved{
+        animation:pepvBtnSavedPulse 1.8s ease-in-out forwards;
+        border-color:#22c55e!important;
+        color:#86efac!important;
+        background:rgba(34,197,94,0.16)!important;
+      }
+      @keyframes pepvAdvisorSkeletonPulse{
+        0%,100%{opacity:0.32}
+        50%{opacity:0.58}
+      }
+      .pepv-advisor-skeleton{
+        border-radius:10px;
+        background:#14202e;
+        min-height:76px;
+        animation:pepvAdvisorSkeletonPulse 1.15s ease-in-out infinite;
+      }
       .btn-green{background:#10b98115;border:1px solid #10b981;color:#10b981;padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500}
       .btn-red{background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 11px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s}
       .btn-red:hover{background:#ef444418}
@@ -157,7 +178,6 @@ export function GlobalStyles() {
       .btn-upgrade-ghost{background:transparent!important;border:1px solid #243040!important;color:#8fa5bf!important}
       .btn-upgrade-ghost:hover{border-color:#4a6080!important;color:#dde4ef!important}
       @media (max-width: 640px) {
-        .guide-sidebar{display:none}
         .tab-btn{padding:10px 10px;font-size:13px}
       }
       /* AI Guide full-screen takeover — open/close use same duration per breakpoint */
@@ -182,9 +202,30 @@ export function GlobalStyles() {
       .guide-takeover-close:hover{color:#dde4ef;border-color:#3d5266;background:#14202e}
       .guide-takeover-close:focus-visible{outline:2px solid #00d4aa;outline-offset:2px}
       .guide-takeover-panel-wrap{
-        flex:1;min-height:0;display:flex;flex-direction:row;gap:16px;margin-top:2px;
+        flex:1;min-height:0;display:flex;flex-direction:row;gap:16px;margin-top:2px;width:100%;
       }
-      @media (max-width:640px){
+      .guide-takeover-chat-panel{display:flex;flex-direction:column;min-height:0;min-width:0}
+      .guide-takeover-msgs{flex:1;min-height:0;overflow-y:auto}
+      .guide-takeover-input-bar{flex-shrink:0}
+      .guide-mobile-goals-toggle{
+        width:100%;display:flex;align-items:center;justify-content:flex-start;gap:8px;
+        padding:8px 12px;border:none;border-radius:0;background:rgba(0,212,170,0.08);
+        color:#00d4aa;font-size:13px;font-family:'JetBrains Mono',monospace;cursor:pointer;text-align:left;
+        border-bottom:1px solid #0e1822;box-sizing:border-box;
+      }
+      .guide-mobile-goals-toggle:hover{background:rgba(0,212,170,0.12)}
+      .guide-mobile-goals-dropdown{flex-shrink:0;background:#07090e;border-bottom:1px solid #14202e}
+      .guide-mobile-goals-panel{
+        max-height:120px;overflow-y:auto;overflow-x:hidden;border-top:1px solid #0e1822;
+        -webkit-overflow-scrolling:touch;
+      }
+      .guide-mobile-goals-row{
+        display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;padding:8px 10px;
+        overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin;
+      }
+      .goal-chip.guide-mobile-goal-pill{width:auto!important;flex-shrink:0!important;white-space:nowrap;text-align:center}
+      @media (max-width:768px){
+        .guide-sidebar{display:none!important}
         .guide-takeover-root{
           padding-top:max(52px,env(safe-area-inset-top));
           animation:guideTakeoverInMobile .34s ease;
@@ -197,6 +238,20 @@ export function GlobalStyles() {
         @keyframes guideTakeoverOutMobile{
           from{opacity:1;transform:translateY(0)}
           to{opacity:0;transform:translateY(100%)}
+        }
+        .guide-takeover-panel-wrap{
+          flex-direction:column;
+          gap:0;
+          align-items:stretch;
+        }
+        .guide-takeover-chat-panel{
+          flex:1;
+          min-height:0;
+          width:100%;
+        }
+        .guide-takeover-msgs{
+          flex:1;
+          min-height:0;
         }
       }
       [data-demo-highlight="1"]{

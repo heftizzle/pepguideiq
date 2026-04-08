@@ -49,8 +49,29 @@ import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
 import { formatHandleDisplay } from "./lib/memberProfileHandle.js";
 import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
+import ReactMarkdown from "react-markdown";
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
+
+/** Assistant message markdown (AI Guide); stable ref for react-markdown. */
+const AI_GUIDE_MARKDOWN_COMPONENTS = {
+  h2: ({ children }) => (
+    <div className="brand" style={{ fontSize: 14, fontWeight: 700, color: "#00d4aa", marginBottom: 6, marginTop: 12 }}>
+      {children}
+    </div>
+  ),
+  h3: ({ children }) => (
+    <div className="brand" style={{ fontSize: 13, fontWeight: 600, color: "#dde4ef", marginBottom: 4, marginTop: 10 }}>
+      {children}
+    </div>
+  ),
+  strong: ({ children }) => <span style={{ color: "#dde4ef", fontWeight: 600 }}>{children}</span>,
+  hr: () => <hr style={{ border: "none", borderTop: "1px solid #1e2a38", margin: "10px 0" }} />,
+  p: ({ children }) => <p style={{ marginBottom: 8, lineHeight: 1.6 }}>{children}</p>,
+  li: ({ children }) => (
+    <li style={{ marginBottom: 4, lineHeight: 1.6, marginLeft: 16 }}>{children}</li>
+  ),
+};
 
 /** Parent row for a variant (`variantOf` id), if present in the catalog. */
 function getVariantParent(peptide) {
@@ -384,6 +405,11 @@ function PepGuideIQApp({ user, setUser }) {
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
   const [guideExiting, setGuideExiting] = useState(false);
+  /** AI Guide: below 768px hides sidebar; goals live in a toggle + horizontal pill row. */
+  const [guideLayoutMobile, setGuideLayoutMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+  );
+  const [guideMobileGoalsOpen, setGuideMobileGoalsOpen] = useState(false);
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
@@ -394,7 +420,27 @@ function PepGuideIQApp({ user, setUser }) {
     setGoals([]);
     setAiQueryUsage(null);
     setAiLoading(false);
+    setGuideMobileGoalsOpen(false);
   }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const fn = () => {
+      setGuideLayoutMobile(mq.matches);
+      if (!mq.matches) setGuideMobileGoalsOpen(false);
+    };
+    fn();
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+
+  const toggleGuideGoal = useCallback(
+    (g) => {
+      setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+      if (guideLayoutMobile) setGuideMobileGoalsOpen(false);
+    },
+    [guideLayoutMobile]
+  );
 
   useEffect(() => {
     if (prevTabRef.current === "guide" && activeTab !== "guide") {
@@ -1532,6 +1578,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
               savedStackLimit={savedStackLimit}
               onUpgrade={openUpgradeModal}
               primaryCategory={primaryCategory}
+              user={user}
+              plan={user?.plan ?? "entry"}
             />
           )}
 
@@ -1672,9 +1720,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     type="button"
                     key={g}
                     className={`goal-chip ${goals.includes(g) ? "on" : ""}`}
-                    onClick={() =>
-                      setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
-                    }
+                    onClick={() => toggleGuideGoal(g)}
                   >
                     {g}
                   </button>
@@ -1694,6 +1740,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               </div>
 
               <div
+                className="guide-takeover-chat-panel"
                 style={{
                   flex: 1,
                   display: "flex",
@@ -1705,6 +1752,60 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   minWidth: 0,
                 }}
               >
+                {guideLayoutMobile && (
+                  <div className="guide-mobile-goals-dropdown">
+                    <button
+                      type="button"
+                      className="guide-mobile-goals-toggle"
+                      aria-expanded={guideMobileGoalsOpen}
+                      aria-controls="guide-mobile-goals-panel"
+                      id="guide-mobile-goals-toggle"
+                      onClick={() => setGuideMobileGoalsOpen((o) => !o)}
+                    >
+                      <span className="pepv-emoji" aria-hidden>
+                        🎯{" "}
+                      </span>
+                      Goals
+                      {goals.length > 0 ? (
+                        <span className="mono" style={{ color: "#8fa5bf", fontSize: 12 }}>
+                          {" "}
+                          ({goals.length})
+                        </span>
+                      ) : null}
+                      <span className="mono" style={{ marginLeft: "auto", color: "#4a6080", fontSize: 11 }}>
+                        {guideMobileGoalsOpen ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {guideMobileGoalsOpen && (
+                      <div className="guide-mobile-goals-panel" id="guide-mobile-goals-panel" role="region" aria-labelledby="guide-mobile-goals-toggle">
+                        <div className="guide-mobile-goals-row">
+                          {GOALS.map((g) => (
+                            <button
+                              type="button"
+                              key={g}
+                              className={`goal-chip guide-mobile-goal-pill ${goals.includes(g) ? "on" : ""}`}
+                              onClick={() => toggleGuideGoal(g)}
+                            >
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                        {myStack.length > 0 && (
+                          <div style={{ padding: "0 10px 8px", borderTop: "1px solid #14202e" }}>
+                            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", margin: "6px 0 4px" }}>
+                              // SAVED STACK
+                            </div>
+                            {myStack.map((p) => (
+                              <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "#2e4055", padding: "2px 0" }}>
+                                → {p.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div
                   style={{
                     padding: "12px 16px",
@@ -1713,6 +1814,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     alignItems: "center",
                     gap: 10,
                     flexWrap: "wrap",
+                    flexShrink: 0,
                   }}
                 >
                   <div
@@ -1749,7 +1851,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   )}
                 </div>
 
-                <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+                <div className="guide-takeover-msgs" style={{ flex: 1, overflowY: "auto", padding: 14 }}>
                   {aiMsgs.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
@@ -1778,7 +1880,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
                         </div>
                       )}
-                      <div style={{ whiteSpace: "pre-wrap", color: msg.role === "user" ? "#dde4ef" : "#8fa5bf" }}>{msg.content}</div>
+                      {msg.role === "user" ? (
+                        <div style={{ whiteSpace: "pre-wrap", color: "#dde4ef" }}>{msg.content}</div>
+                      ) : (
+                        <div style={{ color: "#8fa5bf" }}>
+                          <ReactMarkdown components={AI_GUIDE_MARKDOWN_COMPONENTS}>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
                       {msg.role === "assistant" && msg.limitReached && (
                         <button type="button" className="btn-teal" onClick={openUpgradeModal} style={{ marginTop: 10, fontSize: 13, padding: "6px 12px" }}>
                           Upgrade for more queries
@@ -1796,7 +1904,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <div ref={msgEnd} />
                 </div>
 
-                <div style={{ padding: 10, borderTop: "1px solid #0e1822", display: "flex", flexDirection: "column", gap: 4 }}>
+                <div
+                  className="guide-takeover-input-bar"
+                  style={{ padding: 10, borderTop: "1px solid #0e1822", display: "flex", flexDirection: "column", gap: 4 }}
+                >
                   <div style={{ display: "flex", gap: 8 }}>
                     <textarea
                       className="ai-input"

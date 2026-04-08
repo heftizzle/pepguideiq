@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCategoryCssVars } from "../data/catalog.js";
+import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
+import { supabase } from "../lib/supabase.js";
 import { hasAccess } from "../lib/tiers.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
@@ -154,8 +156,10 @@ export function BuildTab({
   savedStackLimit,
   onUpgrade,
   primaryCategory,
-  userPlan = "entry",
+  user = null,
+  plan = "entry",
 }) {
+  const { activeProfileId } = useActiveProfile();
   const wide = useWideLayout();
   const [calcOpen, setCalcOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
@@ -177,7 +181,11 @@ export function BuildTab({
   const advisorDebounce = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const advisorFetchGen = useRef(0);
 
-  const advisorRecsUnlocked = hasAccess(userPlan, "pro");
+  const [shoppingHistory, setShoppingHistory] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const advisorRecsUnlocked = hasAccess(plan, "pro");
 
   useEffect(() => {
     return () => {
@@ -221,11 +229,29 @@ export function BuildTab({
 
           const res = await fetch(`${API_WORKER_URL}/ai-stack-advisor`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "X-User-Id": user?.id ?? "anon",
+              "X-User-Plan": plan ?? "entry",
+            },
             body: JSON.stringify({ currentStack, catalog: compactCatalog }),
           });
 
           if (myId !== advisorFetchGen.current) return;
+
+          if (res.status === 429) {
+            const data = await res.json().catch(() => ({}));
+            if (myId !== advisorFetchGen.current) return;
+            setAdvisorData({
+              insight:
+                typeof data.limitMessage === "string" && data.limitMessage.trim()
+                  ? data.limitMessage.trim()
+                  : "Daily AI advisor limit reached. Upgrade for more.",
+              recommendations: [],
+            });
+            setAdvisorLoading(false);
+            return;
+          }
 
           const data = await res.json().catch(() => ({}));
           if (myId !== advisorFetchGen.current) return;
@@ -269,8 +295,8 @@ export function BuildTab({
         advisorDebounce.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce keyed on `rows` only per spec; catalogById/catalog read from latest closure
-  }, [rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounced advisor; deps rows + rate-limit identity (user/plan); catalog/primaryCategory from latest closure
+  }, [rows, user?.id, plan]);
 
   useEffect(() => {
     if (activeTab === "build" && prevTabRef.current !== "build") {
@@ -292,6 +318,32 @@ export function BuildTab({
     }
     prevTabRef.current = activeTab;
   }, [activeTab, myStack, stackName]);
+
+  useEffect(() => {
+    if (activeTab !== "build") return;
+    if (!user?.id || !activeProfileId || !supabase) return;
+
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("shopping_lists")
+          .select("id, stack_name, cycle_weeks, items, created_at")
+          .eq("user_id", user.id)
+          .eq("profile_id", activeProfileId)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (!error && data) setShoppingHistory(data);
+      } catch {
+        /* silent */
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    void loadHistory();
+  }, [activeTab, user?.id, activeProfileId]);
 
   const filteredSearch = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
@@ -437,12 +489,61 @@ export function BuildTab({
       "Estimates only — verify with your supplier and clinician.",
     ];
     const text = lines.join("\n");
+
+    let copiedOk = false;
     try {
       await navigator.clipboard.writeText(text);
-      return true;
+      copiedOk = true;
     } catch {
-      return false;
+      /* ignore */
     }
+
+    if (user?.id && activeProfileId && cycleLines.length > 0 && supabase) {
+      const items = cycleLines
+        .filter((L) => L.totalMg != null && L.vials != null)
+        .map((L) => ({
+          name: L.name,
+          dose: L.dose,
+          frequency: L.freqLabel,
+          totalMg: Math.round(L.totalMg * 1000) / 1000,
+          vials: L.vials,
+          vialSize: L.vialSize,
+        }));
+
+      try {
+        const { data: inserted } = await supabase
+          .from("shopping_lists")
+          .insert({
+            user_id: user.id,
+            profile_id: activeProfileId,
+            stack_name: localName.trim() || stackName || "My Stack",
+            cycle_weeks: w,
+            items,
+          })
+          .select("id, stack_name, cycle_weeks, items, created_at")
+          .single();
+
+        if (inserted) {
+          setShoppingHistory((prev) => [inserted, ...prev].slice(0, 10));
+
+          const { data: all } = await supabase
+            .from("shopping_lists")
+            .select("id, created_at")
+            .eq("user_id", user.id)
+            .eq("profile_id", activeProfileId)
+            .order("created_at", { ascending: false });
+
+          if (all && all.length > 10) {
+            const toDelete = all.slice(10).map((r) => r.id);
+            await supabase.from("shopping_lists").delete().in("id", toDelete);
+          }
+        }
+      } catch {
+        /* silent — copy already succeeded */
+      }
+    }
+
+    return copiedOk;
   };
 
   const handleCopyShoppingList = async () => {
@@ -934,6 +1035,166 @@ export function BuildTab({
       >
         {copied ? "✓ Copied!" : "Copy Shopping List"}
       </button>
+
+      {/* ── ORDER HISTORY ────────────────────────────────── */}
+      {(shoppingHistory.length > 0 || historyLoading) && (
+        <div style={{ marginTop: 14, borderTop: "1px solid #1e2a38", paddingTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((o) => !o)}
+            style={{
+              width: "100%",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "2px 0",
+              marginBottom: historyOpen ? 10 : 0,
+            }}
+          >
+            <span className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.08em" }}>
+              📋 ORDER HISTORY ({shoppingHistory.length})
+            </span>
+            <span className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+              {historyOpen ? "▲" : "▼"}
+            </span>
+          </button>
+
+          {historyOpen &&
+            (historyLoading ? (
+              <div
+                className="pulse"
+                style={{ height: 52, borderRadius: 8, background: "rgba(255,255,255,0.04)" }}
+              />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {shoppingHistory.map((entry) => {
+                  const date = new Date(entry.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+                  const listText = [
+                    `pepguideIQ — cycle shopping list (${entry.cycle_weeks} week${entry.cycle_weeks !== 1 ? "s" : ""})`,
+                    "",
+                    ...(entry.items ?? []).map(
+                      (item) =>
+                        `${item.name} · ${item.dose} · ${item.frequency} · ~${item.totalMg}mg total · ${item.vials}× ${item.vialSize}mg vials`
+                    ),
+                    "",
+                    "Estimates only — verify with your supplier and clinician.",
+                  ].join("\n");
+
+                  return (
+                    <div
+                      key={entry.id}
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: "1px solid #1e2a38",
+                        borderRadius: 8,
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span className="mono" style={{ fontSize: 11, color: "#8fa5bf" }}>
+                          {date} · {entry.cycle_weeks}wk
+                        </span>
+                        <span className="brand" style={{ fontSize: 11, color: "#4a6080" }}>
+                          {entry.stack_name}
+                        </span>
+                      </div>
+
+                      <ul style={{ margin: "0 0 8px 0", paddingLeft: 14, lineHeight: 1.6 }}>
+                        {(entry.items ?? []).map((item, i) => (
+                          <li key={i} className="mono" style={{ fontSize: 11, color: "#5c6d82" }}>
+                            {item.name} · {item.vials}× {item.vialSize}mg
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn-teal"
+                          style={{ fontSize: 11, padding: "4px 10px", minHeight: "unset" }}
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(listText);
+                            } catch {
+                              /* ignore */
+                            }
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1800);
+                          }}
+                        >
+                          Re-copy
+                        </button>
+
+                        {typeof navigator.share === "function" && (
+                          <button
+                            type="button"
+                            className="btn-teal"
+                            style={{ fontSize: 11, padding: "4px 10px", minHeight: "unset" }}
+                            onClick={() =>
+                              navigator
+                                .share({ title: `${entry.stack_name} order list`, text: listText })
+                                .catch(() => {})
+                            }
+                          >
+                            Share
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="btn-teal"
+                          style={{ fontSize: 11, padding: "4px 10px", minHeight: "unset" }}
+                          onClick={() => {
+                            (entry.items ?? []).forEach((item) => {
+                              const compound = catalog.find(
+                                (c) => c.name.toLowerCase() === String(item.name ?? "").toLowerCase()
+                              );
+                              if (compound) addCompound(compound);
+                            });
+                            document.querySelector(".pepv-main-scroll")?.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        >
+                          → Load into Builder
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-red"
+                          style={{
+                            fontSize: 11,
+                            padding: "4px 8px",
+                            minHeight: "unset",
+                            marginLeft: "auto",
+                          }}
+                          onClick={async () => {
+                            setShoppingHistory((prev) => prev.filter((e) => e.id !== entry.id));
+                            if (supabase) await supabase.from("shopping_lists").delete().eq("id", entry.id);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+        </div>
+      )}
     </>
   );
 
