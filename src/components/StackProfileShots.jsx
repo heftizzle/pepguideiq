@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { getProfileStackShotR2Keys, getSessionAccessToken } from "../lib/supabase.js";
-
-const VIAL_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
-const VIAL_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const VIAL_PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+import {
+  R2_UPLOAD_ACCEPT_ATTR,
+  R2_UPLOAD_ALLOWED_TYPES,
+  R2_UPLOAD_MAX_BYTES,
+  uploadImageToR2,
+} from "../lib/r2Upload.js";
 
 function useWorkerObjectUrl(r2Key, workerConfigured) {
   const [objectUrl, setObjectUrl] = useState(null);
@@ -79,41 +81,30 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
     e.target.value = "";
     if (!f) return;
     setErr(null);
-    if (!VIAL_PHOTO_TYPES.has(f.type)) {
-      setErr("// JPEG, PNG, or WebP only");
+    if (!R2_UPLOAD_ALLOWED_TYPES.has(f.type)) {
+      setErr("// JPEG, PNG, WebP, or GIF only");
       return;
     }
-    if (f.size > VIAL_PHOTO_MAX_BYTES) {
-      setErr("// Max 5MB");
+    if (f.size > R2_UPLOAD_MAX_BYTES) {
+      setErr("// Max 10MB");
       return;
     }
-    const token = await getSessionAccessToken();
-    if (!token) {
-      setErr("// Sign in required");
-      return;
-    }
-    const fd = new FormData();
-    fd.append("file", f);
-    fd.append("kind", kind);
     setUploading(true);
-    try {
-      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
-        setErr(`// ${msg}`);
-        return;
-      }
-      await onUploaded();
-    } catch {
-      setErr("// Network error");
-    } finally {
-      setUploading(false);
+    const result = await uploadImageToR2({
+      path: "/stack-photo",
+      file: f,
+      fields: { kind },
+      onState: (state) => {
+        if (state === "retrying") setErr("// Retrying…");
+      },
+    });
+    setUploading(false);
+    if (!result.ok) {
+      setErr(`// ${result.error}`);
+      return;
     }
+    setErr(null);
+    await onUploaded();
   }
 
   return (
@@ -130,7 +121,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
       <input
         ref={inputRef}
         type="file"
-        accept={VIAL_PHOTO_ACCEPT}
+        accept={R2_UPLOAD_ACCEPT_ATTR}
         style={{ display: "none" }}
         onChange={(e) => void onInputChange(e)}
       />

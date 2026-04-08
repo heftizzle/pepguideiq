@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { SettingsTab } from "./SettingsTab.jsx";
 import { StackProfileShots } from "./StackProfileShots.jsx";
-import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import { isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { formatPlan } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
 import {
   fetchBodyMetrics,
   fetchUserProfileStats,
-  getSessionAccessToken,
   listRecentDosedAtDates,
   upsertBodyMetrics,
 } from "../lib/supabase.js";
+import { uploadImageToR2, R2_UPLOAD_ACCEPT_ATTR } from "../lib/r2Upload.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -436,32 +436,32 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
       return;
     }
     if (avatarBusy) return;
+    if (!activeProfileId) {
+      setErr("No active profile");
+      return;
+    }
     setAvatarBusy(true);
     setErr(null);
-    try {
-      const token = await getSessionAccessToken();
-      if (!token) throw new Error("Not signed in");
-      if (!activeProfileId) throw new Error("No active profile");
-      const fd = new FormData();
-      fd.append("kind", "avatar");
-      fd.append("member_profile_id", activeProfileId);
-      fd.append("file", file);
-      const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(typeof j.error === "string" ? j.error : "Upload failed");
-      }
-      await refreshMemberProfiles();
-      setAvatarImageNonce((n) => n + 1);
-    } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : "Upload failed");
-    } finally {
+    setMsg(null);
+    const result = await uploadImageToR2({
+      path: "/stack-photo",
+      file,
+      fields: { kind: "avatar", member_profile_id: activeProfileId },
+      onState: (state) => {
+        if (state === "retrying") setMsg("Retrying…");
+      },
+    });
+    setMsg(null);
+    if (!result.ok) {
+      setErr(result.error);
       setAvatarBusy(false);
+      return;
     }
+    // Worker has already persisted member_profiles.avatar_url with the full URL.
+    // Refresh so any other consumer (header, ProfileSwitcher) sees the new value.
+    await refreshMemberProfiles();
+    setAvatarImageNonce((n) => n + 1);
+    setAvatarBusy(false);
   };
 
   const toggleHeightUnit = (u) => {
@@ -690,7 +690,7 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
               </div>
             )}
           </button>
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => void onAvatarPick(e)} />
+          <input ref={fileRef} type="file" accept={R2_UPLOAD_ACCEPT_ATTR} hidden onChange={(e) => void onAvatarPick(e)} />
           <div style={{ flex: "1 1 0", minWidth: 0 }}>
             <div
               style={{

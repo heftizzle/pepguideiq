@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { getSessionAccessToken } from "../lib/supabase.js";
 import { API_WORKER_URL } from "../lib/config.js";
-
-const ACCEPT = "image/jpeg,image/png,image/webp";
-const MAX_BYTES = 5 * 1024 * 1024;
-const OK_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+import {
+  R2_UPLOAD_ACCEPT_ATTR,
+  R2_UPLOAD_ALLOWED_TYPES,
+  R2_UPLOAD_MAX_BYTES,
+  uploadImageToR2,
+} from "../lib/r2Upload.js";
 
 /**
  * @param {{
@@ -110,43 +112,30 @@ export function StackPhotoUpload({
       return;
     }
     setErr(null);
-    if (!file || !OK_TYPES.has(file.type)) {
-      setErr("// JPEG, PNG, or WebP only");
+    if (!file || !R2_UPLOAD_ALLOWED_TYPES.has(file.type)) {
+      setErr("// JPEG, PNG, WebP, or GIF only");
       return;
     }
-    if (file.size > MAX_BYTES) {
-      setErr("// Max 5MB");
+    if (file.size > R2_UPLOAD_MAX_BYTES) {
+      setErr("// Max 10MB");
       return;
     }
-
-    const token = await getSessionAccessToken();
-    if (!token) {
-      setErr("// Sign in required");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
 
     setUploading(true);
-    try {
-      const res = await fetch(`${API_WORKER_URL}/upload-stack-photo`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
-        setErr(`// ${msg}`);
-        return;
-      }
-      await onUploaded();
-    } catch {
-      setErr("// Network error");
-    } finally {
-      setUploading(false);
+    const result = await uploadImageToR2({
+      path: "/upload-stack-photo",
+      file,
+      onState: (state) => {
+        if (state === "retrying") setErr("// Retrying…");
+      },
+    });
+    setUploading(false);
+    if (!result.ok) {
+      setErr(`// ${result.error}`);
+      return;
     }
+    setErr(null);
+    await onUploaded();
   }
 
   function onInputChange(e) {
@@ -207,7 +196,7 @@ export function StackPhotoUpload({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
+        accept={R2_UPLOAD_ACCEPT_ATTR}
         style={{ display: "none" }}
         onChange={onInputChange}
       />

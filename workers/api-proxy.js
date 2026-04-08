@@ -37,12 +37,25 @@ const DAILY_QUERY_LIMIT = {
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";
 const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
 
-const STACK_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const STACK_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 const STACK_PHOTO_TYPES = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
+  ["image/gif", "gif"],
 ]);
+
+/** Content-Type from stored R2 object's filename extension (fallback when metadata is missing). */
+function contentTypeFromKey(key) {
+  const m = String(key ?? "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  if (!m) return "application/octet-stream";
+  const ext = m[1];
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+  return "application/octet-stream";
+}
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -54,6 +67,8 @@ const CORS_BASE = {
 };
 
 // ─── Security Headers ───
+// img-src includes the Worker origin (workers.dev) so avatars served from
+// /avatars/{key} render in the SPA from a different origin.
 const SECURITY_HEADERS = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
@@ -64,8 +79,8 @@ const SECURITY_HEADERS = {
     "default-src 'self'; " +
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " +
     "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; " +
-    "connect-src 'self' https://api.anthropic.com https://*.supabase.co; " +
+    "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.workers.dev; " +
+    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev; " +
     "frame-src https://challenges.cloudflare.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
@@ -78,6 +93,10 @@ const RATE_LIMIT_STORE = new Map();
 const RATE_LIMITS = {
   auth: { windowMs: 60_000, max: 10 },
   api: { windowMs: 60_000, max: 60 },
+  /** Authed image uploads (POST/PUT): 20/min per IP. */
+  r2_write: { windowMs: 60_000, max: 20 },
+  /** Authenticated private image reads (GET /stack-photo): 500/min per IP. Public /avatars/ is unrate-limited. */
+  r2_read: { windowMs: 60_000, max: 500 },
 };
 
 // ─── Turnstile ───
@@ -117,7 +136,7 @@ async function verifyTurnstile(token, env) {
 
 /**
  * @param {string} ip
- * @param {"auth" | "api"} type
+ * @param {"auth" | "api" | "r2_read" | "r2_write"} type
  */
 function checkRateLimit(ip, type) {
   const cfg = RATE_LIMITS[type] ?? RATE_LIMITS.api;
@@ -941,14 +960,21 @@ async function handleUploadStackPhoto(request, env, cors) {
   }
 
   const size = typeof file.size === "number" ? file.size : 0;
-  if (size <= 0 || size > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+  if (size <= 0) {
+    return jsonResponse({ error: "File is empty" }, 400, cors);
+  }
+  if (size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
   }
 
   const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
   const ext = STACK_PHOTO_TYPES.get(mime);
   if (!ext) {
-    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400, cors);
+    return jsonResponse(
+      { error: "Unsupported file type — use JPEG, PNG, WebP, or GIF" },
+      415,
+      cors
+    );
   }
 
   const key = `${userId}/stack.${ext}`;
@@ -959,7 +985,7 @@ async function handleUploadStackPhoto(request, env, cors) {
     return jsonResponse({ error: "Could not read file" }, 400, cors);
   }
   if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
   }
 
   try {
@@ -979,7 +1005,8 @@ async function handleUploadStackPhoto(request, env, cors) {
     return jsonResponse({ error: "Failed to update profile" }, 502, cors);
   }
 
-  return jsonResponse({ key, private: true }, 200, cors);
+  const url = privateStackPhotoUrl(request, key);
+  return jsonResponse({ url, key, private: true }, 200, cors);
 }
 
 /**
@@ -1037,13 +1064,15 @@ async function handleGetStackPhoto(request, env, cors) {
     if (!obj) {
       return new Response("Not found", { status: 404, headers: cors });
     }
-    const ct = obj.httpMetadata?.contentType ?? "application/octet-stream";
+    const ct =
+      (obj.httpMetadata && typeof obj.httpMetadata.contentType === "string" && obj.httpMetadata.contentType) ||
+      contentTypeFromKey(key);
     return new Response(obj.body, {
       status: 200,
       headers: {
         ...cors,
         "Content-Type": ct,
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "private, max-age=31536000, immutable",
       },
     });
   } catch (e) {
@@ -1066,6 +1095,16 @@ const AVATAR_R2_KEY_RE = new RegExp(
  */
 function publicMemberAvatarUrl(request, key) {
   return `${new URL(request.url).origin}/avatars/${key}`;
+}
+
+/**
+ * Canonical URL for private R2 reads (vial photos, stack shots, legacy stack photo).
+ * The client must attach a Bearer token when fetching this URL.
+ * @param {Request} request
+ * @param {string} key
+ */
+function privateStackPhotoUrl(request, key) {
+  return `${new URL(request.url).origin}/stack-photo?key=${encodeURIComponent(key)}`;
 }
 
 /**
@@ -1095,14 +1134,16 @@ async function handleGetAvatar(request, env, cors) {
     if (!obj) {
       return new Response("Not found", { status: 404, headers: cors });
     }
-    const ct = obj.httpMetadata?.contentType ?? "image/jpeg";
+    const ct =
+      (obj.httpMetadata && typeof obj.httpMetadata.contentType === "string" && obj.httpMetadata.contentType) ||
+      contentTypeFromKey(key);
     const isHead = request.method === "HEAD";
     return new Response(isHead ? null : obj.body, {
       status: 200,
       headers: {
         ...cors,
         "Content-Type": ct,
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch (e) {
@@ -1537,13 +1578,20 @@ async function handlePostStackPhoto(request, env, cors) {
   }
 
   const size = typeof file.size === "number" ? file.size : 0;
-  if (size <= 0 || size > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+  if (size <= 0) {
+    return jsonResponse({ error: "File is empty" }, 400, cors);
+  }
+  if (size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
   }
 
   const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
   if (!STACK_PHOTO_TYPES.has(mime)) {
-    return jsonResponse({ error: "Allowed types: image/jpeg, image/png, image/webp" }, 400, cors);
+    return jsonResponse(
+      { error: "Unsupported file type — use JPEG, PNG, WebP, or GIF" },
+      415,
+      cors
+    );
   }
 
   let key;
@@ -1580,7 +1628,7 @@ async function handlePostStackPhoto(request, env, cors) {
     return jsonResponse({ error: "Could not read file" }, 400, cors);
   }
   if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File must be between 1 byte and 5MB" }, 400, cors);
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
   }
 
   if (kind === "vial") {
@@ -1611,29 +1659,36 @@ async function handlePostStackPhoto(request, env, cors) {
   }
 
   let patched = false;
+  /** Full canonical URL of the uploaded object — always non-empty on success. */
+  let url = "";
   if (kind === "stack_shot_1") {
     patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_1_r2_key: key });
+    url = privateStackPhotoUrl(request, key);
   } else if (kind === "stack_shot_2") {
     patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stack_shot_2_r2_key: key });
+    url = privateStackPhotoUrl(request, key);
   } else if (kind === "avatar") {
     if (avatarMemberProfileId) {
-      const avatarPublicUrl = publicMemberAvatarUrl(request, key);
+      url = publicMemberAvatarUrl(request, key);
       const avatarPatch = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
-        avatar_url: avatarPublicUrl,
+        avatar_url: url,
       });
       patched = avatarPatch.ok;
     } else {
       patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { avatar_r2_key: key });
+      url = publicMemberAvatarUrl(request, key);
     }
   } else {
     patched = await supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, { vial_photo_r2_key: key }, profileId);
+    url = privateStackPhotoUrl(request, key);
   }
 
   if (!patched) {
     return jsonResponse({ error: "Failed to update database" }, 502, cors);
   }
 
-  return jsonResponse({ key, private: true }, 200, cors);
+  const isPublic = kind === "avatar";
+  return jsonResponse({ url, key, private: !isPublic }, 200, cors);
 }
 
 /**
@@ -1765,16 +1820,42 @@ async function handleRequest(request, env) {
     const url = new URL(request.url);
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
     const pathname = url.pathname;
+    const method = request.method;
 
+    /**
+     * Public R2 GETs (/avatars/{key}) are never rate-limited — they're static
+     * asset reads served from an immutable object store. Rate limiting here
+     * would cascade into broken <img> tags.
+     */
     const skipRateLimitPublicAvatar =
       pathname.startsWith("/avatars/") &&
-      (request.method === "GET" || request.method === "HEAD" || request.method === "OPTIONS");
+      (method === "GET" || method === "HEAD" || method === "OPTIONS");
+
+    /** Authed image uploads (multipart): POST /stack-photo, POST /upload-stack-photo, POST/PUT /avatars. */
+    const isR2Write =
+      (pathname === "/stack-photo" && method === "POST") ||
+      (pathname === "/upload-stack-photo" && method === "POST") ||
+      ((pathname === "/avatars" || pathname === "/avatars/") &&
+        (method === "POST" || method === "PUT"));
+
+    /** Authed private reads: GET /stack-photo. Higher limit for <img> rendering bursts. */
+    const isR2Read = pathname === "/stack-photo" && (method === "GET" || method === "HEAD");
 
     if (!skipRateLimitPublicAvatar) {
-      const rlType =
-        pathname.startsWith("/auth") || pathname.startsWith("/login") || pathname.startsWith("/signup")
-          ? "auth"
-          : "api";
+      let rlType;
+      if (isR2Write) {
+        rlType = "r2_write";
+      } else if (isR2Read) {
+        rlType = "r2_read";
+      } else if (
+        pathname.startsWith("/auth") ||
+        pathname.startsWith("/login") ||
+        pathname.startsWith("/signup")
+      ) {
+        rlType = "auth";
+      } else {
+        rlType = "api";
+      }
       const ipRl = checkRateLimit(ip, rlType);
       if (ipRl.limited) {
         return rateLimitResponse(ipRl.retryAfter);
