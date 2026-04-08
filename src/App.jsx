@@ -1543,7 +1543,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         return <span key={cat} className="pill" style={{ background:cc+"15",color:cc,border:`1px solid ${cc}30`,fontSize: 13,padding:"4px 10px" }}>{cat}: {n}</span>;
                       })}
                     </div>
-                    <button type="button" className="btn-teal" style={{ fontSize: 13 }}
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      style={{
+                        fontSize: 13,
+                        color: "#00d4aa",
+                        background: "rgba(0,212,170,0.08)",
+                        border: "1px solid #00d4aa",
+                      }}
                       onClick={() => {
                         const summary = myStack
                           .map((p) => {
@@ -1746,7 +1754,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   flex: 1,
                   display: "flex",
                   flexDirection: "column",
-                  background: "#0b0f17",
+                  background: "#07090e",
                   border: "1px solid #14202e",
                   borderRadius: 10,
                   overflow: "hidden",
@@ -1853,7 +1861,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   </div>
                 )}
 
-                <div className="guide-takeover-msgs" style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+                <div
+                  className="guide-takeover-msgs"
+                  style={{ flex: 1, overflowY: "auto", padding: 14, background: "#07090e", color: "#dde4ef" }}
+                >
                   {aiMsgs.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>

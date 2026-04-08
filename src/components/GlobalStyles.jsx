@@ -184,7 +184,7 @@ export function GlobalStyles() {
       .guide-takeover-root{
         position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;box-sizing:border-box;
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
-        background:rgba(5,10,18,.62);backdrop-filter:blur(2px);
+        background:rgba(5,10,18,0.92);backdrop-filter:blur(2px);
         animation:guideTakeoverInDesktop .28s ease;
       }
       .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutDesktop .28s ease forwards}
@@ -204,7 +204,10 @@ export function GlobalStyles() {
       .guide-takeover-panel-wrap{
         flex:1;min-height:0;display:flex;flex-direction:row;gap:16px;margin-top:2px;width:100%;
       }
-      .guide-takeover-chat-panel{display:flex;flex-direction:column;min-height:0;min-width:0}
+      .guide-takeover-chat-panel{
+        display:flex;flex-direction:column;min-height:0;min-width:0;
+        background:#07090e;color:#dde4ef;
+      }
       .guide-takeover-msgs{flex:1;min-height:0;overflow-y:auto}
       .guide-takeover-input-bar{
         flex-shrink:0;
@@ -237,6 +240,8 @@ export function GlobalStyles() {
         .guide-takeover-root{
           padding-top:max(52px,env(safe-area-inset-top));
           animation:guideTakeoverInMobile .34s ease;
+          background:rgba(5,10,18,0.92);
+          backdrop-filter:blur(2px);
         }
         .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutMobile .34s ease forwards}
         @keyframes guideTakeoverInMobile{
