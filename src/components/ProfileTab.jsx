@@ -444,7 +444,7 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
     setErr(null);
     setMsg(null);
     const result = await uploadImageToR2({
-      path: "/stack-photo",
+      path: "/avatars",
       file,
       fields: { kind: "avatar", member_profile_id: activeProfileId },
       onState: (state) => {

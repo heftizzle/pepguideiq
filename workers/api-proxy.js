@@ -1866,8 +1866,9 @@ async function handleRequest(request, env) {
       return handleStripeWebhook(request, env);
     }
 
+    const isAvatarsUploadPath = pathname === "/avatars" || pathname === "/avatars/";
     const pubAvatarCors = publicAvatarCorsHeaders();
-    if (pathname.startsWith("/avatars/")) {
+    if (!isAvatarsUploadPath && pathname.startsWith("/avatars/")) {
       if (request.method === "OPTIONS") {
         return new Response(null, { headers: pubAvatarCors });
       }
@@ -1877,6 +1878,13 @@ async function handleRequest(request, env) {
     }
 
     const cors = corsHeaders(env, request);
+    if (isAvatarsUploadPath && request.method === "OPTIONS") {
+      if (!cors) {
+        return new Response(null, { status: 403 });
+      }
+      return new Response(null, { headers: cors });
+    }
+
     if (request.method === "OPTIONS") {
       if (!cors) {
         return new Response(null, { status: 403 });
@@ -1888,7 +1896,6 @@ async function handleRequest(request, env) {
       return new Response("Forbidden", { status: 403 });
     }
 
-    const isAvatarsUploadPath = pathname === "/avatars" || pathname === "/avatars/";
     if (isAvatarsUploadPath && (request.method === "POST" || request.method === "PUT")) {
       return handlePostStackPhoto(request, env, cors);
     }
