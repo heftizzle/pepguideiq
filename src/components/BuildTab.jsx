@@ -1,7 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCategoryCssVars } from "../data/catalog.js";
+// Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
+import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
+import { hasAccess } from "../lib/tiers.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
+
+const MAX_ADVISOR_CATALOG = 153;
+
+/** @param {{ mechanism?: string, typicalDose?: string }} p */
+function oneSentenceBrief(p) {
+  const m = typeof p.mechanism === "string" ? p.mechanism.trim() : "";
+  if (m) {
+    const first = m.split(/(?<=[.!?])\s+/)[0]?.trim() || m;
+    return first.length > 160 ? `${first.slice(0, 157)}…` : first;
+  }
+  const t = typeof p.typicalDose === "string" ? p.typicalDose.trim() : "";
+  return t.length > 120 ? `${t.slice(0, 117)}…` : t || "Research peptide.";
+}
+
+/**
+ * @param {object[]} catalog
+ * @param {(p: object) => string} primaryCategoryFn
+ */
+function buildAdvisorCatalogPayload(catalog, primaryCategoryFn) {
+  return catalog.slice(0, MAX_ADVISOR_CATALOG).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: primaryCategoryFn(p),
+    brief: oneSentenceBrief(p),
+  }));
+}
 
 const FREQ_OPTIONS = [
   { id: "daily", label: "Daily" },
@@ -125,6 +154,7 @@ export function BuildTab({
   savedStackLimit,
   onUpgrade,
   primaryCategory,
+  userPlan = "entry",
 }) {
   const wide = useWideLayout();
   const [calcOpen, setCalcOpen] = useState(false);
@@ -134,9 +164,113 @@ export function BuildTab({
   const [rows, setRows] = useState([]);
   const [vialOverrides, setVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
   const [cycleWeeks, setCycleWeeks] = useState(8);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const savedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const copiedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const prevTabRef = useRef(activeTab);
 
+  const [advisorData, setAdvisorData] = useState(
+    /** @type {{ insight: string, recommendations: { catalogId: string, name: string, rationale: string }[] } | null} */ (null)
+  );
+  const [advisorLoading, setAdvisorLoading] = useState(false);
+  const advisorDebounce = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const advisorFetchGen = useRef(0);
+
+  const advisorRecsUnlocked = hasAccess(userPlan, "pro");
+
+  useEffect(() => {
+    return () => {
+      if (savedResetTimerRef.current != null) clearTimeout(savedResetTimerRef.current);
+      if (copiedResetTimerRef.current != null) clearTimeout(copiedResetTimerRef.current);
+    };
+  }, []);
+
   const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      setAdvisorData(null);
+      setAdvisorLoading(false);
+      if (advisorDebounce.current != null) {
+        window.clearTimeout(advisorDebounce.current);
+        advisorDebounce.current = null;
+      }
+      return;
+    }
+    if (!isApiWorkerConfigured()) {
+      setAdvisorData(null);
+      setAdvisorLoading(false);
+      return;
+    }
+
+    const myId = ++advisorFetchGen.current;
+    setAdvisorLoading(true);
+
+    if (advisorDebounce.current != null) window.clearTimeout(advisorDebounce.current);
+    advisorDebounce.current = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const currentStack = rows
+            .map((row) => {
+              const p = catalogById.get(row.peptideId);
+              return p ? { id: p.id, name: p.name, category: primaryCategory(p) } : null;
+            })
+            .filter(Boolean);
+          const compactCatalog = buildAdvisorCatalogPayload(catalog, primaryCategory);
+
+          const res = await fetch(`${API_WORKER_URL}/ai-stack-advisor`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ currentStack, catalog: compactCatalog }),
+          });
+
+          if (myId !== advisorFetchGen.current) return;
+
+          const data = await res.json().catch(() => ({}));
+          if (myId !== advisorFetchGen.current) return;
+
+          if (!data || typeof data !== "object") {
+            setAdvisorData(null);
+            return;
+          }
+          const insightRaw = typeof data.insight === "string" ? data.insight : "";
+          const rowIds = new Set(rows.map((r) => r.peptideId));
+          let recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+          recs = recs.filter(
+            (r) =>
+              r &&
+              typeof r.catalogId === "string" &&
+              !rowIds.has(r.catalogId.trim()) &&
+              catalogById.has(r.catalogId.trim())
+          );
+          recs = recs.slice(0, 3).map((r) => ({
+            catalogId: String(r.catalogId).trim(),
+            name: typeof r.name === "string" ? r.name.trim() : String(r.catalogId).trim(),
+            rationale: typeof r.rationale === "string" ? r.rationale.trim() : "",
+          }));
+          const insightTrim = insightRaw.trim();
+          if (insightTrim || recs.length) {
+            setAdvisorData({ insight: insightTrim, recommendations: recs });
+          } else {
+            setAdvisorData(null);
+          }
+        } catch {
+          if (myId === advisorFetchGen.current) setAdvisorData(null);
+        } finally {
+          if (myId === advisorFetchGen.current) setAdvisorLoading(false);
+        }
+      })();
+    }, 900);
+
+    return () => {
+      if (advisorDebounce.current != null) {
+        window.clearTimeout(advisorDebounce.current);
+        advisorDebounce.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce keyed on `rows` only per spec; catalogById/catalog read from latest closure
+  }, [rows]);
 
   useEffect(() => {
     if (activeTab === "build" && prevTabRef.current !== "build") {
@@ -249,6 +383,16 @@ export function BuildTab({
     setMyStack(built);
   };
 
+  const handleSaveStack = () => {
+    saveStack();
+    if (savedResetTimerRef.current != null) window.clearTimeout(savedResetTimerRef.current);
+    setSaved(true);
+    savedResetTimerRef.current = window.setTimeout(() => {
+      setSaved(false);
+      savedResetTimerRef.current = null;
+    }, 1800);
+  };
+
   const cycleLines = useMemo(() => {
     const w = Math.max(1, Number(cycleWeeks) || 1);
     return rows.map((row) => {
@@ -295,9 +439,21 @@ export function BuildTab({
     const text = lines.join("\n");
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch {
-      /* ignore */
+      return false;
     }
+  };
+
+  const handleCopyShoppingList = async () => {
+    const ok = await copyShoppingList();
+    if (!ok) return;
+    if (copiedResetTimerRef.current != null) window.clearTimeout(copiedResetTimerRef.current);
+    setCopied(true);
+    copiedResetTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      copiedResetTimerRef.current = null;
+    }, 1800);
   };
 
   const sectionCard = {
@@ -488,13 +644,167 @@ export function BuildTab({
         )}
       </div>
 
+      {rows.length > 0 && isApiWorkerConfigured() && (advisorLoading || advisorData) && (
+        <div
+          style={{
+            marginTop: 16,
+            border: "1px solid rgba(0, 255, 200, 0.22)",
+            borderRadius: 12,
+            background: "rgba(7, 9, 14, 0.78)",
+            padding: 14,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 10,
+              gap: 8,
+            }}
+          >
+            <div
+              className="brand"
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#00ffc8",
+                letterSpacing: "0.04em",
+              }}
+            >
+              <span className="pepv-emoji" aria-hidden>
+                🤖{" "}
+              </span>
+              AI STACK ADVISOR
+            </div>
+            <span className="mono" style={{ fontSize: 10, color: "#5c6d82", letterSpacing: "0.12em" }}>
+              BETA
+            </span>
+          </div>
+          <div style={{ height: 1, background: "rgba(0, 255, 200, 0.15)", marginBottom: 12 }} />
+          {advisorLoading ? (
+            <>
+              <div className="pepv-advisor-skeleton" style={{ height: 40, marginBottom: 14 }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
+                <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
+              </div>
+            </>
+          ) : advisorData ? (
+            <>
+              <p style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 14px" }}>
+                {advisorData.insight}
+              </p>
+              {advisorData.recommendations.length > 0 ? (
+                <>
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: 11,
+                      color: "#00ffc8",
+                      marginBottom: 10,
+                      letterSpacing: "0.1em",
+                    }}
+                  >
+                    CONSIDER ADDING
+                  </div>
+                  <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {advisorData.recommendations.map((rec) => {
+                      const p = catalogById.get(rec.catalogId);
+                      if (!p) return null;
+                      const cat0 = primaryCategory(p);
+                      return (
+                        <div
+                          key={rec.catalogId}
+                          className="build-tab-compound-meta"
+                          style={{
+                            border: "1px solid #14202e",
+                            borderRadius: 10,
+                            padding: 12,
+                            background: "rgba(7, 9, 14, 0.5)",
+                            ...getCategoryCssVars(cat0),
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              gap: 10,
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>
+                                {p.name}
+                              </div>
+                              <span className="pill pill--category">{cat0}</span>
+                            </div>
+                            {advisorRecsUnlocked ? (
+                              <button
+                                type="button"
+                                className="btn-teal"
+                                style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0 }}
+                                onClick={() => addCompound(p)}
+                              >
+                                + Add
+                              </button>
+                            ) : null}
+                          </div>
+                          {rec.rationale ? (
+                            <div
+                              style={{
+                                fontSize: 13,
+                                color: "#8fa5bf",
+                                lineHeight: 1.5,
+                                marginTop: 8,
+                              }}
+                            >
+                              {rec.rationale}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    {!advisorRecsUnlocked ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          borderRadius: 10,
+                          background: "rgba(7, 9, 14, 0.42)",
+                          backdropFilter: "blur(8px)",
+                          WebkitBackdropFilter: "blur(8px)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: 16,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn-teal"
+                          style={{ fontSize: 13, maxWidth: 300, textAlign: "center" }}
+                          onClick={onUpgrade}
+                        >
+                          Upgrade to Pro for AI recommendations
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      )}
+
       <button
         type="button"
-        className="btn-teal"
+        className={saved ? "btn-teal btn-saved" : "btn-teal"}
         style={{ width: "100%", marginTop: 16, fontSize: 13 }}
-        onClick={saveStack}
+        onClick={handleSaveStack}
       >
-        Save Stack
+        {saved ? "✓ Stack Saved!" : "Save Stack"}
       </button>
     </div>
   );
@@ -619,10 +929,10 @@ export function BuildTab({
         type="button"
         className="btn-teal"
         style={{ width: "100%", marginTop: 14, fontSize: 13 }}
-        onClick={() => void copyShoppingList()}
+        onClick={() => void handleCopyShoppingList()}
         disabled={rows.length === 0}
       >
-        Copy Shopping List
+        {copied ? "✓ Copied!" : "Copy Shopping List"}
       </button>
     </>
   );
