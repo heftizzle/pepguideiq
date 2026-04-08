@@ -409,7 +409,8 @@ function PepGuideIQApp({ user, setUser }) {
   const [guideLayoutMobile, setGuideLayoutMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
-  const [guideMobileGoalsOpen, setGuideMobileGoalsOpen] = useState(false);
+  /** Mobile (max-width 768px): collapsible goals row above the message list. */
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
@@ -420,14 +421,14 @@ function PepGuideIQApp({ user, setUser }) {
     setGoals([]);
     setAiQueryUsage(null);
     setAiLoading(false);
-    setGuideMobileGoalsOpen(false);
+    setGoalsOpen(false);
   }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
     const fn = () => {
       setGuideLayoutMobile(mq.matches);
-      if (!mq.matches) setGuideMobileGoalsOpen(false);
+      if (!mq.matches) setGoalsOpen(false);
     };
     fn();
     mq.addEventListener("change", fn);
@@ -437,7 +438,7 @@ function PepGuideIQApp({ user, setUser }) {
   const toggleGuideGoal = useCallback(
     (g) => {
       setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
-      if (guideLayoutMobile) setGuideMobileGoalsOpen(false);
+      if (guideLayoutMobile) setGoalsOpen(false);
     },
     [guideLayoutMobile]
   );
@@ -1752,60 +1753,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   minWidth: 0,
                 }}
               >
-                {guideLayoutMobile && (
-                  <div className="guide-mobile-goals-dropdown">
-                    <button
-                      type="button"
-                      className="guide-mobile-goals-toggle"
-                      aria-expanded={guideMobileGoalsOpen}
-                      aria-controls="guide-mobile-goals-panel"
-                      id="guide-mobile-goals-toggle"
-                      onClick={() => setGuideMobileGoalsOpen((o) => !o)}
-                    >
-                      <span className="pepv-emoji" aria-hidden>
-                        🎯{" "}
-                      </span>
-                      Goals
-                      {goals.length > 0 ? (
-                        <span className="mono" style={{ color: "#8fa5bf", fontSize: 12 }}>
-                          {" "}
-                          ({goals.length})
-                        </span>
-                      ) : null}
-                      <span className="mono" style={{ marginLeft: "auto", color: "#4a6080", fontSize: 11 }}>
-                        {guideMobileGoalsOpen ? "▲" : "▼"}
-                      </span>
-                    </button>
-                    {guideMobileGoalsOpen && (
-                      <div className="guide-mobile-goals-panel" id="guide-mobile-goals-panel" role="region" aria-labelledby="guide-mobile-goals-toggle">
-                        <div className="guide-mobile-goals-row">
-                          {GOALS.map((g) => (
-                            <button
-                              type="button"
-                              key={g}
-                              className={`goal-chip guide-mobile-goal-pill ${goals.includes(g) ? "on" : ""}`}
-                              onClick={() => toggleGuideGoal(g)}
-                            >
-                              {g}
-                            </button>
-                          ))}
-                        </div>
-                        {myStack.length > 0 && (
-                          <div style={{ padding: "0 10px 8px", borderTop: "1px solid #14202e" }}>
-                            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", margin: "6px 0 4px" }}>
-                              // SAVED STACK
-                            </div>
-                            {myStack.map((p) => (
-                              <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "#2e4055", padding: "2px 0" }}>
-                                → {p.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
                 <div
                   style={{
                     padding: "12px 16px",
@@ -1851,12 +1798,69 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   )}
                 </div>
 
+                {guideLayoutMobile && (
+                  <div className="guide-mobile-goals-dropdown">
+                    <button
+                      type="button"
+                      className="guide-mobile-goals-toggle"
+                      aria-expanded={goalsOpen}
+                      aria-controls="guide-mobile-goals-panel"
+                      id="guide-mobile-goals-toggle"
+                      onClick={() => setGoalsOpen((o) => !o)}
+                    >
+                      <span className="pepv-emoji" aria-hidden>
+                        🎯{" "}
+                      </span>
+                      Goals
+                      {goals.length > 0 ? (
+                        <span className="mono" style={{ color: "#8fa5bf", fontSize: 12 }}>
+                          {" "}
+                          ({goals.length})
+                        </span>
+                      ) : null}
+                      <span className="mono" style={{ marginLeft: "auto", color: "#4a6080", fontSize: 11 }}>
+                        {goalsOpen ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {goalsOpen && (
+                      <div className="guide-mobile-goals-panel" id="guide-mobile-goals-panel" role="region" aria-labelledby="guide-mobile-goals-toggle">
+                        <div className="guide-mobile-goals-row">
+                          {GOALS.map((g) => (
+                            <button
+                              type="button"
+                              key={g}
+                              className={`goal-chip guide-mobile-goal-pill ${goals.includes(g) ? "on" : ""}`}
+                              onClick={() => toggleGuideGoal(g)}
+                            >
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                        {myStack.length > 0 && (
+                          <div style={{ padding: "0 10px 8px", borderTop: "1px solid #14202e" }}>
+                            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", margin: "6px 0 4px" }}>
+                              // SAVED STACK
+                            </div>
+                            {myStack.map((p) => (
+                              <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "#2e4055", padding: "2px 0" }}>
+                                → {p.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="guide-takeover-msgs" style={{ flex: 1, overflowY: "auto", padding: 14 }}>
                   {aiMsgs.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
                       <div className="mono" style={{ color: "#a0a0b0", fontSize: 13, marginBottom: 18 }}>
-                        // Optional: select goals above, then ask anything.
+                        {guideLayoutMobile
+                          ? "// Optional: open 🎯 Goals, then ask anything."
+                          : "// Optional: select goals in the sidebar, then ask anything."}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
                         {[
@@ -1904,10 +1908,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <div ref={msgEnd} />
                 </div>
 
-                <div
-                  className="guide-takeover-input-bar"
-                  style={{ padding: 10, borderTop: "1px solid #0e1822", display: "flex", flexDirection: "column", gap: 4 }}
-                >
+                <div className="guide-takeover-input-bar">
                   <div style={{ display: "flex", gap: 8 }}>
                     <textarea
                       className="ai-input"

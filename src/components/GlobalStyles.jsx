@@ -206,7 +206,15 @@ export function GlobalStyles() {
       }
       .guide-takeover-chat-panel{display:flex;flex-direction:column;min-height:0;min-width:0}
       .guide-takeover-msgs{flex:1;min-height:0;overflow-y:auto}
-      .guide-takeover-input-bar{flex-shrink:0}
+      .guide-takeover-input-bar{
+        flex-shrink:0;
+        padding:10px;
+        border-top:1px solid #0e1822;
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+        box-sizing:border-box;
+      }
       .guide-mobile-goals-toggle{
         width:100%;display:flex;align-items:center;justify-content:flex-start;gap:8px;
         padding:8px 12px;border:none;border-radius:0;background:rgba(0,212,170,0.08);
@@ -245,13 +253,25 @@ export function GlobalStyles() {
           align-items:stretch;
         }
         .guide-takeover-chat-panel{
-          flex:1;
+          flex:1 1 auto;
           min-height:0;
           width:100%;
+          max-width:100%;
+          min-width:0;
+          align-self:stretch;
         }
         .guide-takeover-msgs{
           flex:1;
           min-height:0;
+          min-width:0;
+        }
+        .guide-takeover-input-bar{
+          position:sticky;
+          bottom:0;
+          z-index:2;
+          background:#0b0f17;
+          box-shadow:0 -8px 24px rgba(5,10,18,0.75);
+          padding-bottom:max(10px,env(safe-area-inset-bottom));
         }
       }
       [data-demo-highlight="1"]{
