@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
-
-const DEBOUNCE_MS = 150;
 
 /**
  * @param {string} text
@@ -110,7 +108,6 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
   const inputRef = useRef(null);
   const rootRef = useRef(null);
   const dropdownRef = useRef(null);
-  const debounceRef = useRef(null);
   const showDropdownRef = useRef(false);
 
   useEffect(() => {
@@ -140,33 +137,18 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [onDismiss]);
 
-  const pushSearch = useCallback(
-    (value) => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      debounceRef.current = window.setTimeout(() => {
-        setSearch(value);
-      }, DEBOUNCE_MS);
-    },
-    [setSearch]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    };
-  }, []);
-
   const onChangeInput = (e) => {
     const v = e.target.value;
     setSuppressSuggestions(false);
     setInputValue(v);
-    pushSearch(v);
+    // Keep App.jsx `search` in lockstep with the input. Debouncing + unmount (dismiss / tap grid)
+    // cleared the pending timeout and left parent `search` stale (often ""), so the grid “reset”
+    // after closing compound detail.
+    setSearch(v);
   };
 
   const pickPeptide = (p) => {
     const name = p.name || "";
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = null;
     setSuppressSuggestions(true);
     setInputValue(name);
     setSearch(name);

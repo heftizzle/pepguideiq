@@ -163,7 +163,6 @@ export function BuildTab({
   const wide = useWideLayout();
   const [calcOpen, setCalcOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
-  const [searchInputKey, setSearchInputKey] = useState(0);
   const [localName, setLocalName] = useState(stackName);
   const [rows, setRows] = useState([]);
   const [vialOverrides, setVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -377,8 +376,6 @@ export function BuildTab({
           addedDate: new Date().toLocaleDateString(),
         },
       ]);
-      setSearchQ("");
-      setSearchInputKey((k) => k + 1);
     },
     [rows, savedStackLimit, onUpgrade]
   );
@@ -584,7 +581,6 @@ export function BuildTab({
         ADD COMPOUND
       </div>
       <LibrarySearchInput
-        key={searchInputKey}
         initialValue={searchQ}
         placeholder="Search catalog…"
         onDebouncedChange={setSearchQ}

@@ -7,7 +7,10 @@ const DEBOUNCE_MS = 150;
  * @param {{ onDebouncedChange: (value: string) => void, initialValue?: string, className?: string, style?: import("react").CSSProperties, placeholder?: string }} props
  */
 export function LibrarySearchInput({ onDebouncedChange, initialValue = "", className = "search-input", style, placeholder }) {
-  const [local, setLocal] = useState(initialValue);
+  const [local, setLocal] = useState(() => {
+    if (import.meta.env.DEV) console.log("[search reset]", initialValue);
+    return initialValue;
+  });
 
   useEffect(() => {
     const t = window.setTimeout(() => {
