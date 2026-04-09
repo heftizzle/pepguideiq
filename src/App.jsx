@@ -49,6 +49,8 @@ import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
 import { formatHandleDisplay } from "./lib/memberProfileHandle.js";
 import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
+import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
+import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
 
 const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
@@ -106,7 +108,7 @@ function peptideMatchesRouteFilter(p, routeKey) {
   switch (routeKey) {
     case "injectable":
       return (
-        /subq|subcutaneous|intramuscular|injection|injectable|iv infusion|intravenous/.test(s) ||
+        /subq|subcutaneous|intramuscular|injection|injectable|iv infusion|intravenous|nebulized/.test(s) ||
         /\biv\b/.test(s) ||
         /(^|[\s,/])im([\s,/]|$)/.test(s)
       );
@@ -385,6 +387,11 @@ function PepGuideIQApp({ user, setUser }) {
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
+  /** Build tab editor — lifted so it survives unmount (e.g. full-screen AI Guide). */
+  const [buildRows, setBuildRows] = useState([]);
+  const [buildLocalStackName, setBuildLocalStackName] = useState("");
+  const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
+  const [buildCycleWeeks, setBuildCycleWeeks] = useState(8);
   const [stackShareId, setStackShareId] = useState(null);
   const [stackFeedVisible, setStackFeedVisible] = useState(false);
   const [showAdd, setShowAdd]     = useState(false);
@@ -415,6 +422,9 @@ function PepGuideIQApp({ user, setUser }) {
   const msgEnd = useRef(null);
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
+  const buildPrevTabRef = useRef(activeTab);
+  /** After build → AI Guide, skip one hydrate from `myStack` when user returns to Build (guide closes via Library). */
+  const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
     setAiMsgs([]);
@@ -445,11 +455,28 @@ function PepGuideIQApp({ user, setUser }) {
   );
 
   useEffect(() => {
+    if (prevTabRef.current === "build" && activeTab === "guide") {
+      preserveBuildEditorAfterGuideRef.current = true;
+    }
     if (prevTabRef.current === "guide" && activeTab !== "guide") {
       resetGuideAiState();
     }
     prevTabRef.current = activeTab;
   }, [activeTab, resetGuideAiState]);
+
+  useEffect(() => {
+    const prev = buildPrevTabRef.current;
+    if (activeTab === "build" && prev !== "build") {
+      if (preserveBuildEditorAfterGuideRef.current) {
+        preserveBuildEditorAfterGuideRef.current = false;
+      } else {
+        setBuildLocalStackName(stackName);
+        setBuildRows(buildRowsFromMyStack(myStack));
+        setBuildVialOverrides({});
+      }
+    }
+    buildPrevTabRef.current = activeTab;
+  }, [activeTab, myStack, stackName]);
 
   useEffect(() => {
     if (activeTab !== "guide" && !guideExiting) return;
@@ -582,6 +609,10 @@ function PepGuideIQApp({ user, setUser }) {
         /* ignore */
       }
       setStackName(storedName);
+      setBuildRows(buildRowsFromMyStack(stack));
+      setBuildLocalStackName(storedName);
+      setBuildVialOverrides({});
+      preserveBuildEditorAfterGuideRef.current = false;
       setStackShareId(
         s && typeof s === "object" && !Array.isArray(s) && typeof s.shareId === "string" && s.shareId.trim()
           ? s.shareId.trim()
@@ -739,7 +770,8 @@ function PepGuideIQApp({ user, setUser }) {
             .join("; ")}.`
         : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
-    const system = `You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight. The user is an advanced biohacker.${stackCtx}${goalsCtx}`;
+    const system = `The user is an advanced biohacker.${stackCtx}${goalsCtx}`;
+    const catalog = buildAdvisorCatalogPayload(PEPTIDES, primaryCategory);
     if (!isApiWorkerConfigured()) {
       setAiMsgs((prev) => [
         ...prev,
@@ -759,7 +791,7 @@ function PepGuideIQApp({ user, setUser }) {
       const res = await fetch(`${API_WORKER_URL}/v1/chat`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ messages: msgs, system }),
+        body: JSON.stringify({ messages: msgs, system, catalog }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -816,6 +848,11 @@ function PepGuideIQApp({ user, setUser }) {
     stackHydrated.current = false;
     setMyStack([]);
     setStackName("");
+    setBuildRows([]);
+    setBuildLocalStackName("");
+    setBuildVialOverrides({});
+    setBuildCycleWeeks(8);
+    preserveBuildEditorAfterGuideRef.current = false;
     setAiQueryUsage(null);
     setProtocolDeepLink(null);
     setUser(null);
@@ -875,6 +912,14 @@ function PepGuideIQApp({ user, setUser }) {
     setMyStack,
     stackName,
     setStackName,
+    buildRows,
+    setBuildRows,
+    buildLocalStackName,
+    setBuildLocalStackName,
+    buildVialOverrides,
+    setBuildVialOverrides,
+    buildCycleWeeks,
+    setBuildCycleWeeks,
     stackShareId,
     setStackShareId,
     stackFeedVisible,
@@ -969,6 +1014,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setMyStack,
     stackName,
     setStackName,
+    buildRows,
+    setBuildRows,
+    buildLocalStackName,
+    setBuildLocalStackName,
+    buildVialOverrides,
+    setBuildVialOverrides,
+    buildCycleWeeks,
+    setBuildCycleWeeks,
     stackShareId,
     setStackShareId,
     stackFeedVisible,
@@ -1592,6 +1645,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
               stackName={stackName}
               setStackName={setStackName}
               setMyStack={setMyStack}
+              rows={buildRows}
+              setRows={setBuildRows}
+              localName={buildLocalStackName}
+              setLocalName={setBuildLocalStackName}
+              vialOverrides={buildVialOverrides}
+              setVialOverrides={setBuildVialOverrides}
+              cycleWeeks={buildCycleWeeks}
+              setCycleWeeks={setBuildCycleWeeks}
               savedStackLimit={savedStackLimit}
               onUpgrade={openUpgradeModal}
               primaryCategory={primaryCategory}
@@ -2026,6 +2087,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 ["Start Dose", p.startDose],
                 ["Titration", p.titrationNote],
                 ["Half-life", p.halfLife],
+                ...(typeof p.form === "string" && p.form.trim() ? [["Form", p.form.trim()]] : []),
+                ...(typeof p.unit === "string" && p.unit.trim() ? [["Unit", p.unit.trim()]] : []),
                 ["Route", p.route.join(", ")],
                 ["Cycle", p.cycle],
                 ["Storage", p.storage],
@@ -2064,7 +2127,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
                     setActiveTab("guide");
                   }}>
-                  Ask AI →
+                  Ask Pep Guide →
                 </button>
                 <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ fontSize: 13 }}
                   onClick={() => { if (!inStack) { openAdd(p); setSelPeptide(null); } }}>

@@ -24,7 +24,8 @@ export function hasInjectableRoute(peptide) {
     /injectable/.test(s) ||
     /\biv\b/.test(s) ||
     /iv infusion/.test(s) ||
-    /intravenous/.test(s)
+    /intravenous/.test(s) ||
+    /nebulized/.test(s)
   );
 }
 

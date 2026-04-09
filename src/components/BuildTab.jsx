@@ -1,38 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCategoryCssVars } from "../data/catalog.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
 import { supabase } from "../lib/supabase.js";
 import { hasAccess } from "../lib/tiers.js";
+import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
-
-const MAX_ADVISOR_CATALOG = 153;
-
-/** @param {{ mechanism?: string, typicalDose?: string }} p */
-function oneSentenceBrief(p) {
-  const m = typeof p.mechanism === "string" ? p.mechanism.trim() : "";
-  if (m) {
-    const first = m.split(/(?<=[.!?])\s+/)[0]?.trim() || m;
-    return first.length > 160 ? `${first.slice(0, 157)}…` : first;
-  }
-  const t = typeof p.typicalDose === "string" ? p.typicalDose.trim() : "";
-  return t.length > 120 ? `${t.slice(0, 117)}…` : t || "Research peptide.";
-}
-
-/**
- * @param {object[]} catalog
- * @param {(p: object) => string} primaryCategoryFn
- */
-function buildAdvisorCatalogPayload(catalog, primaryCategoryFn) {
-  return catalog.slice(0, MAX_ADVISOR_CATALOG).map((p) => ({
-    id: p.id,
-    name: p.name,
-    category: primaryCategoryFn(p),
-    brief: oneSentenceBrief(p),
-  }));
-}
 
 const FREQ_OPTIONS = [
   { id: "daily", label: "Daily" },
@@ -42,6 +17,85 @@ const FREQ_OPTIONS = [
   { id: "weekly", label: "Weekly" },
   { id: "custom", label: "Custom" },
 ];
+
+const ADVISOR_TIER_KEYS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
+
+/** @param {unknown} t */
+function normalizeAdvisorTier(t) {
+  if (typeof t !== "string") return undefined;
+  const k = t.trim().toLowerCase().replace(/-/g, "_");
+  return ADVISOR_TIER_KEYS.has(k) ? k : undefined;
+}
+
+const ADVISOR_TIER_BADGE_STYLES = {
+  must_have: {
+    emoji: "🟢",
+    label: "Must Have",
+    border: "1px solid rgba(34, 197, 94, 0.55)",
+    background: "rgba(34, 197, 94, 0.16)",
+    color: "#4ade80",
+  },
+  nice_to_have: {
+    emoji: "🟡",
+    label: "Nice to Have",
+    border: "1px solid rgba(234, 179, 8, 0.55)",
+    background: "rgba(234, 179, 8, 0.14)",
+    color: "#facc15",
+  },
+  not_necessary: {
+    emoji: "🟠",
+    label: "Not Necessary",
+    border: "1px solid rgba(249, 115, 22, 0.55)",
+    background: "rgba(249, 115, 22, 0.14)",
+    color: "#fb923c",
+  },
+  redundant: {
+    emoji: "🔴",
+    label: "Redundant",
+    border: "1px solid rgba(239, 68, 68, 0.55)",
+    background: "rgba(239, 68, 68, 0.14)",
+    color: "#f87171",
+  },
+};
+
+/** @param {{ tier?: string }} props */
+function AdvisorTierBadge({ tier }) {
+  const key = normalizeAdvisorTier(tier);
+  if (!key) return null;
+  const cfg = ADVISOR_TIER_BADGE_STYLES[key];
+  return (
+    <span
+      className="mono"
+      style={{
+        position: "absolute",
+        top: 10,
+        right: 10,
+        zIndex: 2,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "5px 10px",
+        borderRadius: 12,
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        lineHeight: 1.15,
+        whiteSpace: "nowrap",
+        maxWidth: "min(200px, calc(100% - 20px))",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        border: cfg.border,
+        background: cfg.background,
+        color: cfg.color,
+        boxShadow: "0 0 0 1px rgba(0, 0, 0, 0.2)",
+      }}
+      title={cfg.label}
+    >
+      <span aria-hidden>{cfg.emoji}</span>
+      {cfg.label}
+    </span>
+  );
+}
 
 function parseDoseToMg(input) {
   const s = String(input ?? "")
@@ -120,19 +174,6 @@ function formatFrequencyLabel(freqKey, customPerWeek) {
   }
 }
 
-function parseFreqFromStack(stackFrequency) {
-  const s = String(stackFrequency || "").trim().toLowerCase();
-  if (!s) return { freqKey: "daily", customPerWeek: "" };
-  const cm = s.match(/^(\d+(?:\.\d+)?)\s*x\/?\s*week/i);
-  if (cm) return { freqKey: "custom", customPerWeek: cm[1] };
-  if (/eod|every other/.test(s)) return { freqKey: "eod", customPerWeek: "" };
-  if (/3\s*x|three times/.test(s)) return { freqKey: "3x", customPerWeek: "" };
-  if (/2\s*x|twice/.test(s)) return { freqKey: "2x", customPerWeek: "" };
-  if (/weekly|once a week/.test(s)) return { freqKey: "weekly", customPerWeek: "" };
-  if (/daily|every day|qd\b/.test(s)) return { freqKey: "daily", customPerWeek: "" };
-  return { freqKey: "daily", customPerWeek: "" };
-}
-
 function useWideLayout() {
   const [wide, setWide] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 900px)").matches : true
@@ -153,6 +194,14 @@ export function BuildTab({
   stackName,
   setStackName,
   setMyStack,
+  rows,
+  setRows,
+  localName,
+  setLocalName,
+  vialOverrides,
+  setVialOverrides,
+  cycleWeeks,
+  setCycleWeeks,
   savedStackLimit,
   onUpgrade,
   primaryCategory,
@@ -163,22 +212,29 @@ export function BuildTab({
   const wide = useWideLayout();
   const [calcOpen, setCalcOpen] = useState(false);
   const [searchQ, setSearchQ] = useState("");
-  const [localName, setLocalName] = useState(stackName);
-  const [rows, setRows] = useState([]);
-  const [vialOverrides, setVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
-  const [cycleWeeks, setCycleWeeks] = useState(8);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const savedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const copiedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
-  const prevTabRef = useRef(activeTab);
 
   const [advisorData, setAdvisorData] = useState(
-    /** @type {{ insight: string, recommendations: { catalogId: string, name: string, rationale: string }[] } | null} */ (null)
+    /** @type {{ insight: string, recommendations: { peptideId: string, name: string, rationale: string, tier?: string }[] } | null} */ (
+      null
+    )
   );
   const [advisorLoading, setAdvisorLoading] = useState(false);
+  /** Set when the last advisor request failed (non-2xx / network); cleared on new attempt. */
+  const [advisorError, setAdvisorError] = useState(/** @type {string | null} */ (null));
   const advisorDebounce = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const advisorFetchGen = useRef(0);
+  /** Fingerprint of the stack we last successfully loaded recommendations for (includes plan/user so tier changes refetch). */
+  const lastAdvisorFingerprint = useRef("");
+
+  const advisorStackFingerprint = useMemo(() => {
+    if (rows.length === 0) return "";
+    const ids = rows.map((r) => r.peptideId).sort().join(",");
+    return `${user?.id ?? "anon"}:${plan ?? "entry"}:${ids}`;
+  }, [rows, user?.id, plan]);
 
   const [shoppingHistory, setShoppingHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -195,9 +251,17 @@ export function BuildTab({
 
   const catalogById = useMemo(() => new Map(catalog.map((p) => [p.id, p])), [catalog]);
 
+  /** Show loading skeleton on the first paint whenever we will fetch (effect runs after paint). */
+  useLayoutEffect(() => {
+    if (!advisorStackFingerprint || !isApiWorkerConfigured()) return;
+    setAdvisorLoading(true);
+  }, [advisorStackFingerprint]);
+
   useEffect(() => {
     if (rows.length === 0) {
+      lastAdvisorFingerprint.current = "";
       setAdvisorData(null);
+      setAdvisorError(null);
       setAdvisorLoading(false);
       if (advisorDebounce.current != null) {
         window.clearTimeout(advisorDebounce.current);
@@ -207,26 +271,43 @@ export function BuildTab({
     }
     if (!isApiWorkerConfigured()) {
       setAdvisorData(null);
+      setAdvisorError(null);
       setAdvisorLoading(false);
       return;
     }
 
     const myId = ++advisorFetchGen.current;
     setAdvisorLoading(true);
+    setAdvisorError(null);
 
     if (advisorDebounce.current != null) window.clearTimeout(advisorDebounce.current);
     advisorDebounce.current = window.setTimeout(() => {
       void (async () => {
         try {
+          if (advisorStackFingerprint === lastAdvisorFingerprint.current) {
+            if (myId === advisorFetchGen.current) setAdvisorLoading(false);
+            return;
+          }
+
           const currentStack = rows
             .map((row) => {
               const p = catalogById.get(row.peptideId);
               return p ? { id: p.id, name: p.name, category: primaryCategory(p) } : null;
             })
             .filter(Boolean);
+          if (currentStack.length === 0) {
+            if (myId === advisorFetchGen.current) {
+              setAdvisorData(null);
+              setAdvisorError(
+                "Stack rows do not match the catalog, so AI Guide has nothing to analyze. Add compounds from search above."
+              );
+            }
+            return;
+          }
+
           const compactCatalog = buildAdvisorCatalogPayload(catalog, primaryCategory);
 
-          const res = await fetch(`${API_WORKER_URL}/ai-stack-advisor`, {
+          const res = await fetch(`${API_WORKER_URL}/ai-guide`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -245,10 +326,20 @@ export function BuildTab({
               insight:
                 typeof data.limitMessage === "string" && data.limitMessage.trim()
                   ? data.limitMessage.trim()
-                  : "Daily AI advisor limit reached. Upgrade for more.",
+                  : "Daily AI Guide limit reached. Upgrade for more.",
               recommendations: [],
             });
+            setAdvisorError(null);
+            lastAdvisorFingerprint.current = advisorStackFingerprint;
             setAdvisorLoading(false);
+            return;
+          }
+
+          if (!res.ok) {
+            if (myId === advisorFetchGen.current) {
+              setAdvisorData(null);
+              setAdvisorError(`AI Guide request failed (${res.status}). Check that the Worker exposes POST /ai-guide.`);
+            }
             return;
           }
 
@@ -257,36 +348,58 @@ export function BuildTab({
 
           if (!data || typeof data !== "object") {
             setAdvisorData(null);
+            setAdvisorError("Invalid response from AI Guide.");
             return;
           }
           const insightRaw = typeof data.insight === "string" ? data.insight : "";
           const rowIds = new Set(rows.map((r) => r.peptideId));
           let recs = Array.isArray(data.recommendations) ? data.recommendations : [];
-          recs = recs.filter(
-            (r) =>
-              r &&
-              typeof r.catalogId === "string" &&
-              !rowIds.has(r.catalogId.trim()) &&
-              catalogById.has(r.catalogId.trim())
-          );
-          recs = recs.slice(0, 3).map((r) => ({
-            catalogId: String(r.catalogId).trim(),
-            name: typeof r.name === "string" ? r.name.trim() : String(r.catalogId).trim(),
-            rationale: typeof r.rationale === "string" ? r.rationale.trim() : "",
-          }));
+          recs = recs
+            .map((r) => {
+              if (!r || typeof r !== "object") return null;
+              const pid =
+                typeof r.peptideId === "string"
+                  ? r.peptideId.trim()
+                  : typeof r.catalogId === "string"
+                    ? r.catalogId.trim()
+                    : "";
+              if (!pid || rowIds.has(pid) || !catalogById.has(pid)) return null;
+              const reason =
+                typeof r.reason === "string"
+                  ? r.reason.trim()
+                  : typeof r.rationale === "string"
+                    ? r.rationale.trim()
+                    : "";
+              const tier = normalizeAdvisorTier(r.tier);
+              return {
+                peptideId: pid,
+                name: typeof r.name === "string" && r.name.trim() ? r.name.trim() : pid,
+                rationale: reason,
+                ...(tier ? { tier } : {}),
+              };
+            })
+            .filter(Boolean)
+            .slice(0, 4);
           const insightTrim = insightRaw.trim();
+          setAdvisorError(null);
           if (insightTrim || recs.length) {
+            lastAdvisorFingerprint.current = advisorStackFingerprint;
             setAdvisorData({ insight: insightTrim, recommendations: recs });
           } else {
+            lastAdvisorFingerprint.current = "";
             setAdvisorData(null);
+            setAdvisorError("No recommendations returned. Try again after changing your stack.");
           }
         } catch {
-          if (myId === advisorFetchGen.current) setAdvisorData(null);
+          if (myId === advisorFetchGen.current) {
+            setAdvisorData(null);
+            setAdvisorError("Could not reach AI Guide. Check your network and API worker URL.");
+          }
         } finally {
           if (myId === advisorFetchGen.current) setAdvisorLoading(false);
         }
       })();
-    }, 900);
+    }, 2500);
 
     return () => {
       if (advisorDebounce.current != null) {
@@ -294,29 +407,8 @@ export function BuildTab({
         advisorDebounce.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounced advisor; deps rows + rate-limit identity (user/plan); catalog/primaryCategory from latest closure
-  }, [rows, user?.id, plan]);
-
-  useEffect(() => {
-    if (activeTab === "build" && prevTabRef.current !== "build") {
-      setLocalName(stackName);
-      setRows(
-        myStack.map((item) => {
-          const freq = parseFreqFromStack(item.stackFrequency);
-          return {
-            key: item.stackRowKey ?? (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random())),
-            peptideId: item.id,
-            dose: item.stackDose ?? item.startDose ?? "",
-            freqKey: freq.freqKey,
-            customPerWeek: freq.customPerWeek,
-            addedDate: item.addedDate,
-          };
-        })
-      );
-      setVialOverrides({});
-    }
-    prevTabRef.current = activeTab;
-  }, [activeTab, myStack, stackName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounced advisor; rows/catalog/primaryCategory from render when fingerprint changes
+  }, [advisorStackFingerprint]);
 
   useEffect(() => {
     if (activeTab !== "build") return;
@@ -742,7 +834,7 @@ export function BuildTab({
         )}
       </div>
 
-      {rows.length > 0 && isApiWorkerConfigured() && (advisorLoading || advisorData) && (
+      {rows.length > 0 && isApiWorkerConfigured() && (
         <div
           style={{
             marginTop: 16,
@@ -773,7 +865,7 @@ export function BuildTab({
               <span className="pepv-emoji" aria-hidden>
                 🤖{" "}
               </span>
-              AI STACK ADVISOR
+              AI Guide
             </div>
             <span className="mono" style={{ fontSize: 10, color: "#5c6d82", letterSpacing: "0.12em" }}>
               BETA
@@ -786,8 +878,14 @@ export function BuildTab({
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
                 <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
+                <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
+                <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
               </div>
             </>
+          ) : advisorError && !advisorData ? (
+            <p style={{ fontSize: 13, color: "#f87171", lineHeight: 1.55, margin: 0 }}>
+              {advisorError}
+            </p>
           ) : advisorData ? (
             <>
               <p style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 14px" }}>
@@ -808,58 +906,66 @@ export function BuildTab({
                   </div>
                   <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
                     {advisorData.recommendations.map((rec) => {
-                      const p = catalogById.get(rec.catalogId);
+                      const p = catalogById.get(rec.peptideId);
                       if (!p) return null;
                       const cat0 = primaryCategory(p);
+                      const tierNorm = normalizeAdvisorTier(rec.tier);
                       return (
                         <div
-                          key={rec.catalogId}
+                          key={rec.peptideId}
                           className="build-tab-compound-meta"
                           style={{
+                            position: "relative",
                             border: "1px solid #14202e",
                             borderRadius: 10,
                             padding: 12,
+                            paddingTop: tierNorm ? 40 : 12,
                             background: "rgba(7, 9, 14, 0.5)",
                             ...getCategoryCssVars(cat0),
                           }}
                         >
+                          <AdvisorTierBadge tier={rec.tier} />
+                          <div style={{ minWidth: 0, paddingRight: tierNorm ? 8 : 0 }}>
+                            <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>
+                              {p.name}
+                            </div>
+                            <span className="pill pill--category">{cat0}</span>
+                          </div>
                           <div
                             style={{
                               display: "flex",
-                              alignItems: "flex-start",
+                              alignItems: "flex-end",
                               justifyContent: "space-between",
-                              gap: 10,
+                              gap: 12,
+                              marginTop: 8,
                             }}
                           >
-                            <div style={{ minWidth: 0 }}>
-                              <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>
-                                {p.name}
+                            {rec.rationale ? (
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  color: "#8fa5bf",
+                                  lineHeight: 1.5,
+                                  flex: "1 1 auto",
+                                  minWidth: 0,
+                                }}
+                              >
+                                {rec.rationale}
                               </div>
-                              <span className="pill pill--category">{cat0}</span>
-                            </div>
+                            ) : (
+                              <div style={{ flex: "1 1 auto" }} />
+                            )}
                             {advisorRecsUnlocked ? (
                               <button
                                 type="button"
                                 className="btn-teal"
-                                style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0 }}
+                                style={{ fontSize: 12, padding: "6px 12px", flexShrink: 0, alignSelf: "flex-end" }}
                                 onClick={() => addCompound(p)}
                               >
                                 + Add
                               </button>
                             ) : null}
                           </div>
-                          {rec.rationale ? (
-                            <div
-                              style={{
-                                fontSize: 13,
-                                color: "#8fa5bf",
-                                lineHeight: 1.5,
-                                marginTop: 8,
-                              }}
-                            >
-                              {rec.rationale}
-                            </div>
-                          ) : null}
                         </div>
                       );
                     })}

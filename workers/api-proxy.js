@@ -318,9 +318,9 @@ function normalizeMessages(messages) {
   }));
 }
 
-// ─── AI STACK ADVISOR ───────────────────────────────────────────────────────
+// ─── AI GUIDE (stack recommendations) ───────────────────────────────────────
 /**
- * POST /ai-stack-advisor — Build-tab stack suggestions (permissive CORS; empty 200 on parse/upstream failure).
+ * POST /ai-guide (aliases: /ai-stack-advisor, /stack-advisor) — Build-tab stack suggestions (permissive CORS; empty 200 on parse/upstream failure).
  * @param {Request} request
  * @param {Record<string, string | undefined>} env
  */
@@ -367,7 +367,7 @@ async function handleStackAdvisor(request, env) {
             insight: "",
             recommendations: [],
             rateLimited: true,
-            limitMessage: `You've used your ${dailyLimit} daily AI advisor calls on the ${planRaw} plan.`,
+            limitMessage: `You've used your ${dailyLimit} daily AI Guide calls on the ${planRaw} plan.`,
           }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -388,21 +388,31 @@ async function handleStackAdvisor(request, env) {
         brief: typeof c.brief === "string" ? c.brief : "",
       }));
 
-    const systemPrompt = `You are an expert peptide and biohacking protocol advisor. The user is building a research stack and needs synergistic compound recommendations. You MUST only recommend compounds that exist in the provided catalog — never invent compounds not in the list. Be specific about mechanism synergies. Return ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON. Exact shape required:
+    const systemPrompt = `You are an expert peptide and biohacking protocol advisor. The user is building a research stack and needs honest, nuanced compound recommendations. You MUST only recommend compounds that exist in the provided catalog — never invent compounds not in the list. Be specific about mechanisms and overlap with the current stack. Return ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON. Exact shape required:
 {
-  "insight": "1-2 sentences assessing the current stack and what dimension is missing",
+  "insight": "1-2 sentences assessing the current stack (strengths, gaps, redundancy)",
   "recommendations": [
-    { "catalogId": "exact_id_from_catalog", "name": "Exact Name", "rationale": "One sentence on why it pairs with this stack." }
+    {
+      "peptideId": "exact_id_from_catalog",
+      "name": "Exact catalog name",
+      "reason": "One clear sentence: why this tier applies and how it relates to the current stack.",
+      "tier": "must_have"
+    }
   ]
 }
-Return 2-3 recommendations maximum. Only use catalogId values from the provided catalog.`;
 
-    const userMessage = `Current stack: ${JSON.stringify(currentStack)}
+Return EXACTLY 4 recommendations — no fewer, no more. Each object MUST include "tier" as one of these strings only:
+- "must_have": high synergy with the current stack; a clear gap is being filled.
+- "nice_to_have": complementary benefit; marginal improvement, not essential.
+- "not_necessary": the stack already covers this therapeutic/goal angle adequately.
+- "redundant": overlaps with an existing compound; may compete, duplicate mechanism, or add little distinct value.
 
-Available catalog (filtered, not in stack already):
-${JSON.stringify(compactCatalog)}
+Tier assignment rules:
+- As the stack grows larger, be more honest: surface more "not_necessary" and "redundant" picks when appropriate. A stack of ~10 compounds should rarely label anything "must_have" unless the gap is unmistakable.
+- Do not force four "must_have" items; use the full tier spectrum when the stack warrants it.
+- Every peptideId MUST match an "id" from the provided catalog (compounds not already in the user's stack).
 
-Assess the stack and recommend 2-3 compounds to add.`;
+Only use peptideId values from the provided catalog.`;
 
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -421,9 +431,24 @@ Assess the stack and recommend 2-3 compounds to add.`;
       },
       body: JSON.stringify({
         model: MODEL_ENTRY_PRO,
-        max_tokens: 400,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
+        max_tokens: 900,
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Available catalog (filtered, not in stack already):\n${JSON.stringify(compactCatalog)}`,
+                cache_control: { type: "ephemeral" },
+              },
+              {
+                type: "text",
+                text: `Current stack: ${JSON.stringify(currentStack)}\n\nAssess the stack and return exactly 4 recommendations in the required JSON shape (each with peptideId, name, reason, and tier).`,
+              },
+            ],
+          },
+        ],
       }),
     });
 
@@ -437,7 +462,33 @@ Assess the stack and recommend 2-3 compounds to add.`;
     const parsed = JSON.parse(cleaned);
 
     const catalogIdSet = new Set(catalog.map((c) => (c && c.id ? String(c.id) : "")).filter(Boolean));
-    const safeRecs = (parsed.recommendations ?? []).filter((r) => r && catalogIdSet.has(r.catalogId)).slice(0, 3);
+    const ADVISOR_TIERS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
+    const rawRecs = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+    const safeRecs = rawRecs
+      .map((r) => {
+        if (!r || typeof r !== "object") return null;
+        const pid =
+          typeof r.peptideId === "string"
+            ? r.peptideId.trim()
+            : typeof r.catalogId === "string"
+              ? r.catalogId.trim()
+              : "";
+        if (!pid || !catalogIdSet.has(pid)) return null;
+        const tierRaw = typeof r.tier === "string" ? r.tier.trim().toLowerCase().replace(/-/g, "_") : "";
+        const tier = ADVISOR_TIERS.has(tierRaw) ? tierRaw : undefined;
+        const name = typeof r.name === "string" && r.name.trim() ? r.name.trim() : pid;
+        const reason =
+          typeof r.reason === "string"
+            ? r.reason.trim()
+            : typeof r.rationale === "string"
+              ? r.rationale.trim()
+              : "";
+        const out = { peptideId: pid, name, reason };
+        if (tier) out.tier = tier;
+        return out;
+      })
+      .filter(Boolean)
+      .slice(0, 4);
 
     return new Response(JSON.stringify({ insight: parsed.insight ?? "", recommendations: safeRecs }), {
       status: 200,
@@ -578,11 +629,50 @@ async function fetchProfilePlan(supabaseUrl, serviceKey, userId) {
   return normalizePlanTier(row?.plan);
 }
 
-function buildSystem(body) {
-  const extra = typeof body?.system === "string" ? body.system.trim() : "";
-  const base =
-    "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
-  return extra ? `${base}\n\n${extra}` : base;
+/** Cached system prefix for AI Guide (/v1/chat); dynamic user context is a separate block. */
+const AI_GUIDE_SYSTEM_BASE =
+  "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
+
+/**
+ * Anthropic Messages API: system as content blocks with prompt caching on the static prefix.
+ * @param {{ system?: string }} body
+ * @returns {Array<{ type: string, text: string, cache_control?: { type: string } }>}
+ */
+function buildChatSystemBlocks(body) {
+  const dynamic = typeof body?.system === "string" ? body.system.trim() : "";
+  const blocks = [
+    { type: "text", text: AI_GUIDE_SYSTEM_BASE, cache_control: { type: "ephemeral" } },
+  ];
+  if (dynamic) blocks.push({ type: "text", text: dynamic });
+  return blocks;
+}
+
+/**
+ * Inject compact catalog (cacheable) before the latest user turn for prompt caching.
+ * @param {Array<{ role: string, content: unknown }>} messages
+ * @param {unknown} catalog
+ */
+function injectCatalogCacheIntoMessages(messages, catalog) {
+  if (!Array.isArray(catalog) || catalog.length === 0) return messages;
+  const out = messages.map((m) => ({ ...m }));
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i].role !== "user") continue;
+    const c = out[i].content;
+    const text = typeof c === "string" ? c : String(c ?? "");
+    out[i] = {
+      ...out[i],
+      content: [
+        {
+          type: "text",
+          text: `Peptide catalog (compact JSON for reference):\n${JSON.stringify(catalog)}`,
+          cache_control: { type: "ephemeral" },
+        },
+        { type: "text", text },
+      ],
+    };
+    break;
+  }
+  return out;
 }
 
 function tierPlanFromStripeSubscription(subscr) {
@@ -2097,8 +2187,15 @@ async function handleRequest(request, env) {
       return handleGetStackPhoto(request, env, cors);
     }
 
-    // ─── AI STACK ADVISOR ────────────────────────────────────────────────
-    if (url.pathname === "/ai-stack-advisor" && request.method === "POST") {
+    // ─── AI GUIDE (stack recommendations) ────────────────────────────────
+    // Normalize trailing slash so POST /ai-guide/ still matches (avoids 404 from typo/proxies).
+    const stackAdvisorPath = (url.pathname.replace(/\/+$/, "") || "/");
+    if (
+      (stackAdvisorPath === "/ai-guide" ||
+        stackAdvisorPath === "/ai-stack-advisor" ||
+        stackAdvisorPath === "/stack-advisor") &&
+      request.method === "POST"
+    ) {
       return handleStackAdvisor(request, env);
     }
 
@@ -2167,11 +2264,15 @@ async function handleRequest(request, env) {
 
     const model = modelForPlan(plan);
 
+    const baseMsgs = normalizeMessages(body.messages).slice(-10);
+    const catalogForCache = Array.isArray(body.catalog) ? body.catalog : null;
+    const messages = injectCatalogCacheIntoMessages(baseMsgs, catalogForCache);
+
     const payload = {
       model,
       max_tokens: Math.min(body.max_tokens ?? 1024, 1024),
-      messages: normalizeMessages(body.messages).slice(-10),
-      system: buildSystem(body),
+      messages,
+      system: buildChatSystemBlocks(body),
     };
 
     let res;

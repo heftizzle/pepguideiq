@@ -19,6 +19,13 @@
 #      VITE_API_WORKER_URL=https://pepguideiq-api-proxy.YOUR-SUBDOMAIN.workers.dev
 #    → restart Vite: npm run dev
 #
+# Local Worker (wrangler dev):
+#   Terminal 1: npx wrangler dev   → default http://localhost:8787
+#   .env.local:  VITE_API_WORKER_URL=http://localhost:8787
+#   (no trailing slash). Restart Vite after changing env.
+#   Same-origin option: VITE_API_WORKER_URL=http://localhost:5173/api-worker
+#   with Vite proxy (see vite.config.js) — avoids CORS while dev servers differ.
+#
 # 5. Run Supabase migrations through 008_plan_and_stack_photo_security.sql (plan enforcement + stack_photo_r2_key).
 #
 # Stack photos (R2):
@@ -38,6 +45,10 @@
 name = "pepguideiq-api-proxy"
 main = "workers/api-proxy.js"
 compatibility_date = "2024-12-01"
+
+# Default dev URL: http://127.0.0.1:8787 — set VITE_API_WORKER_URL to match.
+[dev]
+port = 8787
 
 # Production: set ENVIRONMENT = "production" and ALLOWED_ORIGIN = "https://your-domain.com"
 # [vars]

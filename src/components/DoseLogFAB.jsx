@@ -4,34 +4,109 @@ import { useDemoTourOptional } from "../context/DemoTourContext.jsx";
 
 const FAB_SIZE = 56;
 const FAB_BODY_MIN_HEIGHT = 72;
+/** Total vertical footprint used for bounds (matches main button minHeight). */
+const FAB_HEIGHT = FAB_BODY_MIN_HEIGHT;
 /** Clears bottom nav; safe-area keeps FAB above home indicator on notched phones. */
 const FAB_BOTTOM_CSS = "calc(80px + env(safe-area-inset-bottom, 0px))";
-const EDGE = 16;
+/** Horizontal inset so the full FAB stays in view (was 16; spec asks 28px). */
+const MARGIN_X = 28;
 const TAP_MAX_PX = 10;
 /** Below this horizontal drag distance, snap back to the edge for the side we started on. */
 const COMMIT_DRAG_PX = 40;
 const TOUR_STRIP_ID = "pepv-demo-tour-strip";
 const TOUR_GAP_PX = 8;
+/** Space reserved below header for clamping vertical position. */
+const HEADER_TOP_SAFE = 60;
+/** Bottom nav height — FAB must sit fully above this band. */
+const NAV_BAR_HEIGHT = 80;
 
-/** Bottom-right default: same as `right: 16px` intent for the centered-transform layout. */
-function defaultOffsetXBottomRight() {
+const STORAGE_KEY = "pepv.doseFab.pos";
+
+/** @param {number} [w] */
+function clampOffsetX(raw, w = typeof window !== "undefined" ? window.innerWidth : 0) {
+  if (!w) return raw;
+  const centerLeft = w / 2 - FAB_SIZE / 2;
+  const minOff = MARGIN_X - centerLeft;
+  const maxOff = w - MARGIN_X - FAB_SIZE / 2 - w / 2;
+  return Math.min(maxOff, Math.max(minOff, raw));
+}
+
+/** @param {number} raw @param {number} [h] */
+function clampFabTop(raw, h = typeof window !== "undefined" ? window.innerHeight : 0) {
+  if (!h) return raw;
+  const minTop = HEADER_TOP_SAFE;
+  const maxTop = h - NAV_BAR_HEIGHT - FAB_HEIGHT;
+  if (maxTop < minTop) return Math.max(0, (h - FAB_HEIGHT) / 2);
+  return Math.min(maxTop, Math.max(minTop, raw));
+}
+
+/** Default horizontal offset per spec: (W/2) − 44px, then clamped to safe horizontal bounds. */
+function defaultOffsetX() {
   if (typeof window === "undefined") return 0;
-  return window.innerWidth / 2 - FAB_SIZE - EDGE;
+  return clampOffsetX(window.innerWidth / 2 - 44);
+}
+
+function defaultFabTop() {
+  if (typeof window === "undefined") return 100;
+  return clampFabTop(window.innerHeight / 2 - FAB_HEIGHT / 2);
+}
+
+function readStoredFabPosition() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (typeof o.offsetX !== "number" || typeof o.top !== "number") return null;
+    return { offsetX: o.offsetX, top: o.top };
+  } catch {
+    return null;
+  }
+}
+
+function persistFabPosition(offsetX, top) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ offsetX, top }));
+  } catch {
+    /* ignore */
+  }
 }
 
 /** @param {"left" | "right"} side */
 function snapOffsetXForSide(side) {
   const w = window.innerWidth;
   const centerLeft = w / 2 - FAB_SIZE / 2;
-  const minOff = EDGE - centerLeft;
-  const maxOff = w - FAB_SIZE - EDGE - centerLeft;
-  return side === "left" ? minOff : maxOff;
+  const minOff = MARGIN_X - centerLeft;
+  const maxOff = w - MARGIN_X - FAB_SIZE / 2 - w / 2;
+  return clampOffsetX(side === "left" ? minOff : maxOff, w);
 }
 
 /** @param {number} offsetX */
 function sideFromOffsetX(offsetX) {
+  return offsetX < 0 ? "left" : "right";
+}
+
+function getInitialFabPosition() {
+  if (typeof window === "undefined") {
+    return { offsetX: 0, top: 100 };
+  }
   const w = window.innerWidth;
-  return w / 2 + offsetX < w / 2 ? "left" : "right";
+  const h = window.innerHeight;
+  const defX = defaultOffsetX();
+  const defTop = defaultFabTop();
+  const stored = readStoredFabPosition();
+  let ox = defX;
+  let top = defTop;
+  if (stored) {
+    ox = stored.offsetX;
+    top = stored.top;
+  }
+  const cx = clampOffsetX(ox, w);
+  const ct = clampFabTop(top, h);
+  if (stored && (cx !== stored.offsetX || ct !== stored.top)) {
+    persistFabPosition(cx, ct);
+  }
+  return { offsetX: cx, top: ct };
 }
 
 /** @param {{ onSessionPicked: (session: "morning"|"afternoon"|"evening"|"night") => void }} props */
@@ -39,23 +114,28 @@ export function DoseLogFAB({ onSessionPicked }) {
   const demoTour = useDemoTourOptional();
   const stripVisible = Boolean(demoTour?.stripVisible);
 
-  const [offsetX, setOffsetX] = useState(defaultOffsetXBottomRight);
-  const [transition, setTransition] = useState("transform 0.2s ease");
+  const [fabPos, setFabPos] = useState(() => getInitialFabPosition());
+  const offsetX = fabPos.offsetX;
+  const fabTopPx = fabPos.top;
+  const [transition, setTransition] = useState("transform 0.2s ease, top 0.2s ease");
   const [expanded, setExpanded] = useState(false);
   const [fabBottomPx, setFabBottomPx] = useState(null);
 
   const draggingRef = useRef(false);
-  const offsetXRef = useRef(defaultOffsetXBottomRight());
+  const offsetXRef = useRef(offsetX);
+  const fabTopRef = useRef(fabTopPx);
   const dragRef = useRef({
     startX: 0,
     startY: 0,
     startOffsetX: 0,
+    startTop: 0,
   });
   const fabRef = useRef(null);
 
   useEffect(() => {
     offsetXRef.current = offsetX;
-  }, [offsetX]);
+    fabTopRef.current = fabTopPx;
+  }, [offsetX, fabTopPx]);
 
   const recomputeBottomAboveTour = useCallback(() => {
     const el = document.getElementById(TOUR_STRIP_ID);
@@ -100,29 +180,26 @@ export function DoseLogFAB({ onSessionPicked }) {
     };
   }, [stripVisible, recomputeBottomAboveTour, demoTour?.showCollapsedTeaser, demoTour?.showFullPanel]);
 
-  const clampOffsetX = useCallback((raw) => {
-    if (typeof window === "undefined") return raw;
-    const centerLeft = window.innerWidth / 2 - FAB_SIZE / 2;
-    const minOff = EDGE - centerLeft;
-    const maxOff = window.innerWidth - FAB_SIZE - EDGE - centerLeft;
-    return Math.min(maxOff, Math.max(minOff, raw));
+  const syncPositionAfterResize = useCallback(() => {
+    if (draggingRef.current) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const nextX = clampOffsetX(offsetXRef.current, w);
+    const nextTop = clampFabTop(fabTopRef.current, h);
+    offsetXRef.current = nextX;
+    fabTopRef.current = nextTop;
+    setFabPos({ offsetX: nextX, top: nextTop });
+    persistFabPosition(nextX, nextTop);
   }, []);
 
-  const syncOffsetAfterResize = useCallback(() => {
-    if (draggingRef.current) return;
-    const next = clampOffsetX(offsetXRef.current);
-    offsetXRef.current = next;
-    setOffsetX(next);
-  }, [clampOffsetX]);
-
   useLayoutEffect(() => {
-    syncOffsetAfterResize();
-  }, [syncOffsetAfterResize]);
+    syncPositionAfterResize();
+  }, [syncPositionAfterResize]);
 
   useEffect(() => {
     const onResize = () => {
       if (draggingRef.current) return;
-      syncOffsetAfterResize();
+      syncPositionAfterResize();
       if (stripVisible) {
         const next = recomputeBottomAboveTour();
         if (next != null) setFabBottomPx(next);
@@ -130,7 +207,7 @@ export function DoseLogFAB({ onSessionPicked }) {
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [stripVisible, syncOffsetAfterResize, recomputeBottomAboveTour]);
+  }, [stripVisible, syncPositionAfterResize, recomputeBottomAboveTour]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -143,38 +220,48 @@ export function DoseLogFAB({ onSessionPicked }) {
     return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, [expanded]);
 
-  const finishDrag = useCallback((clientX, clientY) => {
-    const { startX, startY, startOffsetX } = dragRef.current;
-    const dx = clientX - startX;
-    const dy = clientY - startY;
-    const dist = Math.hypot(dx, dy);
+  const finishDrag = useCallback(
+    (clientX, clientY) => {
+      const { startX, startOffsetX } = dragRef.current;
+      const dx = clientX - startX;
+      const dist = Math.hypot(dx, clientY - startY);
 
-    draggingRef.current = false;
-    setTransition("transform 0.2s ease");
+      draggingRef.current = false;
+      setTransition("transform 0.2s ease, top 0.2s ease");
 
-    if (dist < TAP_MAX_PX) {
-      setExpanded((v) => !v);
-      return;
-    }
+      if (dist < TAP_MAX_PX) {
+        setExpanded((v) => !v);
+        return;
+      }
 
-    setExpanded(false);
+      setExpanded(false);
 
-    const w = typeof window !== "undefined" ? window.innerWidth : 0;
-    const startSide = sideFromOffsetX(startOffsetX);
+      const w = typeof window !== "undefined" ? window.innerWidth : 0;
+      const h = typeof window !== "undefined" ? window.innerHeight : 0;
+      const startSide = sideFromOffsetX(startOffsetX);
 
-    if (Math.abs(dx) < COMMIT_DRAG_PX) {
-      const snap = snapOffsetXForSide(startSide);
-      setOffsetX(snap);
-      offsetXRef.current = snap;
-      return;
-    }
+      let nextX;
+      if (Math.abs(dx) < COMMIT_DRAG_PX) {
+        nextX = snapOffsetXForSide(startSide);
+      } else {
+        const currentCenterX = w / 2 + offsetXRef.current;
+        const nextSide = currentCenterX < w / 2 ? "left" : "right";
+        nextX = snapOffsetXForSide(nextSide);
+      }
+      nextX = clampOffsetX(nextX, w);
 
-    const currentCenterX = w / 2 + offsetXRef.current;
-    const nextSide = currentCenterX < w / 2 ? "left" : "right";
-    const snap = snapOffsetXForSide(nextSide);
-    setOffsetX(snap);
-    offsetXRef.current = snap;
-  }, []);
+      let nextTop = fabTopRef.current;
+      if (fabBottomPx == null) {
+        nextTop = clampFabTop(fabTopRef.current, h);
+      }
+
+      offsetXRef.current = nextX;
+      fabTopRef.current = nextTop;
+      setFabPos({ offsetX: nextX, top: nextTop });
+      persistFabPosition(nextX, nextTop);
+    },
+    [fabBottomPx]
+  );
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
@@ -182,6 +269,7 @@ export function DoseLogFAB({ onSessionPicked }) {
       startX: e.clientX,
       startY: e.clientY,
       startOffsetX: offsetXRef.current,
+      startTop: fabTopRef.current,
     };
     draggingRef.current = true;
     setTransition("none");
@@ -194,11 +282,18 @@ export function DoseLogFAB({ onSessionPicked }) {
 
   const onPointerMove = (e) => {
     if (!draggingRef.current) return;
-    const { startX, startOffsetX } = dragRef.current;
+    const { startX, startY, startOffsetX, startTop } = dragRef.current;
     const dx = e.clientX - startX;
-    const next = clampOffsetX(startOffsetX + dx);
-    offsetXRef.current = next;
-    setOffsetX(next);
+    const dy = e.clientY - startY;
+    const nextX = clampOffsetX(startOffsetX + dx);
+    offsetXRef.current = nextX;
+    if (fabBottomPx == null) {
+      const nextTop = clampFabTop(startTop + dy);
+      fabTopRef.current = nextTop;
+      setFabPos({ offsetX: nextX, top: nextTop });
+    } else {
+      setFabPos((p) => ({ ...p, offsetX: nextX }));
+    }
   };
 
   const onPointerUp = (e) => {
@@ -214,10 +309,15 @@ export function DoseLogFAB({ onSessionPicked }) {
   const onPointerCancel = () => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    setTransition("transform 0.2s ease");
-    const { startOffsetX } = dragRef.current;
-    setOffsetX(startOffsetX);
-    offsetXRef.current = startOffsetX;
+    setTransition("transform 0.2s ease, top 0.2s ease");
+    const { startOffsetX, startTop } = dragRef.current;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const x = clampOffsetX(startOffsetX, w);
+    const t = fabBottomPx == null ? clampFabTop(startTop, h) : clampFabTop(fabTopRef.current, h);
+    offsetXRef.current = x;
+    fabTopRef.current = t;
+    setFabPos({ offsetX: x, top: t });
   };
 
   const sessions = getProtocolSessionsOrdered();
@@ -227,7 +327,8 @@ export function DoseLogFAB({ onSessionPicked }) {
     onSessionPicked(id);
   };
 
-  const bottomStyle = fabBottomPx != null ? `${fabBottomPx}px` : FAB_BOTTOM_CSS;
+  const useBottomLayout = fabBottomPx != null;
+  const bottomStyle = useBottomLayout ? `${fabBottomPx}px` : FAB_BOTTOM_CSS;
 
   return (
     <div
@@ -237,8 +338,8 @@ export function DoseLogFAB({ onSessionPicked }) {
         zIndex: 38,
         left: "50%",
         right: "auto",
-        bottom: bottomStyle,
-        top: "auto",
+        bottom: useBottomLayout ? bottomStyle : "auto",
+        top: useBottomLayout ? "auto" : fabTopPx,
         width: FAB_SIZE,
         transform: `translateX(calc(-50% + ${offsetX}px))`,
         transition,
