@@ -8,6 +8,7 @@ import { insertDoseLog, listPeptideIdsWithDosesOnLocalDay } from "../lib/supabas
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
+import { useActiveProfile } from "../context/ProfileContext.jsx";
 
 function todayYmd() {
   const d = new Date();
@@ -33,6 +34,7 @@ function clampUnits(u) {
  * @param {{ userId: string, profileId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string, wakeTime?: string | null }} props
  */
 export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse, onUpgrade, wakeTime = null }) {
+  const { refreshMemberProfiles } = useActiveProfile();
   const session = useMemo(() => inferProtocolSessionForNow(wakeTime), [wakeTime]);
 
   const [lines, setLines] = useState(null);
@@ -165,6 +167,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     if (error) return;
     setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
     setGuardrail(null);
+    void refreshMemberProfiles();
     const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
     showDoseToast(getDoseLogCelebrationMessage(cat, r.name));
     bumpReload();

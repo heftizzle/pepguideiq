@@ -32,7 +32,7 @@ import {
   useDemoTour,
 } from "./context/DemoTourContext.jsx";
 import { DemoTourBar, DemoTourHelpButton } from "./components/DemoTourChrome.jsx";
-import { getNextTierId, getTier, hasAccess } from "./lib/tiers.js";
+import { canAddStackRow, getNextTierId, getSavedStackRowLimit } from "./lib/tiers.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import { resolveStability } from "./lib/catalogStability.js";
 import { hasInjectableRoute } from "./lib/doseRouteKind.js";
@@ -692,11 +692,11 @@ function PepGuideIQApp({ user, setUser }) {
     setSortMode("popular");
   };
 
-  const savedStackLimit = getTier(user?.plan ?? "entry").stackLimit;
-  const canAddToStack = myStack.length < savedStackLimit;
-  const canAI = hasAccess(user?.plan, "pro");
-  const canUploadStackPhoto = hasAccess(user?.plan ?? "entry", "pro");
-  const canVialTracker = hasAccess(user?.plan ?? "entry", "pro");
+  const savedStackLimit = getSavedStackRowLimit(user?.plan ?? "entry");
+  const canAddToStack = canAddStackRow(user?.plan ?? "entry", myStack.length);
+  const canAI = Boolean(user?.id);
+  const canUploadStackPhoto = Boolean(user?.id);
+  const canVialTracker = Boolean(user?.id);
 
   const protocolRows = useMemo(
     () => myStack.map((p) => ({ peptideId: p.id, name: p.name })),
@@ -1527,8 +1527,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       style={{ fontSize: 13,color:"#a0a0b0",marginTop:2,maxWidth:520 }}
                       title="A Saved Stack is a named peptide protocol you can build, save, and revisit."
                     >
-                      {myStack.length} peptide{myStack.length!==1?"s":""} saved
-                      {` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`}
+                      {myStack.length} peptide{myStack.length !== 1 ? "s" : ""} saved
+                      {Number.isFinite(savedStackLimit)
+                        ? ` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`
+                        : " · Unlimited Saved Stacks"}
                     </div>
                   </div>
                   <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
@@ -1753,6 +1755,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 onOpenUpgrade={openUpgradeModal}
                 onSignOut={handleSignOut}
                 canUseProgressPhotos={canVialTracker}
+                savedStackPeptides={myStack.map((p) => ({ id: p.id, name: p.name }))}
               />
             </div>
           )}

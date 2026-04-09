@@ -368,6 +368,46 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
               <div style={{ fontSize: 13, color: "#6b8299", lineHeight: 1.5 }}>{row.subline}</div>
 
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 18,
+                  fontSize: 12,
+                  color: "#8fa5bf",
+                  lineHeight: 1.5,
+                  listStyleType: "disc",
+                }}
+              >
+                {row.limitBullets.map((line) => (
+                  <li key={line} style={{ marginBottom: 4 }}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#4a6080", letterSpacing: "0.06em", marginTop: 4 }}
+              >
+                // ALL TIERS
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 18,
+                  fontSize: 12,
+                  color: "#6b8299",
+                  lineHeight: 1.45,
+                  listStyleType: "disc",
+                }}
+              >
+                {row.allTiersInclude.map((line) => (
+                  <li key={line} style={{ marginBottom: 3 }}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+
               <div style={{ marginTop: "auto", paddingTop: 6 }}>{renderTierActions(row)}</div>
             </div>
           );

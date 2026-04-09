@@ -10,7 +10,8 @@ const FAB_HEIGHT = FAB_BODY_MIN_HEIGHT;
 const FAB_BOTTOM_CSS = "calc(80px + env(safe-area-inset-bottom, 0px))";
 /** Horizontal inset so the full FAB stays in view (was 16; spec asks 28px). */
 const MARGIN_X = 28;
-const TAP_MAX_PX = 10;
+/** Movement past this (px) starts a drag; at or below = tap (toggle menu). */
+const DRAG_THRESHOLD_PX = 6;
 /** Below this horizontal drag distance, snap back to the edge for the side we started on. */
 const COMMIT_DRAG_PX = 40;
 const TOUR_STRIP_ID = "pepv-demo-tour-strip";
@@ -121,7 +122,11 @@ export function DoseLogFAB({ onSessionPicked }) {
   const [expanded, setExpanded] = useState(false);
   const [fabBottomPx, setFabBottomPx] = useState(null);
 
+  /** True only after pointer moved past DRAG_THRESHOLD_PX (resize must not fight the user). */
   const draggingRef = useRef(false);
+  /** idle | pending (down, not yet past threshold) | dragging */
+  const dragPhaseRef = useRef(/** @type {"idle" | "pending" | "dragging"} */ ("idle"));
+  const capturedPointerIdRef = useRef(/** @type {number | null} */ (null));
   const offsetXRef = useRef(offsetX);
   const fabTopRef = useRef(fabTopPx);
   const dragRef = useRef({
@@ -131,6 +136,17 @@ export function DoseLogFAB({ onSessionPicked }) {
     startTop: 0,
   });
   const fabRef = useRef(null);
+
+  const releaseFabPointerCapture = useCallback((target) => {
+    const id = capturedPointerIdRef.current;
+    if (id == null || !target) return;
+    try {
+      target.releasePointerCapture(id);
+    } catch {
+      /* already released or unsupported */
+    }
+    capturedPointerIdRef.current = null;
+  }, []);
 
   useEffect(() => {
     offsetXRef.current = offsetX;
@@ -220,19 +236,11 @@ export function DoseLogFAB({ onSessionPicked }) {
     return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, [expanded]);
 
-  const finishDrag = useCallback(
-    (clientX, clientY) => {
+  /** Snap/commit after a real drag (not used for tap). */
+  const finishDragCommit = useCallback(
+    (clientX, _clientY) => {
       const { startX, startOffsetX } = dragRef.current;
       const dx = clientX - startX;
-      const dist = Math.hypot(dx, clientY - startY);
-
-      draggingRef.current = false;
-      setTransition("transform 0.2s ease, top 0.2s ease");
-
-      if (dist < TAP_MAX_PX) {
-        setExpanded((v) => !v);
-        return;
-      }
 
       setExpanded(false);
 
@@ -263,15 +271,27 @@ export function DoseLogFAB({ onSessionPicked }) {
     [fabBottomPx]
   );
 
+  const restoreFabAfterAbortedDrag = useCallback(() => {
+    const { startOffsetX, startTop } = dragRef.current;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const x = clampOffsetX(startOffsetX, w);
+    const t = fabBottomPx == null ? clampFabTop(startTop, h) : clampFabTop(fabTopRef.current, h);
+    offsetXRef.current = x;
+    fabTopRef.current = t;
+    setFabPos({ offsetX: x, top: t });
+  }, [fabBottomPx]);
+
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
+    dragPhaseRef.current = "pending";
+    capturedPointerIdRef.current = e.pointerId;
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       startOffsetX: offsetXRef.current,
       startTop: fabTopRef.current,
     };
-    draggingRef.current = true;
     setTransition("none");
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -281,10 +301,17 @@ export function DoseLogFAB({ onSessionPicked }) {
   };
 
   const onPointerMove = (e) => {
-    if (!draggingRef.current) return;
+    if (dragPhaseRef.current === "idle") return;
     const { startX, startY, startOffsetX, startTop } = dragRef.current;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
+
+    if (dragPhaseRef.current === "pending") {
+      if (Math.hypot(dx, dy) <= DRAG_THRESHOLD_PX) return;
+      dragPhaseRef.current = "dragging";
+      draggingRef.current = true;
+    }
+
     const nextX = clampOffsetX(startOffsetX + dx);
     offsetXRef.current = nextX;
     if (fabBottomPx == null) {
@@ -297,27 +324,51 @@ export function DoseLogFAB({ onSessionPicked }) {
   };
 
   const onPointerUp = (e) => {
-    if (!draggingRef.current) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
-    finishDrag(e.clientX, e.clientY);
-  };
-
-  const onPointerCancel = () => {
-    if (!draggingRef.current) return;
+    if (dragPhaseRef.current === "idle") return;
+    const target = e.currentTarget;
+    releaseFabPointerCapture(target);
+    const phase = dragPhaseRef.current;
+    dragPhaseRef.current = "idle";
     draggingRef.current = false;
     setTransition("transform 0.2s ease, top 0.2s ease");
-    const { startOffsetX, startTop } = dragRef.current;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const x = clampOffsetX(startOffsetX, w);
-    const t = fabBottomPx == null ? clampFabTop(startTop, h) : clampFabTop(fabTopRef.current, h);
-    offsetXRef.current = x;
-    fabTopRef.current = t;
-    setFabPos({ offsetX: x, top: t });
+
+    if (phase === "pending") {
+      const { startX, startY } = dragRef.current;
+      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+      if (dist <= DRAG_THRESHOLD_PX) {
+        setExpanded((v) => !v);
+      }
+      return;
+    }
+    if (phase === "dragging") {
+      finishDragCommit(e.clientX, e.clientY);
+    }
+  };
+
+  const onPointerCancel = (e) => {
+    if (dragPhaseRef.current === "idle") return;
+    const target = e.currentTarget;
+    releaseFabPointerCapture(target);
+    const phase = dragPhaseRef.current;
+    dragPhaseRef.current = "idle";
+    draggingRef.current = false;
+    setTransition("transform 0.2s ease, top 0.2s ease");
+    if (phase === "dragging") {
+      restoreFabAfterAbortedDrag();
+    }
+  };
+
+  /** Fires after releasePointerCapture or if the browser steals capture — clears stuck drag state. */
+  const onLostPointerCapture = () => {
+    if (dragPhaseRef.current === "idle") return;
+    capturedPointerIdRef.current = null;
+    const phase = dragPhaseRef.current;
+    dragPhaseRef.current = "idle";
+    draggingRef.current = false;
+    setTransition("transform 0.2s ease, top 0.2s ease");
+    if (phase === "dragging") {
+      restoreFabAfterAbortedDrag();
+    }
   };
 
   const sessions = getProtocolSessionsOrdered();
@@ -421,6 +472,7 @@ export function DoseLogFAB({ onSessionPicked }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
+        onLostPointerCapture={onLostPointerCapture}
         style={{
           width: FAB_SIZE,
           minWidth: FAB_SIZE,

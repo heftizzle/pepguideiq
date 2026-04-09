@@ -1,16 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SettingsTab } from "./SettingsTab.jsx";
-import { StackProfileShots } from "./StackProfileShots.jsx";
-import { isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { formatPlan } from "../lib/tiers.js";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import { formatPlan, getTier } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
 import {
+  checkMemberProfileHandleAvailable,
   fetchBodyMetrics,
   fetchUserProfileStats,
+  getSessionAccessToken,
   listRecentDosedAtDates,
+  patchMemberProfileViaWorker,
   upsertBodyMetrics,
+  updateMemberProfile,
 } from "../lib/supabase.js";
-import { uploadImageToR2, R2_UPLOAD_ACCEPT_ATTR } from "../lib/r2Upload.js";
+import {
+  R2_UPLOAD_ACCEPT_ATTR,
+  R2_UPLOAD_ALLOWED_TYPES,
+  R2_UPLOAD_MAX_BYTES,
+  uploadImageToR2,
+} from "../lib/r2Upload.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -23,6 +31,13 @@ const SECTION = {
   textTransform: "uppercase",
   fontFamily: "'JetBrains Mono', monospace",
 };
+
+const EXPERIENCE_OPTIONS = [
+  { id: "beginner", label: "Beginner" },
+  { id: "intermediate", label: "Intermediate" },
+  { id: "advanced", label: "Advanced" },
+  { id: "elite", label: "Elite" },
+];
 
 const GOAL_OPTIONS = [
   { id: "shred", label: "🔥 Shred" },
@@ -270,12 +285,177 @@ const GEAR_BTN = {
   boxSizing: "border-box",
 };
 
-/** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, canUseProgressPhotos?: boolean }} props */
-export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProgressPhotos = false }) {
+function usePrivateStackPhotoUrl(r2Key, workerConfigured) {
+  const [objectUrl, setObjectUrl] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    let revoke = null;
+    async function run() {
+      if (!r2Key || !workerConfigured) {
+        setObjectUrl(null);
+        return;
+      }
+      const token = await getSessionAccessToken();
+      if (!token || cancelled) {
+        setObjectUrl(null);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) {
+          setObjectUrl(null);
+          return;
+        }
+        const blob = await res.blob();
+        const u = URL.createObjectURL(blob);
+        revoke = u;
+        if (!cancelled) setObjectUrl(u);
+      } catch {
+        if (!cancelled) setObjectUrl(null);
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [r2Key, workerConfigured]);
+  return objectUrl;
+}
+
+function formatProfilePhotoTimestamp(iso) {
+  if (!iso || typeof iso !== "string") return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/**
+ * @param {{ label: string, kind: string, memberProfileId: string, r2Key: string | null | undefined, uploadedAt?: string | null, canMutate: boolean, onUpgrade: () => void, onUploaded: () => Promise<void> | void, workerOk: boolean }} props
+ */
+function ProfilePrivatePhotoSlot({
+  label,
+  kind,
+  memberProfileId,
+  r2Key,
+  uploadedAt,
+  canMutate,
+  onUpgrade,
+  onUploaded,
+  workerOk,
+}) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [slotErr, setSlotErr] = useState(null);
+  const imgUrl = usePrivateStackPhotoUrl(r2Key ?? "", workerOk);
+  const uploadedLabel = formatProfilePhotoTimestamp(uploadedAt);
+
+  async function onInputChange(e) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!canMutate) {
+      onUpgrade();
+      return;
+    }
+    if (!workerOk) {
+      setSlotErr("Configure VITE_API_WORKER_URL");
+      return;
+    }
+    if (!memberProfileId) {
+      setSlotErr("No profile");
+      return;
+    }
+    if (!R2_UPLOAD_ALLOWED_TYPES.has(f.type) || f.size > R2_UPLOAD_MAX_BYTES) {
+      setSlotErr("JPEG/PNG/WebP/GIF, max 10MB");
+      return;
+    }
+    setSlotErr(null);
+    setUploading(true);
+    const result = await uploadImageToR2({
+      path: "/stack-photo",
+      file: f,
+      fields: { kind, member_profile_id: memberProfileId },
+    });
+    setUploading(false);
+    if (!result.ok) {
+      setSlotErr(result.error);
+      return;
+    }
+    await onUploaded();
+  }
+
+  return (
+    <div style={{ flex: "1 1 120px", minWidth: 100, maxWidth: 200 }}>
+      <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 6, letterSpacing: "0.08em" }}>
+        {label}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (!canMutate) {
+            onUpgrade();
+            return;
+          }
+          inputRef.current?.click();
+        }}
+        disabled={uploading}
+        style={{
+          width: "100%",
+          aspectRatio: "3 / 4",
+          borderRadius: 10,
+          border: "1px dashed #243040",
+          background: r2Key && imgUrl ? `url(${imgUrl}) center/cover no-repeat, #07090e` : "#07090e",
+          cursor: canMutate ? "pointer" : "not-allowed",
+          opacity: uploading ? 0.7 : 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#4a6080",
+          fontSize: 12,
+          padding: 8,
+          textAlign: "center",
+        }}
+      >
+        {!r2Key || !imgUrl ? (uploading ? "…" : "+") : null}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={R2_UPLOAD_ACCEPT_ATTR}
+        hidden
+        onChange={(e) => void onInputChange(e)}
+      />
+      {slotErr ? (
+        <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
+          {slotErr}
+        </div>
+      ) : null}
+      {uploadedLabel ? (
+        <div className="mono" style={{ fontSize: 9, color: "#4a6080", marginTop: 4, lineHeight: 1.3 }}>
+          {uploadedLabel}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, canUseProgressPhotos?: boolean, savedStackPeptides?: { id: string, name: string }[] }} props */
+export function ProfileTab({
+  user,
+  setUser,
+  onOpenUpgrade,
+  onSignOut,
+  canUseProgressPhotos = false,
+  savedStackPeptides = [],
+}) {
   const { activeProfileId, activeProfile, memberProfilesVersion, refreshMemberProfiles } = useActiveProfile();
   const demo = useDemoTourOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
+  const canUploadBodyScan = Boolean(getTier(user?.plan ?? "entry").inbody_dexa_upload);
 
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
   const [goal, setGoal] = useState("");
@@ -292,11 +472,25 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
   const [bodyFatSlider, setBodyFatSlider] = useState(3);
   const [stats, setStats] = useState(null);
   const [iqScoreExpanded, setIqScoreExpanded] = useState(false);
-  const [streak, setStreak] = useState(0);
+  const [clientStreakFallback, setClientStreakFallback] = useState(0);
   const [avatarImageNonce, setAvatarImageNonce] = useState(0);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [bodyMetricsRow, setBodyMetricsRow] = useState(null);
+  const [displayNameDraft, setDisplayNameDraft] = useState("");
+  const [handleDraft, setHandleDraft] = useState("@");
+  const [handleHint, setHandleHint] = useState("");
+  const [bioDraft, setBioDraft] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const scanFileRef = useRef(null);
+  const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
+
+  const setFieldRef = useCallback((id) => {
+    return (el) => {
+      fieldAnchorRefs.current[id] = el;
+    };
+  }, []);
 
   const displayNameShown =
     activeProfile && typeof activeProfile.display_name === "string" ? activeProfile.display_name.trim() : "";
@@ -307,6 +501,11 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
     avatarImageNonce + memberProfilesVersion,
     workerOk
   );
+
+  const streakCount =
+    activeProfile != null && typeof activeProfile.current_streak === "number"
+      ? activeProfile.current_streak
+      : clientStreakFallback;
 
   useEffect(() => {
     if (!user?.id || !activeProfileId || !isSupabaseConfigured()) {
@@ -322,9 +521,11 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
       if (ignore) return;
       if (error) {
         setErr(error.message);
+        setBodyMetricsRow(null);
         return;
       }
       setErr(null);
+      setBodyMetricsRow(row ?? null);
       const wu = row && row.weight_unit === "kg" ? "kg" : "lbs";
       setWeightUnit(wu);
       setGoal(row && typeof row.goal === "string" ? row.goal : "");
@@ -358,11 +559,232 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
   }, [user.id, activeProfileId]);
 
   useEffect(() => {
+    if (!activeProfile) return;
+    setDisplayNameDraft(String(activeProfile.display_name ?? "").trim());
+    const h = activeProfile.handle;
+    setHandleDraft(h ? `@${String(h).replace(/^@/, "")}` : "@");
+    setBioDraft(typeof activeProfile.bio === "string" ? activeProfile.bio : "");
+  }, [activeProfile, activeProfileId, memberProfilesVersion]);
+
+  useEffect(() => {
+    if (!workerOk || !activeProfileId) {
+      setHandleHint("");
+      return;
+    }
+    const raw = handleDraft.replace(/^@/, "").trim().toLowerCase();
+    if (raw.length === 0) {
+      setHandleHint("");
+      return;
+    }
+    if (raw.length < 3) {
+      setHandleHint("At least 3 characters");
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(raw)) {
+      setHandleHint("Letters, numbers, underscores only");
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const { available, reason, error } = await checkMemberProfileHandleAvailable(handleDraft, activeProfileId);
+        if (error) {
+          setHandleHint("");
+          return;
+        }
+        if (available) setHandleHint("Available");
+        else if (reason === "taken") setHandleHint("Already taken");
+        else setHandleHint("");
+      })();
+    }, 450);
+    return () => window.clearTimeout(t);
+  }, [handleDraft, activeProfileId, workerOk]);
+
+  const saveProfilePatch = useCallback(
+    async (patch) => {
+      if (!activeProfileId) return false;
+      try {
+        if (workerOk) {
+          const { error } = await patchMemberProfileViaWorker(activeProfileId, patch);
+          if (error) {
+            setErr(error.message);
+            return false;
+          }
+        } else {
+          const { error } = await updateMemberProfile(activeProfileId, patch);
+          if (error) {
+            setErr(error.message);
+            return false;
+          }
+        }
+        setErr(null);
+        await refreshMemberProfiles();
+        return true;
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Save failed");
+        return false;
+      }
+    },
+    [activeProfileId, workerOk, refreshMemberProfiles]
+  );
+
+  const completionFields = useMemo(() => {
+    const handleSaved =
+      typeof activeProfile?.handle === "string" && /^[a-z0-9_]{3,20}$/.test(activeProfile.handle.trim());
+    return [
+      {
+        id: "avatar",
+        done: Boolean(activeProfile?.avatar_url && String(activeProfile.avatar_url).trim()),
+        label: "Photo",
+      },
+      {
+        id: "display_name",
+        done: Boolean(displayNameShown),
+        label: "Name",
+      },
+      { id: "handle", done: handleSaved, label: "Handle" },
+      {
+        id: "bio",
+        done: Boolean(typeof activeProfile?.bio === "string" && activeProfile.bio.trim()),
+        label: "Bio",
+      },
+      {
+        id: "goal",
+        done: Boolean(bodyMetricsRow && typeof bodyMetricsRow.goal === "string" && bodyMetricsRow.goal.trim()),
+        label: "Goal",
+      },
+      {
+        id: "weight",
+        done: bodyMetricsRow != null && bodyMetricsRow.weight_lbs != null && Number.isFinite(Number(bodyMetricsRow.weight_lbs)),
+        label: "Weight",
+      },
+      {
+        id: "height",
+        done: bodyMetricsRow != null && bodyMetricsRow.height_in != null && Number.isFinite(Number(bodyMetricsRow.height_in)),
+        label: "Height",
+      },
+      {
+        id: "experience_level",
+        done: Boolean(
+          activeProfile?.experience_level &&
+            EXPERIENCE_OPTIONS.some((o) => o.id === String(activeProfile.experience_level).toLowerCase())
+        ),
+        label: "Level",
+      },
+      {
+        id: "active_stack",
+        done: savedStackPeptides.length > 0,
+        label: "Stack",
+      },
+    ];
+  }, [activeProfile, bodyMetricsRow, displayNameShown, savedStackPeptides]);
+
+  const completionPct = useMemo(() => {
+    const n = completionFields.filter((f) => f.done).length;
+    return Math.round((n / completionFields.length) * 100);
+  }, [completionFields]);
+
+  const firstIncompleteFieldId = useMemo(() => {
+    const f = completionFields.find((x) => !x.done);
+    return f?.id ?? null;
+  }, [completionFields]);
+
+  const scrollToField = useCallback((fieldId) => {
+    const el = fieldAnchorRefs.current[fieldId];
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const commitDisplayName = useCallback(async () => {
+    if (!activeProfileId) return;
+    const t = displayNameDraft.trim();
+    if (t === displayNameShown) return;
+    if (!t) {
+      setErr("Display name cannot be empty");
+      setDisplayNameDraft(String(activeProfile?.display_name ?? "").trim());
+      return;
+    }
+    await saveProfilePatch({ display_name: t });
+  }, [activeProfileId, displayNameDraft, displayNameShown, activeProfile?.display_name, saveProfilePatch]);
+
+  const commitHandle = useCallback(async () => {
+    if (!activeProfileId) return;
+    const raw = handleDraft.replace(/^@/, "").trim().toLowerCase();
+    const saved = String(activeProfile?.handle || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, "");
+    if (raw === saved) return;
+    if (raw.length === 0) {
+      await saveProfilePatch({ handle: null });
+      return;
+    }
+    if (raw.length < 3) {
+      setErr("Handle must be at least 3 characters");
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(raw)) {
+      setErr("Handle: use letters, numbers, and underscores only");
+      return;
+    }
+    await saveProfilePatch({ handle: raw });
+  }, [activeProfileId, handleDraft, activeProfile?.handle, saveProfilePatch]);
+
+  const commitBio = useCallback(async () => {
+    if (!activeProfileId) return;
+    const t = bioDraft.slice(0, 160).trim();
+    const saved = typeof activeProfile?.bio === "string" ? activeProfile.bio.trim() : "";
+    if (t === saved) return;
+    await saveProfilePatch({ bio: t || null });
+  }, [activeProfileId, bioDraft, activeProfile?.bio, saveProfilePatch]);
+
+  const pickExperienceLevel = useCallback(
+    async (id) => {
+      if (String(activeProfile?.experience_level || "").toLowerCase() === id) return;
+      await saveProfilePatch({ experience_level: id });
+    },
+    [activeProfile?.experience_level, saveProfilePatch]
+  );
+
+  const onBodyScanPick = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file) return;
+      if (!canUploadBodyScan) {
+        onOpenUpgrade();
+        return;
+      }
+      if (!workerOk) {
+        setErr("Configure VITE_API_WORKER_URL to upload.");
+        return;
+      }
+      if (!activeProfileId) {
+        setErr("No active profile");
+        return;
+      }
+      if (!R2_UPLOAD_ALLOWED_TYPES.has(file.type) || file.size > R2_UPLOAD_MAX_BYTES) {
+        setErr("JPEG/PNG/WebP/GIF, max 10MB");
+        return;
+      }
+      setScanBusy(true);
+      setErr(null);
+      const result = await uploadImageToR2({
+        path: "/stack-photo",
+        file,
+        fields: { kind: "body_scan", member_profile_id: activeProfileId },
+      });
+      setScanBusy(false);
+      if (!result.ok) {
+        setErr(result.error);
+        return;
+      }
+      await refreshMemberProfiles();
+    },
+    [activeProfileId, canUploadBodyScan, onOpenUpgrade, workerOk, refreshMemberProfiles]
+  );
+
+  useEffect(() => {
     if (!user?.id || !activeProfileId || !isSupabaseConfigured()) return;
     let ignore = false;
-    listRecentDosedAtDates(user.id, activeProfileId).then(({ dates }) => {
-      if (!ignore) setStreak(calculateStreak(dates ?? []));
-    });
     fetchUserProfileStats(activeProfileId).then((s) => {
       if (!ignore) setStats(s);
     });
@@ -371,9 +793,30 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
     };
   }, [user.id, activeProfileId]);
 
+  /** Prefer `member_profiles.current_streak` (DB trigger on dose_logs); client calc only if column missing (older API). */
+  useEffect(() => {
+    if (activeProfile != null && typeof activeProfile.current_streak === "number") {
+      return;
+    }
+    if (!user?.id || !activeProfileId || !isSupabaseConfigured()) return;
+    let ignore = false;
+    listRecentDosedAtDates(user.id, activeProfileId).then(({ dates }) => {
+      if (!ignore) setClientStreakFallback(calculateStreak(dates ?? []));
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [user.id, activeProfileId, activeProfile?.current_streak, memberProfilesVersion]);
+
   useEffect(() => {
     setIqScoreExpanded(false);
   }, [user.id]);
+
+  const refreshBodyMetricsRow = useCallback(async () => {
+    if (!activeProfileId) return;
+    const { row } = await fetchBodyMetrics(activeProfileId);
+    setBodyMetricsRow(row ?? null);
+  }, [activeProfileId]);
 
   const persistHeightInches = async (totalIn) => {
     if (!user?.id || !activeProfileId) return;
@@ -382,7 +825,10 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
       height_in: v != null ? Math.round(clamp(v, 48, 96)) : null,
     });
     if (error) setErr(error.message);
-    else setErr(null);
+    else {
+      setErr(null);
+      void refreshBodyMetricsRow();
+    }
   };
 
   const commitHeightInches = async (totalIn) => {
@@ -402,7 +848,10 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
       weight_unit: weightUnit,
     });
     if (error) setErr(error.message);
-    else setErr(null);
+    else {
+      setErr(null);
+      void refreshBodyMetricsRow();
+    }
   };
 
   const commitBodyFat = async (pctVal) => {
@@ -411,12 +860,18 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
     if (v <= 3) {
       const { error } = await upsertBodyMetrics(user.id, activeProfileId, { body_fat_pct: null });
       if (error) setErr(error.message);
-      else setErr(null);
+      else {
+        setErr(null);
+        void refreshBodyMetricsRow();
+      }
       return;
     }
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, { body_fat_pct: v });
     if (error) setErr(error.message);
-    else setErr(null);
+    else {
+      setErr(null);
+      void refreshBodyMetricsRow();
+    }
   };
 
   const saveGoal = async (g) => {
@@ -424,7 +879,10 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
     setGoal(g);
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, { goal: g || null });
     if (error) setErr(error.message);
-    else setErr(null);
+    else {
+      setErr(null);
+      void refreshBodyMetricsRow();
+    }
   };
 
   const onAvatarPick = async (e) => {
@@ -635,112 +1093,254 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
         </div>
       )}
 
+      <button
+        type="button"
+        onClick={() => {
+          if (firstIncompleteFieldId) scrollToField(firstIncompleteFieldId);
+        }}
+        style={{
+          width: "100%",
+          textAlign: "left",
+          marginBottom: 20,
+          padding: 14,
+          borderRadius: 12,
+          border: "1px solid #1e2a38",
+          background: "#0b0f17",
+          cursor: firstIncompleteFieldId ? "pointer" : "default",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            color: "#dde4ef",
+            marginBottom: 8,
+            fontFamily: "'Outfit', sans-serif",
+            fontWeight: 600,
+          }}
+        >
+          Profile {completionPct}% complete
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: "#1e2a38", overflow: "hidden" }}>
+          <div
+            style={{
+              width: `${completionPct}%`,
+              height: "100%",
+              background: "#00d4aa",
+              transition: "width 0.25s ease",
+              borderRadius: 4,
+            }}
+          />
+        </div>
+      </button>
+
       <div style={SECTION}>User</div>
       <Card>
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            data-demo-target={DEMO_TARGET.profile_avatar}
-            {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_avatar)))}
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: "50%",
-              border: "2px solid #243040",
-              overflow: "hidden",
-              padding: 0,
-              cursor: avatarBusy ? "wait" : "pointer",
-              background: "#07090e",
-              flexShrink: 0,
-              opacity: avatarBusy ? 0.85 : 1,
-            }}
-            aria-label="Upload or replace profile photo"
-          >
-            {memberAvatarSrc ? (
-              <img
-                src={memberAvatarSrc}
-                alt=""
-                draggable={false}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "#00d4aa",
-                  fontFamily: "'Outfit', sans-serif",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}
-              >
-                {avatarInitialLetter(displayNameShown, user.name, user.email)}
-              </div>
-            )}
-          </button>
+          <div ref={setFieldRef("avatar")}>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              data-demo-target={DEMO_TARGET.profile_avatar}
+              {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_avatar)))}
+              style={{
+                width: 112,
+                height: 112,
+                minWidth: 112,
+                minHeight: 112,
+                borderRadius: "50%",
+                border: "2px solid #243040",
+                overflow: "hidden",
+                padding: 0,
+                cursor: avatarBusy ? "wait" : "pointer",
+                background: "#07090e",
+                flexShrink: 0,
+                opacity: avatarBusy ? 0.85 : 1,
+              }}
+              aria-label="Upload or replace profile photo"
+            >
+              {memberAvatarSrc ? (
+                <img
+                  src={memberAvatarSrc}
+                  alt=""
+                  draggable={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 36,
+                    fontWeight: 700,
+                    color: "#00d4aa",
+                    fontFamily: "'Outfit', sans-serif",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                  }}
+                >
+                  {avatarInitialLetter(displayNameShown, user.name, user.email)}
+                </div>
+              )}
+            </button>
+          </div>
           <input ref={fileRef} type="file" accept={R2_UPLOAD_ACCEPT_ATTR} hidden onChange={(e) => void onAvatarPick(e)} />
           <div style={{ flex: "1 1 0", minWidth: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                flexWrap: "wrap",
-                gap: "6px 8px",
-                marginBottom: 6,
-                lineHeight: 1.25,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 19,
-                  fontWeight: 700,
-                  color: "#f1f5f9",
-                  fontFamily: "'Outfit', sans-serif",
-                  letterSpacing: "-0.02em",
-                }}
+            <div ref={setFieldRef("display_name")} style={{ marginBottom: 10 }}>
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}
               >
-                {displayNameShown || "—"}
-              </span>
-              {goalEmojiFromId(goal) ? (
-                <span
-                  className="pepv-emoji"
-                  style={{ fontSize: 20, lineHeight: 1 }}
-                  aria-hidden
-                  title={GOAL_OPTIONS.find((g) => g.id === goal)?.label ?? ""}
-                >
-                  {goalEmojiFromId(goal)}
-                </span>
-              ) : null}
+                DISPLAY NAME
+              </div>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <input
+                  className="form-input"
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 700,
+                    flex: "1 1 200px",
+                    minWidth: 0,
+                    fontFamily: "'Outfit', sans-serif",
+                  }}
+                  value={displayNameDraft}
+                  onChange={(e) => setDisplayNameDraft(e.target.value.slice(0, 120))}
+                  onBlur={() => void commitDisplayName()}
+                  placeholder="Your display name"
+                  aria-label="Display name"
+                />
+                {goalEmojiFromId(goal) ? (
+                  <span
+                    className="pepv-emoji"
+                    style={{ fontSize: 20, lineHeight: 1 }}
+                    aria-hidden
+                    title={GOAL_OPTIONS.find((g) => g.id === goal)?.label ?? ""}
+                  >
+                    {goalEmojiFromId(goal)}
+                  </span>
+                ) : null}
+              </div>
             </div>
             <div
               style={{
                 fontSize: 13,
                 color: "#6b7c8f",
-                marginBottom: 10,
+                marginBottom: 12,
                 lineHeight: 1.35,
                 wordBreak: "break-word",
               }}
             >
               {user.email}
             </div>
+            <div ref={setFieldRef("handle")} style={{ marginBottom: 14 }}>
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}
+              >
+                HANDLE
+              </div>
+              <input
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", fontFamily: "'JetBrains Mono', monospace" }}
+                value={handleDraft}
+                onChange={(e) => {
+                  let v = e.target.value;
+                  if (!v.startsWith("@")) v = `@${v.replace(/^@+/, "")}`;
+                  const rest = v
+                    .slice(1)
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_]/g, "")
+                    .slice(0, 20);
+                  setHandleDraft(`@${rest}`);
+                }}
+                onBlur={() => void commitHandle()}
+                placeholder="@yourhandle"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label="Handle"
+              />
+              {handleHint ? (
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 11,
+                    color: handleHint === "Available" ? "#00d4aa" : "#6b7c8f",
+                    marginTop: 4,
+                  }}
+                >
+                  {handleHint}
+                </div>
+              ) : null}
+            </div>
+            <div ref={setFieldRef("bio")} style={{ marginBottom: 14 }}>
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}
+              >
+                BIO
+              </div>
+              <textarea
+                className="form-input"
+                style={{ fontSize: 13, width: "100%", minHeight: 72, resize: "vertical", lineHeight: 1.45 }}
+                value={bioDraft}
+                onChange={(e) => setBioDraft(e.target.value.slice(0, 160))}
+                onBlur={() => void commitBio()}
+                placeholder="Tell the community about your protocol..."
+                maxLength={160}
+                rows={3}
+                aria-label="Bio"
+              />
+              <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginTop: 4, textAlign: "right" }}>
+                {bioDraft.length}/160
+              </div>
+            </div>
+            <div ref={setFieldRef("experience_level")} style={{ marginBottom: 14 }}>
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}
+              >
+                EXPERIENCE LEVEL
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {EXPERIENCE_OPTIONS.map((o) => {
+                  const sel = String(activeProfile?.experience_level || "").toLowerCase() === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => void pickExperienceLevel(o.id)}
+                      style={{
+                        fontSize: 13,
+                        padding: "6px 12px",
+                        borderRadius: 999,
+                        border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                        background: sel ? "rgba(0,212,170,0.12)" : "transparent",
+                        color: sel ? "#00d4aa" : "#6b7c8f",
+                        cursor: "pointer",
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span className="pill" style={tierPillStyle(user.plan)}>
                 {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
               </span>
               <span className="pepv-emoji" style={{ fontSize: 13, color: "#dde4ef" }}>
-                🔥 {streak} day{streak === 1 ? "" : "s"} streak
+                {streakCount <= 0 ? "🔥 Start your streak!" : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} streak`}
               </span>
             </div>
           </div>
@@ -779,24 +1379,27 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
           data-demo-target={DEMO_TARGET.profile_body_metrics}
           {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_body_metrics)))}
         >
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
-            GOAL
+          <div ref={setFieldRef("goal")}>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
+              GOAL
+            </div>
+            <select
+              className="form-input"
+              style={{ fontSize: 13, width: "100%", marginBottom: 14, cursor: "pointer" }}
+              value={goal}
+              onChange={(e) => void saveGoal(e.target.value)}
+            >
+              <option value="">Select…</option>
+              {GOAL_OPTIONS.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <select
-            className="form-input"
-            style={{ fontSize: 13, width: "100%", marginBottom: 14, cursor: "pointer" }}
-            value={goal}
-            onChange={(e) => void saveGoal(e.target.value)}
-          >
-            <option value="">Select…</option>
-            {GOAL_OPTIONS.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.label}
-              </option>
-            ))}
-          </select>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div ref={setFieldRef("weight")}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
               WEIGHT
             </span>
@@ -811,7 +1414,10 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
                       if (!user?.id || !activeProfileId) return;
                       const { error } = await upsertBodyMetrics(user.id, activeProfileId, { weight_unit: u });
                       if (error) setErr(error.message);
-                      else setErr(null);
+                      else {
+                        setErr(null);
+                        void refreshBodyMetricsRow();
+                      }
                     })();
                   }}
                   style={{
@@ -839,8 +1445,10 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
             onLive={setWeightSlider}
             onCommit={(v) => void commitWeightDisplay(v)}
           />
+          </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div ref={setFieldRef("height")}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
               HEIGHT
             </span>
@@ -900,6 +1508,7 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
               onCommit={(cm) => void commitHeightInches(cm / 2.54)}
             />
           )}
+          </div>
 
           <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
             BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
@@ -913,24 +1522,130 @@ export function ProfileTab({ user, setUser, onOpenUpgrade, onSignOut, canUseProg
             onLive={setBodyFatSlider}
             onCommit={(v) => void commitBodyFat(v)}
           />
+
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
+              BODY COMPOSITION SCAN
+            </div>
+            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 10 }}>
+              InBody, DEXA, or any body comp scan
+              <br />
+              — auto-populates metrics (Pro+)
+            </div>
+            <input
+              ref={scanFileRef}
+              type="file"
+              accept={R2_UPLOAD_ACCEPT_ATTR}
+              hidden
+              onChange={(e) => void onBodyScanPick(e)}
+            />
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13, opacity: scanBusy ? 0.75 : 1 }}
+              disabled={scanBusy || !activeProfileId}
+              onClick={() => {
+                if (!canUploadBodyScan) {
+                  onOpenUpgrade();
+                  return;
+                }
+                scanFileRef.current?.click();
+              }}
+            >
+              {scanBusy ? "Uploading…" : activeProfile?.body_scan_r2_key ? "Replace scan" : "Upload scan"}
+            </button>
+          </div>
         </div>
       </Card>
 
       <div style={SECTION}>Progress photos</div>
-      {canUseProgressPhotos && user?.id ? (
-        <Card style={{ paddingBottom: 12 }}>
-          <StackProfileShots userId={user.id} canUse={canUseProgressPhotos} onUpgrade={onOpenUpgrade} />
-        </Card>
-      ) : (
-        <Card>
-          <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5, marginBottom: 12 }}>
-            Stack reference photos for your protocol — included with Pro and above.
+      <Card style={{ paddingBottom: 12 }}>
+        {canUseProgressPhotos && activeProfileId ? (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
+            <ProfilePrivatePhotoSlot
+              label="FRONT"
+              kind="progress_front"
+              memberProfileId={activeProfileId}
+              r2Key={activeProfile?.progress_photo_front_r2_key}
+              uploadedAt={activeProfile?.progress_photo_front_at}
+              canMutate={canUseProgressPhotos}
+              onUpgrade={onOpenUpgrade}
+              onUploaded={() => refreshMemberProfiles()}
+              workerOk={workerOk}
+            />
+            <ProfilePrivatePhotoSlot
+              label="SIDE"
+              kind="progress_side"
+              memberProfileId={activeProfileId}
+              r2Key={activeProfile?.progress_photo_side_r2_key}
+              uploadedAt={activeProfile?.progress_photo_side_at}
+              canMutate={canUseProgressPhotos}
+              onUpgrade={onOpenUpgrade}
+              onUploaded={() => refreshMemberProfiles()}
+              workerOk={workerOk}
+            />
+            <ProfilePrivatePhotoSlot
+              label="BACK"
+              kind="progress_back"
+              memberProfileId={activeProfileId}
+              r2Key={activeProfile?.progress_photo_back_r2_key}
+              uploadedAt={activeProfile?.progress_photo_back_at}
+              canMutate={canUseProgressPhotos}
+              onUpgrade={onOpenUpgrade}
+              onUploaded={() => refreshMemberProfiles()}
+              workerOk={workerOk}
+            />
           </div>
-          <button type="button" className="btn-teal" style={{ fontSize: 13 }} onClick={onOpenUpgrade}>
-            Upgrade to unlock
-          </button>
-        </Card>
-      )}
+        ) : (
+          <>
+            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5, marginBottom: 12 }}>
+              Front, side, and back progress photos — included with Pro and above.
+            </div>
+            <button type="button" className="btn-teal" style={{ fontSize: 13 }} onClick={onOpenUpgrade}>
+              Upgrade to unlock
+            </button>
+          </>
+        )}
+      </Card>
+
+      <div style={SECTION}>Labs</div>
+      <Card>
+        <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55 }}>
+          // Coming soon — upload labs and track biomarkers over time.
+        </div>
+      </Card>
+
+      <div style={SECTION}>Active stack</div>
+      <Card>
+        <div ref={setFieldRef("active_stack")}>
+          <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 10, letterSpacing: "0.08em" }}>
+            ACTIVE STACK
+          </div>
+          {savedStackPeptides.length === 0 ? (
+            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5 }}>
+              // No active stack saved yet
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {savedStackPeptides.map((p) => (
+                <span
+                  key={p.id}
+                  className="pill"
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 10px",
+                    background: "rgba(0,212,170,0.08)",
+                    border: "1px solid rgba(0,212,170,0.25)",
+                    color: "#94a3b8",
+                  }}
+                >
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

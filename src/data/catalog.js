@@ -1,4 +1,4 @@
-import { TIERS, formatPrice } from "../lib/tiers.js";
+import { ALL_TIERS_INCLUDE_LINES, formatProgressPhotoSetsLabel, TIERS, formatPrice } from "../lib/tiers.js";
 import { NEW_PEPTIDES } from "../../pepguideiq_new_entries/index.js";
 import { normalizeNewCatalogEntry } from "../lib/normalizeNewCatalogEntry.js";
 import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
@@ -298,10 +298,11 @@ const PLAN_CONFIG = [
     period: "forever",
     color: "#4a6080",
     features: [
-      "Browse full peptide library",
-      `${TIERS.entry.stackLimit} Saved Stacks`,
-      `${TIERS.entry.aiQueriesPerDay} AI query/day`,
-      `${TIERS.entry.reconLimit} reconstitution saves`,
+      `${TIERS.entry.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,
+      `${TIERS.entry.stack_advisor_calls_per_day} Stack Advisor calls/day`,
+      `${formatProgressPhotoSetsLabel(TIERS.entry.progress_photo_sets)} progress photos`,
+      `${TIERS.entry.profiles} profile`,
+      ...ALL_TIERS_INCLUDE_LINES,
     ],
   },
   {
@@ -310,9 +311,12 @@ const PLAN_CONFIG = [
     color: "#00d4aa",
     popular: true,
     features: [
-      `${TIERS.pro.stackLimit} Saved Stacks`,
-      `${TIERS.pro.aiQueriesPerDay} AI queries/day`,
-      `${TIERS.pro.reconLimit} reconstitution saves`,
+      `${TIERS.pro.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,
+      `${TIERS.pro.stack_advisor_calls_per_day} Stack Advisor calls/day`,
+      `${formatProgressPhotoSetsLabel(TIERS.pro.progress_photo_sets)} progress photos`,
+      "InBody / DEXA scan upload",
+      `${TIERS.pro.profiles} profile`,
+      ...ALL_TIERS_INCLUDE_LINES,
     ],
   },
   {
@@ -320,9 +324,12 @@ const PLAN_CONFIG = [
     period: "/mo",
     color: "#f59e0b",
     features: [
-      `${TIERS.elite.stackLimit} Saved Stacks`,
-      `${TIERS.elite.aiQueriesPerDay} AI queries/day`,
+      `${TIERS.elite.ai_guide_calls_per_day} AI Guide calls/day (Sonnet)`,
+      `${TIERS.elite.stack_advisor_calls_per_day} Stack Advisor calls/day`,
+      `${formatProgressPhotoSetsLabel(TIERS.elite.progress_photo_sets)} progress photos`,
       `${TIERS.elite.profiles} profiles`,
+      "Claude Vision OCR · Shift schedule",
+      ...ALL_TIERS_INCLUDE_LINES,
     ],
   },
   {
@@ -330,9 +337,12 @@ const PLAN_CONFIG = [
     period: "/mo",
     color: "#a855f7",
     features: [
-      `${TIERS.goat.stackLimit} Saved Stacks`,
-      `${TIERS.goat.aiQueriesPerDay} AI queries/day`,
-      `${TIERS.goat.profiles} profiles — Family / Couples`,
+      `${TIERS.goat.ai_guide_calls_per_day} AI Guide calls/day (Sonnet)`,
+      `${TIERS.goat.stack_advisor_calls_per_day} Stack Advisor calls/day`,
+      `${formatProgressPhotoSetsLabel(TIERS.goat.progress_photo_sets)} progress photos`,
+      `${TIERS.goat.profiles} profiles`,
+      "Founding member · Early access",
+      ...ALL_TIERS_INCLUDE_LINES,
     ],
   },
 ];

@@ -10,6 +10,7 @@ import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
+import { useActiveProfile } from "../context/ProfileContext.jsx";
 
 function todayYmd() {
   const d = new Date();
@@ -70,6 +71,7 @@ export function ProtocolTab({
   const skipGuardrailForPeptideIdRef = useRef(null);
   const deepLinkConsumedRef = useRef(false);
   const demo = useDemoTourOptional();
+  const { refreshMemberProfiles } = useActiveProfile();
 
   useEffect(() => {
     if (initialSession && !deepLinkConsumedRef.current) {
@@ -195,6 +197,7 @@ export function ProtocolTab({
     if (error) return;
     setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
     setGuardrail(null);
+    void refreshMemberProfiles();
     const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
     showDoseToast(getDoseLogCelebrationMessage(cat, r.name));
     bumpReload();

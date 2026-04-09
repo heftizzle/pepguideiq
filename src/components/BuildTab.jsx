@@ -4,7 +4,6 @@ import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
 import { supabase } from "../lib/supabase.js";
-import { hasAccess } from "../lib/tiers.js";
 import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
@@ -240,7 +239,7 @@ export function BuildTab({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const advisorRecsUnlocked = hasAccess(plan, "pro");
+  const advisorRecsUnlocked = true;
 
   useEffect(() => {
     return () => {
@@ -452,7 +451,7 @@ export function BuildTab({
   const addCompound = useCallback(
     (p) => {
       if (rows.some((r) => r.peptideId === p.id)) return;
-      if (rows.length >= savedStackLimit) {
+      if (Number.isFinite(savedStackLimit) && rows.length >= savedStackLimit) {
         onUpgrade();
         return;
       }
@@ -496,7 +495,7 @@ export function BuildTab({
   };
 
   const saveStack = () => {
-    if (rows.length > savedStackLimit) {
+    if (Number.isFinite(savedStackLimit) && rows.length > savedStackLimit) {
       onUpgrade();
       return;
     }

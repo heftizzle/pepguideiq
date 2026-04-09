@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { formatPlan } from "../lib/tiers.js";
+import { formatPlan, getTier } from "../lib/tiers.js";
 import {
   deleteAccountViaWorker,
   deleteMemberProfileViaWorker,
@@ -78,6 +78,7 @@ function hasProvider(identities, provider) {
 
 /** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, onBack: () => void }} props */
 export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack }) {
+  const scheduleUnlocked = Boolean(getTier(user?.plan ?? "entry").shift_schedule);
   const {
     activeProfileId,
     activeProfile,
@@ -583,68 +584,79 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
 
       <div style={SECTION}>Schedule</div>
       <Card>
-        <div
-          data-demo-target={DEMO_TARGET.profile_shift_schedule}
-          {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_shift_schedule)))}
-          style={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Shift schedule</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {SHIFT_SCHEDULE_OPTIONS.map((opt) => {
-                const on = scheduleShift === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setScheduleShift(opt.id)}
-                    disabled={scheduleBusy}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: on ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                      background: on ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
-                      color: on ? "#00d4aa" : "#8fa5bf",
-                      fontSize: 12,
-                      cursor: scheduleBusy ? "default" : "pointer",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      flex: "1 1 auto",
-                      minWidth: 72,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        {scheduleUnlocked ? (
           <div
-            data-demo-target={DEMO_TARGET.profile_wake}
-            {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_wake)))}
+            data-demo-target={DEMO_TARGET.profile_shift_schedule}
+            {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_shift_schedule)))}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Wake time</div>
-            <input
-              className="form-input"
-              type="time"
-              style={{ fontSize: 13, width: "100%", maxWidth: 200, boxSizing: "border-box" }}
-              value={wakeTimeInput}
-              onChange={(e) => setWakeTimeInput(e.target.value)}
-              disabled={scheduleBusy}
-            />
-            <div style={{ fontSize: 12, color: "#6b7c8f", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
-              Your wake time personalizes dose reminders and protocol guardrails to your schedule.
+            <div>
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Shift schedule</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {SHIFT_SCHEDULE_OPTIONS.map((opt) => {
+                  const on = scheduleShift === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setScheduleShift(opt.id)}
+                      disabled={scheduleBusy}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: on ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                        background: on ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
+                        color: on ? "#00d4aa" : "#8fa5bf",
+                        fontSize: 12,
+                        cursor: scheduleBusy ? "default" : "pointer",
+                        fontFamily: "'JetBrains Mono', monospace",
+                        flex: "1 1 auto",
+                        minWidth: 72,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            <div
+              data-demo-target={DEMO_TARGET.profile_wake}
+              {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_wake)))}
+            >
+              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Wake time</div>
+              <input
+                className="form-input"
+                type="time"
+                style={{ fontSize: 13, width: "100%", maxWidth: 200, boxSizing: "border-box" }}
+                value={wakeTimeInput}
+                onChange={(e) => setWakeTimeInput(e.target.value)}
+                disabled={scheduleBusy}
+              />
+              <div style={{ fontSize: 12, color: "#6b7c8f", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
+                Your wake time personalizes dose reminders and protocol guardrails to your schedule.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13, alignSelf: "flex-start" }}
+              disabled={scheduleBusy || !workerOk}
+              onClick={() => void saveSchedule()}
+            >
+              {scheduleBusy ? "…" : "Save schedule"}
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn-teal"
-            style={{ fontSize: 13, alignSelf: "flex-start" }}
-            disabled={scheduleBusy || !workerOk}
-            onClick={() => void saveSchedule()}
-          >
-            {scheduleBusy ? "…" : "Save schedule"}
-          </button>
-        </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55 }}>
+              Shift schedule and wake time are included with Elite and GOAT — personalize protocol timing for shift work.
+            </div>
+            <button type="button" className="btn-teal" style={{ fontSize: 13, alignSelf: "flex-start" }} onClick={onOpenUpgrade}>
+              View plans
+            </button>
+          </div>
+        )}
       </Card>
 
       <div style={SECTION}>Notifications</div>

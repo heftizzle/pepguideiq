@@ -34,6 +34,8 @@ export function GlobalStyles() {
         background:var(--bg-primary);
         min-height:100vh;
         box-sizing:border-box;
+        overflow:visible;
+        padding-bottom:32px;
       }
       @supports (min-height:100dvh){
         body{min-height:100dvh}
@@ -44,8 +46,10 @@ export function GlobalStyles() {
       .pepv-profile-tab{
         background-color:var(--bg-primary);
         background:var(--bg-primary);
-        min-height:100%;
+        min-height:min-content;
         box-sizing:border-box;
+        overflow:visible;
+        padding-bottom:24px;
       }
       *{box-sizing:border-box;margin:0;padding:0}
       ::-webkit-scrollbar{width:3px}
