@@ -585,6 +585,7 @@ export function BuildTab({
       </div>
       <LibrarySearchInput
         key={searchInputKey}
+        initialValue={searchQ}
         placeholder="Search catalog…"
         onDebouncedChange={setSearchQ}
         style={{ width: "100%", marginBottom: 10 }}

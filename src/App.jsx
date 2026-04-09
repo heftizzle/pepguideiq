@@ -380,7 +380,8 @@ function PepGuideIQApp({ user, setUser }) {
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("popular");
-  const [search, setSearch]       = useState("");
+  /** Library filter query — kept in PepGuideIQApp so it survives modal open/close and mobile search panel unmount. */
+  const [search, setSearch] = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
@@ -516,8 +517,7 @@ function PepGuideIQApp({ user, setUser }) {
 
   const dismissLibrarySearch = useCallback(() => {
     setLibrarySearchOpen(false);
-    setSearch("");
-  }, [setSearch]);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) {
