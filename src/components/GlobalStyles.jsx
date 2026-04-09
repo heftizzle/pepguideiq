@@ -185,6 +185,7 @@ export function GlobalStyles() {
         position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;box-sizing:border-box;
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
         background:rgba(5,10,18,0.92);backdrop-filter:blur(2px);
+        background:#07090e !important;
         animation:guideTakeoverInDesktop .28s ease;
       }
       .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutDesktop .28s ease forwards}
@@ -242,6 +243,7 @@ export function GlobalStyles() {
           animation:guideTakeoverInMobile .34s ease;
           background:rgba(5,10,18,0.92);
           backdrop-filter:blur(2px);
+          background:#07090e !important;
         }
         .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutMobile .34s ease forwards}
         @keyframes guideTakeoverInMobile{
