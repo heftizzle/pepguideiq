@@ -54,8 +54,8 @@ function coreSteps(firstProtocolSessionId) {
   return [
     { target: DEMO_TARGET.nav_library, tab: "library", text: "Browse the compound library" },
     { target: DEMO_TARGET.library_add_stack, tab: "library", text: "Add a compound to your stack" },
-    { target: DEMO_TARGET.nav_vials, tab: "vials", text: "Create a vial" },
-    { target: DEMO_TARGET.vial_reconstitute, tab: "vials", text: "Reconstitute your vial" },
+    { target: DEMO_TARGET.nav_vials, tab: "vialTracker", text: "Create a vial" },
+    { target: DEMO_TARGET.vial_reconstitute, tab: "vialTracker", text: "Reconstitute your vial" },
     { target: DEMO_TARGET.profile_wake, tab: "profile", text: "Set your time of day" },
     { target: DEMO_TARGET.protocol_log_dose, tab: "protocol", protocolSession: sid, text: "Log your dose" },
   ];

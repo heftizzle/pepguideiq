@@ -19,6 +19,7 @@ import {
 } from "../lib/r2Upload.js";
 import { persistVialPeptideId, vialQueryPeptideIds } from "../lib/resolveStackCatalogPeptide.js";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { formatInjectableDoseHistoryAmount, isBlendCatalogComponents } from "../lib/doseLogDisplay.js";
 import { blendConcentrationsMgPerMl, calculateBlendDose, scaleBlendComponentsToVial } from "../lib/peptideMath.js";
 
 const BLEND_DRAW_MIN = 0.05;
@@ -46,11 +47,6 @@ function formatBlendMcgDraw(n) {
 function formatBlendConcMgPerMl(parts) {
   if (!parts || parts.length === 0) return "—";
   return parts.map((p) => `${p.name} ${p.mgPerMl.toFixed(2)}mg/mL`).join(" · ");
-}
-
-/** Multi-component catalog row (vial tile shows per-component conc., not DB aggregate). */
-function isBlendCatalogComponents(components) {
-  return Array.isArray(components) && components.length >= 2;
 }
 
 function useWorkerObjectUrl(r2Key, workerConfigured) {
@@ -268,31 +264,31 @@ function formatShortDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/** Injectable (mcg) vs oral/nasal/topical count logs. */
-function formatDoseLogLine(d) {
+/**
+ * Injectable (mcg) vs oral/nasal/topical count logs.
+ * @param {Record<string, unknown>} d
+ * @param {Record<string, unknown> | null | undefined} vial
+ * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ */
+function formatDoseLogLine(d, vial, catalogBlendComponents) {
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
-  if (d.dose_mcg != null && Number.isFinite(Number(d.dose_mcg))) {
-    return `${Number(d.dose_mcg).toLocaleString()} mcg`;
-  }
-  return "—";
+  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents);
 }
 
-/** Calendar detail: prefer mg when ≥ 1000 mcg. */
-function formatCalendarDoseAmount(d) {
+/**
+ * @param {Record<string, unknown>} d
+ * @param {Map<string, Record<string, unknown>> | null | undefined} vialsById
+ * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ */
+function formatCalendarDoseAmount(d, vialsById, catalogBlendComponents) {
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
-  const mcg = Number(d.dose_mcg);
-  if (!Number.isFinite(mcg)) return "—";
-  if (mcg >= 1000) {
-    const mg = mcg / 1000;
-    const t =
-      mg % 1 === 0 ? mg.toLocaleString() : mg.toLocaleString(undefined, { maximumFractionDigits: 3 });
-    return `${t} mg`;
-  }
-  return `${mcg.toLocaleString()} mcg`;
+  const vid = typeof d.vial_id === "string" ? d.vial_id : null;
+  const vial = vid && vialsById?.get ? vialsById.get(vid) : null;
+  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents);
 }
 
 function formatDoseTimeLocal(iso) {
@@ -500,7 +496,17 @@ function clampViewMonth(ym, now = new Date()) {
 
 const DOW_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
 
-function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMonth, onNextMonth, resolvePeptideName }) {
+function DoseHistoryCalendar({
+  doses,
+  viewMonth,
+  canGoPrev,
+  canGoNext,
+  onPrevMonth,
+  onNextMonth,
+  resolvePeptideName,
+  vialsById,
+  catalogBlendComponents,
+}) {
   const [selectedYmd, setSelectedYmd] = useState(null);
 
   const byDay = useMemo(() => {
@@ -838,7 +844,7 @@ function DoseHistoryCalendar({ doses, viewMonth, canGoPrev, canGoNext, onPrevMon
             .sort((a, b) => new Date(a.dosed_at).getTime() - new Date(b.dosed_at).getTime())
             .map((log, i) => {
               const name = resolvePeptideName(log.peptide_id);
-              const amount = formatCalendarDoseAmount(log);
+              const amount = formatCalendarDoseAmount(log, vialsById, catalogBlendComponents);
               const timeStr = formatDoseTimeLocal(log.dosed_at);
               const sess = protocolSessionPillLabel(log.protocol_session);
               const meta = [timeStr, sess].filter(Boolean).join(" · ");
@@ -1133,7 +1139,7 @@ function VialRow({
               </div>
               {doses.map((d) => (
                 <div key={d.id} className="mono" style={{ fontSize: 13, color: "#4a6080", padding: "2px 0" }}>
-                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d)}
+                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents)}
                   {d.notes ? ` · ${d.notes}` : ""}
                 </div>
               ))}
@@ -1252,6 +1258,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   );
 
   const reloadGen = useRef(0);
+
+  const vialsById = useMemo(() => new Map((vials ?? []).map((x) => [x.id, x])), [vials]);
 
   useEffect(() => {
     if (highlightTarget === DEMO_TARGET.vial_reconstitute && canMutate && demoAnchorFirst) setShowAdd(true);
@@ -1434,13 +1442,13 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
           opacity: 0.55,
           cursor: "pointer",
         }}
-        title="Upgrade to Pro to track your vials"
+        title="Upgrade to Pro to use Vial Tracker"
       >
         <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
-          VIALS
+          VIAL TRACKER
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
-          Upgrade to Pro to track your vials
+          Upgrade to Pro to use Vial Tracker
         </div>
       </div>
     );
@@ -1470,6 +1478,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         onPrevMonth={goCalPrevMonth}
         onNextMonth={goCalNextMonth}
         resolvePeptideName={resolvePeptideName}
+        vialsById={vialsById}
+        catalogBlendComponents={blendComponents ?? undefined}
       />
 
       {canMutate && (

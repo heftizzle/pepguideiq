@@ -3,6 +3,7 @@ import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
+import { formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import { insertDoseLog, listPeptideIdsWithDosesOnLocalDay } from "../lib/supabase.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
@@ -226,7 +227,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
           TODAY — QUICK LOG
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.45 }}>
-          Nothing to quick-log yet — add active vials for injectables in the Vials tab, or add oral / nasal compounds to your stack.
+          Nothing to quick-log yet — add active vials for injectables in Vial Tracker, or add oral / nasal compounds to your stack.
         </div>
       </div>
     );
@@ -254,7 +255,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
               >
                 <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{entry.name}</div>
                 <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginTop: 6, lineHeight: 1.45 }}>
-                  Injectable — no active vial today. Add or reconstitute in the Vials tab.
+                  Injectable — no active vial today. Add or reconstitute in Vial Tracker.
                 </div>
               </div>
             );
@@ -443,7 +444,16 @@ function QuickNonInjectableRow({ line, isLast, session, loggedToday, busy, onDos
 
 function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsDelta, onLogDose }) {
   const vial = line.vials.find((v) => v.id === line.selectedVialId) ?? line.vials[0];
+  const catalog = useMemo(
+    () => findCatalogPeptideForStackRow({ id: line.peptideId, name: line.name }),
+    [line.peptideId, line.name]
+  );
+  const blendComponents = catalog?.components;
   const derivedMcg = useMemo(() => unitsToMcg(line.units, vial?.concentration_mcg_ml), [line.units, vial?.concentration_mcg_ml]);
+  const dosePreview = useMemo(
+    () => formatProtocolInjectableDosePreview(line.units, vial, blendComponents),
+    [line.units, vial, blendComponents]
+  );
   const timingWarning = getTimingWarning(line.peptideId, session);
   const canLog = derivedMcg != null && derivedMcg > 0 && vial;
 
@@ -463,7 +473,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
         <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{line.name}</div>
         <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", maxWidth: 260 }}>
           {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
-          {line.vials.length > 1 ? " (active vial — Vials tab)" : ""}
+          {line.vials.length > 1 ? " (active vial — Vial Tracker)" : ""}
         </div>
       </div>
       {timingWarning && (
@@ -503,11 +513,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
         >
           +
         </button>
-        <div className="mono" style={{ fontSize: 13, color: "#00d4aa" }}>
-          {derivedMcg != null
-            ? `= ${derivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
-            : "— mcg"}
-        </div>
+        <div className="mono" style={{ fontSize: 13, color: "#00d4aa" }}>{dosePreview}</div>
         <button
           type="button"
           className="btn-teal"

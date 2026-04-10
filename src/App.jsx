@@ -387,7 +387,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
-  /** Build tab editor — lifted so it survives unmount (e.g. full-screen AI Guide). */
+  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Guide). */
   const [buildRows, setBuildRows] = useState([]);
   const [buildLocalStackName, setBuildLocalStackName] = useState("");
   const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -423,7 +423,7 @@ function PepGuideIQApp({ user, setUser }) {
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
   const buildPrevTabRef = useRef(activeTab);
-  /** After build → AI Guide, skip one hydrate from `myStack` when user returns to Build (guide closes via Library). */
+  /** After Stack Builder → AI Guide, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
   const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
@@ -455,7 +455,7 @@ function PepGuideIQApp({ user, setUser }) {
   );
 
   useEffect(() => {
-    if (prevTabRef.current === "build" && activeTab === "guide") {
+    if (prevTabRef.current === "stackBuilder" && activeTab === "guide") {
       preserveBuildEditorAfterGuideRef.current = true;
     }
     if (prevTabRef.current === "guide" && activeTab !== "guide") {
@@ -466,7 +466,7 @@ function PepGuideIQApp({ user, setUser }) {
 
   useEffect(() => {
     const prev = buildPrevTabRef.current;
-    if (activeTab === "build" && prev !== "build") {
+    if (activeTab === "stackBuilder" && prev !== "stackBuilder") {
       if (preserveBuildEditorAfterGuideRef.current) {
         preserveBuildEditorAfterGuideRef.current = false;
       } else {
@@ -1639,7 +1639,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             </div>
           )}
 
-          {activeTab === "build" && (
+          {activeTab === "stackBuilder" && (
             <BuildTab
               activeTab={activeTab}
               catalog={PEPTIDES}
@@ -1663,7 +1663,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             />
           )}
 
-          {activeTab === "vials" && (
+          {activeTab === "vialTracker" && (
             <div>
               <div style={{ marginBottom: 18 }}>
                 <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
@@ -1676,7 +1676,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {myStack.length === 0 ? (
                 <div style={{ border: "1px dashed #14202e", borderRadius: 10, padding: "60px 0", textAlign: "center" }}>
                   <div className="mono" style={{ color: "#a0a0b0", fontSize: 13 }}>
-                    // Save injectable compounds to your stack first, then manage vials here.
+                    // Save injectable compounds to your stack first, then manage them in Vial Tracker.
                   </div>
                 </div>
               ) : (
@@ -2251,25 +2251,28 @@ function PepGuideIQMainTree({ mainUiRef }) {
             </button>
             {[
               {
-                tabId: "vials",
+                tabId: "vialTracker",
                 emoji: "🧪",
-                label: "VIALS",
+                label: "VIAL TRACKER",
+                ariaLabel: "Vial Tracker",
                 demoTarget: DEMO_TARGET.nav_vials,
-                isActive: activeTab === "vials",
-                onClick: () => setActiveTab("vials"),
+                isActive: activeTab === "vialTracker",
+                onClick: () => setActiveTab("vialTracker"),
               },
               {
-                tabId: "build",
+                tabId: "stackBuilder",
                 emoji: "🏗️",
-                label: "BUILD",
+                label: "STACK BUILDER",
+                ariaLabel: "Stack Builder",
                 demoTarget: DEMO_TARGET.nav_build,
-                isActive: activeTab === "build",
-                onClick: () => setActiveTab("build"),
+                isActive: activeTab === "stackBuilder",
+                onClick: () => setActiveTab("stackBuilder"),
               },
               {
                 tabId: "stacks",
                 emoji: "📋",
                 label: "STACKS",
+                ariaLabel: "Stacks",
                 demoTarget: DEMO_TARGET.nav_stacks,
                 isActive: activeTab === "stack",
                 onClick: () => setActiveTab("stack"),
@@ -2278,6 +2281,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 tabId: "network",
                 emoji: NETWORK_TAB_EMOJI,
                 label: "NETWORK",
+                ariaLabel: "Network",
                 demoTarget: DEMO_TARGET.nav_network,
                 isActive: activeTab === "network",
                 onClick: () => setActiveTab("network"),
@@ -2286,6 +2290,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 tabId: "profile",
                 emoji: "👤",
                 label: "PROFILE",
+                ariaLabel: "Profile",
                 demoTarget: DEMO_TARGET.nav_profile,
                 isActive: activeTab === "profile",
                 onClick: () => setActiveTab("profile"),
@@ -2294,6 +2299,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               <button
                 key={item.tabId}
                 type="button"
+                aria-label={item.ariaLabel}
                 data-demo-target={item.demoTarget}
                 {...demoHighlightProps(isHighlighted(item.demoTarget))}
                 onClick={item.onClick}

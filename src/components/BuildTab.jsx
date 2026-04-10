@@ -410,7 +410,7 @@ export function BuildTab({
   }, [advisorStackFingerprint]);
 
   useEffect(() => {
-    if (activeTab !== "build") return;
+    if (activeTab !== "stackBuilder") return;
     if (!user?.id || !activeProfileId || !supabase) return;
 
     const loadHistory = async () => {

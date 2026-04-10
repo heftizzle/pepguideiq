@@ -1786,7 +1786,7 @@ async function handleDeleteMemberProfile(request, env, cors, profileIdRaw) {
 
 /**
  * Authenticated POST — multipart: file + kind (stack_shot_1 | stack_shot_2 | vial).
- * Vials tab hero shots and per-vial photos; Saved Stacks keep using POST /upload-stack-photo.
+ * Vial Tracker hero shots and per-vial photos; Saved Stacks keep using POST /upload-stack-photo.
  */
 async function handlePostStackPhoto(request, env, cors) {
   if (!supabaseAuthReady(env)) {

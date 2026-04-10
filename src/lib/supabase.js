@@ -732,7 +732,7 @@ export async function fetchSharedStackByShareId(shareId) {
 // ─── Vial tracker (`public.user_vials`, `public.dose_logs`) — migrations 005, 006, 009 ─
 
 /**
- * R2 keys for Vials-tab hero stack shots (migration 009).
+ * R2 keys for Vial Tracker hero stack shots (migration 009).
  * @param {string} userId
  * @returns {Promise<{ key1: string | null, key2: string | null, error: Error | null }>}
  */

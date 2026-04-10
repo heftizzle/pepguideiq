@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide.js";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
+import { formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import { insertDoseLog, listPeptideIdsWithDosesOnLocalDay } from "../lib/supabase.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
@@ -357,7 +358,7 @@ function ProtocolMissingVialRow({ name }) {
     <div style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}>
       <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600, marginBottom: 6 }}>{name}</div>
       <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5 }}>
-        Injectable — no active vial today. Add or reconstitute a vial in the Vials tab.
+        Injectable — no active vial today. Add or reconstitute a vial in Vial Tracker.
       </div>
     </div>
   );
@@ -451,7 +452,16 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
 
 function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, onLogDose, demoLogDose = false }) {
   const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
+  const catalog = useMemo(
+    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }),
+    [row.peptideId, row.name]
+  );
+  const blendComponents = catalog?.components;
   const derivedMcg = useMemo(() => unitsToMcg(row.units, vial?.concentration_mcg_ml), [row.units, vial]);
+  const dosePreview = useMemo(
+    () => formatProtocolInjectableDosePreview(row.units, vial, blendComponents),
+    [row.units, vial, blendComponents]
+  );
 
   const vialIndex = row.vials.findIndex((v) => v.id === row.selectedVialId);
   const labelNum = vialIndex >= 0 ? vialIndex + 1 : 1;
@@ -473,7 +483,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#4a6080", textAlign: "right", maxWidth: 280 }}>
           {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
-          {row.vials.length > 1 ? " (active vial — change in Vials tab)" : ""}
+          {row.vials.length > 1 ? " (active vial — change in Vial Tracker)" : ""}
         </div>
       </div>
       {timingWarning && (
@@ -522,11 +532,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         >
           +
         </button>
-        <div style={{ fontSize: 13, color: "#00d4aa" }}>
-          {derivedMcg != null
-            ? `= ${derivedMcg.toLocaleString(undefined, { maximumFractionDigits: 1 })} mcg`
-            : "— mcg"}
-        </div>
+        <div style={{ fontSize: 13, color: "#00d4aa" }}>{dosePreview}</div>
         <button
           type="button"
           className="btn-teal"
