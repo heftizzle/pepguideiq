@@ -4,6 +4,7 @@ import { PROTOCOL_SESSION_UI } from "../data/protocolSessions.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import {
   deleteUserVial,
+  getEarliestDosedAtForPeptideIds,
   getSessionAccessToken,
   insertUserVial,
   listDoseLogsForPeptideIdsRange,
@@ -449,60 +450,71 @@ function localDayEndToIso(d) {
   return x.toISOString();
 }
 
-/** Inclusive ISO bounds for Supabase query for the visible calendar grid. */
-function getDoseHistoryQueryRange(viewMonth, now = new Date()) {
+/** Widen fetch window: earliest dose or 160d back (whichever is earlier) through 160d forward end-of-day. */
+function doseHistoryFetchRangeIso(now = new Date(), earliestDosedAtIso = null) {
   const today = stripTimeLocal(now);
-  const isCurrentMonth = viewMonth.y === today.getFullYear() && viewMonth.m === today.getMonth();
-  if (isCurrentMonth) {
-    const windowEnd = new Date(today);
-    const windowStart = new Date(today);
-    windowStart.setDate(windowStart.getDate() - 29);
-    const gridStart = startOfWeekSunday(windowStart);
-    const gridEnd = endOfWeekSaturday(windowEnd);
-    return { startIso: localDayStartToIso(gridStart), endIso: localDayEndToIso(gridEnd) };
+  const maxEnd = new Date(today);
+  maxEnd.setDate(maxEnd.getDate() + 160);
+  maxEnd.setHours(23, 59, 59, 999);
+  const min160 = stripTimeLocal(new Date(today));
+  min160.setDate(min160.getDate() - 160);
+  let minStart = stripTimeLocal(min160);
+  if (earliestDosedAtIso) {
+    const e = stripTimeLocal(new Date(earliestDosedAtIso));
+    if (e.getTime() < minStart.getTime()) minStart = e;
   }
-  const monthFirst = new Date(viewMonth.y, viewMonth.m, 1);
-  const monthLast = new Date(viewMonth.y, viewMonth.m + 1, 0);
-  const gridStart = startOfWeekSunday(monthFirst);
-  const gridEnd = endOfWeekSaturday(monthLast);
-  return { startIso: localDayStartToIso(gridStart), endIso: localDayEndToIso(gridEnd) };
+  return { startIso: localDayStartToIso(minStart), endIso: localDayEndToIso(maxEnd) };
+}
+
+function parseYmdLocal(ymd) {
+  const [y, mo, d] = String(ymd)
+    .split("-")
+    .map((x) => parseInt(x, 10));
+  if (!y || !mo || !d) return stripTimeLocal(new Date());
+  return stripTimeLocal(new Date(y, mo - 1, d));
+}
+
+function addDaysLocal(d, n) {
+  const x = stripTimeLocal(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function defaultTwoWeekStartYmd() {
+  return ymdFromDate(addDaysLocal(stripTimeLocal(new Date()), -7));
 }
 
 function monthLabelUpper(viewMonth) {
   return new Date(viewMonth.y, viewMonth.m, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase();
 }
 
-function cmpViewMonth(a, b) {
-  if (a.y !== b.y) return a.y - b.y;
-  return a.m - b.m;
-}
-
-function minViewMonth(now = new Date()) {
-  const d = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-  return { y: d.getFullYear(), m: d.getMonth() };
-}
-
 function currentViewMonth(now = new Date()) {
   return { y: now.getFullYear(), m: now.getMonth() };
 }
 
-function clampViewMonth(ym, now = new Date()) {
-  const cur = currentViewMonth(now);
-  const min = minViewMonth(now);
-  if (cmpViewMonth(ym, cur) > 0) return cur;
-  if (cmpViewMonth(ym, min) < 0) return min;
-  return ym;
+function formatTwoWeekRangeHeader(startYmd) {
+  const a = parseYmdLocal(startYmd);
+  const b = addDaysLocal(a, 13);
+  const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase();
+  return `${fmt(a)} – ${fmt(b)}`;
 }
 
 const DOW_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function DoseHistoryCalendar({
   doses,
+  expanded,
+  onToggleExpand,
+  twoWeekStartYmd,
+  onTwoWeekPrev,
+  onTwoWeekNext,
+  canTwoWeekPrev,
+  canTwoWeekNext,
   viewMonth,
-  canGoPrev,
-  canGoNext,
-  onPrevMonth,
-  onNextMonth,
+  onMonthPrev,
+  onMonthNext,
+  canMonthPrev,
+  canMonthNext,
   resolvePeptideName,
   vialsById,
   catalogBlendComponents,
@@ -521,7 +533,7 @@ function DoseHistoryCalendar({
 
   useEffect(() => {
     setSelectedYmd(null);
-  }, [viewMonth.y, viewMonth.m]);
+  }, [viewMonth.y, viewMonth.m, twoWeekStartYmd, expanded]);
 
   useEffect(() => {
     if (!selectedYmd) return;
@@ -536,40 +548,192 @@ function DoseHistoryCalendar({
   const now = new Date();
   const today = stripTimeLocal(now);
   const todayStr = todayYmd();
-  const isCurrentMonth = viewMonth.y === today.getFullYear() && viewMonth.m === today.getMonth();
+  const todayMs = today.getTime();
 
-  let gridStart;
-  let gridEnd;
-  let w0;
-  let w1;
-  let monthFirst;
-  let monthLast;
+  const canGoPrev = expanded ? canMonthPrev : canTwoWeekPrev;
+  const canGoNext = expanded ? canMonthNext : canTwoWeekNext;
+  const onPrev = expanded ? onMonthPrev : onTwoWeekPrev;
+  const onNext = expanded ? onMonthNext : onTwoWeekNext;
 
-  if (isCurrentMonth) {
-    const windowEnd = new Date(today);
-    const windowStart = new Date(today);
-    windowStart.setDate(windowStart.getDate() - 29);
-    w0 = windowStart.getTime();
-    w1 = windowEnd.getTime();
-    gridStart = startOfWeekSunday(windowStart);
-    gridEnd = endOfWeekSaturday(windowEnd);
-    monthFirst = null;
-    monthLast = null;
-  } else {
+  const headerTitle = expanded ? monthLabelUpper(viewMonth) : formatTwoWeekRangeHeader(twoWeekStartYmd);
+
+  let gridCells = [];
+  let monthFirst = null;
+  let monthLast = null;
+  if (expanded) {
     monthFirst = stripTimeLocal(new Date(viewMonth.y, viewMonth.m, 1));
     monthLast = stripTimeLocal(new Date(viewMonth.y, viewMonth.m + 1, 0));
-    gridStart = startOfWeekSunday(monthFirst);
-    gridEnd = endOfWeekSaturday(monthLast);
-    w0 = null;
-    w1 = null;
+    const gridStart = startOfWeekSunday(monthFirst);
+    const gridEnd = endOfWeekSaturday(monthLast);
+    for (let c = new Date(gridStart); c.getTime() <= gridEnd.getTime(); c.setDate(c.getDate() + 1)) {
+      gridCells.push(new Date(c));
+    }
+  } else {
+    const ws = parseYmdLocal(twoWeekStartYmd);
+    for (let i = 0; i < 14; i += 1) {
+      gridCells.push(addDaysLocal(ws, i));
+    }
   }
 
-  const gridCells = [];
-  for (let c = new Date(gridStart); c.getTime() <= gridEnd.getTime(); c.setDate(c.getDate() + 1)) {
-    gridCells.push(new Date(c));
-  }
+  const renderCell = (d) => {
+    const ymd = ymdFromDate(d);
+    const t = stripTimeLocal(d).getTime();
+    const dayLogs = byDay.get(ymd) ?? [];
+    const has = dayLogs.length > 0;
+    const isToday = ymd === todayStr;
 
-  const headerTitle = monthLabelUpper(viewMonth);
+    let isPadding;
+    let isFutureNoClick;
+
+    if (expanded) {
+      const mf = monthFirst.getTime();
+      const ml = monthLast.getTime();
+      const inMonth = t >= mf && t <= ml;
+      isPadding = !inMonth;
+      isFutureNoClick = false;
+    } else {
+      isPadding = false;
+      isFutureNoClick = t > todayMs && !isToday && !has;
+    }
+
+    const paddingCellStyle = {
+      minWidth: 36,
+      minHeight: 36,
+      borderRadius: 12,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 8,
+      color: "#2e4055",
+      background: "#06080c",
+      border: "1px solid #0e1822",
+      fontSize: 12,
+      boxSizing: "border-box",
+      ...(has && selectedYmd === ymd
+        ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+        : {}),
+    };
+
+    if (isPadding || isFutureNoClick) {
+      const dot = has ? (
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#00d4aa",
+            boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+            flexShrink: 0,
+            marginTop: 4,
+          }}
+        />
+      ) : null;
+
+      if (has) {
+        return (
+          <button
+            key={ymd}
+            type="button"
+            className="mono"
+            aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
+            aria-pressed={selectedYmd === ymd}
+            title={`${dayLogs.length} dose(s) — ${ymd}`}
+            onClick={() => toggleDay(ymd)}
+            style={{
+              ...paddingCellStyle,
+              cursor: "pointer",
+              appearance: "none",
+              WebkitAppearance: "none",
+              fontFamily: "inherit",
+              margin: 0,
+            }}
+          >
+            <span>{d.getDate()}</span>
+            {dot}
+          </button>
+        );
+      }
+
+      return (
+        <div key={ymd} aria-hidden={isPadding} className="mono" style={paddingCellStyle}>
+          <span>{d.getDate()}</span>
+          {dot}
+        </div>
+      );
+    }
+
+    const isPast = t < todayMs && !isToday;
+    const baseBg = isToday ? "rgba(0, 212, 170, 0.14)" : "#07090e";
+    const numColor = isPast ? "#5a6d82" : "#8fa5bf";
+    const borderColor = isToday ? "#00d4aa" : "#14202e";
+    const borderWidth = isToday ? 2 : 1;
+
+    const contentCellStyle = {
+      minWidth: 36,
+      minHeight: 36,
+      borderRadius: 12,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      padding: "8px 6px",
+      fontFamily: "JetBrains Mono, monospace",
+      fontSize: 12,
+      lineHeight: 1,
+      color: numColor,
+      background: baseBg,
+      border: `${borderWidth}px solid ${borderColor}`,
+      boxSizing: "border-box",
+      ...(has && selectedYmd === ymd
+        ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+        : {}),
+    };
+
+    const contentDot = has ? (
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "#00d4aa",
+          boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+          flexShrink: 0,
+        }}
+      />
+    ) : null;
+
+    if (has) {
+      return (
+        <button
+          key={ymd}
+          type="button"
+          aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
+          aria-pressed={selectedYmd === ymd}
+          title={`${dayLogs.length} dose(s) — ${ymd}`}
+          onClick={() => toggleDay(ymd)}
+          style={{
+            ...contentCellStyle,
+            cursor: "pointer",
+            appearance: "none",
+            WebkitAppearance: "none",
+            margin: 0,
+          }}
+        >
+          <span>{d.getDate()}</span>
+          {contentDot}
+        </button>
+      );
+    }
+
+    return (
+      <div key={ymd} title={ymd} style={contentCellStyle}>
+        <span>{d.getDate()}</span>
+        {contentDot}
+      </div>
+    );
+  };
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -590,7 +754,7 @@ function DoseHistoryCalendar({
           type="button"
           className="btn-teal"
           disabled={!canGoPrev}
-          onClick={() => onPrevMonth()}
+          onClick={() => onPrev()}
           style={{
             fontSize: 12,
             padding: "4px 10px",
@@ -599,7 +763,7 @@ function DoseHistoryCalendar({
             opacity: canGoPrev ? 1 : 0.35,
             cursor: canGoPrev ? "pointer" : "not-allowed",
           }}
-          aria-label="Previous month"
+          aria-label={expanded ? "Previous month" : "Previous week"}
         >
           ←
         </button>
@@ -619,7 +783,7 @@ function DoseHistoryCalendar({
           type="button"
           className="btn-teal"
           disabled={!canGoNext}
-          onClick={() => onNextMonth()}
+          onClick={() => onNext()}
           style={{
             fontSize: 12,
             padding: "4px 10px",
@@ -628,193 +792,84 @@ function DoseHistoryCalendar({
             opacity: canGoNext ? 1 : 0.35,
             cursor: canGoNext ? "pointer" : "not-allowed",
           }}
-          aria-label="Next month"
+          aria-label={expanded ? "Next month" : "Next week"}
         >
           →
         </button>
       </div>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(36px, 1fr))",
-          gap: 6,
-          maxWidth: 420,
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "stretch",
+          gap: 4,
+          maxWidth: 460,
         }}
       >
-        {DOW_HEADERS.map((h, i) => (
+        <div style={{ flex: "1 1 auto", minWidth: 0, maxWidth: 420 }}>
           <div
-            key={`dow-${i}`}
-            className="mono"
             style={{
-              textAlign: "center",
-              fontSize: 12,
-              color: "#8fa5bf",
-              padding: "4px 0",
-              letterSpacing: "0.06em",
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(36px, 1fr))",
+              gap: 6,
             }}
           >
-            {h}
-          </div>
-        ))}
-        {gridCells.map((d) => {
-          const ymd = ymdFromDate(d);
-          const t = stripTimeLocal(d).getTime();
-          const dayLogs = byDay.get(ymd) ?? [];
-          const has = dayLogs.length > 0;
-          const isToday = ymd === todayStr;
-
-          let inContent;
-          let isFutureNoClick;
-          if (isCurrentMonth) {
-            inContent = t >= w0 && t <= w1;
-            isFutureNoClick = inContent && t > today.getTime();
-          } else {
-            const mf = monthFirst.getTime();
-            const ml = monthLast.getTime();
-            inContent = t >= mf && t <= ml;
-            isFutureNoClick = false;
-          }
-
-          const isPadding = !inContent;
-
-          const paddingCellStyle = {
-            minWidth: 36,
-            minHeight: 36,
-            borderRadius: 12,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 8,
-            color: "#2e4055",
-            background: "#06080c",
-            border: "1px solid #0e1822",
-            fontSize: 12,
-            boxSizing: "border-box",
-            ...(has && selectedYmd === ymd
-              ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
-              : {}),
-          };
-
-          if (isPadding || isFutureNoClick) {
-            const dot = has ? (
-              <span
+            {DOW_HEADERS.map((h, i) => (
+              <div
+                key={`dow-${i}`}
+                className="mono"
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#00d4aa",
-                  boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
-                  flexShrink: 0,
-                  marginTop: 4,
-                }}
-              />
-            ) : null;
-
-            if (has) {
-              return (
-                <button
-                  key={ymd}
-                  type="button"
-                  className="mono"
-                  aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
-                  aria-pressed={selectedYmd === ymd}
-                  title={`${dayLogs.length} dose(s) — ${ymd}`}
-                  onClick={() => toggleDay(ymd)}
-                  style={{
-                    ...paddingCellStyle,
-                    cursor: "pointer",
-                    appearance: "none",
-                    WebkitAppearance: "none",
-                    fontFamily: "inherit",
-                    margin: 0,
-                  }}
-                >
-                  <span>{d.getDate()}</span>
-                  {dot}
-                </button>
-              );
-            }
-
-            return (
-              <div key={ymd} aria-hidden={isPadding} className="mono" style={paddingCellStyle}>
-                <span>{d.getDate()}</span>
-                {dot}
-              </div>
-            );
-          }
-
-          const isPast = t < today.getTime() && !isToday;
-          const baseBg = isToday ? "rgba(0, 212, 170, 0.14)" : "#07090e";
-          const numColor = isPast ? "#5a6d82" : "#8fa5bf";
-          const borderColor = isToday ? "#00d4aa" : "#14202e";
-          const borderWidth = isToday ? 2 : 1;
-
-          const contentCellStyle = {
-            minWidth: 36,
-            minHeight: 36,
-            borderRadius: 12,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-            padding: "8px 6px",
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: 12,
-            lineHeight: 1,
-            color: numColor,
-            background: baseBg,
-            border: `${borderWidth}px solid ${borderColor}`,
-            boxSizing: "border-box",
-            ...(has && selectedYmd === ymd
-              ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
-              : {}),
-          };
-
-          const contentDot = has ? (
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#00d4aa",
-                boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
-                flexShrink: 0,
-              }}
-            />
-          ) : null;
-
-          if (has) {
-            return (
-              <button
-                key={ymd}
-                type="button"
-                aria-label={`${dayLogs.length} dose(s) on ${ymd}`}
-                aria-pressed={selectedYmd === ymd}
-                title={`${dayLogs.length} dose(s) — ${ymd}`}
-                onClick={() => toggleDay(ymd)}
-                style={{
-                  ...contentCellStyle,
-                  cursor: "pointer",
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  margin: 0,
+                  textAlign: "center",
+                  fontSize: 12,
+                  color: "#8fa5bf",
+                  padding: "4px 0",
+                  letterSpacing: "0.06em",
                 }}
               >
-                <span>{d.getDate()}</span>
-                {contentDot}
-              </button>
-            );
-          }
-
-          return (
-            <div key={ymd} title={ymd} style={contentCellStyle}>
-              <span>{d.getDate()}</span>
-              {contentDot}
-            </div>
-          );
-        })}
+                {h}
+              </div>
+            ))}
+            {gridCells.map((d) => renderCell(d))}
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flexShrink: 0,
+            width: 40,
+            paddingTop: 28,
+            alignSelf: "stretch",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 40,
+            }}
+          >
+            <button
+              type="button"
+              className="btn-teal"
+              onClick={onToggleExpand}
+              aria-label={expanded ? "Collapse to two-week calendar" : "Expand to full month"}
+              title={expanded ? "Two-week view" : "Month view"}
+              style={{
+                fontSize: 12,
+                padding: "4px 10px",
+                minWidth: 36,
+                borderRadius: 12,
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >
+              <span aria-hidden>{expanded ? "△" : "▽"}</span>
+            </button>
+          </div>
+        </div>
       </div>
       {selectedYmd && byDay.has(selectedYmd) ? (
         <div
@@ -1180,6 +1235,9 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => currentViewMonth());
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+  const [twoWeekStartYmd, setTwoWeekStartYmd] = useState(() => defaultTwoWeekStartYmd());
+  const [earliestDosedAtIso, setEarliestDosedAtIso] = useState(/** @type {string | null} */ (null));
 
   const [formLabel, setFormLabel] = useState("");
   const [formRecon, setFormRecon] = useState(todayYmd);
@@ -1261,6 +1319,44 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
 
   const vialsById = useMemo(() => new Map((vials ?? []).map((x) => [x.id, x])), [vials]);
 
+  const calendarLimits = useMemo(() => {
+    const today = stripTimeLocal(new Date());
+    const maxD = stripTimeLocal(new Date(today));
+    maxD.setDate(maxD.getDate() + 160);
+    const min160 = stripTimeLocal(new Date(today));
+    min160.setDate(min160.getDate() - 160);
+    let minD = min160;
+    if (earliestDosedAtIso) {
+      const e = stripTimeLocal(new Date(earliestDosedAtIso));
+      if (e.getTime() < minD.getTime()) minD = e;
+    }
+    return { minD, maxD };
+  }, [earliestDosedAtIso]);
+
+  const canTwoWeekPrev = useMemo(() => {
+    const ws = parseYmdLocal(twoWeekStartYmd);
+    const prevStart = addDaysLocal(ws, -7);
+    return prevStart.getTime() >= calendarLimits.minD.getTime();
+  }, [twoWeekStartYmd, calendarLimits.minD]);
+
+  const canTwoWeekNext = useMemo(() => {
+    const ws = parseYmdLocal(twoWeekStartYmd);
+    const endAfterShift = addDaysLocal(ws, 20);
+    return endAfterShift.getTime() <= calendarLimits.maxD.getTime();
+  }, [twoWeekStartYmd, calendarLimits.maxD]);
+
+  const canMonthPrev = useMemo(() => {
+    const lastOfPrevMonth = new Date(viewMonth.y, viewMonth.m, 0);
+    const lastStrip = stripTimeLocal(lastOfPrevMonth);
+    return lastStrip.getTime() >= calendarLimits.minD.getTime();
+  }, [viewMonth.y, viewMonth.m, calendarLimits.minD]);
+
+  const canMonthNext = useMemo(() => {
+    const firstOfNextMonth = new Date(viewMonth.y, viewMonth.m + 1, 1);
+    const firstStrip = stripTimeLocal(firstOfNextMonth);
+    return firstStrip.getTime() <= calendarLimits.maxD.getTime();
+  }, [viewMonth.y, viewMonth.m, calendarLimits.maxD]);
+
   useEffect(() => {
     if (highlightTarget === DEMO_TARGET.vial_reconstitute && canMutate && demoAnchorFirst) setShowAdd(true);
   }, [highlightTarget, canMutate, demoAnchorFirst]);
@@ -1298,7 +1394,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
       .map((row) => row.peptide_id)
       .filter((x) => typeof x === "string" && String(x).trim());
     const calendarPeptideIds = [...new Set([...vialLookupIds, ...fromVials])];
-    const { startIso, endIso } = getDoseHistoryQueryRange(viewMonth, new Date());
+    const { dosedAt: earliest } = await getEarliestDosedAtForPeptideIds(userId, profileId, calendarPeptideIds);
+    if (gen !== reloadGen.current) return;
+    setEarliestDosedAtIso(typeof earliest === "string" && earliest ? earliest : null);
+    const { startIso, endIso } = doseHistoryFetchRangeIso(new Date(), earliest ?? null);
     const { doses: cal } = await listDoseLogsForPeptideIdsRange(
       userId,
       profileId,
@@ -1309,7 +1408,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     if (gen !== reloadGen.current) return;
     setCalendarDoses(cal ?? []);
     setLoading(false);
-  }, [userId, profileId, vialLookupIds, canUse, viewMonth]);
+  }, [userId, profileId, vialLookupIds, canUse]);
 
   useEffect(() => {
     void reload();
@@ -1402,20 +1501,25 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     }
   }
 
-  const canCalGoPrev = cmpViewMonth(viewMonth, minViewMonth()) > 0;
-  const canCalGoNext = cmpViewMonth(viewMonth, currentViewMonth()) < 0;
+  function goTwoWeekPrev() {
+    setTwoWeekStartYmd((prev) => ymdFromDate(addDaysLocal(parseYmdLocal(prev), -7)));
+  }
 
-  function goCalPrevMonth() {
+  function goTwoWeekNext() {
+    setTwoWeekStartYmd((prev) => ymdFromDate(addDaysLocal(parseYmdLocal(prev), 7)));
+  }
+
+  function goMonthPrev() {
     setViewMonth((v) => {
       const d = new Date(v.y, v.m - 1, 1);
-      return clampViewMonth({ y: d.getFullYear(), m: d.getMonth() });
+      return { y: d.getFullYear(), m: d.getMonth() };
     });
   }
 
-  function goCalNextMonth() {
+  function goMonthNext() {
     setViewMonth((v) => {
       const d = new Date(v.y, v.m + 1, 1);
-      return clampViewMonth({ y: d.getFullYear(), m: d.getMonth() });
+      return { y: d.getFullYear(), m: d.getMonth() };
     });
   }
 
@@ -1472,11 +1576,27 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
 
       <DoseHistoryCalendar
         doses={calendarDoses}
+        expanded={calendarExpanded}
+        onToggleExpand={() => {
+          setCalendarExpanded((prev) => {
+            const next = !prev;
+            if (next) {
+              const w = parseYmdLocal(twoWeekStartYmd);
+              setViewMonth({ y: w.getFullYear(), m: w.getMonth() });
+            }
+            return next;
+          });
+        }}
+        twoWeekStartYmd={twoWeekStartYmd}
+        onTwoWeekPrev={goTwoWeekPrev}
+        onTwoWeekNext={goTwoWeekNext}
+        canTwoWeekPrev={canTwoWeekPrev}
+        canTwoWeekNext={canTwoWeekNext}
         viewMonth={viewMonth}
-        canGoPrev={canCalGoPrev}
-        canGoNext={canCalGoNext}
-        onPrevMonth={goCalPrevMonth}
-        onNextMonth={goCalNextMonth}
+        onMonthPrev={goMonthPrev}
+        onMonthNext={goMonthNext}
+        canMonthPrev={canMonthPrev}
+        canMonthNext={canMonthNext}
         resolvePeptideName={resolvePeptideName}
         vialsById={vialsById}
         catalogBlendComponents={blendComponents ?? undefined}

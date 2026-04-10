@@ -897,6 +897,31 @@ export async function listPeptideIdsWithDosesOnLocalDay(userId, profileId, ymd) 
 /**
  * @param {string[]} peptideIds
  */
+/**
+ * Earliest `dosed_at` across the given peptides (for calendar scroll-back limit).
+ * @param {string} userId
+ * @param {string} profileId
+ * @param {string[]} peptideIds
+ * @returns {Promise<{ dosedAt: string | null, error: Error | null }>}
+ */
+export async function getEarliestDosedAtForPeptideIds(userId, profileId, peptideIds) {
+  const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (!supabase || !profileId) return { dosedAt: null, error: notConfiguredError() };
+  if (ids.length === 0) return { dosedAt: null, error: null };
+  let q = supabase
+    .from("dose_logs")
+    .select("dosed_at")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .order("dosed_at", { ascending: true })
+    .limit(1);
+  q = ids.length === 1 ? q.eq("peptide_id", ids[0]) : q.in("peptide_id", ids);
+  const { data, error } = await q;
+  const row = Array.isArray(data) && data.length > 0 ? data[0] : null;
+  const raw = row && typeof row.dosed_at === "string" ? row.dosed_at : null;
+  return { dosedAt: raw, error: error ?? null };
+}
+
 export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideIds, startIso, endIso) {
   const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };

@@ -1082,6 +1082,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
+  const profileNavTopLabel = useMemo(() => {
+    const disp = formatHandleDisplay(activeProfile?.handle ?? "");
+    if (!disp) return "MY";
+    return disp.length > 8 ? `${disp.slice(0, 7)}…` : disp;
+  }, [activeProfile?.handle, memberProfilesVersion]);
+
   return (
     <>
         <GlobalStyles />
@@ -2222,7 +2228,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 10,
                   lineHeight: 1,
                   letterSpacing: "0.03em",
-                  color: "#7a8694",
+                  color: libraryNavActive ? "#00d4aa" : "rgb(92, 109, 130)",
                   fontWeight: 500,
                 }}
                 aria-hidden
@@ -2253,7 +2259,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {
                 tabId: "vialTracker",
                 emoji: "🧪",
-                label: "VIAL TRACKER",
+                labelTop: "VIAL",
+                label: "TRACKER",
                 ariaLabel: "Vial Tracker",
                 demoTarget: DEMO_TARGET.nav_vials,
                 isActive: activeTab === "vialTracker",
@@ -2262,7 +2269,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {
                 tabId: "stackBuilder",
                 emoji: "🏗️",
-                label: "STACK BUILDER",
+                labelTop: "STACK",
+                label: "BUILDER",
                 ariaLabel: "Stack Builder",
                 demoTarget: DEMO_TARGET.nav_build,
                 isActive: activeTab === "stackBuilder",
@@ -2271,6 +2279,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {
                 tabId: "stacks",
                 emoji: "📋",
+                labelTop: "SAVED",
                 label: "STACKS",
                 ariaLabel: "Stacks",
                 demoTarget: DEMO_TARGET.nav_stacks,
@@ -2280,6 +2289,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {
                 tabId: "network",
                 emoji: NETWORK_TAB_EMOJI,
+                labelTop: "PEPGUIDE",
                 label: "NETWORK",
                 ariaLabel: "Network",
                 demoTarget: DEMO_TARGET.nav_network,
@@ -2289,6 +2299,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {
                 tabId: "profile",
                 emoji: "👤",
+                labelTop: profileNavTopLabel,
                 label: "PROFILE",
                 ariaLabel: "Profile",
                 demoTarget: DEMO_TARGET.nav_profile,
@@ -2321,6 +2332,23 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   boxShadow: item.isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
                 }}
               >
+                {item.labelTop ? (
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 10,
+                      lineHeight: 1,
+                      letterSpacing: "0.03em",
+                      fontWeight: 500,
+                      margin: 0,
+                      padding: 0,
+                      color: item.isActive ? "#00d4aa" : "rgb(92, 109, 130)",
+                    }}
+                    aria-hidden
+                  >
+                    {item.labelTop}
+                  </span>
+                ) : null}
                 <span
                   className="pepv-emoji"
                   style={{ fontSize: 18, lineHeight: 1, opacity: item.isActive ? 1 : 0.72 }}
@@ -2335,6 +2363,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     letterSpacing: "0.06em",
                     color: item.isActive ? "#00d4aa" : "#5c6d82",
                     fontWeight: 500,
+                    textAlign: "center",
                   }}
                 >
                   {item.label}

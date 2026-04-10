@@ -7,6 +7,90 @@ import { formatPlan, getNextTierId, TIER_RANK } from "../lib/tiers.js";
 
 const ROWS = getUpgradeTierRows();
 
+/** Modal-only accents (do not change tier pricing / Stripe ids). */
+const TIER_ACCENTS = {
+  entry: "#22c55e",
+  pro: "#06b6d4",
+  elite: "#a855f7",
+  goat: "#f59e0b",
+};
+
+const CARD_EMOJI = {
+  entry: "🌱",
+  pro: "🔬",
+  elite: "⚡",
+  goat: "🐐",
+};
+
+const CTA_DARK_TEXT = "#0f172a";
+
+function hexToRgbTriple(hex) {
+  const h = String(hex).replace("#", "");
+  return `${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)}`;
+}
+
+/** @param {string} priceLabel */
+function splitPriceLabel(priceLabel) {
+  if (!priceLabel || priceLabel === "Free") return { price: "Free", suffix: "" };
+  if (priceLabel.endsWith("/mo")) return { price: priceLabel.slice(0, -3), suffix: "/mo" };
+  return { price: priceLabel, suffix: "" };
+}
+
+function upgradeCtaLabel(rowId) {
+  if (rowId === "pro") return "Get Pro";
+  if (rowId === "elite") return "Get Elite";
+  if (rowId === "goat") return "Go GOAT 🐐";
+  return "Upgrade";
+}
+
+function neutralDisabledCtaStyle() {
+  return {
+    width: "100%",
+    padding: "10px 12px",
+    fontSize: 13,
+    opacity: 0.45,
+    cursor: "default",
+    borderRadius: 10,
+    border: "1px solid #334155",
+    color: "#64748b",
+    background: "rgba(15, 23, 42, 0.45)",
+  };
+}
+
+/** @param {string} rowId */
+function tierPrimaryCtaStyle(rowId, disabled) {
+  const accent = TIER_ACCENTS[rowId] ?? "#64748b";
+  const isGoat = rowId === "goat";
+  const base = {
+    width: "100%",
+    borderRadius: 10,
+    cursor: disabled ? "default" : "pointer",
+    fontSize: isGoat ? 15 : 13,
+    fontWeight: isGoat ? 700 : 600,
+    padding: isGoat ? "14px 18px" : "10px 12px",
+    opacity: disabled ? 0.5 : 1,
+    transition: "opacity 0.15s ease",
+  };
+  if (rowId === "entry") {
+    return {
+      ...base,
+      background: "transparent",
+      border: `1px solid ${accent}`,
+      color: accent,
+    };
+  }
+  if (rowId === "pro") {
+    return { ...base, background: accent, color: CTA_DARK_TEXT, border: "none" };
+  }
+  if (rowId === "elite") {
+    return { ...base, background: accent, color: "#ffffff", border: "none" };
+  }
+  if (rowId === "goat") {
+    return { ...base, background: accent, color: CTA_DARK_TEXT, border: "none" };
+  }
+  return { ...base, ...neutralDisabledCtaStyle() };
+}
+
 const BILLING_ERROR_USER_MESSAGE = "Unable to load billing info. Please try again.";
 
 const mutedDowngradeBtn = {
@@ -28,6 +112,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
   const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
   const [downgradeError, setDowngradeError] = useState(null);
   const [upgradeActionError, setUpgradeActionError] = useState(null);
+  const [hoverTierId, setHoverTierId] = useState(null);
 
   const refetchSubscription = () => {
     setSubscriptionLoading(true);
@@ -184,42 +269,37 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
     }
 
     if (actionsDisabled) {
+      const disabledLabel = subscriptionLoading
+        ? "Loading…"
+        : isSame
+          ? rowId === "entry"
+            ? "Start Free"
+            : "This is your current plan"
+          : isUpgrade
+            ? upgradeCtaLabel(rowId)
+            : rowId === "entry"
+              ? "Move to Free"
+              : "Schedule Downgrade";
       return (
-        <button
-          type="button"
-          disabled
-          className="btn-teal btn-upgrade-current"
-          style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
-        >
-          {subscriptionLoading ? "Loading…" : isSame ? "This is your current plan" : isUpgrade ? "Upgrade" : "Downgrade"}
+        <button type="button" disabled style={neutralDisabledCtaStyle()}>
+          {disabledLabel}
         </button>
       );
     }
 
     if (isSame) {
+      const label = rowId === "entry" ? "Start Free" : "This is your current plan";
       return (
-        <button
-          type="button"
-          disabled
-          className="btn-teal btn-upgrade-current"
-          style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
-        >
-          This is your current plan
+        <button type="button" disabled style={tierPrimaryCtaStyle(rowId, true)}>
+          {label}
         </button>
       );
     }
 
     if (isUpgrade) {
-      const isNext = rowId === nextStripeTier;
-      const label = isNext ? "Upgrade Now" : "Learn More";
       return (
-        <button
-          type="button"
-          className={isNext ? "btn-teal btn-upgrade-cta" : "btn-teal btn-upgrade-ghost"}
-          style={{ width: "100%", padding: "10px 12px", fontSize: 13 }}
-          onClick={() => void tierAction(rowId)}
-        >
-          {label}
+        <button type="button" style={tierPrimaryCtaStyle(rowId, false)} onClick={() => void tierAction(rowId)}>
+          {upgradeCtaLabel(rowId)}
         </button>
       );
     }
@@ -227,12 +307,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
     if (isDowngrade) {
       if (!canDowngrade) {
         return (
-          <button
-            type="button"
-            disabled
-            className="btn-teal btn-upgrade-current"
-            style={{ width: "100%", padding: "10px 12px", fontSize: 13, opacity: 0.4, cursor: "default" }}
-          >
+          <button type="button" disabled style={neutralDisabledCtaStyle()}>
             {rowId === "entry" ? "Move to Free" : "Schedule Downgrade"}
           </button>
         );
@@ -253,6 +328,129 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
     }
 
     return null;
+  };
+
+  const renderPricingTierCard = (row) => {
+    const isGoat = row.id === "goat";
+    const accent = TIER_ACCENTS[row.id];
+    const rgb = hexToRgbTriple(accent);
+    const emoji = CARD_EMOJI[row.id];
+    const hover = hoverTierId === row.id;
+    const isCurrent = row.id === stripeTier;
+    const isNext = row.id === nextStripeTier;
+    const isRec = row.id === upgradeFocusTier || isNext;
+    const borderA = hover ? 0.55 : 0.4;
+    let glowA = hover ? 0.22 : 0.12;
+    if (isRec && !isCurrent) glowA += 0.06;
+    const { price, suffix } = splitPriceLabel(row.priceLabel);
+
+    const featureListStyle = {
+      margin: 0,
+      paddingLeft: 0,
+      listStyle: "none",
+      fontSize: 13,
+      lineHeight: 1.6,
+      color: "#cdd8e8",
+    };
+
+    const checkRow = (line) => (
+      <li key={line} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 6 }}>
+        <span style={{ color: accent, flexShrink: 0, fontWeight: 700, lineHeight: 1.6 }} aria-hidden>
+          ✓
+        </span>
+        <span>{line}</span>
+      </li>
+    );
+
+    return (
+      <div
+        key={row.id}
+        onMouseEnter={() => setHoverTierId(row.id)}
+        onMouseLeave={() => setHoverTierId(null)}
+        style={{
+          position: "relative",
+          background: `rgba(${rgb}, 0.06)`,
+          border: `1px solid rgba(${rgb}, ${borderA})`,
+          borderTop: `3px solid ${accent}`,
+          borderRadius: 12,
+          padding: isGoat ? 22 : 16,
+          paddingTop: isGoat ? 28 : 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: isGoat ? 14 : 12,
+          minWidth: 0,
+          minHeight: isGoat ? 460 : undefined,
+          boxShadow: `0 0 18px rgba(${rgb}, ${glowA})`,
+          transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+        }}
+      >
+        {isGoat ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 14,
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: CTA_DARK_TEXT,
+              background: "rgba(245, 158, 11, 0.92)",
+              padding: "5px 10px",
+              borderRadius: 6,
+            }}
+          >
+            GOAT TIER
+          </div>
+        ) : null}
+
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <span className="pepv-emoji" style={{ fontSize: isGoat ? 48 : 36, lineHeight: 1 }} aria-hidden>
+            {emoji}
+          </span>
+          <div
+            className="brand"
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: accent,
+            }}
+          >
+            {row.name}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+            <span
+              className="brand"
+              style={{
+                fontSize: isGoat ? 36 : 28,
+                fontWeight: 800,
+                color: accent,
+              }}
+            >
+              {price}
+            </span>
+            {suffix ? (
+              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{suffix}</span>
+            ) : null}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#e8eef6", lineHeight: 1.45 }}>{row.headline}</div>
+
+        <div style={{ fontSize: 13, color: "#a8b8d0", lineHeight: 1.55 }}>{row.subline}</div>
+
+        <ul style={featureListStyle}>{row.limitBullets.map(checkRow)}</ul>
+
+        <div className="mono" style={{ fontSize: 11, color: "#7d92ab", letterSpacing: "0.06em", marginTop: 2 }}>
+          // ALL TIERS
+        </div>
+        <ul style={featureListStyle}>{row.allTiersInclude.map(checkRow)}</ul>
+
+        <div style={{ marginTop: "auto", paddingTop: 8 }}>{renderTierActions(row)}</div>
+      </div>
+    );
   };
 
   return (
@@ -327,91 +525,9 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         )}
       </div>
 
-      <div
-        className="upgrade-tier-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-          gap: 12,
-        }}
-      >
-        {ROWS.map((row) => {
-          const isCurrent = row.id === stripeTier;
-          const isNext = row.id === nextStripeTier;
-          const isRec = row.id === upgradeFocusTier || isNext;
-
-          return (
-            <div
-              key={row.id}
-              style={{
-                background: "#07090e",
-                border: `${isRec && !isCurrent ? 2 : 1}px solid ${isCurrent ? row.color + "90" : isRec ? row.color + "55" : row.color + "28"}`,
-                borderRadius: 10,
-                padding: 14,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                minWidth: 0,
-                boxShadow: isRec && !isCurrent ? `0 0 0 1px ${row.color}30, 0 10px 28px ${row.color}14` : "none",
-              }}
-            >
-              <div>
-                <div className="brand" style={{ fontSize: 15, fontWeight: 800, color: "#dde4ef" }}>
-                  {row.name} {row.emoji}
-                </div>
-                <div style={{ marginTop: 6 }}>
-                  <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef" }}>{row.priceLabel}</span>
-                </div>
-              </div>
-
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", lineHeight: 1.35 }}>{row.headline}</div>
-
-              <div style={{ fontSize: 13, color: "#6b8299", lineHeight: 1.5 }}>{row.subline}</div>
-
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  fontSize: 12,
-                  color: "#8fa5bf",
-                  lineHeight: 1.5,
-                  listStyleType: "disc",
-                }}
-              >
-                {row.limitBullets.map((line) => (
-                  <li key={line} style={{ marginBottom: 4 }}>
-                    {line}
-                  </li>
-                ))}
-              </ul>
-
-              <div
-                className="mono"
-                style={{ fontSize: 11, color: "#4a6080", letterSpacing: "0.06em", marginTop: 4 }}
-              >
-                // ALL TIERS
-              </div>
-              <ul
-                style={{
-                  margin: 0,
-                  paddingLeft: 18,
-                  fontSize: 12,
-                  color: "#6b8299",
-                  lineHeight: 1.45,
-                  listStyleType: "disc",
-                }}
-              >
-                {row.allTiersInclude.map((line) => (
-                  <li key={line} style={{ marginBottom: 3 }}>
-                    {line}
-                  </li>
-                ))}
-              </ul>
-
-              <div style={{ marginTop: "auto", paddingTop: 6 }}>{renderTierActions(row)}</div>
-            </div>
-          );
-        })}
+      <div>
+        <div className="upgrade-tier-grid-top">{ROWS.slice(0, 3).map((row) => renderPricingTierCard(row))}</div>
+        <div className="upgrade-tier-grid-goat">{renderPricingTierCard(ROWS[3])}</div>
       </div>
 
       <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
@@ -419,9 +535,18 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       </div>
 
       <style>{`
+        .upgrade-tier-grid-top {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .upgrade-tier-grid-goat {
+          width: 100%;
+        }
         @media (max-width: 900px) {
-          .upgrade-tier-grid {
-            grid-template-columns: 1fr !important;
+          .upgrade-tier-grid-top {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
