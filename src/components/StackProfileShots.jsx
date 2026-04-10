@@ -69,7 +69,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
       return;
     }
     if (!workerConfigured) {
-      setErr("// Configure VITE_API_WORKER_URL");
+      setErr("Configure VITE_API_WORKER_URL");
       return;
     }
     setErr(null);
@@ -82,11 +82,11 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
     if (!f) return;
     setErr(null);
     if (!R2_UPLOAD_ALLOWED_TYPES.has(f.type)) {
-      setErr("// JPEG, PNG, WebP, or GIF only");
+      setErr("JPEG, PNG, WebP, or GIF only");
       return;
     }
     if (f.size > R2_UPLOAD_MAX_BYTES) {
-      setErr("// Max 10MB");
+      setErr("Max 10MB");
       return;
     }
     setUploading(true);
@@ -95,12 +95,12 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
       file: f,
       fields: { kind },
       onState: (state) => {
-        if (state === "retrying") setErr("// Retrying…");
+        if (state === "retrying") setErr("Retrying…");
       },
     });
     setUploading(false);
     if (!result.ok) {
-      setErr(`// ${result.error}`);
+      setErr(result.error ?? "Upload failed");
       return;
     }
     setErr(null);

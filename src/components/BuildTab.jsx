@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase.js";
 import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
+import { canAddStackRow } from "../lib/tiers.js";
 
 const FREQ_OPTIONS = [
   { id: "daily", label: "Daily" },
@@ -451,7 +452,7 @@ export function BuildTab({
   const addCompound = useCallback(
     (p) => {
       if (rows.some((r) => r.peptideId === p.id)) return;
-      if (Number.isFinite(savedStackLimit) && rows.length >= savedStackLimit) {
+      if (!canAddStackRow(plan, rows.length)) {
         onUpgrade();
         return;
       }
@@ -468,7 +469,7 @@ export function BuildTab({
         },
       ]);
     },
-    [rows, savedStackLimit, onUpgrade]
+    [rows, plan, onUpgrade]
   );
 
   const moveRow = (idx, dir) => {
@@ -731,7 +732,7 @@ export function BuildTab({
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.length === 0 ? (
           <div className="mono" style={{ color: "#5c6d82", fontSize: 13, padding: "12px 0" }}>
-            // Add compounds from search above
+            Add compounds from search above
           </div>
         ) : (
           rows.map((row, idx) => {
@@ -1033,7 +1034,7 @@ export function BuildTab({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.length === 0 ? (
-          <div className="mono" style={{ color: "#5c6d82", fontSize: 13 }}>// Add compounds to calculate</div>
+          <div className="mono" style={{ color: "#5c6d82", fontSize: 13 }}>Add compounds to calculate</div>
         ) : (
           cycleLines.map((L) => (
             <div

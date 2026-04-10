@@ -112,7 +112,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
       return;
     }
     if (!workerConfigured) {
-      setErr("// Worker URL");
+      setErr("Worker URL");
       return;
     }
     setErr(null);

@@ -7,51 +7,51 @@ import {
 
 /** Single bold hook per tier (marketing line). */
 const HEADLINES = {
-  entry: "Start free — AI Guide + Stack Advisor included",
-  pro: "InBody / DEXA uploads + more AI capacity",
-  elite: "Claude Sonnet — vision OCR + shift-aware scheduling",
-  goat: "Founding member perks + max capacity",
+  entry: "Start free — explore the full compound library",
+  pro: "Serious about your protocol",
+  elite: "Full protocol intelligence",
+  goat: "The complete arsenal",
 };
 
-const PREV_LABEL = { pro: "Entry", elite: "Pro", goat: "Elite" };
+const SUBLINES = {
+  entry: "Track 2 compounds, ask the AI Guide twice a day, and build your first stack.",
+  pro: "Track up to 10 compounds, more AI queries, and upload your body scan results.",
+  elite:
+    "Everything in Pro, plus Deep Intel AI, up to 25 compounds, unlimited progress photos, 2 profiles, and Vision OCR.",
+  goat:
+    "Everything in Elite, plus up to 50 compounds, max AI capacity, 4 profiles, and early access to every new feature.",
+};
 
 function modelLabel(id) {
   const t = TIERS[id];
-  return t.ai_guide_model === "sonnet" ? "Claude Sonnet" : "Claude Haiku";
+  return t.ai_guide_model === "sonnet" ? "Deep Intel AI" : "Standard AI";
+}
+
+/** First bullet: compounds tracked (copy matches tier caps). */
+function compoundsTrackedLine(id) {
+  const t = TIERS[id];
+  const n = t.stackLimit;
+  if (id === "entry") return `Track ${n} compounds`;
+  return `Track up to ${n} compounds`;
 }
 
 /** Tier-specific limit lines (upgrade modal). */
 function tierLimitBullets(id) {
   const t = TIERS[id];
   const lines = [
-    `AI Guide: ${t.ai_guide_calls_per_day}/day (${modelLabel(id)})`,
-    `Stack Advisor: ${t.stack_advisor_calls_per_day}/day`,
-    `Progress photos: ${formatProgressPhotoSetsLabel(t.progress_photo_sets)}`,
-    `${t.profiles} profile${t.profiles === 1 ? "" : "s"}`,
+    compoundsTrackedLine(id),
+    `AI Guide: ${t.ai_guide_calls_per_day} a day (${modelLabel(id)})`,
+    `Stack Advisor: ${t.stack_advisor_calls_per_day} a day`,
   ];
+  if (Number.isFinite(t.progress_photo_sets)) {
+    lines.push(`Progress photos: ${formatProgressPhotoSetsLabel(t.progress_photo_sets)}`);
+  }
+  lines.push(`${t.profiles} profile${t.profiles === 1 ? "" : "s"}`);
   if (t.inbody_dexa_upload) lines.push("InBody / DEXA scan upload");
-  if (t.claude_vision_ocr) lines.push("Claude Vision OCR (scans)");
-  if (t.shift_schedule) lines.push("Shift schedule + wake time");
-  if (t.founding_member) lines.push("Founding member");
+  if (t.claude_vision_ocr) lines.push("Vision OCR (scans)");
+  if (t.shift_schedule) lines.push("Personalized dosing schedule");
   if (t.early_access) lines.push("Early access to new features");
   return lines;
-}
-
-function deltaVersusPrevious(id) {
-  const cur = TIERS[id];
-  const label = PREV_LABEL[id];
-  if (id === "pro") {
-    return `Everything in ${label}, plus higher daily caps, ${formatProgressPhotoSetsLabel(cur.progress_photo_sets)} progress photos, and InBody / DEXA upload.`;
-  }
-  if (id === "elite") {
-    return `Everything in ${label}, plus ${modelLabel(id)} for AI Guide, unlimited progress photo sets, 2 profiles, Vision OCR, and shift scheduling.`;
-  }
-  return `Everything in ${label}, plus more daily calls, 4 profiles, founding member status, and early access.`;
-}
-
-function entrySubline() {
-  const e = TIERS.entry;
-  return `AI Guide ${e.ai_guide_calls_per_day}/day (${modelLabel("entry")}) · Stack Advisor ${e.stack_advisor_calls_per_day}/day · ${formatProgressPhotoSetsLabel(e.progress_photo_sets)} progress photos`;
 }
 
 /**
@@ -74,7 +74,7 @@ export function getUpgradeTierRows() {
       emoji: t.emoji,
       priceLabel,
       headline: HEADLINES[id],
-      subline: id === "entry" ? entrySubline() : deltaVersusPrevious(id),
+      subline: SUBLINES[id],
       color: colors[id],
       limitBullets: tierLimitBullets(id),
       allTiersInclude: ALL_TIERS_INCLUDE_LINES,

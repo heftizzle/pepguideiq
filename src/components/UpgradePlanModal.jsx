@@ -91,8 +91,6 @@ function tierPrimaryCtaStyle(rowId, disabled) {
   return { ...base, ...neutralDisabledCtaStyle() };
 }
 
-const BILLING_ERROR_USER_MESSAGE = "Unable to load billing info. Please try again.";
-
 const mutedDowngradeBtn = {
   width: "100%",
   padding: "10px 12px",
@@ -111,7 +109,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
   const [downgradeFlow, setDowngradeFlow] = useState(null);
   const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
   const [downgradeError, setDowngradeError] = useState(null);
-  const [upgradeActionError, setUpgradeActionError] = useState(null);
   const [hoverTierId, setHoverTierId] = useState(null);
 
   const refetchSubscription = () => {
@@ -147,9 +144,14 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
     };
   }, []);
 
-  const actionsDisabled = subscriptionLoading || subscriptionError != null;
+  const actionsDisabled = subscriptionLoading;
   const subscriptionOk = !subscriptionLoading && subscriptionError == null && subscriptionInfo != null;
-  const stripeTier = subscriptionOk && subscriptionInfo.plan ? subscriptionInfo.plan : "entry";
+  const stripeTier =
+    subscriptionError != null
+      ? "entry"
+      : subscriptionOk && subscriptionInfo.plan
+        ? subscriptionInfo.plan
+        : "entry";
 
   const canDowngrade =
     subscriptionOk &&
@@ -169,16 +171,10 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
   const tierAction = async (planId) => {
     if (actionsDisabled || planId === "entry") return;
-    setUpgradeActionError(null);
     const url = getStripeCheckoutUrlWithClientRef(planId, user?.id);
-    if (url) {
-      onClose();
-      window.location.assign(url);
-      return;
-    }
-    setUpgradeActionError(
-      "Checkout is not configured. Set VITE_STRIPE_CHECKOUT_* for your domain and configure the Worker webhook (STRIPE_WEBHOOK_SECRET). See README."
-    );
+    if (!url) return;
+    onClose();
+    window.location.assign(url);
   };
 
   const confirmDowngrade = async (targetId) => {
@@ -287,6 +283,14 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       );
     }
 
+    if (subscriptionError != null && isUpgrade) {
+      return (
+        <button type="button" disabled style={neutralDisabledCtaStyle()}>
+          Coming Soon
+        </button>
+      );
+    }
+
     if (isSame) {
       const label = rowId === "entry" ? "Start Free" : "This is your current plan";
       return (
@@ -364,7 +368,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
     return (
       <div
-        key={row.id}
         onMouseEnter={() => setHoverTierId(row.id)}
         onMouseLeave={() => setHoverTierId(null)}
         style={{
@@ -379,7 +382,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           flexDirection: "column",
           gap: isGoat ? 14 : 12,
           minWidth: 0,
-          minHeight: isGoat ? 460 : undefined,
           boxShadow: `0 0 18px rgba(${rgb}, ${glowA})`,
           transition: "box-shadow 0.2s ease, border-color 0.2s ease",
         }}
@@ -443,9 +445,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
 
         <ul style={featureListStyle}>{row.limitBullets.map(checkRow)}</ul>
 
-        <div className="mono" style={{ fontSize: 11, color: "#7d92ab", letterSpacing: "0.06em", marginTop: 2 }}>
-          // ALL TIERS
-        </div>
         <ul style={featureListStyle}>{row.allTiersInclude.map(checkRow)}</ul>
 
         <div style={{ marginTop: "auto", paddingTop: 8 }}>{renderTierActions(row)}</div>
@@ -461,11 +460,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4 }}>
             Compare tiers — upgrade anytime. Cancel anytime.
           </div>
-          {upgradeActionError && (
-            <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginTop: 8, maxWidth: 520 }}>
-              {upgradeActionError}
-            </div>
-          )}
         </div>
         <button
           type="button"
@@ -477,57 +471,12 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
         </button>
       </div>
 
-      <div
-        style={{
-          marginBottom: 16,
-          padding: 12,
-          background: "#0b0f17",
-          border: "1px solid #14202e",
-          borderRadius: 8,
-        }}
-      >
-        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.12em", marginBottom: 8 }}>
-          // BILLING (STRIPE)
-        </div>
-        {subscriptionLoading && (
-          <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
-            Loading subscription…
+      <div className="upgrade-tier-grid">
+        {ROWS.map((row) => (
+          <div key={row.id} style={{ minWidth: 0 }}>
+            {renderPricingTierCard(row)}
           </div>
-        )}
-        {!subscriptionLoading && subscriptionError && (
-          <div className="mono" style={{ fontSize: 13, color: "#f59e0b", lineHeight: 1.5 }}>
-            {BILLING_ERROR_USER_MESSAGE}
-          </div>
-        )}
-        {subscriptionOk && (
-          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
-            <div>
-              <span className="mono" style={{ color: "#4a6080" }}>status</span> {subscriptionInfo.status}
-            </div>
-            {subscriptionInfo.current_period_end > 0 && (
-              <div style={{ marginTop: 6 }}>
-                <span className="mono" style={{ color: "#4a6080" }}>current_period_end</span> {periodEndDate}
-              </div>
-            )}
-            <div style={{ marginTop: 6 }}>
-              <span className="mono" style={{ color: "#4a6080" }}>cancel_at_period_end</span>{" "}
-              {subscriptionInfo.cancel_at_period_end ? "true" : "false"}
-            </div>
-            <div style={{ marginTop: 6 }}>
-              <span className="mono" style={{ color: "#4a6080" }}>plan</span> {subscriptionInfo.plan}
-            </div>
-            {subscriptionInfo.pending_plan != null && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #14202e", color: "#6b8299" }}>
-                <span className="mono" style={{ color: "#4a6080" }}>pending_plan</span> {subscriptionInfo.pending_plan}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <div className="upgrade-tier-grid-top">{ROWS.slice(0, 3).map((row) => renderPricingTierCard(row))}</div>
-        <div className="upgrade-tier-grid-goat">{renderPricingTierCard(ROWS[3])}</div>
+        ))}
       </div>
 
       <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
@@ -535,17 +484,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
       </div>
 
       <style>{`
-        .upgrade-tier-grid-top {
+        .upgrade-tier-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
-          margin-bottom: 12px;
         }
-        .upgrade-tier-grid-goat {
-          width: 100%;
-        }
-        @media (max-width: 900px) {
-          .upgrade-tier-grid-top {
+        @media (max-width: 500px) {
+          .upgrade-tier-grid {
             grid-template-columns: 1fr;
           }
         }

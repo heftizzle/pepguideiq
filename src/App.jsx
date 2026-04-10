@@ -1149,10 +1149,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </span>
                         AI GUIDE
                       </button>
-                      <span
+                      <button
+                        type="button"
                         className="mono"
+                        onClick={openUpgradeModal}
                         style={{
                           ...HEADER_ACCOUNT_PILL_BASE,
+                          cursor: "pointer",
                           background: tier.background,
                           color: tier.color,
                           border: tier.border,
@@ -1163,7 +1166,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           {tier.emoji}
                         </span>
                         {tier.label}
-                      </span>
+                      </button>
                       {user.plan !== "goat" && (
                         <button
                           type="button"
@@ -1511,7 +1514,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     </div>
                   );
                 })}
-                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"#a0a0b0",fontSize: 13,padding:"40px 0",gridColumn:"1/-1" }}>// No results</div>}
+                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"#a0a0b0",fontSize: 13,padding:"40px 0",gridColumn:"1/-1" }}>No results</div>}
               </div>
             </div>
           )}
@@ -1561,7 +1564,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed #14202e",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
                   <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>⬡</div>
-                  <div className="mono" style={{ color:"#a0a0b0",fontSize: 13 }}>// No Saved Stacks yet. Add compounds from the Library.</div>
+                  <div className="mono" style={{ color:"#a0a0b0",fontSize: 13 }}>No Saved Stacks yet. Add compounds from the Library.</div>
                 </div>
               ) : (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
@@ -1605,7 +1608,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     </div>
                   ))}
                   <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
-                    <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>// SAVED STACK BREAKDOWN</div>
+                    <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
                       {[...new Set(myStack.map((p) => primaryCategory(p)))].map((cat) => {
                         const cc = getCatColor(cat); const n = myStack.filter((p) => primaryCategory(p) === cat).length;
@@ -1682,7 +1685,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               {myStack.length === 0 ? (
                 <div style={{ border: "1px dashed #14202e", borderRadius: 10, padding: "60px 0", textAlign: "center" }}>
                   <div className="mono" style={{ color: "#a0a0b0", fontSize: 13 }}>
-                    // Save injectable compounds to your stack first, then manage them in Vial Tracker.
+                    Save injectable compounds to your stack first, then manage them in Vial Tracker.
                   </div>
                 </div>
               ) : (
@@ -1800,7 +1803,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 className="guide-sidebar"
               >
                 <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
-                  // GOALS <span style={{ color: "#a0a0b0" }}>(optional)</span>
+                  GOALS <span style={{ color: "#a0a0b0" }}>(optional)</span>
                 </div>
                 {GOALS.map((g) => (
                   <button
@@ -1815,7 +1818,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 {myStack.length > 0 && (
                   <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #0e1822" }}>
                     <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
-                      // SAVED STACK LOADED
+                      SAVED STACK LOADED
                     </div>
                     {myStack.map((p) => (
                       <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 13, color: "#2e4055", padding: "2px 0" }}>
@@ -1925,7 +1928,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         {myStack.length > 0 && (
                           <div style={{ padding: "0 10px 8px", borderTop: "1px solid #14202e" }}>
                             <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", margin: "6px 0 4px" }}>
-                              // SAVED STACK
+                              SAVED STACK
                             </div>
                             {myStack.map((p) => (
                               <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "#2e4055", padding: "2px 0" }}>
@@ -1948,8 +1951,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
                       <div className="mono" style={{ color: "#a0a0b0", fontSize: 13, marginBottom: 18 }}>
                         {guideLayoutMobile
-                          ? "// Optional: open 🎯 Goals, then ask anything."
-                          : "// Optional: select goals in the sidebar, then ask anything."}
+                          ? "Optional: open 🎯 Goals, then ask anything."
+                          : "Optional: select goals in the sidebar, then ask anything."}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
                         {[
@@ -1990,7 +1993,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   {aiLoading && (
                     <div className="ai-msg ai-bot">
                       <div className="mono pulse" style={{ fontSize: 13, color: "#00d4aa" }}>
-                        // Analyzing protocol data…
+                        Analyzing protocol data…
                       </div>
                     </div>
                   )}
@@ -2106,22 +2109,22 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
               <div style={{ marginTop:12 }}>
-                <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".12em",marginBottom:7 }}>// BENEFITS</div>
+                <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"#00d4aa0e",color:"#00d4aa70",border:"1px solid #00d4aa18" }}>{b}</span>)}</div>
               </div>
               <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize: 13,color:"#f59e0b",letterSpacing:".12em",marginBottom:7 }}>// SIDE EFFECTS</div>
+                <div className="mono" style={{ fontSize: 13,color:"#f59e0b",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
               </div>
               {p.stacksWith.length > 0 && (
                 <div style={{ marginTop:10 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>// STACKS WELL WITH</div>
+                  <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
                   <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
                 </div>
               )}
               {p.notes && (
                 <div style={{ marginTop:12,background:"#07090e",border:"1px solid #0e1822",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>// NOTES</div>
+                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>NOTES</div>
                   <div style={{ fontSize: 13,color:"#a0a0b0",lineHeight:1.65 }}>{p.notes}</div>
                 </div>
               )}
@@ -2485,7 +2488,7 @@ export default function PepGuideIQ() {
             fontSize: 13,
           }}
         >
-          // Loading session…
+          Loading session…
         </div>
       </>
     );

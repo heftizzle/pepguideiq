@@ -81,7 +81,7 @@ export function StackPhotoUpload({
       return;
     }
     if (noWorker) {
-      setErr("// Configure VITE_API_WORKER_URL");
+      setErr("Configure VITE_API_WORKER_URL");
       return;
     }
     setErr(null);
@@ -95,7 +95,7 @@ export function StackPhotoUpload({
       return;
     }
     if (noWorker) {
-      setErr("// Configure VITE_API_WORKER_URL");
+      setErr("Configure VITE_API_WORKER_URL");
       return;
     }
     setErr(null);
@@ -108,16 +108,16 @@ export function StackPhotoUpload({
       return;
     }
     if (noWorker) {
-      setErr("// Configure VITE_API_WORKER_URL");
+      setErr("Configure VITE_API_WORKER_URL");
       return;
     }
     setErr(null);
     if (!file || !R2_UPLOAD_ALLOWED_TYPES.has(file.type)) {
-      setErr("// JPEG, PNG, WebP, or GIF only");
+      setErr("JPEG, PNG, WebP, or GIF only");
       return;
     }
     if (file.size > R2_UPLOAD_MAX_BYTES) {
-      setErr("// Max 10MB");
+      setErr("Max 10MB");
       return;
     }
 
@@ -126,12 +126,12 @@ export function StackPhotoUpload({
       path: "/upload-stack-photo",
       file,
       onState: (state) => {
-        if (state === "retrying") setErr("// Retrying…");
+        if (state === "retrying") setErr("Retrying…");
       },
     });
     setUploading(false);
     if (!result.ok) {
-      setErr(`// ${result.error}`);
+      setErr(result.error ?? "Upload failed");
       return;
     }
     setErr(null);
@@ -246,7 +246,7 @@ export function StackPhotoUpload({
               zIndex: 2,
             }}
           >
-            // Uploading…
+            Uploading…
           </div>
         )}
         {showThumb ? (

@@ -221,7 +221,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     return (
       <div style={{ marginBottom: 16 }}>
         <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 8 }}>
-          // {protocolHeaderLine()}
+          {protocolHeaderLine()}
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 8 }}>
           TODAY — QUICK LOG
@@ -236,7 +236,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
   return (
     <div style={{ marginBottom: 20 }}>
       <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 4 }}>
-        // {protocolHeaderLine()}
+        {protocolHeaderLine()}
       </div>
       <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
         TODAY — QUICK LOG

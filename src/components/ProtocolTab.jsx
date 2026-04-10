@@ -210,7 +210,7 @@ export function ProtocolTab({
     return (
       <div className="mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
         <div style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
-          // PROTOCOL
+          PROTOCOL
         </div>
         <div
           role="button"
@@ -231,7 +231,7 @@ export function ProtocolTab({
           }}
         >
           <div style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>
-            // Upgrade to Pro to run protocol logging with vials.
+            Upgrade to Pro to run protocol logging with vials.
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ export function ProtocolTab({
   if (!isSupabaseConfigured()) {
     return (
       <div className="mono" style={{ fontSize: 13, color: "#4a6080", fontFamily: "'JetBrains Mono', monospace" }}>
-        // Configure Supabase to use Protocol.
+        Configure Supabase to use Protocol.
       </div>
     );
   }
@@ -249,7 +249,7 @@ export function ProtocolTab({
   return (
     <div className="mono" style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 100, fontFamily: "'JetBrains Mono', monospace" }}>
       <div style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 24 }}>
-        // {protocolHeaderLine()}
+        {protocolHeaderLine()}
       </div>
 
       {emptyBecauseNoStack && (

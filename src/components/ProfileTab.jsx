@@ -1611,7 +1611,7 @@ export function ProfileTab({
       <div style={SECTION}>Labs</div>
       <Card>
         <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55 }}>
-          // Coming soon — upload labs and track biomarkers over time.
+          Coming soon — upload labs and track biomarkers over time.
         </div>
       </Card>
 
@@ -1623,7 +1623,7 @@ export function ProfileTab({
           </div>
           {savedStackPeptides.length === 0 ? (
             <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5 }}>
-              // No active stack saved yet
+              No active stack saved yet
             </div>
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
