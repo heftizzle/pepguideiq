@@ -1469,6 +1469,69 @@ function normalizeWakeTimeForPatch(s) {
 }
 
 /**
+ * One PostgREST GET for member_profiles list (service role; not the browser JWT).
+ * @param {string} attemptLabel "1" | "2" for logs
+ * @returns {Promise<{ ok: true, rows: object[] } | { ok: false, status: number, errorBody: string }>}
+ */
+async function fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, attemptLabel) {
+  const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
+    userId
+  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
+  try {
+    const res = await fetch(sel, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    });
+    const raw = await res.text();
+    /** @type {unknown} */
+    let parsed = null;
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (parseErr) {
+        log(env, "warn", "member_profile_get_list_json_parse_error", {
+          userId,
+          status: res.status,
+          attempt: attemptLabel,
+          bodyPreview: raw.slice(0, 2000),
+          parseMessage: parseErr && typeof parseErr === "object" && "message" in parseErr ? parseErr.message : String(parseErr),
+        });
+        return { ok: false, status: res.status, errorBody: raw.slice(0, 2000) };
+      }
+    }
+    if (!res.ok) {
+      log(env, "warn", "member_profile_get_list_postgrest_non_ok", {
+        userId,
+        status: res.status,
+        attempt: attemptLabel,
+        bodyPreview: raw.slice(0, 2000),
+      });
+      return { ok: false, status: res.status, errorBody: raw.slice(0, 2000) };
+    }
+    if (!Array.isArray(parsed)) {
+      log(env, "warn", "member_profile_get_list_not_array", {
+        userId,
+        attempt: attemptLabel,
+        typeofParsed: typeof parsed,
+        bodyPreview: typeof raw === "string" ? raw.slice(0, 800) : "",
+      });
+      return { ok: false, status: res.status, errorBody: typeof raw === "string" ? raw.slice(0, 800) : "" };
+    }
+    return { ok: true, rows: parsed };
+  } catch (err) {
+    const msg = err && typeof err === "object" && "message" in err ? String(err.message) : String(err);
+    log(env, "error", "member_profile_get_list_fetch_threw", {
+      userId,
+      attempt: attemptLabel,
+      message: msg,
+    });
+    return { ok: false, status: 0, errorBody: msg };
+  }
+}
+
+/**
  * GET /member-profiles — list signed-in user's member_profiles (includes locale fields).
  */
 async function handleGetMemberProfiles(request, env, cors) {
@@ -1482,21 +1545,34 @@ async function handleGetMemberProfiles(request, env, cors) {
   const userId = sessionUser.sub;
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
-    userId
-  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,experience_level,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
-  const res = await fetch(sel, {
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-    },
-  });
-  const rows = await res.json().catch(() => []);
-  if (!res.ok || !Array.isArray(rows)) {
-    log(env, "warn", "member_profile_get_list_failed", { userId, status: res.status });
-    return jsonResponse({ error: "Could not load profiles" }, 502, cors);
+
+  let out = await fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, "1");
+  const transient =
+    !out.ok && ((out.status >= 500 && out.status < 600) || out.status === 0);
+  if (transient) {
+    await new Promise((r) => setTimeout(r, 500));
+    out = await fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, "2");
   }
-  return jsonResponse({ profiles: rows }, 200, cors);
+  if (!out.ok) {
+    const upstream = out.status;
+    const clientStatus = upstream >= 400 && upstream < 500 ? upstream : 502;
+    log(env, "warn", "member_profile_get_list_failed", {
+      userId,
+      upstreamStatus: upstream,
+      clientStatus,
+      detailPreview: out.errorBody.slice(0, 500),
+    });
+    return jsonResponse(
+      {
+        error: "Could not load profiles",
+        upstream_status: upstream,
+        detail: out.errorBody.slice(0, 800),
+      },
+      clientStatus,
+      cors
+    );
+  }
+  return jsonResponse({ profiles: out.rows }, 200, cors);
 }
 
 /**
@@ -1942,6 +2018,19 @@ function parseMemberProfilePatchBody(body) {
       }
     } else {
       return { error: "experience_level must be a string or null" };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "goals")) {
+    hasKey = true;
+    const v = body.goals;
+    if (v === null) {
+      patch.goals = null;
+    } else if (typeof v === "string") {
+      const t = v.trim().slice(0, 400);
+      patch.goals = t === "" ? null : t;
+    } else {
+      return { error: "goals must be a string or null" };
     }
   }
 

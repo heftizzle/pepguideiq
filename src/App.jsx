@@ -21,6 +21,7 @@ import { StackShareControls } from "./components/StackShareControls.jsx";
 import { BuildTab } from "./components/BuildTab.jsx";
 import { ProfileTab } from "./components/ProfileTab.jsx";
 import { PeopleSearch } from "./components/PeopleSearch.jsx";
+import { NotificationsBell } from "./components/NotificationsBell.jsx";
 import { NavTooltips } from "./components/NavTooltips.jsx";
 import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
@@ -1201,7 +1202,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
           }}
         >
 
-          <div className="grid-bg" style={{ borderBottom:"1px solid #0e1822" }}>
+          <div
+            className="grid-bg"
+            style={{
+              borderBottom: "1px solid #0e1822",
+              position: "relative",
+              /* Stack above main scroll; keep in sync with NotificationsBell.jsx PEPV_TOP_HEADER_Z_INDEX */
+              zIndex: 70,
+            }}
+          >
             <div style={{ maxWidth:1200,margin:"0 auto",padding:"0 16px" }}>
               <div style={{ display:"flex",alignItems:"center",padding:"12px 0 0",flexWrap:"wrap",gap:8 }}>
                 <Logo />
@@ -1285,6 +1294,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           Upgrade
                         </button>
                       )}
+                      <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
                       <button
                         type="button"
                         className="mono"

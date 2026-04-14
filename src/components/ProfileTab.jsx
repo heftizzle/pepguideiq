@@ -1220,6 +1220,14 @@ export function ProfileTab({
       return;
     }
     void refreshBodyMetricsRow();
+    if (workerOk) {
+      const { error: syncErr } = await patchMemberProfileViaWorker(activeProfileId, { goals: csv });
+      if (syncErr) setErr(syncErr.message ?? "Could not sync goals to profile.");
+    } else if (isSupabaseConfigured()) {
+      const { error: syncErr } = await updateMemberProfile(activeProfileId, { goals: csv });
+      if (syncErr) setErr(syncErr.message ?? "Could not sync goals to profile.");
+    }
+    void refreshMemberProfiles();
     showSavedBriefly();
   };
 

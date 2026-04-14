@@ -326,7 +326,7 @@ export async function listMemberProfiles(userId) {
   const { data, error } = await supabase
     .from("member_profiles")
     .select(
-      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, experience_level, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
+      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, experience_level, goals, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
@@ -1032,4 +1032,53 @@ export async function listRecentDosedAtDates(userId, profileId) {
     .gte("dosed_at", since.toISOString())
     .order("dosed_at", { ascending: false });
   return { dates: data?.map((r) => r.dosed_at) ?? [], error };
+}
+
+// ─── Notifications (migration 036) ─────────────────────────────────────────
+
+/**
+ * @returns {Promise<{ count: number, error: Error | null }>}
+ */
+export async function getUnreadNotificationCount() {
+  if (!supabase) return { count: 0, error: notConfiguredError() };
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("read", false);
+  return { count: typeof count === "number" ? count : 0, error: error ?? null };
+}
+
+/**
+ * @param {number} [limit]
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
+ */
+export async function fetchNotificationsRecent(limit = 10) {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id, actor_id, type, read, created_at, actor_handle, actor_display_handle, actor_display_name")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(50, Math.max(1, limit)));
+  return { rows: Array.isArray(data) ? data : [], error: error ?? null };
+}
+
+/**
+ * @param {string} notificationId
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function markNotificationRead(notificationId) {
+  if (!supabase) return { error: notConfiguredError() };
+  const id = typeof notificationId === "string" ? notificationId.trim() : "";
+  if (!id) return { error: new Error("Missing notification id.") };
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("id", id);
+  return { error: error ?? null };
+}
+
+/**
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function markAllNotificationsRead() {
+  if (!supabase) return { error: notConfiguredError() };
+  const { error } = await supabase.from("notifications").update({ read: true }).eq("read", false);
+  return { error: error ?? null };
 }
