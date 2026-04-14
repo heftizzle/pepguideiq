@@ -1331,16 +1331,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   />
                 )}
                 <div style={{ flex: 1, minWidth: 8 }} aria-hidden />
-                <div
-                  id="nav-account-anchor"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    overflowX: "auto",
-                    flexWrap: "wrap",
-                  }}
-                >
+                <div id="nav-account-anchor" className="pepv-nav-account-pill-row">
                   {(() => {
                     const guideOn = activeTab === "guide";
                     const tier = tierHeaderMeta(user.plan);

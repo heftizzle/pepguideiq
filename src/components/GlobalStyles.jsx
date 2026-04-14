@@ -324,6 +324,44 @@ export function GlobalStyles() {
         animation:pepv-notifications-bell-glow 1.5s ease-in-out infinite;
       }
 
+      /* Header: AI Guide / tier / profile pills — desktop may wrap; mobile = one scrollable row */
+      .pepv-nav-account-pill-row{
+        display:flex;
+        align-items:center;
+        gap:6px;
+        flex-wrap:wrap;
+        overflow-x:auto;
+      }
+      @media (max-width:767px){
+        .pepv-nav-account-pill-row{
+          flex-wrap:nowrap;
+          white-space:nowrap;
+          overflow-y:hidden;
+          -webkit-overflow-scrolling:touch;
+          min-width:0;
+          overscroll-behavior-x:contain;
+        }
+        .pepv-nav-account-pill-row > *{
+          flex-shrink:0;
+        }
+      }
+
+      /* Library mobile search strip — extra top space below header pills on narrow screens */
+      .pepv-library-mobile-search-panel{
+        box-sizing:border-box;
+        width:100%;
+        padding:10px 0 12px;
+        border-bottom:1px solid #0e1822;
+        position:relative;
+        z-index:220;
+      }
+      @media (max-width:767px){
+        .pepv-library-mobile-search-panel{
+          padding-top:22px;
+          padding-bottom:14px;
+        }
+      }
+
       /* Persistent header — shared action control (App.jsx + header icons). */
       .pepv-header-action-btn{
         box-sizing:border-box;

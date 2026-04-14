@@ -145,16 +145,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
   };
 
   return (
-    <div
-      ref={rootRef}
-      style={{
-        width: "100%",
-        padding: "10px 0 12px",
-        borderBottom: "1px solid #0e1822",
-        position: "relative",
-        zIndex: 220,
-      }}
-    >
+    <div ref={rootRef} className="pepv-library-mobile-search-panel">
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input
           ref={inputRef}
