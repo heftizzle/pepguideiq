@@ -1050,6 +1050,7 @@ function PepGuideIQApp({ user, setUser }) {
   /** Bottom nav tab `<button>` elements for `NavTooltips` positioning. */
   const navTabButtonRefs = useRef(/** @type {Partial<Record<string, HTMLButtonElement | null>>} */ ({}));
 
+  /** PepGuideIQMainTree destructures the same keys — keep this object and that destructure identical. */
   mainUiRef.current = {
     user,
     setUser,
@@ -1114,6 +1115,7 @@ function PepGuideIQApp({ user, setUser }) {
     resolvedHeaderMemberAvatar,
     sortedPeptides,
     handleCategorySelect,
+    planForStackLimits,
     savedStackLimit,
     canAddToStack,
     stackListReady,
@@ -1137,8 +1139,6 @@ function PepGuideIQApp({ user, setUser }) {
     setLibrarySearchOpen,
     dismissLibrarySearch,
     setShowPeopleSearch,
-    peopleSearchInitialQuery,
-    setPeopleSearchInitialQuery,
     networkScrollToDosePostId,
     setNetworkScrollToDosePostId,
     navTabButtonRefs,
@@ -1270,6 +1270,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
     resolvedHeaderMemberAvatar,
     sortedPeptides,
     handleCategorySelect,
+    planForStackLimits,
     savedStackLimit,
     canAddToStack,
     stackListReady,
