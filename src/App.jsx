@@ -1095,6 +1095,7 @@ function PepGuideIQApp({ user, setUser }) {
     setGoals,
     showUpgrade,
     upgradeFocusTier,
+    upgradeGateReason,
     variantNoteExpandedById,
     setVariantNoteExpandedById,
     protocolDeepLink,
@@ -1250,6 +1251,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setGoals,
     showUpgrade,
     upgradeFocusTier,
+    upgradeGateReason,
     variantNoteExpandedById,
     setVariantNoteExpandedById,
     protocolDeepLink,
@@ -1364,7 +1366,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         <button
                           type="button"
                           className={`pepv-header-action-btn ${tier.tierClass}`}
-                          onClick={openUpgradeModal}
+                          onClick={() => openUpgradeModal()}
                           aria-label={`Plan: ${tier.label}`}
                         >
                           <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
@@ -1376,7 +1378,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           <button
                             type="button"
                             className="pepv-header-action-btn"
-                            onClick={openUpgradeModal}
+                            onClick={() => openUpgradeModal()}
                             style={{ color: "#00d4aa" }}
                           >
                             Upgrade
