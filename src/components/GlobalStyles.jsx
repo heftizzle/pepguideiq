@@ -102,6 +102,13 @@ export function GlobalStyles() {
       .search-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:10px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%}
       .search-input:focus{border-color:#00d4aa50}
       .search-input::placeholder{color:#a0a0b0}
+      @media (max-width:767px){
+        .search-input::placeholder,
+        .search-input::-webkit-input-placeholder{
+          color:rgba(255,255,255,0.55);
+          opacity:1;
+        }
+      }
       .btn-teal{background:#00d4aa14;border:1px solid #00d4aa;color:#00d4aa;padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;transition:all .2s}
       .btn-teal:hover{background:#00d4aa22}
       .btn-teal:disabled{opacity:.4;cursor:not-allowed}
