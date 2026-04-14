@@ -6,8 +6,6 @@ const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
 const HELP_MENU_MAX_W = 280;
 
-const hit44 = { minWidth: 44, minHeight: 44 };
-
 const HELP_MENU_ROW = {
   display: "flex",
   alignItems: "center",
@@ -144,27 +142,16 @@ export function DemoTourHelpButton() {
         <button
           ref={buttonRef}
           type="button"
+          className="pepv-header-action-btn pepv-header-action-btn--icon"
+          data-active={helpMenuOpen ? "true" : undefined}
           aria-label="Help and guided tour"
           aria-expanded={helpMenuOpen}
           aria-haspopup="menu"
           onClick={() => setHelpMenuOpen((o) => !o)}
-          style={{
-            ...hit44,
-            padding: "0 10px",
-            borderRadius: 12,
-            border: helpMenuOpen ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-            background: helpMenuOpen ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-            color: helpMenuOpen ? "#00d4aa" : "#5c6d82",
-            cursor: "pointer",
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 16,
-            fontWeight: 700,
-            alignItems: "center",
-            justifyContent: "center",
-            lineHeight: 1,
-          }}
         >
-          ?
+          <span className="pepv-emoji" aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>
+            ❓
+          </span>
         </button>
       </div>
       {menuPortal}

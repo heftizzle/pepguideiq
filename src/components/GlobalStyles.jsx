@@ -63,7 +63,7 @@ export function GlobalStyles() {
         .pepv-library-cat-chev{display:none!important}
       }
       .grid-bg{background-image:linear-gradient(rgba(0,212,170,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,.025) 1px,transparent 1px);background-size:48px 48px}
-      .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#4a6080;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
+      .tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:#8fa5bf;padding:12px 16px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;transition:all .2s;white-space:nowrap}
       .tab-btn:hover{color:#8fa5bf}
       .tab-btn.active{color:#00d4aa;border-bottom-color:#00d4aa}
       .pcard{
@@ -129,7 +129,7 @@ export function GlobalStyles() {
       .btn-green{background:#10b98115;border:1px solid #10b981;color:#10b981;padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500}
       .btn-red{background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 11px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s}
       .btn-red:hover{background:#ef444418}
-      .cat-btn{background:transparent;border:1px solid #14202e;color:#4a6080;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;white-space:nowrap;transition:all .2s;font-family:'Outfit',sans-serif}
+      .cat-btn{background:transparent;border:1px solid #14202e;color:#8fa5bf;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;white-space:nowrap;transition:all .2s;font-family:'Outfit',sans-serif}
       .cat-btn.active{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
       .cat-btn:hover:not(.active){border-color:#243040;color:#8fa5bf}
       .mono{font-family:'JetBrains Mono',monospace}
@@ -142,7 +142,7 @@ export function GlobalStyles() {
       .drow{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid #0e1822;align-items:flex-start}
       .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:#00d4aa;text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0}
       .dval{font-size:13px;color:#8fa5bf;flex:1;line-height:1.6}
-      .goal-chip{padding:6px 10px;border-radius:20px;border:1px solid #14202e;background:transparent;color:#4a6080;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s;text-align:left;width:100%}
+      .goal-chip{padding:6px 10px;border-radius:20px;border:1px solid #14202e;background:transparent;color:#8fa5bf;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s;text-align:left;width:100%}
       .goal-chip.on{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
       .ai-msg{padding:12px 14px;border-radius:8px;margin:6px 0;font-size:13px;line-height:1.65;animation:fi .3s ease}
       @keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
@@ -156,7 +156,7 @@ export function GlobalStyles() {
       .form-input:focus{border-color:#00d4aa50}
       .pulse{animation:pulse 2s infinite}
       @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-      .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#4a6080;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
+      .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#8fa5bf;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
       .sugg-btn:hover{border-color:#00d4aa30;color:#8fa5bf}
       .guide-sidebar{scrollbar-width:thin}
       .modal-backdrop--sheet{align-items:flex-end;justify-content:center;padding:0}
@@ -314,6 +314,150 @@ export function GlobalStyles() {
         font-family:'Outfit',sans-serif,"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif;
         font-weight:500;
         letter-spacing:0.02em;
+      }
+      @keyframes pepv-notifications-bell-glow{
+        0%,100%{box-shadow:0 0 0 0 rgba(0,200,180,0.7)}
+        50%{box-shadow:0 0 8px rgba(0,200,180,0)}
+      }
+      .pepv-notifications-bell--unread{
+        border-color:rgba(0,212,170,0.45)!important;
+        animation:pepv-notifications-bell-glow 1.5s ease-in-out infinite;
+      }
+
+      /* Persistent header — shared action control (App.jsx + header icons). */
+      .pepv-header-action-btn{
+        box-sizing:border-box;
+        height:36px;
+        min-width:36px;
+        padding:0 12px;
+        border-radius:8px;
+        border:1px solid #1e3040;
+        background:#0e1520;
+        font-family:'Outfit',sans-serif,"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif;
+        font-size:13px;
+        font-weight:500;
+        color:#dde4ef;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        flex-shrink:0;
+        cursor:pointer;
+        line-height:1;
+        transition:border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .pepv-header-action-btn:disabled{
+        cursor:default;
+        opacity:0.55;
+      }
+      .pepv-header-action-btn:hover:not(:disabled){
+        border-color:#00d4aa40;
+        background:#14202e;
+      }
+      .pepv-header-action-btn--icon{
+        width:36px;
+        min-width:36px;
+        padding:0;
+      }
+      .pepv-header-action-btn[data-active="true"]{
+        border-color:rgba(0,212,170,0.55);
+        background:rgba(0,212,170,0.14);
+        color:#00d4aa;
+      }
+      .pepv-header-action-btn[data-active="true"]:hover:not(:disabled){
+        border-color:#00d4aa40;
+        background:#14202e;
+        color:#dde4ef;
+      }
+      .pepv-header-tier--goat{
+        background:#a855f720!important;
+        color:#a855f7!important;
+        border-color:#a855f730!important;
+      }
+      .pepv-header-tier--goat[data-active="true"]{
+        background:rgba(168,85,247,0.22)!important;
+        color:#d8b4fe!important;
+      }
+      .pepv-header-tier--elite{
+        background:#f59e0b20!important;
+        color:#f59e0b!important;
+        border-color:#f59e0b30!important;
+      }
+      .pepv-header-tier--pro{
+        background:#00d4aa20!important;
+        color:#00d4aa!important;
+        border-color:#00d4aa30!important;
+      }
+      .pepv-header-tier--entry{
+        color:#8fa5bf!important;
+      }
+      .pepv-header-action-btn.pepv-header-tier--goat:hover:not(:disabled),
+      .pepv-header-action-btn.pepv-header-tier--elite:hover:not(:disabled),
+      .pepv-header-action-btn.pepv-header-tier--pro:hover:not(:disabled),
+      .pepv-header-action-btn.pepv-header-tier--entry:hover:not(:disabled){
+        border-color:#00d4aa40!important;
+        background:#14202e!important;
+        color:#dde4ef!important;
+      }
+      .pepv-header-action-surface{
+        box-sizing:border-box;
+        height:36px;
+        min-width:36px;
+        max-width:260px;
+        padding:0;
+        border-radius:8px;
+        border:1px solid #1e3040;
+        background:#0e1520;
+        font-family:'Outfit',sans-serif,"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif;
+        font-size:13px;
+        font-weight:500;
+        color:#8fa5bf;
+        display:inline-flex;
+        align-items:center;
+        overflow:hidden;
+        flex-shrink:0;
+        transition:border-color 0.15s ease, background 0.15s ease;
+      }
+      .pepv-header-action-surface:hover{
+        border-color:#00d4aa40;
+        background:#14202e;
+      }
+      .pepv-header-profile-pill__segment{
+        border:none;
+        background:transparent;
+        color:inherit;
+        font:inherit;
+        font-size:13px;
+        font-weight:500;
+        font-family:inherit;
+        cursor:pointer;
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        height:100%;
+        min-height:0;
+        box-sizing:border-box;
+      }
+      .pepv-header-profile-pill__segment--primary{
+        flex:1 1 auto;
+        min-width:0;
+        padding:0 10px 0 12px;
+        justify-content:flex-start;
+        text-align:left;
+      }
+      .pepv-header-profile-pill__segment--handle{
+        flex-shrink:0;
+        padding:0 10px;
+        max-width:130px;
+        color:#00d4aa;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        border-left:1px solid #243040;
+      }
+      @media (max-width:560px){
+        .pepv-header-action-surface.pepv-header-profile-pill--narrow{max-width:180px}
+        .pepv-header-profile-pill__segment--handle.pepv-header-profile-pill--narrow{max-width:100px}
       }
     `}</style>
   );

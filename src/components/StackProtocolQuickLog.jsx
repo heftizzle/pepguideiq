@@ -263,7 +263,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           TODAY — QUICK LOG
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>Upgrade to Pro to log doses from your stack</div>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>Upgrade to Pro to log doses from your stack</div>
       </div>
     );
   }
@@ -287,7 +287,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 8 }}>
           TODAY — QUICK LOG
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.45 }}>
           Nothing to quick-log yet — add active vials for injectables in Vial Tracker, or add oral / nasal compounds to your stack.
         </div>
       </div>

@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Modal } from "./Modal.jsx";
 import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
-import { getStripeCheckoutUrlWithClientRef } from "../lib/checkout.js";
-import { fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
-import { formatPlan, getNextTierId, TIER_RANK } from "../lib/tiers.js";
+import { isApiWorkerConfigured, isStripePublishableConfigured } from "../lib/config.js";
+import { getStripeBrowser } from "../lib/stripeBrowser.js";
+import { createStripeSubscription, fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
+import { getCurrentUser } from "../lib/supabase.js";
+import { formatPlan, getNextTierId, TIER_ORDER, TIER_RANK } from "../lib/tiers.js";
 import { getSuggestedUpgradeTier, getUpgradeGateCopy } from "../lib/upgradeGateCopy.js";
 
 const ROWS = getUpgradeTierRows();
@@ -42,6 +45,75 @@ function upgradeCtaLabel(rowId) {
   if (rowId === "elite") return "Get Elite";
   if (rowId === "goat") return "Go GOAT 🐐";
   return "Upgrade";
+}
+
+const STRIPE_ELEMENTS_APPEARANCE = {
+  theme: "night",
+  variables: {
+    colorPrimary: "#00d4aa",
+    colorBackground: "#0b0f17",
+    colorText: "#e8eef6",
+    colorDanger: "#f87171",
+    borderRadius: "10px",
+    fontFamily: "system-ui, sans-serif",
+  },
+};
+
+/**
+ * @param {{ planLabel: string, onBack: () => void, onCompleted: () => Promise<void>, setPayError: (msg: string | null) => void }} props
+ */
+function UpgradePaymentInner({ planLabel, onBack, onCompleted, setPayError }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setPayError(null);
+    if (!stripe || !elements) return;
+    setBusy(true);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const path = typeof window !== "undefined" ? window.location.pathname || "/" : "/";
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${origin}${path}`,
+      },
+      redirect: "if_required",
+    });
+    setBusy(false);
+    if (error) {
+      setPayError(error.message ?? "Payment failed");
+      return;
+    }
+    await onCompleted();
+  };
+
+  return (
+    <form onSubmit={(ev) => void handleSubmit(ev)} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="brand" style={{ fontSize: 16, fontWeight: 700, color: "#e8eef6" }}>
+        Complete checkout — {planLabel}
+      </div>
+      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>
+        Encrypted card details. PepGuideIQ never stores your full card number on our servers.
+      </div>
+      <PaymentElement />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn-teal btn-upgrade-ghost"
+          style={{ padding: "10px 16px", fontSize: 13 }}
+          disabled={busy}
+          onClick={onBack}
+        >
+          Back
+        </button>
+        <button type="submit" className="btn-teal" style={{ padding: "10px 18px", fontSize: 13 }} disabled={!stripe || busy}>
+          {busy ? "Processing…" : "Pay & subscribe"}
+        </button>
+      </div>
+    </form>
+  );
 }
 
 function neutralDisabledCtaStyle() {
@@ -114,6 +186,11 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
   const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
   const [downgradeError, setDowngradeError] = useState(null);
   const [hoverTierId, setHoverTierId] = useState(null);
+  /** @type {{ planId: string, clientSecret: string } | null} */
+  const [paymentStep, setPaymentStep] = useState(null);
+  const [paySubmitError, setPaySubmitError] = useState(/** @type {string | null} */ (null));
+  const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
+  const [upgradeSubmitError, setUpgradeSubmitError] = useState(/** @type {string | null} */ (null));
 
   const gateCopy = gateReason ? getUpgradeGateCopy(gateReason) : null;
   const gateCheckoutTier =
@@ -156,12 +233,12 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
 
   const actionsDisabled = subscriptionLoading;
   const subscriptionOk = !subscriptionLoading && subscriptionError == null && subscriptionInfo != null;
+  const profilePlanFallback =
+    typeof planKey === "string" && TIER_ORDER.includes(planKey) ? planKey : "entry";
   const stripeTier =
-    subscriptionError != null
-      ? "entry"
-      : subscriptionOk && subscriptionInfo.plan
-        ? subscriptionInfo.plan
-        : "entry";
+    subscriptionOk && typeof subscriptionInfo.plan === "string" && TIER_ORDER.includes(subscriptionInfo.plan)
+      ? subscriptionInfo.plan
+      : profilePlanFallback;
 
   const canDowngrade =
     subscriptionOk &&
@@ -180,11 +257,38 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
   const nextStripeTier = getNextTierId(stripeTier);
 
   const tierAction = async (planId) => {
-    if (actionsDisabled || planId === "entry") return;
-    const url = getStripeCheckoutUrlWithClientRef(planId, user?.id);
-    if (!url) return;
-    onClose();
-    window.location.assign(url);
+    if (actionsDisabled || upgradeSubmitting || planId === "entry") return;
+    setUpgradeSubmitError(null);
+    if (!isApiWorkerConfigured()) {
+      setUpgradeSubmitError("App API is not configured.");
+      return;
+    }
+    if (!isStripePublishableConfigured()) {
+      setUpgradeSubmitError("Stripe publishable key is missing (set VITE_STRIPE_PUBLISHABLE_KEY).");
+      return;
+    }
+    setUpgradeSubmitting(true);
+    const { data, error } = await createStripeSubscription(
+      /** @type {"pro"|"elite"|"goat"} */ (planId)
+    );
+    setUpgradeSubmitting(false);
+    if (error) {
+      setUpgradeSubmitError(error.message);
+      return;
+    }
+    if (data?.no_payment_needed) {
+      const u = await getCurrentUser();
+      if (u) setUser(u);
+      refetchSubscription();
+      onClose();
+      return;
+    }
+    if (data && typeof data.client_secret === "string" && data.client_secret) {
+      setPaySubmitError(null);
+      setPaymentStep({ planId, clientSecret: data.client_secret });
+      return;
+    }
+    setUpgradeSubmitError("Could not start checkout. Try again or contact support.");
   };
 
   const confirmDowngrade = async (targetId) => {
@@ -293,14 +397,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
       );
     }
 
-    if (subscriptionError != null && isUpgrade) {
-      return (
-        <button type="button" disabled style={neutralDisabledCtaStyle()}>
-          Coming Soon
-        </button>
-      );
-    }
-
     if (isSame) {
       const label = rowId === "entry" ? "Start Free" : "This is your current plan";
       return (
@@ -312,8 +408,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
 
     if (isUpgrade) {
       return (
-        <button type="button" style={tierPrimaryCtaStyle(rowId, false)} onClick={() => void tierAction(rowId)}>
-          {upgradeCtaLabel(rowId)}
+        <button
+          type="button"
+          style={tierPrimaryCtaStyle(rowId, upgradeSubmitting)}
+          disabled={upgradeSubmitting}
+          onClick={() => void tierAction(rowId)}
+        >
+          {upgradeSubmitting ? "…" : upgradeCtaLabel(rowId)}
         </button>
       );
     }
@@ -462,6 +563,88 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
     );
   };
 
+  const stripePromise = getStripeBrowser();
+  const elementsOptions = useMemo(() => {
+    if (!paymentStep?.clientSecret) return null;
+    return {
+      clientSecret: paymentStep.clientSecret,
+      appearance: STRIPE_ELEMENTS_APPEARANCE,
+    };
+  }, [paymentStep?.clientSecret]);
+
+  if (paymentStep && elementsOptions && !stripePromise) {
+    return (
+      <Modal onClose={onClose} maxWidth={480} label="Checkout" variant="sheet">
+        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", lineHeight: 1.5, marginBottom: 16 }}>
+          Stripe could not load (check VITE_STRIPE_PUBLISHABLE_KEY).
+        </div>
+        <button type="button" className="btn-teal" style={{ fontSize: 13 }} onClick={() => setPaymentStep(null)}>
+          Back to plans
+        </button>
+      </Modal>
+    );
+  }
+
+  if (paymentStep && elementsOptions && stripePromise) {
+    const finishAfterPay = async () => {
+      const u = await getCurrentUser();
+      if (u) setUser(u);
+      refetchSubscription();
+      setPaymentStep(null);
+      setPaySubmitError(null);
+      onClose();
+    };
+    return (
+      <Modal
+        onClose={() => {
+          setPaymentStep(null);
+          setPaySubmitError(null);
+          onClose();
+        }}
+        maxWidth={520}
+        label="Secure checkout"
+        variant="sheet"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 }}>
+          <div>
+            <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Secure checkout</div>
+            <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginTop: 4 }}>
+              {formatPlan(paymentStep.planId)} — powered by Stripe
+            </div>
+          </div>
+          <button
+            type="button"
+            style={{ background: "none", border: "none", color: "#8fa5bf", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+            onClick={() => {
+              setPaymentStep(null);
+              setPaySubmitError(null);
+              onClose();
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        {paySubmitError ? (
+          <div className="mono" style={{ color: "#f59e0b", marginBottom: 14, fontSize: 13, lineHeight: 1.45 }}>
+            {paySubmitError}
+          </div>
+        ) : null}
+        <Elements stripe={stripePromise} options={elementsOptions}>
+          <UpgradePaymentInner
+            planLabel={formatPlan(paymentStep.planId)}
+            onBack={() => {
+              setPaymentStep(null);
+              setPaySubmitError(null);
+            }}
+            onCompleted={finishAfterPay}
+            setPayError={setPaySubmitError}
+          />
+        </Elements>
+      </Modal>
+    );
+  }
+
   return (
     <Modal onClose={onClose} maxWidth={1120} label="Plans and pricing" variant="sheet">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
@@ -473,13 +656,36 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         </div>
         <button
           type="button"
-          style={{ background: "none", border: "none", color: "#4a6080", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+          style={{ background: "none", border: "none", color: "#8fa5bf", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
           onClick={onClose}
           aria-label="Close"
         >
           ×
         </button>
       </div>
+
+      {subscriptionError ? (
+        <div
+          className="mono"
+          style={{
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid #4a6080",
+            fontSize: 13,
+            color: "#cbd5e1",
+            lineHeight: 1.5,
+          }}
+        >
+          Could not load subscription status ({subscriptionError}). Your profile plan is shown below; checkout still works.
+        </div>
+      ) : null}
+
+      {upgradeSubmitError ? (
+        <div className="mono" style={{ marginBottom: 14, fontSize: 13, color: "#f59e0b", lineHeight: 1.45 }}>
+          {upgradeSubmitError}
+        </div>
+      ) : null}
 
       {gateCopy ? (
         <div
@@ -501,17 +707,17 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
             <button
               type="button"
               className="btn-teal"
-              disabled={actionsDisabled}
+              disabled={actionsDisabled || upgradeSubmitting}
               style={{
                 fontSize: 14,
                 fontWeight: 600,
                 padding: "10px 18px",
                 borderRadius: 10,
-                opacity: actionsDisabled ? 0.55 : 1,
+                opacity: actionsDisabled || upgradeSubmitting ? 0.55 : 1,
               }}
               onClick={() => void tierAction(gateCheckoutTier)}
             >
-              {gateCopy.ctaLabel} →
+              {upgradeSubmitting ? "…" : `${gateCopy.ctaLabel} →`}
             </button>
           ) : null}
         </div>

@@ -161,7 +161,7 @@ export function PublicStackView({ shareId }) {
               View on pepguideIQ
             </a>
 
-            <p style={{ marginTop: 24, fontSize: 12, color: "#4a6080", lineHeight: 1.5 }}>
+            <p style={{ marginTop: 24, fontSize: 12, color: "#8fa5bf", lineHeight: 1.5 }}>
               Research compounds only. Not medical advice. Consult a qualified professional.
             </p>
           </>

@@ -220,7 +220,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
         ) : key ? (
-          <span className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+          <span className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
             …
           </span>
         ) : (
@@ -1230,7 +1230,7 @@ function VialRow({
                 RECENT
               </div>
               {doses.map((d) => (
-                <div key={d.id} className="mono" style={{ fontSize: 13, color: "#4a6080", padding: "2px 0" }}>
+                <div key={d.id} className="mono" style={{ fontSize: 13, color: "#8fa5bf", padding: "2px 0" }}>
                   {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl)}
                   {d.notes ? ` · ${d.notes}` : ""}
                 </div>
@@ -1600,7 +1600,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           VIAL TRACKER
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
           Upgrade to Pro to use Vial Tracker
         </div>
       </div>

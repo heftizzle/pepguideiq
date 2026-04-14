@@ -10,7 +10,6 @@ const TAB_TOOLTIPS = [
   { id: "stackBuilder", text: "Build your personal compound stack" },
   { id: "stacks", text: "View and manage your saved stacks" },
   { id: "network", text: "Discover protocols from other users" },
-  { id: "profile", text: "Your stats, settings, and handle" },
 ];
 
 const GAP_PX = 10;

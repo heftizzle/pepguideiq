@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
+import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import {
   followMemberProfile,
   getMyFollowing,
@@ -27,9 +28,10 @@ function bioSnippet(bio) {
  *   workerUrl: string,
  *   accessToken: string | null,
  *   onClose: () => void,
+ *   initialQuery?: string | null,
  * }} props
  */
-export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose }) {
+export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose, initialQuery = null }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [results, setResults] = useState(/** @type {object[]} */ ([]));
@@ -38,6 +40,13 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose 
   const [followingLoaded, setFollowingLoaded] = useState(false);
   const [pending, setPending] = useState(() => new Set());
   const reqId = useRef(0);
+
+  useEffect(() => {
+    if (typeof initialQuery === "string" && initialQuery.trim()) {
+      const q = initialQuery.trim();
+      setQuery(q.startsWith("@") ? q : `@${q}`);
+    }
+  }, [initialQuery]);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query.trim()), 350);
@@ -252,7 +261,26 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose 
                         initialsFromProfile(p)
                       )}
                     </div>
-                    <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                    <div
+                      style={{
+                        flex: "1 1 0",
+                        minWidth: 0,
+                        cursor: typeof p.handle === "string" && normalizeHandleInput(p.handle) ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        const ch = normalizeHandleInput(p.handle ?? "");
+                        if (ch) openPublicMemberProfile(ch);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        const ch = normalizeHandleInput(p.handle ?? "");
+                        if (!ch) return;
+                        e.preventDefault();
+                        openPublicMemberProfile(ch);
+                      }}
+                      role={typeof p.handle === "string" && normalizeHandleInput(p.handle) ? "link" : undefined}
+                      tabIndex={typeof p.handle === "string" && normalizeHandleInput(p.handle) ? 0 : undefined}
+                    >
                       <div className="brand" style={{ fontSize: 15, fontWeight: 600, color: "#00d4aa", lineHeight: 1.3 }}>
                         {handleLine || "—"}
                       </div>
@@ -260,7 +288,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose 
                         <div style={{ fontSize: 13, color: "#6b7c8f", marginTop: 2 }}>{dispName}</div>
                       ) : null}
                       {snippet ? (
-                        <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginTop: 6, lineHeight: 1.45 }}>
+                        <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginTop: 6, lineHeight: 1.45 }}>
                           {snippet}
                         </div>
                       ) : null}

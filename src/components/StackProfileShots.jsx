@@ -160,7 +160,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
         {showImage ? (
           <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : r2Key ? (
-          <span className="mono" style={{ fontSize: 12, color: "#4a6080" }}>
+          <span className="mono" style={{ fontSize: 12, color: "#8fa5bf" }}>
             Loading…
           </span>
         ) : (

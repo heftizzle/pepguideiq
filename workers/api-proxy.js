@@ -87,14 +87,15 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\" \"https://hooks.stripe.com\")",
   "Content-Security-Policy":
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " +
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://js.stripe.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.workers.dev; " +
-    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev; " +
-    "frame-src https://challenges.cloudflare.com; " +
+    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev https://api.stripe.com https://m.stripe.network; " +
+    "frame-src https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'",
@@ -675,10 +676,34 @@ function injectCatalogCacheIntoMessages(messages, catalog) {
   return out;
 }
 
-function tierPlanFromStripeSubscription(subscr) {
+/** Map Stripe Price id → app plan tier (env overrides defaults from product catalog). */
+function planFromStripePriceId(priceId, env) {
+  const id = String(priceId ?? "").trim();
+  if (!id) return null;
+  const pro = String(env.STRIPE_PRICE_ID_PRO ?? "price_1TM98cDtHiMNTdJ0FMxPf94X").trim();
+  const elite = String(env.STRIPE_PRICE_ID_ELITE ?? "price_1TMCfYDtHiMNTdJ0urEVgoxc").trim();
+  const goat = String(env.STRIPE_PRICE_ID_GOAT ?? "price_1TMCjnDtHiMNTdJ0CiOHHmQD").trim();
+  if (id === pro) return "pro";
+  if (id === elite) return "elite";
+  if (id === goat) return "goat";
+  return null;
+}
+
+function stripePriceIdForPaidPlan(plan, env) {
+  const p = normalizePlanTier(plan);
+  if (p === "pro") return String(env.STRIPE_PRICE_ID_PRO ?? "price_1TM98cDtHiMNTdJ0FMxPf94X").trim();
+  if (p === "elite") return String(env.STRIPE_PRICE_ID_ELITE ?? "price_1TMCfYDtHiMNTdJ0urEVgoxc").trim();
+  if (p === "goat") return String(env.STRIPE_PRICE_ID_GOAT ?? "price_1TMCjnDtHiMNTdJ0CiOHHmQD").trim();
+  return "";
+}
+
+function tierPlanFromStripeSubscription(subscr, env) {
   if (!subscr || typeof subscr !== "object") return "entry";
   const st = typeof subscr.status === "string" ? subscr.status : "";
   if (st === "canceled" || st === "unpaid" || st === "incomplete_expired") return "entry";
+  const priceId = subscr.items?.data?.[0]?.price?.id ?? subscr.items?.data?.[0]?.plan?.id;
+  const fromPrice = planFromStripePriceId(priceId, env);
+  if (fromPrice) return fromPrice;
   const m =
     (typeof subscr.metadata?.plan === "string" && subscr.metadata.plan.trim().toLowerCase()) ||
     (typeof subscr.items?.data?.[0]?.price?.metadata?.plan === "string" &&
@@ -699,6 +724,363 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
     body: JSON.stringify(patch),
   });
   return res.ok;
+}
+
+/**
+ * @param {string} stripeKey
+ * @param {string} path — e.g. `customers` or `subscriptions/sub_xxx` (no leading slash)
+ * @param {Record<string, string>} fields — flat x-www-form-urlencoded keys (use `items[0][price]` style)
+ */
+async function stripeFormPost(stripeKey, path, fields) {
+  const body = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined || v === null) continue;
+    body.append(k, String(v));
+  }
+  const urlPath = path.startsWith("/") ? path.slice(1) : path;
+  const r = await fetch(`https://api.stripe.com/v1/${urlPath}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const json = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, json };
+}
+
+/** @returns {string | null} */
+function paymentIntentClientSecretFromSubscriptionPayload(obj) {
+  const inv = obj?.latest_invoice;
+  const pi =
+    inv && typeof inv === "object"
+      ? inv.payment_intent
+      : typeof inv === "string"
+        ? null
+        : null;
+  if (pi && typeof pi === "object" && typeof pi.client_secret === "string") return pi.client_secret;
+  return null;
+}
+
+async function supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, subscr) {
+  if (!subscr || typeof subscr !== "object") return false;
+  const priceId =
+    (subscr.items?.data?.[0]?.price && typeof subscr.items.data[0].price.id === "string"
+      ? subscr.items.data[0].price.id
+      : null) ?? null;
+  const st = typeof subscr.status === "string" ? subscr.status : "unknown";
+  const sid = typeof subscr.id === "string" ? subscr.id : null;
+  return supabasePatchProfile(supabaseUrl, serviceKey, userId, {
+    stripe_subscription_id: sid,
+    stripe_price_id: priceId,
+    subscription_status: st,
+  });
+}
+
+/**
+ * @returns {Promise<{ ok: true, customer_id: string } | { ok: false, error: string }>}
+ */
+async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey) {
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=email,name,stripe_customer_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  const profile = Array.isArray(rows) ? rows[0] : null;
+  const existing =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+  if (existing) {
+    return { ok: true, customer_id: existing };
+  }
+  const email = profile && typeof profile.email === "string" ? profile.email.trim() : "";
+  if (!email) {
+    return { ok: false, error: "Profile email missing" };
+  }
+  const name = profile && typeof profile.name === "string" ? profile.name.trim() : "";
+  const { ok, json } = await stripeFormPost(stripeKey, "customers", {
+    email,
+    name,
+    "metadata[supabase_user_id]": userId,
+  });
+  if (!ok || !json || typeof json.id !== "string") {
+    const msg = json?.error?.message || json?.error || `Stripe customer create failed (${ok ? 200 : "err"})`;
+    return { ok: false, error: String(msg) };
+  }
+  const patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stripe_customer_id: json.id });
+  if (!patched) {
+    return { ok: false, error: "Could not save Stripe customer id" };
+  }
+  return { ok: true, customer_id: json.id };
+}
+
+/**
+ * Returns create-subscription JSON: client_secret when payment is required, or syncs Supabase when already active/trialing.
+ */
+async function respondStripeCreateSubscriptionPayload(
+  env,
+  supabaseUrl,
+  serviceKey,
+  userId,
+  customerId,
+  stripeKey,
+  subJson,
+  cors
+) {
+  const secret = paymentIntentClientSecretFromSubscriptionPayload(subJson);
+  const sid = typeof subJson.id === "string" ? subJson.id : "";
+  const st = typeof subJson.status === "string" ? subJson.status : "";
+  if (secret) {
+    return jsonResponse({ client_secret: secret, subscription_id: sid || null, status: st }, 200, cors);
+  }
+  if (["active", "trialing"].includes(st) && sid) {
+    const full = await fetchStripeSubscriptionExpanded(stripeKey, sid);
+    if (full) {
+      const plan = tierPlanFromStripeSubscription(full, env);
+      await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
+      await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+    }
+    return jsonResponse(
+      {
+        client_secret: null,
+        subscription_id: sid,
+        status: st,
+        no_payment_needed: true,
+      },
+      200,
+      cors
+    );
+  }
+  return jsonResponse(
+    {
+      error:
+        "No payment client_secret from Stripe — subscription may still be incomplete. Check the Stripe Dashboard or try again.",
+    },
+    502,
+    cors
+  );
+}
+
+async function handleStripeCreateCustomer(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
+  }
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = user.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const ensured = await ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey);
+  if (!ensured.ok) {
+    return jsonResponse({ error: ensured.error }, 400, cors);
+  }
+  return jsonResponse({ customer_id: ensured.customer_id }, 200, cors);
+}
+
+async function handleStripeCreateSubscription(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+  const planRaw = typeof body?.plan === "string" ? body.plan.trim().toLowerCase() : "";
+  const plan = normalizePlanTier(planRaw);
+  if (!["pro", "elite", "goat"].includes(plan)) {
+    return jsonResponse({ error: "plan must be pro, elite, or goat" }, 400, cors);
+  }
+  let priceId = typeof body?.price_id === "string" ? body.price_id.trim() : "";
+  if (!priceId) {
+    priceId = stripePriceIdForPaidPlan(plan, env);
+  }
+  if (!priceId) {
+    return jsonResponse({ error: "Missing price_id" }, 400, cors);
+  }
+  const mapped = planFromStripePriceId(priceId, env);
+  if (mapped && mapped !== plan) {
+    return jsonResponse({ error: "price_id does not match plan" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const ensured = await ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey);
+  if (!ensured.ok) {
+    return jsonResponse({ error: ensured.error }, 400, cors);
+  }
+  const customerId = ensured.customer_id;
+
+  const qs = new URLSearchParams({ customer: customerId, limit: "5", status: "all" });
+  qs.append("expand[]", "data.items.data.price");
+  const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const listJson = await listRes.json().catch(() => ({}));
+  const subs = Array.isArray(listJson.data) ? listJson.data : [];
+  const activeLike = (s) => ["active", "trialing", "past_due", "unpaid"].includes(s?.status);
+  const existing = subs.find((s) => activeLike(s) && !s.cancel_at_period_end);
+
+  const expandFields = {
+    "metadata[plan]": plan,
+    payment_behavior: "default_incomplete",
+    "payment_settings[save_default_payment_method]": "on_subscription",
+  };
+
+  if (existing && typeof existing.id === "string") {
+    const item0 = existing.items?.data?.[0];
+    const itemId = item0 && typeof item0.id === "string" ? item0.id : "";
+    if (!itemId) {
+      return jsonResponse({ error: "Could not read subscription item id" }, 502, cors);
+    }
+    const form = {
+      "items[0][id]": itemId,
+      "items[0][price]": priceId,
+      proration_behavior: "create_prorations",
+      ...expandFields,
+    };
+    const formBody = new URLSearchParams();
+    for (const [k, v] of Object.entries(form)) {
+      formBody.append(k, String(v));
+    }
+    formBody.append("expand[]", "latest_invoice.payment_intent");
+    const up = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(existing.id)}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formBody,
+    });
+    const subJson = await up.json().catch(() => ({}));
+    if (!up.ok) {
+      return jsonResponse(
+        { error: subJson.error?.message || subJson.error || `Stripe error (${up.status})` },
+        up.status >= 400 && up.status < 600 ? up.status : 502,
+        cors
+      );
+    }
+    return respondStripeCreateSubscriptionPayload(
+      env,
+      supabaseUrl,
+      serviceKey,
+      userId,
+      customerId,
+      stripeKey,
+      subJson,
+      cors
+    );
+  }
+
+  const createBody = new URLSearchParams();
+  createBody.append("customer", customerId);
+  createBody.append("items[0][price]", priceId);
+  createBody.append("payment_behavior", "default_incomplete");
+  createBody.append("payment_settings[save_default_payment_method]", "on_subscription");
+  createBody.append("metadata[plan]", plan);
+  createBody.append("expand[]", "latest_invoice.payment_intent");
+  const cr = await fetch("https://api.stripe.com/v1/subscriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: createBody,
+  });
+  const subJson = await cr.json().catch(() => ({}));
+  if (!cr.ok) {
+    return jsonResponse(
+      { error: subJson.error?.message || subJson.error || `Stripe error (${cr.status})` },
+      cr.status >= 400 && cr.status < 600 ? cr.status : 502,
+      cors
+    );
+  }
+  return respondStripeCreateSubscriptionPayload(
+    env,
+    supabaseUrl,
+    serviceKey,
+    userId,
+    customerId,
+    stripeKey,
+    subJson,
+    cors
+  );
+}
+
+async function handleStripePortalSession(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const returnUrl =
+    typeof body?.return_url === "string" && body.return_url.trim()
+      ? body.return_url.trim()
+      : "https://pepguideiq.com/";
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  const profile = Array.isArray(rows) ? rows[0] : null;
+  const customerId =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+  if (!customerId) {
+    return jsonResponse({ error: "No Stripe customer on file" }, 400, cors);
+  }
+
+  const { ok, json } = await stripeFormPost(stripeKey, "billing_portal/sessions", {
+    customer: customerId,
+    return_url: returnUrl,
+  });
+  if (!ok || !json?.url) {
+    return jsonResponse({ error: json?.error?.message || json?.error || "Portal session failed" }, 502, cors);
+  }
+  return jsonResponse({ url: json.url }, 200, cors);
 }
 
 async function supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, patch, profileId) {
@@ -1065,7 +1447,7 @@ async function handleStripeSubscription(request, env, cors) {
     current_period_end: cpeNum,
     cancel_at_period_end: Boolean(subscr.cancel_at_period_end),
     status: typeof subscr.status === "string" ? subscr.status : "unknown",
-    plan: tierPlanFromStripeSubscription(subscr),
+    plan: tierPlanFromStripeSubscription(subscr, env),
     pending_plan: profile?.pending_plan != null ? String(profile.pending_plan) : null,
   }, 200, cors);
 }
@@ -1139,7 +1521,7 @@ async function handleScheduleDowngrade(request, env, cors) {
     return jsonResponse({ error: "No active subscription to schedule against" }, 400, cors);
   }
 
-  const currentTier = tierPlanFromStripeSubscription(subscr);
+  const currentTier = tierPlanFromStripeSubscription(subscr, env);
   const activeLike = ["active", "trialing", "past_due"].includes(subscr.status);
   if (!activeLike) {
     return jsonResponse({ error: "Subscription is not in a state that allows scheduling" }, 400, cors);
@@ -1674,6 +2056,74 @@ async function handleSearchMemberProfiles(request, env, cors) {
   }));
 
   return jsonResponse({ profiles }, 200, cors);
+}
+
+/**
+ * GET /member-profiles/public?handle=foo — no auth. Public member card fields for a unique @handle.
+ */
+async function handleGetMemberProfilePublic(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const url = new URL(request.url);
+  let h = url.searchParams.get("handle") ?? url.searchParams.get("h") ?? "";
+  if (typeof h === "string" && h.startsWith("@")) h = h.slice(1).trim();
+  h = String(h ?? "").trim().toLowerCase();
+  const safe = sanitizeMemberSearchToken(h);
+  if (!safe || safe.length < 3) {
+    return jsonResponse({ error: "Invalid handle" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const sel = `${supabaseUrl}/rest/v1/member_profiles?handle=eq.${encodeURIComponent(
+    safe
+  )}&select=id,handle,display_handle,display_name,avatar_url,bio,experience_level,goals,user_id&limit=1`;
+
+  const res = await fetch(sel, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    log(env, "warn", "member_profile_public_failed", { status: res.status });
+    return jsonResponse({ error: "Lookup failed" }, 502, cors);
+  }
+  const row = rows[0];
+  if (!row || typeof row.handle !== "string" || !row.handle) {
+    return jsonResponse({ profile: null }, 404, cors);
+  }
+
+  let plan = "entry";
+  const uid = typeof row.user_id === "string" ? row.user_id : "";
+  if (uid) {
+    const pr = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(uid)}&select=plan`, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    });
+    const planRows = await pr.json().catch(() => []);
+    if (Array.isArray(planRows) && planRows[0] && typeof planRows[0].plan === "string") {
+      plan = normalizePlanTier(planRows[0].plan);
+    }
+  }
+
+  const profile = {
+    id: row.id,
+    handle: row.handle,
+    display_handle: row.display_handle,
+    display_name: row.display_name,
+    avatar_url: row.avatar_url,
+    bio: row.bio,
+    experience_level: row.experience_level,
+    goals: row.goals,
+    plan,
+  };
+
+  return jsonResponse({ profile }, 200, cors);
 }
 
 /**
@@ -2520,17 +2970,24 @@ async function handleStripeWebhook(request, env) {
                 : "";
           if ((plan === "entry" || !VALID_PLAN_TIERS.has(plan)) && subId) {
             const sub = await fetchStripeSubscriptionExpanded(stripeKey, subId);
-            if (sub) plan = tierPlanFromStripeSubscription(sub);
+            if (sub) plan = tierPlanFromStripeSubscription(sub, env);
           }
           const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
           if (!ok) {
             log(env, "error", "stripe_webhook_profile_sync_failed", { userId, eventId });
             return new Response("Profile sync failed", { status: 502 });
           }
+          if (subId) {
+            const full = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+            if (full) {
+              await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+            }
+          }
           log(env, "info", "stripe_checkout_completed", { userId, plan, customerId });
         }
         break;
       }
+      case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data?.object ?? {};
@@ -2554,16 +3011,84 @@ async function handleStripeWebhook(request, env) {
           break;
         }
 
-        const plan =
-          event.type === "customer.subscription.deleted"
-            ? "entry"
-            : tierPlanFromStripeSubscription(sub);
+        if (event.type === "customer.subscription.deleted") {
+          const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, "entry", customerId);
+          if (!ok) {
+            log(env, "error", "stripe_webhook_subscription_sync_failed", { userId, eventId });
+            return new Response("Sync failed", { status: 502 });
+          }
+          await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
+            stripe_subscription_id: null,
+            stripe_price_id: null,
+            subscription_status: "canceled",
+          });
+          log(env, "info", "stripe_subscription_synced", { userId, plan: "entry", type: event.type });
+          break;
+        }
+
+        let subFull = sub;
+        if (typeof sub?.id === "string") {
+          const exp = await fetchStripeSubscriptionExpanded(stripeKey, sub.id);
+          if (exp) subFull = exp;
+        }
+        const plan = tierPlanFromStripeSubscription(subFull, env);
         const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
         if (!ok) {
           log(env, "error", "stripe_webhook_subscription_sync_failed", { userId, eventId });
           return new Response("Sync failed", { status: 502 });
         }
+        await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, subFull);
         log(env, "info", "stripe_subscription_synced", { userId, plan, type: event.type });
+        break;
+      }
+      case "invoice.payment_failed": {
+        const inv = event.data?.object ?? {};
+        const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+        if (!customerId) break;
+        const pr = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=id`,
+          {
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+          }
+        );
+        const rows = await pr.json().catch(() => []);
+        const profile = Array.isArray(rows) ? rows[0] : null;
+        const userId = profile && typeof profile.id === "string" ? profile.id : null;
+        if (!userId) break;
+        await supabasePatchProfile(supabaseUrl, serviceKey, userId, { subscription_status: "past_due" });
+        log(env, "warn", "stripe_invoice_payment_failed", { userId, eventId });
+        break;
+      }
+      case "invoice.payment_succeeded": {
+        const inv = event.data?.object ?? {};
+        const customerId = typeof inv.customer === "string" ? inv.customer : inv.customer?.id;
+        const subRef = inv.subscription;
+        const subId = typeof subRef === "string" ? subRef : subRef && typeof subRef === "object" ? subRef.id : "";
+        if (!customerId || !subId) break;
+        const pr = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=id`,
+          {
+            headers: {
+              apikey: serviceKey,
+              Authorization: `Bearer ${serviceKey}`,
+            },
+          }
+        );
+        const rows = await pr.json().catch(() => []);
+        const profile = Array.isArray(rows) ? rows[0] : null;
+        const userId = profile && typeof profile.id === "string" ? profile.id : null;
+        if (!userId) break;
+        const full = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+        if (!full) break;
+        const plan = tierPlanFromStripeSubscription(full, env);
+        const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
+        if (ok) {
+          await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+        }
+        log(env, "info", "stripe_invoice_payment_succeeded", { userId, eventId });
         break;
       }
       default:
@@ -2678,6 +3203,18 @@ async function handleRequest(request, env) {
       return handleScheduleDowngrade(request, env, cors);
     }
 
+    if (url.pathname === "/stripe/create-customer" && request.method === "POST") {
+      return handleStripeCreateCustomer(request, env, cors);
+    }
+
+    if (url.pathname === "/stripe/create-subscription" && request.method === "POST") {
+      return handleStripeCreateSubscription(request, env, cors);
+    }
+
+    if (url.pathname === "/stripe/create-portal-session" && request.method === "POST") {
+      return handleStripePortalSession(request, env, cors);
+    }
+
     if (url.pathname === "/upload-stack-photo" && request.method === "POST") {
       return handleUploadStackPhoto(request, env, cors);
     }
@@ -2688,6 +3225,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/member-profiles/handle-available" && request.method === "GET") {
       return handleCheckHandleAvailability(request, env, cors);
+    }
+
+    if (url.pathname === "/member-profiles/public" && request.method === "GET") {
+      return handleGetMemberProfilePublic(request, env, cors);
     }
 
     if (url.pathname === "/member-profiles/search" && request.method === "GET") {

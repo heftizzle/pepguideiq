@@ -60,3 +60,65 @@ export async function scheduleDowngrade(targetPlan) {
   }
   return { ok: true, error: null };
 }
+
+/**
+ * POST /stripe/create-subscription — returns PaymentIntent client_secret for Elements, or no_payment_needed when already charged.
+ * @param {"pro"|"elite"|"goat"} plan
+ * @returns {Promise<{ data: { client_secret: string | null, subscription_id: string | null, status: string, no_payment_needed?: boolean } | null, error: Error | null }>}
+ */
+export async function createStripeSubscription(plan) {
+  if (!isApiWorkerConfigured()) {
+    return { data: null, error: new Error("Worker URL not configured") };
+  }
+  const token = await getSessionAccessToken();
+  if (!token) {
+    return { data: null, error: new Error("Not signed in") };
+  }
+  const res = await fetch(`${API_WORKER_URL}/stripe/create-subscription`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ plan }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = typeof body.error === "string" ? body.error : `Worker ${res.status}`;
+    return { data: null, error: new Error(msg) };
+  }
+  return { data: body, error: null };
+}
+
+/**
+ * POST /stripe/create-portal-session
+ * @param {string} returnUrl — full URL after leaving the portal
+ * @returns {Promise<{ url: string | null, error: Error | null }>}
+ */
+export async function createStripePortalSession(returnUrl) {
+  if (!isApiWorkerConfigured()) {
+    return { url: null, error: new Error("Worker URL not configured") };
+  }
+  const token = await getSessionAccessToken();
+  if (!token) {
+    return { url: null, error: new Error("Not signed in") };
+  }
+  const res = await fetch(`${API_WORKER_URL}/stripe/create-portal-session`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ return_url: returnUrl }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = typeof body.error === "string" ? body.error : `Worker ${res.status}`;
+    return { url: null, error: new Error(msg) };
+  }
+  const url = typeof body.url === "string" ? body.url : null;
+  if (!url) {
+    return { url: null, error: new Error("Portal URL missing") };
+  }
+  return { url, error: null };
+}

@@ -5,6 +5,7 @@ import { fetchNetworkFeed, fetchPublicNetworkDoseFeed } from "../lib/supabase.js
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
 
 /** Tier emoji for Network stack cards (entry shown as free 🌱). */
@@ -149,9 +150,9 @@ function normalizeDoseRpcRows(raw) {
 }
 
 /**
- * @param {{ userId?: string }} props
+ * @param {{ userId?: string; scrollToDosePostId?: string | null; onConsumedDosePostScrollTarget?: () => void }} props
  */
-export function NetworkTab({ userId }) {
+export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePostScrollTarget }) {
   const [stackItems, setStackItems] = useState(/** @type {object[]} */ ([]));
   const [doseItems, setDoseItems] = useState(/** @type {object[]} */ ([]));
   const [stackLoading, setStackLoading] = useState(true);
@@ -209,6 +210,19 @@ export function NetworkTab({ userId }) {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [userId, loadDoseFeed, loadStackFeed]);
+
+  useEffect(() => {
+    const pid = typeof scrollToDosePostId === "string" ? scrollToDosePostId.trim() : "";
+    if (!pid || doseLoading) return;
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`pepv-network-dose-${pid}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        onConsumedDosePostScrollTarget?.();
+      }
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, [scrollToDosePostId, doseLoading, doseItems, onConsumedDosePostScrollTarget]);
 
   const headerBusy = useMemo(() => stackLoading || doseLoading, [stackLoading, doseLoading]);
 
@@ -310,6 +324,7 @@ export function NetworkTab({ userId }) {
             return (
               <div
                 key={id}
+                id={typeof row.id === "string" && row.id ? `pepv-network-dose-${row.id}` : undefined}
                 className="pcard"
                 role="article"
                 style={{
@@ -322,7 +337,30 @@ export function NetworkTab({ userId }) {
                 }}
               >
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: "#f8fafc" }}>{handleShown}</span>
+                  {handle ? (
+                    <button
+                      type="button"
+                      onClick={() => openPublicMemberProfile(handle)}
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "#f8fafc",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                        textDecoration: "underline",
+                        textDecorationColor: "rgba(248, 250, 252, 0.25)",
+                        textUnderlineOffset: 3,
+                      }}
+                    >
+                      {handleShown}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#f8fafc" }}>{handleShown}</span>
+                  )}
                   {verified ? (
                     <span
                       title="Verified"
@@ -407,12 +445,19 @@ export function NetworkTab({ userId }) {
             const compoundLabel = `${compoundCount} compound${compoundCount === 1 ? "" : "s"}`;
 
             return (
-              <button
+              <div
                 key={`${shareId || idx}`}
-                type="button"
                 className="pcard"
+                role="button"
+                tabIndex={shareId ? 0 : -1}
                 onClick={() => {
                   if (!shareId) return;
+                  window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
+                }}
+                onKeyDown={(e) => {
+                  if (!shareId) return;
+                  if (e.key !== "Enter" && e.key !== " ") return;
+                  e.preventDefault();
                   window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
                 }}
                 style={{
@@ -427,9 +472,35 @@ export function NetworkTab({ userId }) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                    <div className="mono" style={{ fontSize: 14, color: "#00d4aa", marginBottom: handle ? 6 : 0 }}>
-                      {handle ? formatHandleDisplay(handle) : displayName}
-                    </div>
+                    {handle ? (
+                      <button
+                        type="button"
+                        className="mono"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPublicMemberProfile(handle);
+                        }}
+                        style={{
+                          fontSize: 14,
+                          color: "#00d4aa",
+                          marginBottom: 6,
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          textDecoration: "underline",
+                          textDecorationColor: "rgba(0, 212, 170, 0.35)",
+                          textUnderlineOffset: 3,
+                        }}
+                      >
+                        {formatHandleDisplay(handle)}
+                      </button>
+                    ) : (
+                      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", marginBottom: 0 }}>
+                        {displayName}
+                      </div>
+                    )}
                     {handle ? (
                       <div style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9" }}>{displayName}</div>
                     ) : null}
@@ -452,7 +523,7 @@ export function NetworkTab({ userId }) {
                     </span>
                   ) : null}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

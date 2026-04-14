@@ -291,7 +291,7 @@ export function ProtocolTab({
             cursor: "pointer",
           }}
         >
-          <div style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5 }}>
             Upgrade to Pro to run protocol logging with vials.
           </div>
         </div>
@@ -301,7 +301,7 @@ export function ProtocolTab({
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="mono" style={{ fontSize: 13, color: "#4a6080", fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", fontFamily: "'JetBrains Mono', monospace" }}>
         Configure Supabase to use Protocol.
       </div>
     );
@@ -315,7 +315,7 @@ export function ProtocolTab({
       </div>
 
       {emptyBecauseNoStack && (
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
           No stack saved — build your stack in Saved Stacks first.
         </div>
       )}
@@ -325,7 +325,7 @@ export function ProtocolTab({
       )}
 
       {!emptyBecauseNoStack && rows !== null && rows.length === 0 && (
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
           No compounds in this session — edit Saved Stacks to assign morning / afternoon / evening / night.
         </div>
       )}
@@ -446,7 +446,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>{row.name}</div>
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
           {row.routeKind === "oral" ? "Oral" : row.routeKind === "intranasal" ? "Intranasal" : "Topical"}
         </div>
       </div>
@@ -554,7 +554,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>
           {row.name}
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#4a6080", textAlign: "right", maxWidth: 280 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", maxWidth: 280 }}>
           {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
           {row.vials.length > 1 ? " (active vial — change in Vial Tracker)" : ""}
         </div>

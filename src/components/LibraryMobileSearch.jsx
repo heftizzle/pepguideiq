@@ -74,22 +74,11 @@ export function LibraryMobileSearchIcon({ open, onOpen }) {
   return (
     <button
       type="button"
+      className="pepv-header-action-btn pepv-header-action-btn--icon"
+      data-active={open ? "true" : undefined}
       aria-label="Open library search"
       aria-expanded={open}
       onClick={onOpen}
-      style={{
-        minWidth: 44,
-        minHeight: 44,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 12,
-        border: open ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-        background: open ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-        cursor: "pointer",
-        flexShrink: 0,
-        padding: 0,
-      }}
     >
       <span className="pepv-emoji" aria-hidden style={{ fontSize: 20, lineHeight: 1 }}>
         🔍

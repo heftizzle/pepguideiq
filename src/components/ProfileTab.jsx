@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SettingsTab } from "./SettingsTab.jsx";
+import { BodyMetricStepper } from "./BodyMetricStepper.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { formatPlan, getTier } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
@@ -86,7 +87,7 @@ function tierPillStyle(plan) {
   return {
     background:
       plan === "goat" ? "#a855f720" : plan === "elite" ? "#f59e0b20" : plan === "pro" ? "#00d4aa20" : "#14202e",
-    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#4a6080",
+    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#8fa5bf",
     border: `1px solid ${
       plan === "goat" ? "#a855f730" : plan === "elite" ? "#f59e0b30" : plan === "pro" ? "#00d4aa30" : "#14202e"
     }`,
@@ -115,28 +116,6 @@ function Card({ children, style = {} }) {
   );
 }
 
-function StatTile({ value, label }) {
-  return (
-    <div
-      style={{
-        background: "#07090e",
-        border: "1px solid #14202e",
-        borderRadius: 12,
-        padding: 14,
-        minHeight: 92,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <div style={{ fontSize: 22, fontWeight: 700, color: "#dde4ef", lineHeight: 1.2 }}>{value}</div>
-      <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", marginTop: 8, lineHeight: 1.35 }}>
-        {label}
-      </div>
-    </div>
-  );
-}
-
 function pepguideIqScoreParts(stats) {
   if (!stats) return null;
   const doses = typeof stats.doseCount === "number" ? stats.doseCount : 0;
@@ -156,82 +135,147 @@ function pepguideIqTierLabel(score) {
   return "🌱 Just Getting Started";
 }
 
-function PepguideIqScoreTile({ stats, expanded, onToggle }) {
+function pepguideIqScoreBreakdownLine(parts) {
+  if (!parts) return "";
+  return [
+    `${parts.doses} dose${parts.doses === 1 ? "" : "s"} × 2 = ${parts.doses * 2}`,
+    `${parts.compounds} compound${parts.compounds === 1 ? "" : "s"} × 3 = ${parts.compounds * 3}`,
+    `${parts.vials} vial${parts.vials === 1 ? "" : "s"} × 1 = ${parts.vials}`,
+    `${parts.days} day${parts.days === 1 ? "" : "s"} × 1 = ${parts.days}`,
+  ].join(" | ");
+}
+
+function PepguideStatsStrip({ stats, demoHighlightProps, demoHighlighted }) {
   const parts = pepguideIqScoreParts(stats);
-  const breakdown =
-    parts &&
-    [
-      `${parts.doses} dose${parts.doses === 1 ? "" : "s"} × 2 = ${parts.doses * 2}`,
-      `${parts.compounds} compound${parts.compounds === 1 ? "" : "s"} × 3 = ${parts.compounds * 3}`,
-      `${parts.vials} vial${parts.vials === 1 ? "" : "s"} × 1 = ${parts.vials}`,
-      `${parts.days} day${parts.days === 1 ? "" : "s"} × 1 = ${parts.days}`,
-    ].join(" | ");
+  const breakdown = pepguideIqScoreBreakdownLine(parts);
+  const formulaTitle = parts
+    ? `doses ×2 + compounds ×3 + vials ×1 + days ×1 — ${breakdown}`
+    : "doses ×2 + compounds ×3 + vials ×1 + days ×1";
+
+  const valueStyle = { fontSize: 16, fontWeight: 700, color: "#00d4aa", lineHeight: 1.2 };
+  const labelStyle = {
+    fontSize: 12,
+    color: "#8fa5bf",
+    marginTop: 4,
+    lineHeight: 1.25,
+    fontFamily: "'JetBrains Mono', monospace",
+  };
+  const cell = {
+    flex: "1 1 0",
+    minWidth: 0,
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 12,
+    paddingRight: 12,
+  };
+  const firstCell = { ...cell, paddingLeft: 0 };
+  const lastCell = { ...cell, paddingRight: 0 };
+  const divider = (
+    <div
+      aria-hidden
+      style={{
+        width: 1,
+        flexShrink: 0,
+        alignSelf: "stretch",
+        minHeight: 40,
+        background: "#0e1822",
+      }}
+    />
+  );
+
+  const fmt = (n) => (typeof n === "number" ? n : "—");
 
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={!parts}
-      aria-expanded={parts ? expanded : undefined}
+    <div
+      data-demo-target={DEMO_TARGET.profile_score}
+      {...demoHighlightProps(Boolean(demoHighlighted))}
       style={{
-        width: "100%",
-        marginTop: 12,
-        textAlign: "left",
-        cursor: parts ? "pointer" : "default",
-        background: "#07090e",
+        background: "#0b0f17",
         border: "1px solid #14202e",
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 10,
+        padding: "14px 20px",
+        marginBottom: 20,
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "row",
         alignItems: "stretch",
-        gap: 6,
-        opacity: parts ? 1 : 0.85,
+        flexWrap: "nowrap",
         fontFamily: "'Outfit', sans-serif",
-        color: "#dde4ef",
+        overflowX: "auto",
       }}
     >
-      <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", letterSpacing: "0.06em" }}>
-        pepguideIQ Score
+      <div style={firstCell}>
+        <div style={valueStyle}>{fmt(stats?.doseCount)}</div>
+        <div className="mono" style={labelStyle}>
+          Doses Logged
+        </div>
       </div>
+      {divider}
+      <div style={cell}>
+        <div style={valueStyle}>{fmt(stats?.peptideDistinct)}</div>
+        <div className="mono" style={labelStyle}>
+          Compounds
+        </div>
+      </div>
+      {divider}
+      <div style={cell}>
+        <div style={valueStyle}>{fmt(stats?.activeVials)}</div>
+        <div className="mono" style={labelStyle}>
+          Active Vials
+        </div>
+      </div>
+      {divider}
+      <div style={cell}>
+        <div style={valueStyle}>{fmt(stats?.daysTracked)}</div>
+        <div className="mono" style={labelStyle}>
+          Days Tracked
+        </div>
+      </div>
+      {divider}
+      <div style={lastCell} title={formulaTitle}>
+        <div style={valueStyle}>{parts ? parts.score : "—"}</div>
+        <div className="mono" style={labelStyle}>
+          pepguideIQ
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PepguideStatsSectionHeading({ stats }) {
+  const parts = pepguideIqScoreParts(stats);
+  const tierStyle = {
+    fontSize: 11,
+    color: "#6b8299",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    fontFamily: "'JetBrains Mono', monospace",
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        columnGap: 8,
+        rowGap: 6,
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ ...SECTION, marginBottom: 0 }}>PepGuide stats</div>
       {parts ? (
         <>
-          <div
-            style={{
-              fontSize: 36,
-              fontWeight: 800,
-              color: "#00d4aa",
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
-              textShadow: "0 0 24px rgba(0, 212, 170, 0.22)",
-            }}
-          >
-            {parts.score}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#8fa5bf", lineHeight: 1.4 }}>{pepguideIqTierLabel(parts.score)}</div>
-          <div className="mono" style={{ fontSize: 11, color: "#4a5a6e", lineHeight: 1.45 }}>
-            doses ×2 + compounds ×3 + vials ×1 + days ×1
-          </div>
-          {expanded && (
-            <div
-              className="mono"
-              style={{
-                fontSize: 12,
-                color: "#6b7c8f",
-                lineHeight: 1.5,
-                marginTop: 4,
-                paddingTop: 10,
-                borderTop: "1px solid #1a2632",
-              }}
-            >
-              {breakdown}
-            </div>
-          )}
+          <span aria-hidden style={{ ...tierStyle, userSelect: "none" }}>
+            ·
+          </span>
+          <span className="mono" style={tierStyle}>
+            {pepguideIqTierLabel(parts.score)}
+          </span>
         </>
-      ) : (
-        <div style={{ fontSize: 28, fontWeight: 700, color: "#4a6080" }}>—</div>
-      )}
-    </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -248,15 +292,31 @@ function clamp(n, lo, hi) {
 
 function snapToStep(val, min, step) {
   const k = Math.round((val - min) / step);
-  return min + k * step;
+  const out = min + k * step;
+  const dec = (() => {
+    const s = String(step);
+    const i = s.indexOf(".");
+    if (i < 0) return 0;
+    return Math.min(4, s.length - i - 1);
+  })();
+  return Number(out.toFixed(dec));
 }
 
-function fmtFeetInches(totalIn) {
-  const fi = Math.round(totalIn);
-  const f = Math.floor(fi / 12);
-  const inch = fi - f * 12;
-  return `${f}'${inch}"`;
-}
+const LBS_TO_KG = 2.20462;
+const PROFILE_WEIGHT_LBS_MIN = 50;
+const PROFILE_WEIGHT_LBS_MAX = 500;
+const PROFILE_WEIGHT_LBS_STEP = 0.1;
+const PROFILE_WEIGHT_KG_MIN = PROFILE_WEIGHT_LBS_MIN / LBS_TO_KG;
+const PROFILE_WEIGHT_KG_MAX = PROFILE_WEIGHT_LBS_MAX / LBS_TO_KG;
+const PROFILE_WEIGHT_KG_STEP = 0.1;
+
+const PROFILE_HEIGHT_IN_MIN = 36;
+const PROFILE_HEIGHT_IN_MAX = 96;
+const PROFILE_HEIGHT_IN_STEP = 0.25;
+
+const PROFILE_BODY_FAT_MIN = 1;
+const PROFILE_BODY_FAT_MAX = 70;
+const PROFILE_BODY_FAT_STEP = 0.1;
 
 const AVATAR_CROP_VIEW = 240;
 const AVATAR_CROP_OUT = 512;
@@ -451,40 +511,6 @@ function AvatarCropModal({ open, imageUrl, busy, onCancel, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProfileBodyRangeSlider({ min, max, step, value, bubble, onLive, onCommit }) {
-  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
-  return (
-    <div className="pepv-profile-slider-wrap" style={{ "--fill-pct": `${pct}%` }}>
-      <div className="pepv-profile-slider-bubble mono" style={{ left: `${pct}%` }} aria-hidden>
-        {bubble}
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onInput={(e) => onLive(Number(e.currentTarget.value))}
-        onPointerUp={(e) => onCommit(Number(e.currentTarget.value))}
-        onKeyUp={(e) => {
-          if (
-            e.key === "ArrowLeft" ||
-            e.key === "ArrowRight" ||
-            e.key === "ArrowUp" ||
-            e.key === "ArrowDown" ||
-            e.key === "Home" ||
-            e.key === "End" ||
-            e.key === "PageUp" ||
-            e.key === "PageDown"
-          ) {
-            onCommit(Number(e.currentTarget.value));
-          }
-        }}
-      />
     </div>
   );
 }
@@ -684,7 +710,7 @@ function ProfilePrivatePhotoSlot({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#4a6080",
+          color: "#8fa5bf",
           fontSize: 12,
           padding: 8,
           textAlign: "center",
@@ -705,7 +731,7 @@ function ProfilePrivatePhotoSlot({
         </div>
       ) : null}
       {uploadedLabel ? (
-        <div className="mono" style={{ fontSize: 9, color: "#4a6080", marginTop: 4, lineHeight: 1.3 }}>
+        <div className="mono" style={{ fontSize: 9, color: "#8fa5bf", marginTop: 4, lineHeight: 1.3 }}>
           {uploadedLabel}
         </div>
       ) : null}
@@ -722,6 +748,15 @@ export function ProfileTab({
   canUseProgressPhotos = false,
   savedStackPeptides = [],
 }) {
+  const fmtFeetInches = (inches) => {
+    const ft = Math.floor(inches / 12);
+    let ins = Math.round((inches % 12) * 4) / 4;
+    if (ins >= 12) {
+      return `${ft + 1}'0"`;
+    }
+    return `${ft}'${ins}"`;
+  };
+
   const { activeProfileId, activeProfile, memberProfilesVersion, refreshMemberProfiles } = useActiveProfile();
   const demo = useDemoTourOptional();
   const fileRef = useRef(null);
@@ -740,9 +775,8 @@ export function ProfileTab({
   });
   const [weightSlider, setWeightSlider] = useState(200);
   const [heightInchesSlider, setHeightInchesSlider] = useState(68);
-  const [bodyFatSlider, setBodyFatSlider] = useState(3);
+  const [bodyFatSlider, setBodyFatSlider] = useState(20);
   const [stats, setStats] = useState(null);
-  const [iqScoreExpanded, setIqScoreExpanded] = useState(false);
   const [clientStreakFallback, setClientStreakFallback] = useState(0);
   const [avatarImageNonce, setAvatarImageNonce] = useState(0);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -819,7 +853,7 @@ export function ProfileTab({
       setWeightUnit("lbs");
       setWeightSlider(200);
       setHeightInchesSlider(68);
-      setBodyFatSlider(3);
+      setBodyFatSlider(20);
       return;
     }
     let ignore = false;
@@ -835,28 +869,32 @@ export function ProfileTab({
       const wu = row && row.weight_unit === "kg" ? "kg" : "lbs";
       setWeightUnit(wu);
       setGoalIds(parseGoalsFromStorage(row?.goal));
-      const wMin = wu === "kg" ? 36 : 80;
-      const wMax = wu === "kg" ? 180 : 400;
-      const wStep = wu === "kg" ? 0.5 : 1;
+      const wMin = wu === "kg" ? PROFILE_WEIGHT_KG_MIN : PROFILE_WEIGHT_LBS_MIN;
+      const wMax = wu === "kg" ? PROFILE_WEIGHT_KG_MAX : PROFILE_WEIGHT_LBS_MAX;
+      const wStep = wu === "kg" ? PROFILE_WEIGHT_KG_STEP : PROFILE_WEIGHT_LBS_STEP;
       const wl = row?.weight_lbs;
       if (wl != null && Number.isFinite(Number(wl))) {
         const lbs = Number(wl);
-        const disp = wu === "kg" ? lbs / 2.20462 : lbs;
+        const disp = wu === "kg" ? lbs / LBS_TO_KG : lbs;
         setWeightSlider(snapToStep(clamp(disp, wMin, wMax), wMin, wStep));
       } else {
-        setWeightSlider(wu === "kg" ? 80 : 200);
+        setWeightSlider(wu === "kg" ? 80 / LBS_TO_KG : 200);
       }
       const hi = row?.height_in;
       if (hi != null && Number.isFinite(Number(hi))) {
-        setHeightInchesSlider(Math.round(clamp(Number(hi), 48, 96)));
+        setHeightInchesSlider(
+          snapToStep(clamp(Number(hi), PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_MAX), PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_STEP)
+        );
       } else {
         setHeightInchesSlider(68);
       }
       const bf = row?.body_fat_pct;
-      if (bf != null && Number.isFinite(Number(bf)) && Number(bf) > 3) {
-        setBodyFatSlider(snapToStep(clamp(Number(bf), 3, 60), 3, 0.5));
+      if (bf != null && Number.isFinite(Number(bf))) {
+        setBodyFatSlider(
+          snapToStep(clamp(Number(bf), PROFILE_BODY_FAT_MIN, PROFILE_BODY_FAT_MAX), PROFILE_BODY_FAT_MIN, PROFILE_BODY_FAT_STEP)
+        );
       } else {
-        setBodyFatSlider(3);
+        setBodyFatSlider(20);
       }
     });
     return () => {
@@ -1130,10 +1168,6 @@ export function ProfileTab({
     };
   }, [user.id, activeProfileId, activeProfile?.current_streak, memberProfilesVersion]);
 
-  useEffect(() => {
-    setIqScoreExpanded(false);
-  }, [user.id]);
-
   const refreshBodyMetricsRow = useCallback(async () => {
     if (!activeProfileId) return;
     const { row } = await fetchBodyMetrics(activeProfileId);
@@ -1142,9 +1176,12 @@ export function ProfileTab({
 
   const persistHeightInches = async (totalIn) => {
     if (!user?.id || !activeProfileId) return;
-    const v = totalIn != null && Number.isFinite(totalIn) && totalIn > 0 ? totalIn : null;
+    const v =
+      totalIn != null && Number.isFinite(totalIn) && totalIn > 0
+        ? snapToStep(clamp(totalIn, PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_MAX), PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_STEP)
+        : null;
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, {
-      height_in: v != null ? Math.round(clamp(v, 48, 96)) : null,
+      height_in: v != null ? v : null,
     });
     if (error) setErr(error.message);
     else {
@@ -1155,17 +1192,21 @@ export function ProfileTab({
   };
 
   const commitHeightInches = async (totalIn) => {
-    const inches = Math.round(totalIn);
-    await persistHeightInches(clamp(inches, 48, 96));
+    const inches = snapToStep(
+      clamp(totalIn, PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_MAX),
+      PROFILE_HEIGHT_IN_MIN,
+      PROFILE_HEIGHT_IN_STEP
+    );
+    await persistHeightInches(inches);
   };
 
   const commitWeightDisplay = async (disp) => {
     if (!user?.id || !activeProfileId) return;
-    const wMin = weightUnit === "kg" ? 36 : 80;
-    const wMax = weightUnit === "kg" ? 180 : 400;
-    const wStep = weightUnit === "kg" ? 0.5 : 1;
+    const wMin = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MIN : PROFILE_WEIGHT_LBS_MIN;
+    const wMax = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MAX : PROFILE_WEIGHT_LBS_MAX;
+    const wStep = weightUnit === "kg" ? PROFILE_WEIGHT_KG_STEP : PROFILE_WEIGHT_LBS_STEP;
     const v = snapToStep(clamp(disp, wMin, wMax), wMin, wStep);
-    const lbs = weightUnit === "kg" ? v * 2.20462 : v;
+    const lbs = weightUnit === "kg" ? v * LBS_TO_KG : v;
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, {
       weight_lbs: lbs,
       weight_unit: weightUnit,
@@ -1180,17 +1221,11 @@ export function ProfileTab({
 
   const commitBodyFat = async (pctVal) => {
     if (!user?.id || !activeProfileId) return;
-    const v = snapToStep(clamp(pctVal, 3, 60), 3, 0.5);
-    if (v <= 3) {
-      const { error } = await upsertBodyMetrics(user.id, activeProfileId, { body_fat_pct: null });
-      if (error) setErr(error.message);
-      else {
-        setErr(null);
-        void refreshBodyMetricsRow();
-        showSavedBriefly();
-      }
-      return;
-    }
+    const v = snapToStep(
+      clamp(pctVal, PROFILE_BODY_FAT_MIN, PROFILE_BODY_FAT_MAX),
+      PROFILE_BODY_FAT_MIN,
+      PROFILE_BODY_FAT_STEP
+    );
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, { body_fat_pct: v });
     if (error) setErr(error.message);
     else {
@@ -1316,24 +1351,14 @@ export function ProfileTab({
     );
   }
 
-  const wMin = weightUnit === "kg" ? 36 : 80;
-  const wMax = weightUnit === "kg" ? 180 : 400;
-  const wStep = weightUnit === "kg" ? 0.5 : 1;
-  const weightBubble =
-    weightUnit === "kg"
-      ? `${Number.isInteger(weightSlider * 2) ? weightSlider : weightSlider.toFixed(1)} kg`
-      : `${Math.round(weightSlider)} lbs`;
-
-  const heightCmRounded = Math.round(heightInchesSlider * 2.54);
-  const heightMinCm = 120;
-  const heightMaxCm = 245;
-  const heightBubble =
-    heightUnit === "imperial" ? fmtFeetInches(heightInchesSlider) : `${heightCmRounded} cm`;
-
-  const bodyFatBubble =
-    bodyFatSlider <= 3
-      ? "Not set"
-      : `${bodyFatSlider % 1 === 0 ? bodyFatSlider : bodyFatSlider.toFixed(1)}%`;
+  const wMin = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MIN : PROFILE_WEIGHT_LBS_MIN;
+  const wMax = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MAX : PROFILE_WEIGHT_LBS_MAX;
+  const wStep = weightUnit === "kg" ? PROFILE_WEIGHT_KG_STEP : PROFILE_WEIGHT_LBS_STEP;
+  const weightDisplayStr =
+    weightUnit === "kg" ? `${weightSlider.toFixed(1)} kg` : `${weightSlider.toFixed(1)} lbs`;
+  const heightDisplayStrImperial = fmtFeetInches(heightInchesSlider);
+  const heightDisplayStrMetric = `${(heightInchesSlider * 2.54).toFixed(1)} cm`;
+  const bodyFatDisplayStr = `${bodyFatSlider.toFixed(1)}%`;
 
   return (
     <div
@@ -1343,86 +1368,6 @@ export function ProfileTab({
         margin: "0 auto",
       }}
     >
-      <style>{`
-        .pepv-profile-slider-wrap {
-          --fill-pct: 50%;
-          position: relative;
-          width: 100%;
-          padding-top: 30px;
-          margin-bottom: 14px;
-          box-sizing: border-box;
-        }
-        .pepv-profile-slider-bubble {
-          position: absolute;
-          top: 0;
-          transform: translateX(-50%);
-          padding: 4px 10px;
-          border-radius: 10px;
-          border: 1px solid #1e2a38;
-          background: rgba(10, 14, 22, 0.95);
-          color: #dde4ef;
-          font-size: 13px;
-          font-weight: 500;
-          letter-spacing: 0.04em;
-          white-space: nowrap;
-          pointer-events: none;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-          z-index: 2;
-        }
-        .pepv-profile-slider-wrap input[type="range"] {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 100%;
-          height: 28px;
-          margin: 0;
-          background: transparent;
-          cursor: pointer;
-        }
-        .pepv-profile-slider-wrap input[type="range"]:focus {
-          outline: none;
-        }
-        .pepv-profile-slider-wrap input[type="range"]::-webkit-slider-runnable-track {
-          height: 6px;
-          border-radius: 3px;
-          background: linear-gradient(
-            to right,
-            #00d4aa 0%,
-            #00d4aa var(--fill-pct),
-            #1e2a38 var(--fill-pct),
-            #1e2a38 100%
-          );
-        }
-        .pepv-profile-slider-wrap input[type="range"]::-moz-range-track {
-          height: 6px;
-          border-radius: 3px;
-          background: #1e2a38;
-        }
-        .pepv-profile-slider-wrap input[type="range"]::-moz-range-progress {
-          height: 6px;
-          border-radius: 3px;
-          background: #00d4aa;
-        }
-        .pepv-profile-slider-wrap input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          background: #00d4aa;
-          border: 2px solid #07090e;
-          margin-top: -8px;
-          box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.25);
-        }
-        .pepv-profile-slider-wrap input[type="range"]::-moz-range-thumb {
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          background: #00d4aa;
-          border: 2px solid #07090e;
-          box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.25);
-        }
-      `}</style>
-
       <div
         style={{
           display: "flex",
@@ -1677,7 +1622,7 @@ export function ProfileTab({
                 rows={3}
                 aria-label="Bio"
               />
-              <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginTop: 4, textAlign: "right" }}>
+              <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginTop: 4, textAlign: "right" }}>
                 {bioDraft.length}/500
               </div>
             </div>
@@ -1727,31 +1672,12 @@ export function ProfileTab({
         </div>
       </Card>
 
-      <div style={SECTION}>My stats</div>
-      <Card>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 12,
-          }}
-        >
-          <StatTile value={stats?.doseCount ?? "—"} label="Total doses logged" />
-          <StatTile value={stats?.peptideDistinct ?? "—"} label="Compounds tracked" />
-          <StatTile value={stats?.activeVials ?? "—"} label="Active vials" />
-          <StatTile value={stats?.daysTracked ?? "—"} label="Days tracked" />
-        </div>
-        <div
-          data-demo-target={DEMO_TARGET.profile_score}
-          {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_score)))}
-        >
-          <PepguideIqScoreTile
-            stats={stats}
-            expanded={iqScoreExpanded}
-            onToggle={() => setIqScoreExpanded((v) => !v)}
-          />
-        </div>
-      </Card>
+      <PepguideStatsSectionHeading stats={stats} />
+      <PepguideStatsStrip
+        stats={stats}
+        demoHighlightProps={demoHighlightProps}
+        demoHighlighted={Boolean(demo?.isHighlighted(DEMO_TARGET.profile_score))}
+      />
 
       <div style={SECTION}>Body metrics</div>
       <Card>
@@ -1763,7 +1689,7 @@ export function ProfileTab({
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
               GOALS
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginBottom: 10, lineHeight: 1.45 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginBottom: 10, lineHeight: 1.45 }}>
               Tap to select multiple (up to {GOAL_PICK_MAX}).
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -1831,14 +1757,16 @@ export function ProfileTab({
               ))}
             </div>
           </div>
-          <ProfileBodyRangeSlider
+          <BodyMetricStepper
+            value={weightSlider}
             min={wMin}
             max={wMax}
             step={wStep}
-            value={weightSlider}
-            bubble={weightBubble}
-            onLive={setWeightSlider}
-            onCommit={(v) => void commitWeightDisplay(v)}
+            displayText={weightDisplayStr}
+            onCommitValue={(v) => {
+              setWeightSlider(v);
+              void commitWeightDisplay(v);
+            }}
           />
           </div>
 
@@ -1882,40 +1810,32 @@ export function ProfileTab({
               </button>
             </div>
           </div>
-          {heightUnit === "imperial" ? (
-            <ProfileBodyRangeSlider
-              min={48}
-              max={96}
-              step={1}
-              value={Math.round(heightInchesSlider)}
-              bubble={heightBubble}
-              onLive={(v) => setHeightInchesSlider(v)}
-              onCommit={(v) => void commitHeightInches(v)}
-            />
-          ) : (
-            <ProfileBodyRangeSlider
-              min={heightMinCm}
-              max={heightMaxCm}
-              step={1}
-              value={heightCmRounded}
-              bubble={heightBubble}
-              onLive={(cm) => setHeightInchesSlider(cm / 2.54)}
-              onCommit={(cm) => void commitHeightInches(cm / 2.54)}
-            />
-          )}
+          <BodyMetricStepper
+            value={heightInchesSlider}
+            min={PROFILE_HEIGHT_IN_MIN}
+            max={PROFILE_HEIGHT_IN_MAX}
+            step={PROFILE_HEIGHT_IN_STEP}
+            displayText={heightUnit === "imperial" ? heightDisplayStrImperial : heightDisplayStrMetric}
+            onCommitValue={(v) => {
+              setHeightInchesSlider(v);
+              void commitHeightInches(v);
+            }}
+          />
           </div>
 
           <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
             BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
           </div>
-          <ProfileBodyRangeSlider
-            min={3}
-            max={60}
-            step={0.5}
+          <BodyMetricStepper
             value={bodyFatSlider}
-            bubble={bodyFatBubble}
-            onLive={setBodyFatSlider}
-            onCommit={(v) => void commitBodyFat(v)}
+            min={PROFILE_BODY_FAT_MIN}
+            max={PROFILE_BODY_FAT_MAX}
+            step={PROFILE_BODY_FAT_STEP}
+            displayText={bodyFatDisplayStr}
+            onCommitValue={(v) => {
+              setBodyFatSlider(v);
+              void commitBodyFat(v);
+            }}
           />
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>
@@ -2061,7 +1981,7 @@ export function ProfileTab({
             </div>
             <div
               className="mono"
-              style={{ fontSize: 11, color: "#4a6080", marginTop: 8, textAlign: "center", lineHeight: 1.45 }}
+              style={{ fontSize: 11, color: "#8fa5bf", marginTop: 8, textAlign: "center", lineHeight: 1.45 }}
             >
               Saves this front/side/back trio and clears slots for your next check-in.
             </div>

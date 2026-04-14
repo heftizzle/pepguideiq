@@ -1164,7 +1164,7 @@ export function BuildTab({
             <span className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.08em" }}>
               📋 ORDER HISTORY ({shoppingHistory.length})
             </span>
-            <span className="mono" style={{ fontSize: 10, color: "#4a6080" }}>
+            <span className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
               {historyOpen ? "▲" : "▼"}
             </span>
           </button>
@@ -1215,7 +1215,7 @@ export function BuildTab({
                         <span className="mono" style={{ fontSize: 11, color: "#8fa5bf" }}>
                           {date} · {entry.cycle_weeks}wk
                         </span>
-                        <span className="brand" style={{ fontSize: 11, color: "#4a6080" }}>
+                        <span className="brand" style={{ fontSize: 11, color: "#8fa5bf" }}>
                           {entry.stack_name}
                         </span>
                       </div>

@@ -642,7 +642,7 @@ export async function updateStack(userId, profileId, patch) {
 export async function fetchNetworkFeed() {
   if (!supabase) return [];
   try {
-    const { data, error } = await supabase.rpc("get_network_feed");
+    const { data, error } = await supabase.rpc("get_network_feed", {});
     if (error) return [];
     return Array.isArray(data) ? data : [];
   } catch {
@@ -657,7 +657,7 @@ export async function fetchNetworkFeed() {
 export async function fetchPublicNetworkDoseFeed() {
   if (!supabase) return [];
   try {
-    const { data, error } = await supabase.rpc("get_public_network_dose_feed");
+    const { data, error } = await supabase.rpc("get_public_network_dose_feed", {});
     if (error) return [];
     if (data == null) return [];
     if (Array.isArray(data)) return data;
@@ -1056,7 +1056,9 @@ export async function fetchNotificationsRecent(limit = 10) {
   if (!supabase) return { rows: [], error: notConfiguredError() };
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, actor_id, type, read, created_at, actor_handle, actor_display_handle, actor_display_name")
+    .select(
+      "id, actor_id, type, read, created_at, actor_handle, actor_display_handle, actor_display_name, target_share_id, target_network_post_id"
+    )
     .order("created_at", { ascending: false })
     .limit(Math.min(50, Math.max(1, limit)));
   return { rows: Array.isArray(data) ? data : [], error: error ?? null };

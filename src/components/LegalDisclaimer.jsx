@@ -10,7 +10,7 @@ export function LegalDisclaimer() {
         padding: "14px 16px",
         borderTop: "1px solid #14202e",
         fontSize: 13,
-        color: "#4a6080",
+        color: "#8fa5bf",
         lineHeight: 1.55,
         maxWidth: 1200,
         marginLeft: "auto",

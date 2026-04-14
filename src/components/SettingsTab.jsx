@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import { createStripePortalSession } from "../lib/stripeSubscription.js";
 import { formatPlan, getTier } from "../lib/tiers.js";
 import {
   deleteAccountViaWorker,
@@ -48,7 +49,7 @@ function tierPillStyle(plan) {
   return {
     background:
       plan === "goat" ? "#a855f720" : plan === "elite" ? "#f59e0b20" : plan === "pro" ? "#00d4aa20" : "#14202e",
-    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#4a6080",
+    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#8fa5bf",
     border: `1px solid ${
       plan === "goat" ? "#a855f730" : plan === "elite" ? "#f59e0b30" : plan === "pro" ? "#00d4aa30" : "#14202e"
     }`,
@@ -123,6 +124,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   const [handleSaveInlineErr, setHandleSaveInlineErr] = useState(/** @type {string | null} */ (null));
   const [handleSaveSuccess, setHandleSaveSuccess] = useState(false);
   const handleSaveSuccessTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalErr, setPortalErr] = useState(/** @type {string | null} */ (null));
 
   const sortedCountries = useMemo(() => getCountriesForProfileForm(), []);
   const filteredCountries = useMemo(() => {
@@ -160,6 +163,23 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     const u = await getCurrentUser();
     if (u) setUser(u);
   }, [setUser]);
+
+  const openBillingPortal = useCallback(async () => {
+    setPortalErr(null);
+    if (!workerOk) return;
+    const returnUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}${window.location.pathname}${window.location.search}`
+        : "https://pepguideiq.com/";
+    setPortalBusy(true);
+    const { url, error } = await createStripePortalSession(returnUrl);
+    setPortalBusy(false);
+    if (error) {
+      setPortalErr(error.message);
+      return;
+    }
+    if (url) window.location.assign(url);
+  }, [workerOk]);
 
   useEffect(() => {
     setDefaultSession(user.defaultSession ?? "morning");
@@ -929,11 +949,17 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             type="button"
             className="btn-teal"
             style={{ fontSize: 13 }}
-            onClick={() => console.log("[Manage Billing] Stripe customer portal — coming post-launch")}
+            disabled={!workerOk || portalBusy}
+            onClick={() => void openBillingPortal()}
           >
-            Manage Billing
+            {portalBusy ? "…" : "Manage Billing"}
           </button>
         </div>
+        {portalErr ? (
+          <div className="mono" style={{ fontSize: 12, color: "#f59e0b", marginTop: 10, lineHeight: 1.45 }}>
+            {portalErr}
+          </div>
+        ) : null}
 
         {user.plan !== "goat" && (
           <button type="button" className="btn-teal" style={{ fontSize: 13, marginTop: 12, width: "100%" }} onClick={onOpenUpgrade}>

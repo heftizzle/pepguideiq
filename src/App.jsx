@@ -21,6 +21,7 @@ import { StackShareControls } from "./components/StackShareControls.jsx";
 import { BuildTab } from "./components/BuildTab.jsx";
 import { ProfileTab } from "./components/ProfileTab.jsx";
 import { PeopleSearch } from "./components/PeopleSearch.jsx";
+import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.jsx";
 import { NotificationsBell } from "./components/NotificationsBell.jsx";
 import { NavTooltips } from "./components/NavTooltips.jsx";
 import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
@@ -52,10 +53,11 @@ import {
   signOut,
 } from "./lib/supabase.js";
 import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
-import { formatHandleDisplay } from "./lib/memberProfileHandle.js";
+import { formatHandleDisplay, normalizeHandleInput } from "./lib/memberProfileHandle.js";
+import { openPublicMemberProfile } from "./lib/openPublicProfile.js";
 import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
-import { readAgeVerifiedFromStorage, setAgeVerifiedInStorage } from "./lib/ageVerification.js";
+import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
@@ -326,66 +328,74 @@ function headerMemberAvatarInitial(displayName) {
   return s ? s[0].toUpperCase() : "?";
 }
 
-const HEADER_ACCOUNT_PILL_BASE = {
-  minHeight: 44,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #1e2a38",
-  background: "rgba(255, 255, 255, 0.03)",
-  boxShadow: "none",
-  fontSize: 13,
-  fontFamily: "'JetBrains Mono', monospace",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  lineHeight: 1.15,
-  flexShrink: 0,
-  boxSizing: "border-box",
-};
-
-function tierHeaderPill(plan) {
-  switch (plan) {
+/** @param {unknown} plan */
+function tierHeaderMeta(plan) {
+  const p = typeof plan === "string" ? plan.trim().toLowerCase() : "entry";
+  switch (p) {
     case "goat":
-      return {
-        emoji: "🐐",
-        label: "GOAT",
-        background: "#a855f720",
-        color: "#a855f7",
-        border: "1px solid #a855f730",
-      };
+      return { emoji: "🐐", label: "GOAT", tierClass: "pepv-header-tier--goat" };
     case "elite":
-      return {
-        emoji: "⚡",
-        label: "ELITE",
-        background: "#f59e0b20",
-        color: "#f59e0b",
-        border: "1px solid #f59e0b30",
-      };
+      return { emoji: "⚡", label: "ELITE", tierClass: "pepv-header-tier--elite" };
     case "pro":
-      return {
-        emoji: "🔬",
-        label: "PRO",
-        background: "#00d4aa20",
-        color: "#00d4aa",
-        border: "1px solid #00d4aa30",
-      };
+      return { emoji: "🔬", label: "PRO", tierClass: "pepv-header-tier--pro" };
     default:
-      return {
-        emoji: "💸",
-        label: "FREE",
-        background: "#14202e",
-        color: "#4a6080",
-        border: "1px solid #243040",
-      };
+      return { emoji: "💸", label: "FREE", tierClass: "pepv-header-tier--entry" };
+  }
+}
+
+function profileHandleFromWindowPath() {
+  if (typeof window === "undefined") return null;
+  try {
+    const path = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+    const m = path.match(/^\/profile\/([^/]+)$/i);
+    if (!m) return null;
+    const h = normalizeHandleInput(decodeURIComponent(m[1] ?? ""));
+    return h || null;
+  } catch {
+    return null;
+  }
+}
+
+const PEPV_LAST_TAB_KEY = "pepv_last_tab";
+const PEPV_DEFAULT_TAB = "profile";
+
+/** Bottom / main content tab ids (must match `setActiveTab` values). */
+const PEPV_VALID_TABS = new Set([
+  "library",
+  "guide",
+  "stackBuilder",
+  "stack",
+  "network",
+  "vialTracker",
+  "protocol",
+  "profile",
+]);
+
+function readInitialActiveTab() {
+  if (typeof sessionStorage === "undefined") return PEPV_DEFAULT_TAB;
+  try {
+    const raw = sessionStorage.getItem(PEPV_LAST_TAB_KEY);
+    const v = typeof raw === "string" ? raw.trim() : "";
+    if (!v || !PEPV_VALID_TABS.has(v)) return PEPV_DEFAULT_TAB;
+    return v;
+  } catch {
+    return PEPV_DEFAULT_TAB;
   }
 }
 
 function PepGuideIQApp({ user, setUser }) {
   const { activeProfileId, activeProfile, memberProfilesVersion } = useActiveProfile();
-  const [activeTab, setActiveTab] = useState("library");
+  const [activeTab, setActiveTab] = useState(readInitialActiveTab);
+
+  useEffect(() => {
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(PEPV_LAST_TAB_KEY, activeTab);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [activeTab]);
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("popular");
@@ -927,6 +937,26 @@ function PepGuideIQApp({ user, setUser }) {
   const [showHandlePrompt, setShowHandlePrompt] = useState(false);
   const [showPeopleSearch, setShowPeopleSearch] = useState(false);
   const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
+  /** Prefill Find People (e.g. deep link or reopen). */
+  const [peopleSearchInitialQuery, setPeopleSearchInitialQuery] = useState(/** @type {string | null} */ (null));
+  /** Scroll Network “Live dosing” card to this `network_feed.id`, then clear via callback. */
+  const [networkScrollToDosePostId, setNetworkScrollToDosePostId] = useState(/** @type {string | null} */ (null));
+  /** `/profile/:handle` in-app overlay (logged-in shell). */
+  const [publicProfileOverlayHandle, setPublicProfileOverlayHandle] = useState(/** @type {string | null} */ (null));
+  const [publicProfileAccessToken, setPublicProfileAccessToken] = useState(/** @type {string | null} */ (null));
+
+  const closePublicProfileOverlay = useCallback(() => {
+    setPublicProfileOverlayHandle(null);
+    setPublicProfileAccessToken(null);
+    try {
+      const p = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+      if (/^\/profile\/[^/]+$/i.test(p)) {
+        window.history.replaceState({}, "", "/");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (!showPeopleSearch) {
@@ -941,6 +971,50 @@ function PepGuideIQApp({ user, setUser }) {
       cancelled = true;
     };
   }, [showPeopleSearch]);
+
+  useEffect(() => {
+    const onOpenPublicProfile = (/** @type {CustomEvent<{ handle?: string }>} */ e) => {
+      const h = normalizeHandleInput(e.detail?.handle ?? "");
+      if (!h) return;
+      setPublicProfileOverlayHandle(h);
+    };
+    const syncPublicProfileFromUrl = () => {
+      setPublicProfileOverlayHandle(profileHandleFromWindowPath());
+    };
+    const onOpenNetworkPost = (/** @type {CustomEvent<{ postId?: string }>} */ e) => {
+      const pid = typeof e.detail?.postId === "string" ? e.detail.postId.trim() : "";
+      if (!pid) return;
+      setActiveTab("network");
+      setNetworkScrollToDosePostId(pid);
+    };
+    const onOpenNetworkTabOnly = () => {
+      setActiveTab("network");
+    };
+    window.addEventListener("pepguide:open-public-profile", onOpenPublicProfile);
+    window.addEventListener("popstate", syncPublicProfileFromUrl);
+    window.addEventListener("pepguide:open-network-post", onOpenNetworkPost);
+    window.addEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
+    return () => {
+      window.removeEventListener("pepguide:open-public-profile", onOpenPublicProfile);
+      window.removeEventListener("popstate", syncPublicProfileFromUrl);
+      window.removeEventListener("pepguide:open-network-post", onOpenNetworkPost);
+      window.removeEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!publicProfileOverlayHandle) {
+      setPublicProfileAccessToken(null);
+      return;
+    }
+    let cancelled = false;
+    void getSessionAccessToken().then((t) => {
+      if (!cancelled) setPublicProfileAccessToken(t ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicProfileOverlayHandle]);
 
   useEffect(() => {
     if (!user?.id || !activeProfile) {
@@ -1062,6 +1136,10 @@ function PepGuideIQApp({ user, setUser }) {
     setLibrarySearchOpen,
     dismissLibrarySearch,
     setShowPeopleSearch,
+    peopleSearchInitialQuery,
+    setPeopleSearchInitialQuery,
+    networkScrollToDosePostId,
+    setNetworkScrollToDosePostId,
     navTabButtonRefs,
   };
 
@@ -1081,8 +1159,42 @@ function PepGuideIQApp({ user, setUser }) {
                 activeProfileId={activeProfileId}
                 workerUrl={API_WORKER_URL}
                 accessToken={peopleSearchToken}
-                onClose={() => setShowPeopleSearch(false)}
+                initialQuery={peopleSearchInitialQuery}
+                onClose={() => {
+                  try {
+                    const p = (window.location.pathname || "/").replace(/\/$/, "") || "/";
+                    if (/^\/profile\/[^/]+$/i.test(p)) {
+                      window.history.replaceState({}, "", "/");
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                  setShowPeopleSearch(false);
+                  setPeopleSearchInitialQuery(null);
+                }}
               />,
+              document.body
+            )
+          : null}
+        {publicProfileOverlayHandle && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 100,
+                  overflowY: "auto",
+                  background: "#07090e",
+                }}
+              >
+                <PublicMemberProfilePage
+                  handle={publicProfileOverlayHandle}
+                  onClose={closePublicProfileOverlay}
+                  viewerActiveProfileId={activeProfileId}
+                  viewerAccessToken={publicProfileAccessToken}
+                  includeGlobalStyles={false}
+                />
+              </div>,
               document.body
             )
           : null}
@@ -1093,7 +1205,6 @@ function PepGuideIQApp({ user, setUser }) {
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const { isHighlighted, stripVisible } = useDemoTour();
-  const [navProfilePillHover, setNavProfilePillHover] = useState(false);
   const {
     user,
     setUser,
@@ -1180,16 +1291,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setLibrarySearchOpen,
     dismissLibrarySearch,
     setShowPeopleSearch,
+    networkScrollToDosePostId,
+    setNetworkScrollToDosePostId,
     navTabButtonRefs,
   } = mainUiRef.current;
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
-
-  const profileNavTopLabel = useMemo(() => {
-    const disp = formatHandleDisplay(activeProfile?.handle ?? "", activeProfile?.display_handle);
-    if (!disp) return "MY";
-    return disp.length > 8 ? `${disp.slice(0, 7)}…` : disp;
-  }, [activeProfile?.handle, memberProfilesVersion]);
 
   return (
     <>
@@ -1233,7 +1340,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 >
                   {(() => {
                     const guideOn = activeTab === "guide";
-                    const tier = tierHeaderPill(user.plan);
+                    const tier = tierHeaderMeta(user.plan);
                     const memberDisplayRaw = String(activeProfile?.display_name ?? "").trim() || "—";
                     const memberNameShown = narrowHeader
                       ? (memberDisplayRaw.split(/\s+/)[0] || memberDisplayRaw).trim() || "—"
@@ -1243,166 +1350,119 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         <DemoTourHelpButton />
                         <button
                           type="button"
+                          className="pepv-header-action-btn"
                           data-demo-target={DEMO_TARGET.nav_guide}
+                          data-active={guideOn ? "true" : undefined}
                           {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_guide))}
                           onClick={() => setActiveTab("guide")}
-                          style={{
-                            ...HEADER_ACCOUNT_PILL_BASE,
-                            cursor: "pointer",
-                            border: guideOn ? "1px solid rgba(0, 212, 170, 0.55)" : HEADER_ACCOUNT_PILL_BASE.border,
-                            background: guideOn ? "rgba(0, 212, 170, 0.14)" : HEADER_ACCOUNT_PILL_BASE.background,
-                            boxShadow: guideOn ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
-                            color: guideOn ? "#00d4aa" : "#5c6d82",
-                          }}
                         >
-                        <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
-                          🧙
-                        </span>
-                        AI GUIDE
-                      </button>
-                      <button
-                        type="button"
-                        className="mono"
-                        onClick={openUpgradeModal}
-                        style={{
-                          ...HEADER_ACCOUNT_PILL_BASE,
-                          cursor: "pointer",
-                          background: tier.background,
-                          color: tier.color,
-                          border: tier.border,
-                        }}
-                        aria-label={`Plan: ${tier.label}`}
-                      >
-                        <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
-                          {tier.emoji}
-                        </span>
-                        {tier.label}
-                      </button>
-                      {user.plan !== "goat" && (
+                          <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
+                            🧙
+                          </span>
+                          AI GUIDE
+                        </button>
                         <button
                           type="button"
+                          className={`pepv-header-action-btn ${tier.tierClass}`}
                           onClick={openUpgradeModal}
-                          style={{
-                            ...HEADER_ACCOUNT_PILL_BASE,
-                            cursor: "pointer",
-                            border: "1px solid rgba(0, 212, 170, 0.45)",
-                            background: "rgba(0, 212, 170, 0.14)",
-                            boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.08)",
-                            color: "#00d4aa",
-                          }}
+                          aria-label={`Plan: ${tier.label}`}
                         >
-                          Upgrade
+                          <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
+                            {tier.emoji}
+                          </span>
+                          {tier.label}
                         </button>
-                      )}
-                      <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
-                      <button
-                        type="button"
-                        className="mono"
-                        onClick={() => setShowPeopleSearch(true)}
-                        onMouseEnter={() => setNavProfilePillHover(true)}
-                        onMouseLeave={() => setNavProfilePillHover(false)}
-                        style={{
-                          ...HEADER_ACCOUNT_PILL_BASE,
-                          cursor: "pointer",
-                          color: "#8fa5bf",
-                          maxWidth: narrowHeader ? 180 : 260,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          minWidth: 0,
-                          border: navProfilePillHover
-                            ? "1px solid rgba(0, 212, 170, 0.42)"
-                            : HEADER_ACCOUNT_PILL_BASE.border,
-                          background: navProfilePillHover
-                            ? "rgba(255, 255, 255, 0.06)"
-                            : HEADER_ACCOUNT_PILL_BASE.background,
-                          transition: "border-color 0.15s ease, background 0.15s ease, filter 0.15s ease",
-                          filter: navProfilePillHover ? "brightness(1.06)" : "none",
-                        }}
-                        title={
-                          memberDisplayRaw !== "—"
-                            ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}` : ""}`
-                            : undefined
-                        }
-                        aria-label={
-                          memberDisplayRaw !== "—"
-                            ? `Active profile: ${memberDisplayRaw}${
-                                activeProfile?.handle
-                                  ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}. Open find people.`
-                                  : ". Open find people."
-                              }`
-                            : "Open find people"
-                        }
-                      >
-                        {resolvedHeaderMemberAvatar ? (
-                          <img
-                            src={resolvedHeaderMemberAvatar}
-                            alt=""
-                            draggable={false}
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                              flexShrink: 0,
-                              border: "1px solid #243040",
-                            }}
-                          />
-                        ) : (
+                        {user.plan !== "goat" && (
+                          <button
+                            type="button"
+                            className="pepv-header-action-btn"
+                            onClick={openUpgradeModal}
+                            style={{ color: "#00d4aa" }}
+                          >
+                            Upgrade
+                          </button>
+                        )}
+                        <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
+                        <div
+                          role="group"
+                          className={`pepv-header-action-surface pepv-header-profile-pill${narrowHeader ? " pepv-header-profile-pill--narrow" : ""}`}
+                          title={
+                            memberDisplayRaw !== "—"
+                              ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}` : ""}`
+                              : undefined
+                          }
+                          aria-label="Profile and find people"
+                        >
+                        <button
+                          type="button"
+                          className="pepv-header-profile-pill__segment pepv-header-profile-pill__segment--primary"
+                          onClick={() => setShowPeopleSearch(true)}
+                          aria-label={
+                            memberDisplayRaw !== "—"
+                              ? `Active profile: ${memberDisplayRaw}. Open find people.`
+                              : "Open find people"
+                          }
+                        >
+                          {resolvedHeaderMemberAvatar ? (
+                            <img
+                              src={resolvedHeaderMemberAvatar}
+                              alt=""
+                              draggable={false}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                                flexShrink: 0,
+                                border: "1px solid #243040",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              aria-hidden
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: "50%",
+                                background: "#14202e",
+                                border: "1px solid #243040",
+                                color: "#00d4aa",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                flexShrink: 0,
+                                lineHeight: 1,
+                              }}
+                            >
+                              {headerMemberAvatarInitial(memberDisplayRaw)}
+                            </span>
+                          )}
                           <span
-                            aria-hidden
                             style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: "50%",
-                              background: "#14202e",
-                              border: "1px solid #243040",
-                              color: "#00d4aa",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              flexShrink: 0,
-                              lineHeight: 1,
+                              flex: "1 1 auto",
+                              minWidth: 0,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            {headerMemberAvatarInitial(memberDisplayRaw)}
+                            {memberNameShown}
                           </span>
-                        )}
-                        <span
-                          style={{
-                            flex: "1 1 auto",
-                            minWidth: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {memberNameShown}
-                        </span>
+                        </button>
                         {activeProfile?.handle ? (
-                          <span className="mono" style={{ fontSize: 12, color: "#00d4aa", opacity: 0.9, flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            className={`pepv-header-profile-pill__segment pepv-header-profile-pill__segment--handle${narrowHeader ? " pepv-header-profile-pill--narrow" : ""}`}
+                            onClick={() => openPublicMemberProfile(activeProfile.handle)}
+                            aria-label={`View public profile ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}`}
+                            title="View public profile"
+                          >
                             {formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}
-                          </span>
+                          </button>
                         ) : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleSignOut()}
-                        aria-label="Sign out"
-                        title="Sign out"
-                        style={{
-                          ...HEADER_ACCOUNT_PILL_BASE,
-                          cursor: "pointer",
-                          color: "#8fa5bf",
-                        }}
-                      >
-                        <span aria-hidden style={{ fontSize: 15, lineHeight: 1 }}>
-                          🚪
-                        </span>
-                        EXIT
-                      </button>
+                      </div>
                     </>
                   );
                 })()}
@@ -1835,7 +1895,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     });
                     if (injectableRows.length === 0) {
                       return (
-                        <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.5 }}>
+                        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5 }}>
                           No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
                         </div>
                       );
@@ -1875,7 +1935,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
             </div>
           )}
 
-          {activeTab === "network" && <NetworkTab userId={user?.id} />}
+          {activeTab === "network" && (
+            <NetworkTab
+              userId={user?.id}
+              scrollToDosePostId={networkScrollToDosePostId}
+              onConsumedDosePostScrollTarget={() => setNetworkScrollToDosePostId(null)}
+            />
+          )}
 
           {activeTab === "protocol" && user?.id && activeProfileId && protocolDeepLink && (
             <ProtocolTab
@@ -1903,6 +1969,39 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 canUseProgressPhotos={canVialTracker}
                 savedStackPeptides={myStack.map((p) => ({ id: p.id, name: p.name }))}
               />
+              <div
+                style={{
+                  maxWidth: 640,
+                  margin: "0 auto",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "28px 0 40px",
+                  borderTop: "1px solid #1a2430",
+                }}
+              >
+                <button
+                  type="button"
+                  className="mono"
+                  onClick={() => void handleSignOut()}
+                  aria-label="Sign out of your account"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    maxWidth: 280,
+                    margin: "0 auto",
+                    padding: "10px 14px",
+                    fontSize: 12,
+                    letterSpacing: "0.08em",
+                    color: "#7c6d6d",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid #2a2224",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2044,7 +2143,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           ({goals.length})
                         </span>
                       ) : null}
-                      <span className="mono" style={{ marginLeft: "auto", color: "#4a6080", fontSize: 11 }}>
+                      <span className="mono" style={{ marginLeft: "auto", color: "#8fa5bf", fontSize: 11 }}>
                         {goalsOpen ? "▲" : "▼"}
                       </span>
                     </button>
@@ -2221,7 +2320,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
                 <div style={{ display:"flex",gap:8,alignItems:"center" }}>
                   <span className="pill pill--category">{pCat}</span>
-                  <button type="button" style={{ background:"none",border:"none",color:"#4a6080",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
+                  <button type="button" style={{ background:"none",border:"none",color:"#8fa5bf",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
               <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize: 13,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
@@ -2462,16 +2561,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 isActive: activeTab === "network",
                 onClick: () => setActiveTab("network"),
               },
-              {
-                tabId: "profile",
-                emoji: "👤",
-                labelTop: profileNavTopLabel,
-                label: "PROFILE",
-                ariaLabel: "Profile",
-                demoTarget: DEMO_TARGET.nav_profile,
-                isActive: activeTab === "profile",
-                onClick: () => setActiveTab("profile"),
-              },
             ].map((item) => (
               <button
                 key={item.tabId}
@@ -2542,7 +2631,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
           </div>
         </nav>
 
-        <ProfileSwitcher onOpenUpgrade={openUpgradeModal} />
+        <ProfileSwitcher
+          onOpenUpgrade={openUpgradeModal}
+          onGoToProfileSettings={() => setActiveTab("profile")}
+          navTooltipAnchorRef={(el) => {
+            navTabButtonRefs.current.profile = el;
+          }}
+        />
 
         {showHandlePrompt && (
           <Modal onClose={dismissHandlePrompt} maxWidth={440} label="Set your public handle">
@@ -2602,7 +2697,6 @@ export default function PepGuideIQ() {
   const [ageVerified, setAgeVerified] = useState(readAgeVerifiedFromStorage);
 
   const confirmAgeVerified = useCallback(() => {
-    setAgeVerifiedInStorage();
     setAgeVerified(true);
   }, []);
 

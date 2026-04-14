@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isSupabaseConfigured } from "../lib/config.js";
-import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
+import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import {
   fetchNotificationsRecent,
   getUnreadNotificationCount,
@@ -69,6 +70,17 @@ function primaryGoalNotificationEmoji(userGoals) {
     if (GOAL_PRIMARY_EMOJI[key]) return GOAL_PRIMARY_EMOJI[key];
   }
   return "🔔";
+}
+
+/** @param {unknown} type */
+function notificationBodyFromType(type) {
+  const t = String(type ?? "").toLowerCase();
+  if (t === "new_follower" || t === "follow") return "started following you";
+  if (t.includes("like") && t.includes("comment")) return "engaged with your post";
+  if (t.includes("like") || t === "like") return "liked your post";
+  if (t.includes("comment") || t === "comment") return "commented on your post";
+  if (t) return t.replace(/_/g, " ");
+  return "Notification";
 }
 
 /**
@@ -173,17 +185,85 @@ export function NotificationsBell({ userId, userGoals }) {
     }
   };
 
-  const onRowClick = async (row) => {
-    const id = typeof row.id === "string" ? row.id : "";
-    if (!id || row.read === true) return;
-    setBusy(true);
-    try {
-      await markNotificationRead(id);
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const openActorProfileFromRow = useCallback(
+    async (row) => {
+      const h = normalizeHandleInput(row.actor_handle ?? "");
+      if (!h) return;
+      setOpen(false);
+      openPublicMemberProfile(h);
+      const nid = typeof row.id === "string" ? row.id.trim() : "";
+      if (!nid || row.read === true) return;
+      setBusy(true);
+      try {
+        await markNotificationRead(nid);
+        await refresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh]
+  );
+
+  const handleNotificationRowActivate = useCallback(
+    async (row) => {
+      const nid = typeof row.id === "string" ? row.id.trim() : "";
+      const type = String(row.type ?? "").toLowerCase();
+      const alreadyRead = row.read === true;
+
+      setOpen(false);
+
+      const markIfNeeded = async () => {
+        if (!nid || alreadyRead) return;
+        await markNotificationRead(nid);
+        await refresh();
+      };
+
+      setBusy(true);
+      try {
+        if (type === "new_follower" || type === "follow") {
+          const h = normalizeHandleInput(row.actor_handle ?? "");
+          if (h) {
+            openPublicMemberProfile(h);
+            await markIfNeeded();
+            return;
+          }
+          await markIfNeeded();
+          return;
+        }
+
+        const isEngagement =
+          type.includes("like") || type.includes("comment") || type === "like" || type === "comment";
+        if (isEngagement) {
+          const share = typeof row.target_share_id === "string" ? row.target_share_id.trim() : "";
+          if (share) {
+            await markIfNeeded();
+            window.location.assign(`/stack/${encodeURIComponent(share)}`);
+            return;
+          }
+          const rawPost = row.target_network_post_id;
+          const postId =
+            typeof rawPost === "string"
+              ? rawPost.trim()
+              : rawPost != null && String(rawPost).trim()
+                ? String(rawPost).trim()
+                : "";
+          if (postId) {
+            window.dispatchEvent(new CustomEvent("pepguide:open-network-post", { detail: { postId } }));
+            await markIfNeeded();
+            return;
+          }
+          window.dispatchEvent(new CustomEvent("pepguide:open-network-tab"));
+          await markIfNeeded();
+          return;
+        }
+
+        await markIfNeeded();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [refresh]
+  );
 
   if (!userId || !isSupabaseConfigured()) return null;
 
@@ -258,19 +338,15 @@ export function NotificationsBell({ userId, userGoals }) {
               const isRead = row.read === true;
               const label = actorLabel(row);
               const ago = formatTimeAgo(typeof row.created_at === "string" ? row.created_at : "");
-              const body =
-                row.type === "new_follower"
-                  ? "started following you"
-                  : typeof row.type === "string"
-                    ? row.type
-                    : "Notification";
+              const body = notificationBodyFromType(row.type);
+              const actorCanon = normalizeHandleInput(row.actor_handle ?? "");
               return (
                 <button
                   key={id}
                   type="button"
                   role="menuitem"
                   disabled={busy}
-                  onClick={() => void onRowClick(row)}
+                  onClick={() => void handleNotificationRowActivate(row)}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -283,7 +359,34 @@ export function NotificationsBell({ userId, userGoals }) {
                   }}
                 >
                   <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45 }}>
-                    <span style={{ fontWeight: 700, color: "#00d4aa" }}>{label}</span>{" "}
+                    {actorCanon ? (
+                      <span
+                        role="link"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openActorProfileFromRow(row);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" && e.key !== " ") return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void openActorProfileFromRow(row);
+                        }}
+                        style={{
+                          fontWeight: 700,
+                          color: "#00d4aa",
+                          cursor: busy ? "wait" : "pointer",
+                          textDecoration: "underline",
+                          textDecorationColor: "rgba(0, 212, 170, 0.35)",
+                          textUnderlineOffset: 3,
+                        }}
+                      >
+                        {label}
+                      </span>
+                    ) : (
+                      <span style={{ fontWeight: 700, color: "#00d4aa" }}>{label}</span>
+                    )}{" "}
                     <span style={{ color: "#94a3b8" }}>{body}</span>
                   </div>
                   <div className="mono" style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
@@ -302,22 +405,12 @@ export function NotificationsBell({ userId, userGoals }) {
       <button
         ref={btnRef}
         type="button"
+        className={`pepv-header-action-btn pepv-header-action-btn--icon${unread > 0 ? " pepv-notifications-bell--unread" : ""}`}
+        data-active={open ? "true" : undefined}
         onClick={onToggle}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
-        style={{
-          position: "relative",
-          width: 40,
-          height: 36,
-          borderRadius: 8,
-          border: open ? "1px solid rgba(0, 212, 170, 0.45)" : "1px solid #243040",
-          background: open ? "rgba(0, 212, 170, 0.1)" : "rgba(11, 15, 23, 0.85)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          padding: 0,
-        }}
+        style={{ position: "relative" }}
       >
         <span className="pepv-emoji" style={{ fontSize: 22, lineHeight: 1, opacity: open ? 1 : 0.88 }} aria-hidden>
           {bellEmoji}
