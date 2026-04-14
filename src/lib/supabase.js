@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getStoredAffiliateRef, normalizeAffiliateRef } from "./affiliateRef.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./config.js";
 import { generateShareId8 } from "./stackShare.js";
+import { stripHandleAtPrefix } from "./memberProfileHandle.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -490,10 +491,11 @@ export async function checkMemberProfileHandleAvailable(handle, excludeProfileId
   const token = await getSessionAccessToken();
   if (!token) return { available: false, error: new Error("Not signed in") };
   const raw = String(handle ?? "").trim();
-  if (!raw) {
+  const forQuery = stripHandleAtPrefix(raw);
+  if (!forQuery) {
     return { available: false, reason: "empty", error: null };
   }
-  const params = new URLSearchParams({ handle: raw });
+  const params = new URLSearchParams({ handle: forQuery });
   if (excludeProfileId) params.set("exclude", excludeProfileId);
   try {
     const res = await fetch(`${API_WORKER_URL}/member-profiles/handle-available?${params.toString()}`, {

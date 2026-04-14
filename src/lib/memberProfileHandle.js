@@ -5,12 +5,12 @@
 export const MEMBER_HANDLE_PATTERN = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
 
 /**
- * Trim and strip a single leading `@`; preserve casing.
+ * Trim and strip all leading `@`; preserve casing.
  * @param {unknown} raw
  */
 export function stripHandleAtPrefix(raw) {
   let s = String(raw ?? "").trim();
-  if (s.startsWith("@")) s = s.slice(1).trim();
+  while (s.startsWith("@")) s = s.slice(1).trim();
   return s;
 }
 

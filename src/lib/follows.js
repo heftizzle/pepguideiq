@@ -1,5 +1,8 @@
+import { normalizeHandleInput } from "./memberProfileHandle.js";
+
 export async function searchMemberProfiles(query, workerUrl, token) {
-  const q = encodeURIComponent(query.replace(/^@/, "").trim());
+  const n = normalizeHandleInput(query);
+  const q = encodeURIComponent(n);
   const res = await fetch(`${workerUrl}/member-profiles/search?q=${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

@@ -1776,12 +1776,15 @@ const MEMBER_PROFILE_SHIFT_SCHEDULES = new Set(["days", "swings", "mids", "night
 /** Aligned with `member_profiles_handle_format_chk`: 3–32, no .., alphanumeric ends, [a-z0-9_.-] middle. */
 const MEMBER_HANDLE_RE = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
 
+/** Lowercase slug only — same as DB `handle` after backfill; used for exact search before broad ILIKE. */
+const MEMBER_HANDLE_SLUG_RE = /^[a-z0-9][a-z0-9_.-]*[a-z0-9]$/;
+
 const MEMBER_EXPERIENCE_LEVELS = new Set(["beginner", "intermediate", "advanced", "elite"]);
 
-/** Trim and strip a single leading `@`; preserve casing (display_handle / validation). */
+/** Trim and strip all leading `@` (preserve casing for display_handle / validation). */
 function stripHandleAtForApi(v) {
   let t = String(v ?? "").trim();
-  if (t.startsWith("@")) t = t.slice(1).trim();
+  while (t.startsWith("@")) t = t.slice(1).trim();
   return t;
 }
 
@@ -2003,7 +2006,7 @@ async function handleSearchMemberProfiles(request, env, cors) {
   const url = new URL(request.url);
   const rawQ = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
   let q = String(rawQ).trim();
-  if (q.startsWith("@")) q = q.slice(1).trim();
+  while (q.startsWith("@")) q = q.slice(1).trim();
   q = q.toLowerCase();
   const safe = sanitizeMemberSearchToken(q);
   if (!safe) {
@@ -2012,21 +2015,35 @@ async function handleSearchMemberProfiles(request, env, cors) {
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const orClause = `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
-  const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
-    userId
-  )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  };
 
-  const res = await fetch(sel, {
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-    },
-  });
-  const rows = await res.json().catch(() => []);
-  if (!res.ok || !Array.isArray(rows)) {
-    log(env, "warn", "member_profile_search_failed", { userId, status: res.status });
-    return jsonResponse({ error: "Search failed" }, 502, cors);
+  let rows = [];
+  if (safe.length >= 3 && MEMBER_HANDLE_SLUG_RE.test(safe)) {
+    const exactUrl = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
+      userId
+    )}&handle=eq.${encodeURIComponent(safe)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+    const er = await fetch(exactUrl, { headers });
+    const exactRows = await er.json().catch(() => []);
+    if (er.ok && Array.isArray(exactRows) && exactRows.length > 0) {
+      rows = exactRows;
+    }
+  }
+
+  if (rows.length === 0) {
+    const orClause = `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
+    const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
+      userId
+    )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+
+    const res = await fetch(sel, { headers });
+    rows = await res.json().catch(() => []);
+    if (!res.ok || !Array.isArray(rows)) {
+      log(env, "warn", "member_profile_search_failed", { userId, status: res.status });
+      return jsonResponse({ error: "Search failed" }, 502, cors);
+    }
   }
 
   const userIds = [...new Set(rows.map((r) => r?.user_id).filter((x) => typeof x === "string" && x))];
@@ -2066,25 +2083,23 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     return jsonResponse({ error: "Supabase not configured" }, 503, cors);
   }
   const url = new URL(request.url);
-  let h = url.searchParams.get("handle") ?? url.searchParams.get("h") ?? "";
-  if (typeof h === "string" && h.startsWith("@")) h = h.slice(1).trim();
-  h = String(h ?? "").trim().toLowerCase();
-  const safe = sanitizeMemberSearchToken(h);
-  if (!safe || safe.length < 3) {
+  const raw = String(url.searchParams.get("handle") ?? url.searchParams.get("h") ?? "").trim();
+  const stripped = stripHandleAtForApi(raw);
+  if (!stripped || stripped.length < 3) {
     return jsonResponse({ error: "Invalid handle" }, 400, cors);
   }
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const sel = `${supabaseUrl}/rest/v1/member_profiles?handle=eq.${encodeURIComponent(
-    safe
-  )}&select=id,handle,display_handle,display_name,avatar_url,bio,experience_level,goals,user_id&limit=1`;
-
-  const res = await fetch(sel, {
+  const rpcUrl = `${supabaseUrl}/rest/v1/rpc/member_profile_public_by_handle_lookup`;
+  const res = await fetch(rpcUrl, {
+    method: "POST",
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({ handle_query: raw }),
   });
   const rows = await res.json().catch(() => []);
   if (!res.ok || !Array.isArray(rows)) {
