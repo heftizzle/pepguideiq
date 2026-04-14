@@ -4,6 +4,7 @@ import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../
 import { formatPlan, getTier } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
 import {
+  archiveProgressPhotoSetViaWorker,
   checkMemberProfileHandleAvailable,
   fetchBodyMetrics,
   fetchUserProfileStats,
@@ -17,8 +18,11 @@ import {
   R2_UPLOAD_ACCEPT_ATTR,
   R2_UPLOAD_ALLOWED_TYPES,
   R2_UPLOAD_MAX_BYTES,
+  appendImageCacheBustParam,
+  shouldResetImageUploadFetchBust,
   uploadImageToR2,
 } from "../lib/r2Upload.js";
+import { isValidMemberHandleFormat, normalizeHandleInput, stripHandleAtPrefix } from "../lib/memberProfileHandle.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -49,6 +53,27 @@ const GOAL_OPTIONS = [
   { id: "mental_elevate", label: "🧠 Mental Elevate" },
   { id: "general_health", label: "💚 General Health" },
 ];
+
+const GOAL_IDS = new Set(GOAL_OPTIONS.map((g) => g.id));
+const GOAL_PICK_MAX = 8;
+
+/** @param {unknown} s */
+function parseGoalsFromStorage(s) {
+  if (!s || typeof s !== "string") return [];
+  const out = [];
+  for (const p of s.split(",")) {
+    const id = p.trim();
+    if (!id || !GOAL_IDS.has(id) || out.includes(id)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/** @param {string[]} ids */
+function serializeGoals(ids) {
+  const cleaned = ids.filter((id) => GOAL_IDS.has(id));
+  return cleaned.length ? cleaned.join(",") : null;
+}
 
 function goalEmojiFromId(goalId) {
   const o = GOAL_OPTIONS.find((g) => g.id === goalId);
@@ -233,6 +258,203 @@ function fmtFeetInches(totalIn) {
   return `${f}'${inch}"`;
 }
 
+const AVATAR_CROP_VIEW = 240;
+const AVATAR_CROP_OUT = 512;
+
+/**
+ * Circular crop preview with drag to reposition; exports a JPEG blob.
+ * @param {{ open: boolean, imageUrl: string | null, busy: boolean, onCancel: () => void, onConfirm: (blob: Blob) => void | Promise<void> }} p
+ */
+function AvatarCropModal({ open, imageUrl, busy, onCancel, onConfirm }) {
+  const [nw, setNw] = useState(1);
+  const [nh, setNh] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const dragRef = useRef(/** @type {{ sx: number, sy: number, px: number, py: number } | null} */ (null));
+
+  useEffect(() => {
+    if (!open || !imageUrl) return;
+    setNw(1);
+    setNh(1);
+    setPanX(0);
+    setPanY(0);
+    setImgLoaded(false);
+  }, [open, imageUrl]);
+
+  const V = AVATAR_CROP_VIEW;
+  const scale = nw > 0 && nh > 0 ? Math.max(V / nw, V / nh) : 1;
+  const dw = nw * scale;
+  const dh = nh * scale;
+  const maxPanX = Math.max(0, (dw - V) / 2);
+  const maxPanY = Math.max(0, (dh - V) / 2);
+
+  const clampPans = useCallback(
+    (x, y) => ({
+      x: clamp(x, -maxPanX, maxPanX),
+      y: clamp(y, -maxPanY, maxPanY),
+    }),
+    [maxPanX, maxPanY]
+  );
+
+  if (!open || !imageUrl) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Adjust profile photo"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 5000,
+        background: "rgba(5,8,12,0.88)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onCancel();
+      }}
+    >
+      <div
+        style={{
+          background: "#0b0f17",
+          border: "1px solid #2a3d52",
+          borderRadius: 16,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#dde4ef", marginBottom: 6 }}>Adjust photo</div>
+        <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", marginBottom: 14, lineHeight: 1.45 }}>
+          Drag to reposition the photo inside the circle.
+        </div>
+        <div
+          style={{
+            width: V,
+            height: V,
+            margin: "0 auto 16px",
+            borderRadius: "50%",
+            overflow: "hidden",
+            border: "2px solid #00d4aa55",
+            touchAction: "none",
+            position: "relative",
+            background: "#07090e",
+          }}
+        >
+          <img
+            alt=""
+            src={imageUrl}
+            draggable={false}
+            onLoad={(e) => {
+              const el = e.currentTarget;
+              setNw(el.naturalWidth || 1);
+              setNh(el.naturalHeight || 1);
+              setPanX(0);
+              setPanY(0);
+              setImgLoaded(true);
+            }}
+            onPointerDown={(e) => {
+              if (busy || !imgLoaded) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              dragRef.current = { sx: e.clientX, sy: e.clientY, px: panX, py: panY };
+            }}
+            onPointerMove={(e) => {
+              const d = dragRef.current;
+              if (!d || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+              const nx = d.px + e.clientX - d.sx;
+              const ny = d.py + e.clientY - d.sy;
+              const c = clampPans(nx, ny);
+              setPanX(c.x);
+              setPanY(c.y);
+            }}
+            onPointerUp={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                try {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                } catch {
+                  /* ignore */
+                }
+              }
+              dragRef.current = null;
+            }}
+            onPointerCancel={() => {
+              dragRef.current = null;
+            }}
+            style={{
+              position: "absolute",
+              width: dw,
+              height: dh,
+              left: (V - dw) / 2 + panX,
+              top: (V - dh) / 2 + panY,
+              userSelect: "none",
+              pointerEvents: busy ? "none" : "auto",
+              cursor: busy ? "default" : "grab",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            className="btn-teal"
+            style={{ opacity: 0.85, fontSize: 13 }}
+            disabled={busy}
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-teal"
+            style={{ fontSize: 13 }}
+            disabled={busy || !imgLoaded}
+            onClick={() => {
+              void (async () => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                await new Promise((resolve, reject) => {
+                  img.onload = () => resolve(undefined);
+                  img.onerror = () => reject(new Error("Could not read image"));
+                  img.src = imageUrl;
+                });
+                const OUT = AVATAR_CROP_OUT;
+                const s = OUT / V;
+                const canvas = document.createElement("canvas");
+                canvas.width = OUT;
+                canvas.height = OUT;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return;
+                ctx.beginPath();
+                ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2);
+                ctx.clip();
+                const left = ((V - dw) / 2 + panX) * s;
+                const top = ((V - dh) / 2 + panY) * s;
+                ctx.drawImage(img, 0, 0, nw, nh, left, top, dw * s, dh * s);
+                await new Promise((resolve) => {
+                  canvas.toBlob(
+                    (blob) => {
+                      if (blob) void onConfirm(blob);
+                      resolve(undefined);
+                    },
+                    "image/jpeg",
+                    0.92
+                  );
+                });
+              })();
+            }}
+          >
+            {busy ? "Saving…" : "Save photo"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProfileBodyRangeSlider({ min, max, step, value, bubble, onLive, onCommit }) {
   const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
@@ -285,7 +507,7 @@ const GEAR_BTN = {
   boxSizing: "border-box",
 };
 
-function usePrivateStackPhotoUrl(r2Key, workerConfigured) {
+function usePrivateStackPhotoUrl(r2Key, workerConfigured, fetchBustMs = 0) {
   const [objectUrl, setObjectUrl] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -301,7 +523,8 @@ function usePrivateStackPhotoUrl(r2Key, workerConfigured) {
         return;
       }
       try {
-        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+        const base = `${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`;
+        const res = await fetch(appendImageCacheBustParam(base, fetchBustMs), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok || cancelled) {
@@ -321,8 +544,46 @@ function usePrivateStackPhotoUrl(r2Key, workerConfigured) {
       cancelled = true;
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [r2Key, workerConfigured]);
+  }, [r2Key, workerConfigured, fetchBustMs]);
   return objectUrl;
+}
+
+/** @param {{ r2Key: string | null | undefined, workerOk: boolean }} props */
+function ProgressArchiveThumb({ r2Key, workerOk }) {
+  const k = typeof r2Key === "string" ? r2Key.trim() : "";
+  const imgUrl = usePrivateStackPhotoUrl(k, workerOk, 0);
+  return (
+    <div
+      style={{
+        flex: "1 1 72px",
+        minWidth: 56,
+        maxWidth: 120,
+        aspectRatio: "3 / 4",
+        borderRadius: 8,
+        border: "1px solid #243040",
+        background: k && imgUrl ? `url(${imgUrl}) center/cover no-repeat, #07090e` : "#07090e",
+      }}
+    />
+  );
+}
+
+/** @param {{ entry: Record<string, unknown>, workerOk: boolean }} props */
+function ArchivedProgressSetRow({ entry, workerOk }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        alignItems: "stretch",
+        marginBottom: 10,
+      }}
+    >
+      <ProgressArchiveThumb r2Key={entry.progress_photo_front_r2_key} workerOk={workerOk} />
+      <ProgressArchiveThumb r2Key={entry.progress_photo_side_r2_key} workerOk={workerOk} />
+      <ProgressArchiveThumb r2Key={entry.progress_photo_back_r2_key} workerOk={workerOk} />
+    </div>
+  );
 }
 
 function formatProfilePhotoTimestamp(iso) {
@@ -349,8 +610,17 @@ function ProfilePrivatePhotoSlot({
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [slotErr, setSlotErr] = useState(null);
-  const imgUrl = usePrivateStackPhotoUrl(r2Key ?? "", workerOk);
+  const [fetchBustMs, setFetchBustMs] = useState(0);
+  const prevR2KeyRef = useRef(typeof r2Key === "string" ? r2Key.trim() : "");
+  const imgUrl = usePrivateStackPhotoUrl(r2Key ?? "", workerOk, fetchBustMs);
   const uploadedLabel = formatProfilePhotoTimestamp(uploadedAt);
+
+  useEffect(() => {
+    const next = typeof r2Key === "string" ? r2Key.trim() : "";
+    const prev = prevR2KeyRef.current;
+    prevR2KeyRef.current = next;
+    if (shouldResetImageUploadFetchBust(prev, next)) setFetchBustMs(0);
+  }, [r2Key]);
 
   async function onInputChange(e) {
     const f = e.target.files?.[0];
@@ -384,6 +654,7 @@ function ProfilePrivatePhotoSlot({
       setSlotErr(result.error);
       return;
     }
+    setFetchBustMs(Date.now());
     await onUploaded();
   }
 
@@ -458,7 +729,7 @@ export function ProfileTab({
   const canUploadBodyScan = Boolean(getTier(user?.plan ?? "entry").inbody_dexa_upload);
 
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
-  const [goal, setGoal] = useState("");
+  const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
   const [heightUnit, setHeightUnit] = useState(() => {
     try {
@@ -475,6 +746,10 @@ export function ProfileTab({
   const [clientStreakFallback, setClientStreakFallback] = useState(0);
   const [avatarImageNonce, setAvatarImageNonce] = useState(0);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarCrop, setAvatarCrop] = useState(/** @type {{ url: string, revoke: () => void } | null} */ (null));
+  const [archiveProgressBusy, setArchiveProgressBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const savedFlashTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const [err, setErr] = useState(null);
   const [msg, setMsg] = useState(null);
   const [bodyMetricsRow, setBodyMetricsRow] = useState(null);
@@ -491,6 +766,37 @@ export function ProfileTab({
       fieldAnchorRefs.current[id] = el;
     };
   }, []);
+
+  const showSavedBriefly = useCallback(() => {
+    setSavedFlash(true);
+    if (savedFlashTimerRef.current) window.clearTimeout(savedFlashTimerRef.current);
+    savedFlashTimerRef.current = window.setTimeout(() => {
+      setSavedFlash(false);
+      savedFlashTimerRef.current = null;
+    }, 2200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (savedFlashTimerRef.current) window.clearTimeout(savedFlashTimerRef.current);
+    };
+  }, []);
+
+  const progressArchivedSets = useMemo(() => {
+    const raw = activeProfile?.progress_photo_sets;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+      (x) =>
+        x &&
+        typeof x === "object" &&
+        typeof x.progress_photo_front_r2_key === "string" &&
+        x.progress_photo_front_r2_key.trim() &&
+        typeof x.progress_photo_side_r2_key === "string" &&
+        x.progress_photo_side_r2_key.trim() &&
+        typeof x.progress_photo_back_r2_key === "string" &&
+        x.progress_photo_back_r2_key.trim()
+    );
+  }, [activeProfile?.progress_photo_sets]);
 
   const displayNameShown =
     activeProfile && typeof activeProfile.display_name === "string" ? activeProfile.display_name.trim() : "";
@@ -509,7 +815,7 @@ export function ProfileTab({
 
   useEffect(() => {
     if (!user?.id || !activeProfileId || !isSupabaseConfigured()) {
-      setGoal("");
+      setGoalIds([]);
       setWeightUnit("lbs");
       setWeightSlider(200);
       setHeightInchesSlider(68);
@@ -528,7 +834,7 @@ export function ProfileTab({
       setBodyMetricsRow(row ?? null);
       const wu = row && row.weight_unit === "kg" ? "kg" : "lbs";
       setWeightUnit(wu);
-      setGoal(row && typeof row.goal === "string" ? row.goal : "");
+      setGoalIds(parseGoalsFromStorage(row?.goal));
       const wMin = wu === "kg" ? 36 : 80;
       const wMax = wu === "kg" ? 180 : 400;
       const wStep = wu === "kg" ? 0.5 : 1;
@@ -561,8 +867,13 @@ export function ProfileTab({
   useEffect(() => {
     if (!activeProfile) return;
     setDisplayNameDraft(String(activeProfile.display_name ?? "").trim());
-    const h = activeProfile.handle;
-    setHandleDraft(h ? `@${String(h).replace(/^@/, "")}` : "@");
+    const show =
+      typeof activeProfile.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : typeof activeProfile.handle === "string"
+          ? activeProfile.handle.trim()
+          : "";
+    setHandleDraft(show ? `@${stripHandleAtPrefix(show)}` : "@");
     setBioDraft(typeof activeProfile.bio === "string" ? activeProfile.bio : "");
   }, [activeProfile, activeProfileId, memberProfilesVersion]);
 
@@ -571,7 +882,7 @@ export function ProfileTab({
       setHandleHint("");
       return;
     }
-    const raw = handleDraft.replace(/^@/, "").trim().toLowerCase();
+    const raw = stripHandleAtPrefix(handleDraft);
     if (raw.length === 0) {
       setHandleHint("");
       return;
@@ -580,8 +891,8 @@ export function ProfileTab({
       setHandleHint("At least 3 characters");
       return;
     }
-    if (!/^[a-z0-9_]+$/.test(raw)) {
-      setHandleHint("Letters, numbers, underscores only");
+    if (!isValidMemberHandleFormat(raw)) {
+      setHandleHint("Letters, numbers, _, ., or - (3–32) — no .. or . at start/end");
       return;
     }
     const t = window.setTimeout(() => {
@@ -618,18 +929,19 @@ export function ProfileTab({
         }
         setErr(null);
         await refreshMemberProfiles();
+        showSavedBriefly();
         return true;
       } catch (e) {
         setErr(e instanceof Error ? e.message : "Save failed");
         return false;
       }
     },
-    [activeProfileId, workerOk, refreshMemberProfiles]
+    [activeProfileId, workerOk, refreshMemberProfiles, showSavedBriefly]
   );
 
   const completionFields = useMemo(() => {
     const handleSaved =
-      typeof activeProfile?.handle === "string" && /^[a-z0-9_]{3,20}$/.test(activeProfile.handle.trim());
+      typeof activeProfile?.handle === "string" && isValidMemberHandleFormat(activeProfile.handle.trim());
     return [
       {
         id: "avatar",
@@ -649,8 +961,8 @@ export function ProfileTab({
       },
       {
         id: "goal",
-        done: Boolean(bodyMetricsRow && typeof bodyMetricsRow.goal === "string" && bodyMetricsRow.goal.trim()),
-        label: "Goal",
+        done: parseGoalsFromStorage(bodyMetricsRow?.goal).length > 0,
+        label: "Goals",
       },
       {
         id: "weight",
@@ -707,30 +1019,39 @@ export function ProfileTab({
 
   const commitHandle = useCallback(async () => {
     if (!activeProfileId) return;
-    const raw = handleDraft.replace(/^@/, "").trim().toLowerCase();
-    const saved = String(activeProfile?.handle || "")
-      .trim()
-      .toLowerCase()
-      .replace(/^@/, "");
-    if (raw === saved) return;
-    if (raw.length === 0) {
-      await saveProfilePatch({ handle: null });
+    const rawTyped = stripHandleAtPrefix(handleDraft);
+    const prevLower = normalizeHandleInput(activeProfile?.handle ?? "");
+    const prevShow =
+      typeof activeProfile?.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : String(activeProfile?.handle ?? "").trim();
+    if (normalizeHandleInput(rawTyped) === prevLower && rawTyped === stripHandleAtPrefix(prevShow)) return;
+    if (rawTyped.length === 0) {
+      if (workerOk) await saveProfilePatch({ handle: null });
+      else await saveProfilePatch({ handle: null, display_handle: null });
       return;
     }
-    if (raw.length < 3) {
+    if (rawTyped.length < 3) {
       setErr("Handle must be at least 3 characters");
       return;
     }
-    if (!/^[a-z0-9_]+$/.test(raw)) {
-      setErr("Handle: use letters, numbers, and underscores only");
+    if (!isValidMemberHandleFormat(rawTyped)) {
+      setErr("Handle: 3–32 chars; letters, numbers, _, ., or -; no .. or . at start/end");
       return;
     }
-    await saveProfilePatch({ handle: raw });
-  }, [activeProfileId, handleDraft, activeProfile?.handle, saveProfilePatch]);
+    if (workerOk) {
+      await saveProfilePatch({ handle: rawTyped });
+    } else {
+      await saveProfilePatch({
+        handle: rawTyped.toLowerCase(),
+        display_handle: rawTyped,
+      });
+    }
+  }, [activeProfileId, handleDraft, activeProfile?.handle, activeProfile?.display_handle, saveProfilePatch, workerOk]);
 
   const commitBio = useCallback(async () => {
     if (!activeProfileId) return;
-    const t = bioDraft.slice(0, 160).trim();
+    const t = bioDraft.slice(0, 500).trim();
     const saved = typeof activeProfile?.bio === "string" ? activeProfile.bio.trim() : "";
     if (t === saved) return;
     await saveProfilePatch({ bio: t || null });
@@ -778,8 +1099,9 @@ export function ProfileTab({
         return;
       }
       await refreshMemberProfiles();
+      showSavedBriefly();
     },
-    [activeProfileId, canUploadBodyScan, onOpenUpgrade, workerOk, refreshMemberProfiles]
+    [activeProfileId, canUploadBodyScan, onOpenUpgrade, workerOk, refreshMemberProfiles, showSavedBriefly]
   );
 
   useEffect(() => {
@@ -828,6 +1150,7 @@ export function ProfileTab({
     else {
       setErr(null);
       void refreshBodyMetricsRow();
+      showSavedBriefly();
     }
   };
 
@@ -851,6 +1174,7 @@ export function ProfileTab({
     else {
       setErr(null);
       void refreshBodyMetricsRow();
+      showSavedBriefly();
     }
   };
 
@@ -863,6 +1187,7 @@ export function ProfileTab({
       else {
         setErr(null);
         void refreshBodyMetricsRow();
+        showSavedBriefly();
       }
       return;
     }
@@ -871,18 +1196,31 @@ export function ProfileTab({
     else {
       setErr(null);
       void refreshBodyMetricsRow();
+      showSavedBriefly();
     }
   };
 
-  const saveGoal = async (g) => {
+  const toggleGoalId = async (id) => {
+    if (!GOAL_IDS.has(id)) return;
     if (!user?.id || !activeProfileId) return;
-    setGoal(g);
-    const { error } = await upsertBodyMetrics(user.id, activeProfileId, { goal: g || null });
-    if (error) setErr(error.message);
-    else {
-      setErr(null);
-      void refreshBodyMetricsRow();
+    const has = goalIds.includes(id);
+    const next = has ? goalIds.filter((x) => x !== id) : [...goalIds, id];
+    if (!has && next.length > GOAL_PICK_MAX) {
+      setErr(`Pick at most ${GOAL_PICK_MAX} goals`);
+      return;
     }
+    setErr(null);
+    const prev = goalIds;
+    setGoalIds(next);
+    const csv = serializeGoals(next);
+    const { error } = await upsertBodyMetrics(user.id, activeProfileId, { goal: csv });
+    if (error) {
+      setErr(error.message);
+      setGoalIds(prev);
+      return;
+    }
+    void refreshBodyMetricsRow();
+    showSavedBriefly();
   };
 
   const onAvatarPick = async (e) => {
@@ -898,9 +1236,28 @@ export function ProfileTab({
       setErr("No active profile");
       return;
     }
+    if (!R2_UPLOAD_ALLOWED_TYPES.has(file.type) || file.size > R2_UPLOAD_MAX_BYTES) {
+      setErr("JPEG/PNG/WebP/GIF, max 10MB");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setAvatarCrop({
+      url,
+      revoke: () => URL.revokeObjectURL(url),
+    });
+  };
+
+  const cancelAvatarCrop = () => {
+    avatarCrop?.revoke();
+    setAvatarCrop(null);
+  };
+
+  const confirmAvatarCrop = async (blob) => {
+    if (!activeProfileId || !blob) return;
     setAvatarBusy(true);
     setErr(null);
     setMsg(null);
+    const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
     const result = await uploadImageToR2({
       path: "/avatars",
       file,
@@ -915,11 +1272,11 @@ export function ProfileTab({
       setAvatarBusy(false);
       return;
     }
-    // Worker has already persisted member_profiles.avatar_url with the full URL.
-    // Refresh so any other consumer (header, ProfileSwitcher) sees the new value.
+    cancelAvatarCrop();
     await refreshMemberProfiles();
     setAvatarImageNonce((n) => n + 1);
     setAvatarBusy(false);
+    showSavedBriefly();
   };
 
   const toggleHeightUnit = (u) => {
@@ -1092,6 +1449,22 @@ export function ProfileTab({
           {msg}
         </div>
       )}
+      {savedFlash ? (
+        <div className="mono" style={{ fontSize: 12, color: "#5a6d82", marginBottom: 10, letterSpacing: "0.04em" }}>
+          Saved ✓
+        </div>
+      ) : null}
+
+      <AvatarCropModal
+        open={Boolean(avatarCrop?.url)}
+        imageUrl={avatarCrop?.url ?? null}
+        busy={avatarBusy}
+        onCancel={() => {
+          if (avatarBusy) return;
+          cancelAvatarCrop();
+        }}
+        onConfirm={(blob) => void confirmAvatarCrop(blob)}
+      />
 
       <button
         type="button"
@@ -1217,16 +1590,17 @@ export function ProfileTab({
                   placeholder="Your display name"
                   aria-label="Display name"
                 />
-                {goalEmojiFromId(goal) ? (
+                {goalIds.slice(0, 6).map((gid) => (
                   <span
+                    key={gid}
                     className="pepv-emoji"
                     style={{ fontSize: 20, lineHeight: 1 }}
                     aria-hidden
-                    title={GOAL_OPTIONS.find((g) => g.id === goal)?.label ?? ""}
+                    title={GOAL_OPTIONS.find((g) => g.id === gid)?.label ?? ""}
                   >
-                    {goalEmojiFromId(goal)}
+                    {goalEmojiFromId(gid)}
                   </span>
-                ) : null}
+                ))}
               </div>
             </div>
             <div
@@ -1254,11 +1628,7 @@ export function ProfileTab({
                 onChange={(e) => {
                   let v = e.target.value;
                   if (!v.startsWith("@")) v = `@${v.replace(/^@+/, "")}`;
-                  const rest = v
-                    .slice(1)
-                    .toLowerCase()
-                    .replace(/[^a-z0-9_]/g, "")
-                    .slice(0, 20);
+                  const rest = v.slice(1).replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 32);
                   setHandleDraft(`@${rest}`);
                 }}
                 onBlur={() => void commitHandle()}
@@ -1292,15 +1662,15 @@ export function ProfileTab({
                 className="form-input"
                 style={{ fontSize: 13, width: "100%", minHeight: 72, resize: "vertical", lineHeight: 1.45 }}
                 value={bioDraft}
-                onChange={(e) => setBioDraft(e.target.value.slice(0, 160))}
+                onChange={(e) => setBioDraft(e.target.value.slice(0, 500))}
                 onBlur={() => void commitBio()}
                 placeholder="Tell the community about your protocol..."
-                maxLength={160}
+                maxLength={500}
                 rows={3}
                 aria-label="Bio"
               />
               <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginTop: 4, textAlign: "right" }}>
-                {bioDraft.length}/160
+                {bioDraft.length}/500
               </div>
             </div>
             <div ref={setFieldRef("experience_level")} style={{ marginBottom: 14 }}>
@@ -1339,8 +1709,10 @@ export function ProfileTab({
               <span className="pill" style={tierPillStyle(user.plan)}>
                 {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
               </span>
-              <span className="pepv-emoji" style={{ fontSize: 13, color: "#dde4ef" }}>
-                {streakCount <= 0 ? "🔥 Start your streak!" : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} streak`}
+              <span style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.4 }}>
+                {streakCount <= 0
+                  ? "Beginner — log your first dose to start your streak"
+                  : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} streak`}
               </span>
             </div>
           </div>
@@ -1381,21 +1753,35 @@ export function ProfileTab({
         >
           <div ref={setFieldRef("goal")}>
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
-              GOAL
+              GOALS
             </div>
-            <select
-              className="form-input"
-              style={{ fontSize: 13, width: "100%", marginBottom: 14, cursor: "pointer" }}
-              value={goal}
-              onChange={(e) => void saveGoal(e.target.value)}
-            >
-              <option value="">Select…</option>
-              {GOAL_OPTIONS.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
+            <div className="mono" style={{ fontSize: 11, color: "#4a6080", marginBottom: 10, lineHeight: 1.45 }}>
+              Tap to select multiple (up to {GOAL_PICK_MAX}).
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {GOAL_OPTIONS.map((g) => {
+                const sel = goalIds.includes(g.id);
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => void toggleGoalId(g.id)}
+                    style={{
+                      fontSize: 13,
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                      background: sel ? "rgba(0,212,170,0.12)" : "transparent",
+                      color: sel ? "#00d4aa" : "#6b7c8f",
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div ref={setFieldRef("weight")}>
@@ -1417,6 +1803,7 @@ export function ProfileTab({
                       else {
                         setErr(null);
                         void refreshBodyMetricsRow();
+                        showSavedBriefly();
                       }
                     })();
                   }}
@@ -1561,41 +1948,116 @@ export function ProfileTab({
       <div style={SECTION}>Progress photos</div>
       <Card style={{ paddingBottom: 12 }}>
         {canUseProgressPhotos && activeProfileId ? (
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
-            <ProfilePrivatePhotoSlot
-              label="FRONT"
-              kind="progress_front"
-              memberProfileId={activeProfileId}
-              r2Key={activeProfile?.progress_photo_front_r2_key}
-              uploadedAt={activeProfile?.progress_photo_front_at}
-              canMutate={canUseProgressPhotos}
-              onUpgrade={onOpenUpgrade}
-              onUploaded={() => refreshMemberProfiles()}
-              workerOk={workerOk}
-            />
-            <ProfilePrivatePhotoSlot
-              label="SIDE"
-              kind="progress_side"
-              memberProfileId={activeProfileId}
-              r2Key={activeProfile?.progress_photo_side_r2_key}
-              uploadedAt={activeProfile?.progress_photo_side_at}
-              canMutate={canUseProgressPhotos}
-              onUpgrade={onOpenUpgrade}
-              onUploaded={() => refreshMemberProfiles()}
-              workerOk={workerOk}
-            />
-            <ProfilePrivatePhotoSlot
-              label="BACK"
-              kind="progress_back"
-              memberProfileId={activeProfileId}
-              r2Key={activeProfile?.progress_photo_back_r2_key}
-              uploadedAt={activeProfile?.progress_photo_back_at}
-              canMutate={canUseProgressPhotos}
-              onUpgrade={onOpenUpgrade}
-              onUploaded={() => refreshMemberProfiles()}
-              workerOk={workerOk}
-            />
-          </div>
+          <>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
+              <ProfilePrivatePhotoSlot
+                label="FRONT"
+                kind="progress_front"
+                memberProfileId={activeProfileId}
+                r2Key={activeProfile?.progress_photo_front_r2_key}
+                uploadedAt={activeProfile?.progress_photo_front_at}
+                canMutate={canUseProgressPhotos}
+                onUpgrade={onOpenUpgrade}
+                onUploaded={() => {
+                  void refreshMemberProfiles();
+                  showSavedBriefly();
+                }}
+                workerOk={workerOk}
+              />
+              <ProfilePrivatePhotoSlot
+                label="SIDE"
+                kind="progress_side"
+                memberProfileId={activeProfileId}
+                r2Key={activeProfile?.progress_photo_side_r2_key}
+                uploadedAt={activeProfile?.progress_photo_side_at}
+                canMutate={canUseProgressPhotos}
+                onUpgrade={onOpenUpgrade}
+                onUploaded={() => {
+                  void refreshMemberProfiles();
+                  showSavedBriefly();
+                }}
+                workerOk={workerOk}
+              />
+              <ProfilePrivatePhotoSlot
+                label="BACK"
+                kind="progress_back"
+                memberProfileId={activeProfileId}
+                r2Key={activeProfile?.progress_photo_back_r2_key}
+                uploadedAt={activeProfile?.progress_photo_back_at}
+                canMutate={canUseProgressPhotos}
+                onUpgrade={onOpenUpgrade}
+                onUploaded={() => {
+                  void refreshMemberProfiles();
+                  showSavedBriefly();
+                }}
+                workerOk={workerOk}
+              />
+            </div>
+            {progressArchivedSets.length > 0 ? (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #1e2a38" }}>
+                <div
+                  className="mono"
+                  style={{ fontSize: 11, color: "#6b7c8f", marginBottom: 10, letterSpacing: "0.08em" }}
+                >
+                  PREVIOUS SETS
+                </div>
+                {progressArchivedSets.map((entry, idx) => (
+                  <ArchivedProgressSetRow key={idx} entry={entry} workerOk={workerOk} />
+                ))}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+              <button
+                type="button"
+                className="btn-teal"
+                style={{
+                  fontSize: 13,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  opacity:
+                    archiveProgressBusy ||
+                    !workerOk ||
+                    !String(activeProfile?.progress_photo_front_r2_key ?? "").trim() ||
+                    !String(activeProfile?.progress_photo_side_r2_key ?? "").trim() ||
+                    !String(activeProfile?.progress_photo_back_r2_key ?? "").trim()
+                      ? 0.55
+                      : 1,
+                }}
+                disabled={
+                  archiveProgressBusy ||
+                  !workerOk ||
+                  !String(activeProfile?.progress_photo_front_r2_key ?? "").trim() ||
+                  !String(activeProfile?.progress_photo_side_r2_key ?? "").trim() ||
+                  !String(activeProfile?.progress_photo_back_r2_key ?? "").trim()
+                }
+                onClick={() => {
+                  void (async () => {
+                    setArchiveProgressBusy(true);
+                    setErr(null);
+                    const { error } = await archiveProgressPhotoSetViaWorker(activeProfileId);
+                    if (error) setErr(error.message);
+                    else {
+                      await refreshMemberProfiles();
+                      showSavedBriefly();
+                    }
+                    setArchiveProgressBusy(false);
+                  })();
+                }}
+              >
+                <span className="pepv-emoji" aria-hidden style={{ fontSize: 14 }}>
+                  ↓
+                </span>
+                {archiveProgressBusy ? "Saving…" : "+ Add 3 More"}
+              </button>
+            </div>
+            <div
+              className="mono"
+              style={{ fontSize: 11, color: "#4a6080", marginTop: 8, textAlign: "center", lineHeight: 1.45 }}
+            >
+              Saves this front/side/back trio and clears slots for your next check-in.
+            </div>
+          </>
         ) : (
           <>
             <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5, marginBottom: 12 }}>
@@ -1646,6 +2108,7 @@ export function ProfileTab({
           )}
         </div>
       </Card>
+
     </div>
   );
 }

@@ -16,12 +16,20 @@ import {
   R2_UPLOAD_ACCEPT_ATTR,
   R2_UPLOAD_ALLOWED_TYPES,
   R2_UPLOAD_MAX_BYTES,
+  appendImageCacheBustParam,
+  shouldResetImageUploadFetchBust,
   uploadImageToR2,
 } from "../lib/r2Upload.js";
 import { persistVialPeptideId, vialQueryPeptideIds } from "../lib/resolveStackCatalogPeptide.js";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { formatInjectableDoseHistoryAmount, isBlendCatalogComponents } from "../lib/doseLogDisplay.js";
-import { blendConcentrationsMgPerMl, calculateBlendDose, scaleBlendComponentsToVial } from "../lib/peptideMath.js";
+import {
+  blendConcentrationsMgPerMl,
+  blendRecipeTotalMg,
+  calculateBlendDose,
+  resolveCatalogBlendBacRefMl,
+  scaleBlendComponentsToVial,
+} from "../lib/peptideMath.js";
 
 const BLEND_DRAW_MIN = 0.05;
 const BLEND_DRAW_MAX = 0.5;
@@ -47,10 +55,16 @@ function formatBlendMcgDraw(n) {
 /** @param {{ name: string, mgPerMl: number }[] | null | undefined} parts */
 function formatBlendConcMgPerMl(parts) {
   if (!parts || parts.length === 0) return "—";
-  return parts.map((p) => `${p.name} ${p.mgPerMl.toFixed(2)}mg/mL`).join(" · ");
+  return parts
+    .map((p) => {
+      const n = Number(p.mgPerMl);
+      if (!Number.isFinite(n)) return `${p.name}: ratio varies — check CoA`;
+      return `${p.name} ${n.toFixed(2)}mg/mL`;
+    })
+    .join(" · ");
 }
 
-function useWorkerObjectUrl(r2Key, workerConfigured) {
+function useWorkerObjectUrl(r2Key, workerConfigured, fetchBustMs = 0) {
   const [objectUrl, setObjectUrl] = useState(null);
 
   useEffect(() => {
@@ -68,7 +82,8 @@ function useWorkerObjectUrl(r2Key, workerConfigured) {
         return;
       }
       try {
-        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+        const base = `${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`;
+        const res = await fetch(appendImageCacheBustParam(base, fetchBustMs), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok || cancelled) {
@@ -89,7 +104,7 @@ function useWorkerObjectUrl(r2Key, workerConfigured) {
       cancelled = true;
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [r2Key, workerConfigured]);
+  }, [r2Key, workerConfigured, fetchBustMs]);
 
   return objectUrl;
 }
@@ -101,9 +116,18 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState(null);
+  const [fetchBustMs, setFetchBustMs] = useState(0);
+  const prevR2KeyRef = useRef(typeof r2Key === "string" ? r2Key.trim() : "");
   const key = typeof r2Key === "string" ? r2Key.trim() : "";
-  const imgUrl = useWorkerObjectUrl(key || null, workerConfigured);
+  const imgUrl = useWorkerObjectUrl(key || null, workerConfigured, fetchBustMs);
   const showImage = Boolean(key && imgUrl);
+
+  useEffect(() => {
+    const next = typeof r2Key === "string" ? r2Key.trim() : "";
+    const prev = prevR2KeyRef.current;
+    prevR2KeyRef.current = next;
+    if (shouldResetImageUploadFetchBust(prev, next)) setFetchBustMs(0);
+  }, [r2Key]);
 
   function openPicker() {
     if (uploading) return;
@@ -147,6 +171,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
       return;
     }
     setErr(null);
+    setFetchBustMs(Date.now());
     await onUploaded();
   }
 
@@ -269,27 +294,29 @@ function formatShortDate(iso) {
  * Injectable (mcg) vs oral/nasal/topical count logs.
  * @param {Record<string, unknown>} d
  * @param {Record<string, unknown> | null | undefined} vial
- * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
+ * @param {number} [catalogBlendBacRefMl=2]
  */
-function formatDoseLogLine(d, vial, catalogBlendComponents) {
+function formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl = 2) {
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
-  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents);
+  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents, catalogBlendBacRefMl);
 }
 
 /**
  * @param {Record<string, unknown>} d
  * @param {Map<string, Record<string, unknown>> | null | undefined} vialsById
- * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
+ * @param {number} [catalogBlendBacRefMl=2]
  */
-function formatCalendarDoseAmount(d, vialsById, catalogBlendComponents) {
+function formatCalendarDoseAmount(d, vialsById, catalogBlendComponents, catalogBlendBacRefMl = 2) {
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
   const vid = typeof d.vial_id === "string" ? d.vial_id : null;
   const vial = vid && vialsById?.get ? vialsById.get(vid) : null;
-  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents);
+  return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents, catalogBlendBacRefMl);
 }
 
 function formatDoseTimeLocal(iso) {
@@ -518,6 +545,7 @@ function DoseHistoryCalendar({
   resolvePeptideName,
   vialsById,
   catalogBlendComponents,
+  catalogBlendBacRefMl,
 }) {
   const [selectedYmd, setSelectedYmd] = useState(null);
 
@@ -899,7 +927,7 @@ function DoseHistoryCalendar({
             .sort((a, b) => new Date(a.dosed_at).getTime() - new Date(b.dosed_at).getTime())
             .map((log, i) => {
               const name = resolvePeptideName(log.peptide_id);
-              const amount = formatCalendarDoseAmount(log, vialsById, catalogBlendComponents);
+              const amount = formatCalendarDoseAmount(log, vialsById, catalogBlendComponents, catalogBlendBacRefMl);
               const timeStr = formatDoseTimeLocal(log.dosed_at);
               const sess = protocolSessionPillLabel(log.protocol_session);
               const meta = [timeStr, sess].filter(Boolean).join(" · ");
@@ -940,6 +968,7 @@ function VialRow({
   workerConfigured,
   onUpgrade,
   catalogBlendComponents,
+  catalogBlendBacRefMl = 2,
 }) {
   const [label, setLabel] = useState(vial.label ?? "Vial 1");
   const [savingLabel, setSavingLabel] = useState(false);
@@ -970,13 +999,19 @@ function VialRow({
 
   const vialMgNum = Number(vial.vial_size_mg);
   const bacMlNum = Number(vial.bac_water_ml);
-  const recipeSum =
+  const recipeSumFromMg =
     Array.isArray(catalogBlendComponents) && catalogBlendComponents.length > 0
       ? catalogBlendComponents.reduce((s, c) => s + (Number.isFinite(Number(c?.mg)) ? Number(c.mg) : 0), 0)
       : 0;
+  const recipeSum =
+    recipeSumFromMg > 0
+      ? recipeSumFromMg
+      : Array.isArray(catalogBlendComponents) && catalogBlendComponents.length > 0
+        ? blendRecipeTotalMg(catalogBlendComponents, catalogBlendBacRefMl)
+        : 0;
   const scaledForConc =
     recipeSum > 0 && Number.isFinite(vialMgNum) && vialMgNum > 0
-      ? scaleBlendComponentsToVial(catalogBlendComponents, recipeSum, vialMgNum)
+      ? scaleBlendComponentsToVial(catalogBlendComponents, recipeSum, vialMgNum, catalogBlendBacRefMl)
       : [];
   const blendConcParts =
     scaledForConc.length > 0 && Number.isFinite(bacMlNum) && bacMlNum > 0
@@ -1068,9 +1103,11 @@ function VialRow({
                   ) : (
                     catalogBlendComponents.map((c, idx) => {
                       const label = typeof c?.name === "string" ? c.name.trim() : "";
+                      const unknownRatio =
+                        c && Object.prototype.hasOwnProperty.call(c, "mgPerMl") && c.mgPerMl === null;
                       return (
                         <div key={`${label || "c"}-${idx}`}>
-                          {label || "—"}: —
+                          {label || "—"}: {unknownRatio ? "ratio varies — check CoA" : "—"}
                         </div>
                       );
                     })
@@ -1194,7 +1231,7 @@ function VialRow({
               </div>
               {doses.map((d) => (
                 <div key={d.id} className="mono" style={{ fontSize: 13, color: "#4a6080", padding: "2px 0" }}>
-                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents)}
+                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl)}
                   {d.notes ? ` · ${d.notes}` : ""}
                 </div>
               ))}
@@ -1256,30 +1293,42 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     return Array.isArray(o) && o.length > 0 ? o : null;
   }, [catalogEntry?.vialSizeOptions]);
 
+  const blendCatalogBacRefMl = useMemo(() => resolveCatalogBlendBacRefMl(catalogEntry), [catalogEntry]);
+
   const blendComponents = useMemo(() => {
     const c = catalogEntry?.components;
     if (!Array.isArray(c) || c.length === 0) return null;
-    const rows = c
-      .map((x) => ({
-        name: typeof x?.name === "string" ? x.name.trim() : "",
-        mg: Number(x?.mg),
-      }))
-      .filter((x) => x.name && Number.isFinite(x.mg) && x.mg >= 0);
-    return rows.length ? rows : null;
+    const rows = [];
+    for (const x of c) {
+      const name = typeof x?.name === "string" ? x.name.trim() : "";
+      if (!name) continue;
+      const mg = Number(x?.mg);
+      if (Number.isFinite(mg) && mg >= 0) {
+        rows.push({ name, mg });
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(x, "mgPerMl")) {
+        if (x.mgPerMl === null) rows.push({ name, mgPerMl: null });
+        else {
+          const mpm = Number(x.mgPerMl);
+          if (Number.isFinite(mpm) && mpm >= 0) rows.push({ name, mgPerMl: mpm });
+        }
+      }
+    }
+    return rows.length >= 2 ? rows : null;
   }, [catalogEntry?.components]);
 
   const blendTotalMg = useMemo(
-    () => (blendComponents ? blendComponents.reduce((s, x) => s + x.mg, 0) : 0),
-    [blendComponents]
+    () => (blendComponents?.length ? blendRecipeTotalMg(blendComponents, blendCatalogBacRefMl) : 0),
+    [blendComponents, blendCatalogBacRefMl]
   );
 
   const effectiveBlendComponents = useMemo(() => {
     if (!blendComponents?.length || blendTotalMg <= 0) return null;
     const mg = parseFloat(String(formMg).replace(/,/g, ""));
     if (!Number.isFinite(mg) || mg <= 0) return null;
-    const scale = mg / blendTotalMg;
-    return blendComponents.map((c) => ({ name: c.name, mg: c.mg * scale }));
-  }, [blendComponents, blendTotalMg, formMg]);
+    return scaleBlendComponentsToVial(blendComponents, blendTotalMg, mg, blendCatalogBacRefMl);
+  }, [blendComponents, blendTotalMg, formMg, blendCatalogBacRefMl]);
 
   const effectiveBlendTotalMg = useMemo(
     () => (effectiveBlendComponents ? effectiveBlendComponents.reduce((s, x) => s + x.mg, 0) : 0),
@@ -1600,6 +1649,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         resolvePeptideName={resolvePeptideName}
         vialsById={vialsById}
         catalogBlendComponents={blendComponents ?? undefined}
+        catalogBlendBacRefMl={blendCatalogBacRefMl}
       />
 
       {canMutate && (
@@ -1747,6 +1797,11 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginBottom: 12, lineHeight: 1.45 }}>
                 Uses vial total and BAC water (mL) above. Adjust draw volume to see each component per injection.
               </div>
+              {blendTotalMg <= 0 && (
+                <div className="mono" style={{ fontSize: 12, color: "#c4a574", marginBottom: 12, lineHeight: 1.45 }}>
+                  Per-component concentrations are not computed — blend ratios vary by vendor. Confirm masses on CoA before dosing.
+                </div>
+              )}
               <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
                 DRAW VOLUME (mL) — {BLEND_DRAW_MIN}–{BLEND_DRAW_MAX}
               </div>
@@ -1940,6 +1995,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             workerConfigured={workerConfigured}
             onUpgrade={onUpgrade}
             catalogBlendComponents={blendComponents ?? undefined}
+            catalogBlendBacRefMl={blendCatalogBacRefMl}
           />
         ))}
     </div>

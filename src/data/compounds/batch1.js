@@ -13,7 +13,7 @@ export const BATCH1 = [
     dosingRange: { low: "200mcg", medium: "500mcg", high: "1mg", frequency: "Daily intranasal or subQ" },
     tags: ["nootropic", "BDNF", "NGF", "neuroprotective", "cognitive", "ACTH", "Russian"],
     sourcingNotes:
-      "Penguin Peptides carries 5mg and 10mg. For maximum bioavailability and duration, upgrade path is N-Acetyl Semax Amidate.",
+      "Available in 5mg and 10mg vials from research peptide suppliers. For maximum bioavailability and duration, upgrade path is N-Acetyl Semax Amidate.",
     warnings: ["Start low — CNS active compound", "Intranasal preferred for fastest onset"],
     tier: "entry",
     variantOf: "n-acetyl-semax-amidate",
@@ -31,7 +31,7 @@ export const BATCH1 = [
     reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 5, typicalVolumeMl: 1 },
     dosingRange: { low: "100mcg", medium: "250mcg", high: "500mcg", frequency: "Daily intranasal or subQ" },
     tags: ["nootropic", "anxiolytic", "GABA", "BDNF", "sleep", "anti-anxiety", "immunomodulator"],
-    sourcingNotes: "Penguin Peptides carries 5mg and 10mg. Upgrade path is N-Acetyl Selank Amidate for extended activity.",
+    sourcingNotes: "Available in 5mg and 10mg vials from research peptide suppliers. Upgrade path is N-Acetyl Selank Amidate for extended activity.",
     warnings: ["Mild sedation possible at higher doses", "Intranasal preferred for CNS delivery"],
     tier: "entry",
     variantOf: "n-acetyl-selank-amidate",
@@ -48,9 +48,9 @@ export const BATCH1 = [
     reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 10, typicalVolumeMl: 1 },
     dosingRange: { low: "1mg", medium: "3mg", high: "5mg", frequency: "Daily x 10-day course, 1-2x/year" },
     tags: ["longevity", "telomere", "anti-aging", "telomerase", "pineal", "antioxidant", "amidate"],
-    sourcingNotes: "Specialty vendors — not on Penguin or Swiss Chems. Niche but growing demand. Premium longevity protocol compound.",
+    sourcingNotes: "Specialty / niche Khavinson-type channels; not always on mainstream research lists. Niche but growing demand. Premium longevity protocol compound.",
     warnings: ["Lower doses required vs standard Epitalon due to enhanced bioavailability", "Course dosing — not continuous"],
-    tier: "pro",
+    tier: "entry",
     variantOf: "epitalon",
     variantNote: "Premium form. Both termini protected from enzymatic cleavage — significantly more bioavailable and longer acting than standard Epitalon.",
   },
@@ -65,7 +65,7 @@ export const BATCH1 = [
     reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 5, typicalVolumeMl: 1 },
     dosingRange: { low: "250mcg", medium: "500mcg", high: "1mg", frequency: "Daily" },
     tags: ["healing", "recovery", "gut", "angiogenesis", "anti-inflammatory", "tendon", "arginine"],
-    sourcingNotes: "Penguin Peptides carries both acetate and arginine forms. Arginine salt preferred for reconstitution stability.",
+    sourcingNotes: "Available from research peptide vendors in both acetate and arginine forms. Arginine salt preferred for reconstitution stability.",
     warnings: ["Same angiogenesis caveat — avoid with active malignancy", "Oral for gut targeting, subQ for systemic"],
     tier: "entry",
     variantOf: "bpc-157",
@@ -84,7 +84,7 @@ export const BATCH1 = [
     dosingRange: { low: "250/2.5mg", medium: "500/5mg", high: "1000/10mg", frequency: "Daily BPC / Twice weekly TB" },
     tags: ["healing", "recovery", "blend", "BPC-157", "TB-500", "tendon", "anti-inflammatory", "synergy"],
     sourcingNotes:
-      "Available pre-blended from multiple vendors. Penguin carries BPC+TB combo. Named 'Wolverine' in the community for rapid recovery association.",
+      "Available pre-blended from multiple research peptide vendors as BPC+TB combo listings. Named 'Wolverine' in the community for rapid recovery association.",
     warnings: ["Same angiogenesis caveat as BPC-157 — avoid with active malignancy", "TB-500 long half-life — don't over-frequency dose"],
     tier: "entry",
     components: [
@@ -110,9 +110,9 @@ export const BATCH1 = [
     dosingRange: { low: "partial vial", medium: "full vial", high: "full vial", frequency: "Weekly or biweekly" },
     tags: ["healing", "skin", "anti-aging", "collagen", "GHK-Cu", "TB-500", "BPC-157", "regenerative", "blend"],
     sourcingNotes:
-      "Penguin Peptides $124/vial. >98% purity. Sister blend to KLOW — GLOW is skin/regen focused (high GHK-Cu), KLOW is gut/inflammation focused (KPV + even split).",
+      "Typical premium blend tier in the community; demand >98% purity on CoA. Sister blend to KLOW — GLOW is skin/regen focused (high GHK-Cu), KLOW is gut/inflammation focused (KPV + even split).",
     warnings: ["Same angiogenesis caveat as BPC-157", "High GHK-Cu dose — both topical and subQ viable"],
-    tier: "pro",
+    tier: "entry",
     components: [
       { name: "GHK-Cu", mg: 50 },
       { name: "BPC-157", mg: 10 },
@@ -145,9 +145,9 @@ export const BATCH1 = [
     dosingRange: { low: "partial vial", medium: "full vial", high: "full vial", frequency: "Per target peptide within blend" },
     tags: ["healing", "skin", "gut", "anti-inflammatory", "GHK-Cu", "TB-500", "BPC-157", "KPV", "regenerative", "blend"],
     sourcingNotes:
-      "Penguin Peptides and other vendors as pre-blended vial. Sister blend to GLOW — KLOW adds KPV for gut/inflammation alongside the same core regenerative stack.",
+      "Available as a pre-blended vial from several research peptide vendors. Sister blend to GLOW — KLOW adds KPV for gut/inflammation alongside the same core regenerative stack.",
     warnings: ["Same angiogenesis caveat as BPC-157 — avoid with active malignancy", "Dose by individual peptide targets within blend"],
-    tier: "pro",
+    tier: "entry",
     components: [
       { name: "GHK-Cu", mg: 50 },
       { name: "BPC-157", mg: 10 },
@@ -168,9 +168,9 @@ export const BATCH1 = [
       "Bacteriostatic Water. Standard 5mg vial → 2mL BAC. Each 0.1mL (10 units) = 0.25mg total (Semaglutide 125mcg · Cagrilintide 125mcg). Large 10mg vial → 2mL BAC, double concentration. Dose once weekly. Dual GI pathway — start very low and titrate slowly.",
     dosingRange: { low: "0.25/0.25mg", medium: "1/1mg", high: "2.4/2.4mg", frequency: "Weekly" },
     tags: ["weight loss", "metabolic", "GLP-1", "amylin", "dual agonist", "satiety", "blend", "Novo Nordisk"],
-    sourcingNotes: "Penguin Peptides carries as 'GLP-1 C + GLP-1 S'. Clinical trial combination — significant research demand.",
+    sourcingNotes: "Often labeled 'GLP-1 C + GLP-1 S' as a pre-mix from research peptide vendors. Clinical trial combination — significant research demand.",
     warnings: ["Titrate each component separately before combining", "GI side effects additive", "Not for use with other GLP-1 agents"],
-    tier: "elite",
+    tier: "entry",
     components: [
       { name: "Semaglutide", mg: 2.5 },
       { name: "Cagrilintide", mg: 2.5 },
@@ -195,9 +195,9 @@ export const BATCH1 = [
     startDose: "100mcg each (0.02mL at 2mL recon). Titrate up by 50mcg every 1–2 weeks.",
     dosingRange: { low: "100/100mcg", medium: "200/200mcg", high: "300/300mcg", frequency: "2-3x daily, fasted, pre-sleep" },
     tags: ["GH", "growth hormone", "GHRH", "GHRP", "muscle", "recovery", "anti-aging", "blend", "pulse"],
-    sourcingNotes: "Penguin carries as 'CJC no DAC + IPA' pre-blended at $72. Most popular GH peptide stack in the community.",
+    sourcingNotes: "Widely sold pre-blended as 'CJC no DAC + IPA' at typical mid-market blend pricing. Most popular GH peptide stack in the community.",
     warnings: ["Dose pre-sleep for maximal GH release alignment", "Avoid within 2hrs of eating or insulin release", "May cause water retention"],
-    tier: "pro",
+    tier: "entry",
     components: [
       { name: "CJC-1295 No DAC", mg: 5 },
       { name: "Ipamorelin", mg: 5 },
@@ -215,9 +215,9 @@ export const BATCH1 = [
     reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 5, typicalVolumeMl: 1 },
     dosingRange: { low: "0.25mg", medium: "1mg", high: "2.4mg", frequency: "Weekly" },
     tags: ["weight loss", "metabolic", "amylin", "satiety", "CGRP", "Novo Nordisk", "GLP-1 independent"],
-    sourcingNotes: "Penguin carries as standalone 'GLP-1 C'. Finnrick avg 6.3/10 — acceptable. Best used in combination with semaglutide (CagriSema).",
+    sourcingNotes: "Often listed standalone as 'GLP-1 C' from research peptide vendors. Finnrick avg 6.3/10 — acceptable. Best used in combination with semaglutide (CagriSema).",
     warnings: ["Titrate slowly", "Nausea and injection site reactions common", "Not for use with other amylin analogues"],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "mazdutide",
@@ -232,7 +232,7 @@ export const BATCH1 = [
     tags: ["weight loss", "metabolic", "GLP-1", "glucagon", "dual agonist", "liver", "energy expenditure"],
     sourcingNotes: "Finnrick-verified. Chinese-origin compound gaining Western research market traction. Vendor availability growing.",
     warnings: ["Less clinical data available than semaglutide/tirzepatide", "Titrate slowly", "Glucagon agonism may cause nausea"],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "survodutide",
@@ -247,7 +247,7 @@ export const BATCH1 = [
     tags: ["weight loss", "metabolic", "GLP-1", "glucagon", "dual agonist", "MASH", "fatty liver", "Boehringer"],
     sourcingNotes: "Finnrick avg 6.7/10. Phase 3 compound — strong institutional research demand. Growing vendor availability.",
     warnings: ["Limited long-term safety data", "Hepatic monitoring recommended for MASH applications", "Titrate slowly"],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "orforglipron",
@@ -262,12 +262,12 @@ export const BATCH1 = [
     dosingRange: { low: "3mg", medium: "12mg", high: "36mg", frequency: "Daily oral" },
     tags: ["weight loss", "metabolic", "GLP-1", "oral", "small molecule", "non-peptide", "Eli Lilly", "no injection"],
     sourcingNotes:
-      "Swiss Chems carries. No reconstitution needed — oral capsule. Game-changer for accessibility. Not technically a peptide but category-defining for GLP-1 research.",
+      "Available from research peptide vendors as oral capsule. No reconstitution needed — oral capsule. Game-changer for accessibility. Not technically a peptide but category-defining for GLP-1 research.",
     warnings: [
       "GI side effects (nausea, diarrhea) common during titration",
       "Not for use with other GLP-1 agents",
       "Small molecule — different sourcing QC applies vs peptide vendors",
     ],
-    tier: "pro",
+    tier: "entry",
   },
 ];

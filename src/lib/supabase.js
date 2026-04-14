@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getStoredAffiliateRef, normalizeAffiliateRef } from "./affiliateRef.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./config.js";
 import { generateShareId8 } from "./stackShare.js";
 
@@ -115,7 +116,7 @@ export async function authSignIn(email, password) {
 }
 
 /**
- * @param {{ name?: string, plan?: string }} [meta]
+ * @param {{ name?: string, plan?: string, affiliate_ref?: string }} [meta]
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
 // enumeration-safe: always returns generic message regardless of supabase error
@@ -127,10 +128,15 @@ export async function authSignUp(email, password, meta = {}) {
   }
   const name = typeof meta.name === "string" ? meta.name : "";
   const plan = typeof meta.plan === "string" ? meta.plan : "entry";
+  const affiliateRef =
+    normalizeAffiliateRef(meta.affiliate_ref) ?? getStoredAffiliateRef();
+  /** @type {Record<string, string>} */
+  const userData = { name, plan };
+  if (affiliateRef) userData.affiliate_ref = affiliateRef;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { name, plan } },
+    options: { data: userData },
   });
   if (error) {
     return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
@@ -320,7 +326,7 @@ export async function listMemberProfiles(userId) {
   const { data, error } = await supabase
     .from("member_profiles")
     .select(
-      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, demo_sessions_shown, bio, experience_level, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, current_streak"
+      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, experience_level, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
@@ -466,6 +472,11 @@ export async function patchMemberProfileViaWorker(profileId, body) {
     return { error: new Error(msg) };
   }
   return { error: null };
+}
+
+/** PATCH Worker: archive current front/side/back trio into `progress_photo_sets` and clear slots. */
+export async function archiveProgressPhotoSetViaWorker(profileId) {
+  return patchMemberProfileViaWorker(profileId, { archive_progress_photo_set: true });
 }
 
 /**
@@ -634,6 +645,32 @@ export async function fetchNetworkFeed() {
     const { data, error } = await supabase.rpc("get_network_feed");
     if (error) return [];
     return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Live dose posts (non-expired), enriched via RPC — max 50, newest first.
+ * @returns {Promise<object[]>}
+ */
+export async function fetchPublicNetworkDoseFeed() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.rpc("get_public_network_dose_feed");
+    if (error) return [];
+    if (data == null) return [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === "string") {
+      try {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    if (data != null && typeof data === "object") return [data];
+    return [];
   } catch {
     return [];
   }
@@ -946,10 +983,39 @@ export async function listDoseLogsForPeptideRange(userId, profileId, peptideId, 
  * Injectable: vial_id + dose_mcg required (profile_id when using member profiles).
  * Non-injectable: vial_id null, dose_mcg null, dose_count + dose_unit + protocol_session (optional).
  * @param {{ user_id: string, profile_id?: string | null, vial_id?: string | null, peptide_id: string, dose_mcg?: number | null, dose_count?: number | null, dose_unit?: string | null, protocol_session?: string | null, notes?: string | null, dosed_at?: string }} row
+ * @returns {Promise<{ data: { id: string } | null, error: Error | null }>}
  */
 export async function insertDoseLog(row) {
+  if (!supabase) return { data: null, error: notConfiguredError() };
+  const { data, error } = await supabase.from("dose_logs").insert(row).select("id").maybeSingle();
+  return { data: data ?? null, error: error ?? null };
+}
+
+/**
+ * Saved stack row id for the active member profile (one row per user+profile).
+ * @param {string} userId
+ * @param {string} profileId
+ * @returns {Promise<{ stackRowId: string | null, error: Error | null }>}
+ */
+export async function getUserStackRowId(userId, profileId) {
+  if (!supabase || !userId || !profileId) return { stackRowId: null, error: notConfiguredError() };
+  const { data, error } = await supabase
+    .from("user_stacks")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  const id = data && typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;
+  return { stackRowId: id, error: error ?? null };
+}
+
+/**
+ * Inserts a network_feed row (migration 033). `expires_at` defaults server-side (+72h).
+ * @param {Record<string, unknown>} row
+ */
+export async function insertNetworkFeedDosePost(row) {
   if (!supabase) return { error: notConfiguredError() };
-  const { error } = await supabase.from("dose_logs").insert(row);
+  const { error } = await supabase.from("network_feed").insert(row);
   return { error: error ?? null };
 }
 

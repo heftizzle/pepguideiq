@@ -278,7 +278,36 @@ export function DemoTourBar() {
             <div className="mono" style={{ fontSize: 11, color: "#5c6d82", letterSpacing: "0.08em", marginBottom: 4 }}>
               PEPGUIDE IQ · {flowKey ? `${stepIndex + 1} / ${total}` : "Tips"}
             </div>
-            <div style={{ fontSize: 14, color: "#dde4ef", lineHeight: 1.45 }}>{label}</div>
+            {sessionCount === 1 ? (
+              <div style={{ marginBottom: 10 }}>
+                <div
+                  style={{
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#dde4ef",
+                    lineHeight: 1.35,
+                    marginBottom: 6,
+                  }}
+                >
+                  👋 Welcome to pepguideIQ — here's a quick tour
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'Outfit', sans-serif",
+                    fontSize: 12,
+                    color: "#5c6d82",
+                    lineHeight: 1.4,
+                    marginBottom: 8,
+                  }}
+                >
+                  Tap Next to follow along, or × to explore on your own
+                </div>
+                <div style={{ fontSize: 14, color: "#dde4ef", lineHeight: 1.45 }}>{label}</div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 14, color: "#dde4ef", lineHeight: 1.45 }}>{label}</div>
+            )}
           </div>
           <button
             type="button"

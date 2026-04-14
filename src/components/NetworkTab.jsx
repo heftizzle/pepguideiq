@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PEPTIDES } from "../data/catalog.js";
 import { NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
-import { fetchNetworkFeed } from "../lib/supabase.js";
+import { fetchNetworkFeed, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
 
-/** Tier emoji for Network cards (entry shown as free 🌱). */
+/** Tier emoji for Network stack cards (entry shown as free 🌱). */
 const NETWORK_TIER_EMOJI = {
   entry: "🌱",
   pro: "🔬",
@@ -35,6 +37,67 @@ function formatTimeAgo(iso) {
   return `${Math.floor(day / 30)}mo ago`;
 }
 
+/** @param {string | null | undefined} route */
+function formatRouteLabel(route) {
+  const r = typeof route === "string" ? route.trim().toLowerCase() : "";
+  if (!r) return "—";
+  const map = {
+    injectable: "Injectable",
+    oral: "Oral",
+    intranasal: "Intranasal",
+    topical: "Topical",
+    non_injectable: "Non-injectable",
+  };
+  return map[r] ?? r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** @param {string | null | undefined} session */
+function formatSessionLabel(session) {
+  const s = typeof session === "string" ? session.trim().toLowerCase() : "";
+  if (!s) return null;
+  const map = {
+    morning: "Morning",
+    afternoon: "Afternoon",
+    evening: "Evening",
+    night: "Night",
+  };
+  return map[s] ?? s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * @param {unknown} amount
+ * @param {unknown} unit
+ */
+function formatDoseLine(amount, unit) {
+  const u = typeof unit === "string" ? unit.trim().toLowerCase() : "";
+  const n = Number(amount);
+  if (u === "mcg" && Number.isFinite(n) && n > 0) {
+    return formatDoseAmountFromMcg(n) ?? `${n} mcg`;
+  }
+  if (Number.isFinite(n) && u) return `${n} ${unit}`.trim();
+  if (Number.isFinite(n)) return String(n);
+  if (typeof amount === "string" && amount.trim()) return amount.trim();
+  return "—";
+}
+
+function compoundDisplayName(compoundId) {
+  const id = typeof compoundId === "string" ? compoundId.trim() : "";
+  if (!id) return "—";
+  const p = PEPTIDES.find((x) => x && x.id === id);
+  return (p && typeof p.name === "string" && p.name.trim()) || id;
+}
+
+/**
+ * @param {string | null | undefined} expiresIso
+ */
+function isExpiresWithinHours(expiresIso, hours) {
+  if (typeof expiresIso !== "string" || !expiresIso) return false;
+  const end = Date.parse(expiresIso);
+  if (!Number.isFinite(end)) return false;
+  const msLeft = end - Date.now();
+  return msLeft > 0 && msLeft <= hours * 3600 * 1000;
+}
+
 function NetworkFeedSkeleton() {
   return (
     <div
@@ -55,28 +118,99 @@ function NetworkFeedSkeleton() {
   );
 }
 
+function DoseFeedSkeleton() {
+  return (
+    <div
+      className="pcard"
+      style={{
+        cursor: "default",
+        pointerEvents: "none",
+        minHeight: 96,
+        transform: "none",
+        boxShadow: "none",
+      }}
+      aria-hidden
+    >
+      <div style={{ height: 12, background: "#1a2430", borderRadius: 6, width: "44%", marginBottom: 12 }} />
+      <div style={{ height: 18, background: "#1a2430", borderRadius: 6, width: "88%", marginBottom: 8 }} />
+      <div style={{ height: 12, background: "#1a2430", borderRadius: 6, width: "55%" }} />
+    </div>
+  );
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {object[]}
+ */
+function normalizeDoseRpcRows(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw != null && typeof raw === "object") return [raw];
+  return [];
+}
+
 /**
  * @param {{ userId?: string }} props
  */
 export function NetworkTab({ userId }) {
-  const [items, setItems] = useState(/** @type {object[]} */ ([]));
-  const [loading, setLoading] = useState(true);
+  const [stackItems, setStackItems] = useState(/** @type {object[]} */ ([]));
+  const [doseItems, setDoseItems] = useState(/** @type {object[]} */ ([]));
+  const [stackLoading, setStackLoading] = useState(true);
+  const [doseLoading, setDoseLoading] = useState(true);
 
-  const loadFeed = useCallback(async () => {
+  const loadStackFeed = useCallback(async () => {
     if (!isSupabaseConfigured() || !userId) {
-      setItems([]);
-      setLoading(false);
+      setStackItems([]);
+      setStackLoading(false);
       return;
     }
-    setLoading(true);
+    setStackLoading(true);
     const rows = await fetchNetworkFeed();
-    setItems(rows);
-    setLoading(false);
+    setStackItems(rows);
+    setStackLoading(false);
   }, [userId]);
 
+  const loadDoseFeed = useCallback(async () => {
+    if (!isSupabaseConfigured() || !userId) {
+      setDoseItems([]);
+      setDoseLoading(false);
+      return;
+    }
+    setDoseLoading(true);
+    const raw = await fetchPublicNetworkDoseFeed();
+    setDoseItems(normalizeDoseRpcRows(raw));
+    setDoseLoading(false);
+  }, [userId]);
+
+  const refreshAll = useCallback(() => {
+    void loadStackFeed();
+    void loadDoseFeed();
+  }, [loadStackFeed, loadDoseFeed]);
+
   useEffect(() => {
-    void loadFeed();
-  }, [loadFeed]);
+    void loadStackFeed();
+  }, [loadStackFeed]);
+
+  useEffect(() => {
+    void loadDoseFeed();
+  }, [loadDoseFeed]);
+
+  useEffect(() => {
+    if (!userId || !isSupabaseConfigured()) return;
+    const id = window.setInterval(() => void loadDoseFeed(), 60_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") {
+        void loadDoseFeed();
+        void loadStackFeed();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [userId, loadDoseFeed, loadStackFeed]);
+
+  const headerBusy = useMemo(() => stackLoading || doseLoading, [stackLoading, doseLoading]);
 
   if (!userId) {
     return (
@@ -113,28 +247,132 @@ export function NetworkTab({ userId }) {
           <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
             NETWORK
           </div>
-          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4, maxWidth: 520 }}>
-            Public stacks shared by the community.
+          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4, maxWidth: 560 }}>
+            Live dose activity from the community and public stacks shared for discovery.
           </div>
         </div>
         <button
           type="button"
           className="btn-teal"
-          disabled={loading}
-          onClick={() => void loadFeed()}
+          disabled={headerBusy}
+          onClick={() => refreshAll()}
           style={{ fontSize: 13, padding: "8px 14px", minHeight: 44, flexShrink: 0 }}
         >
-          {loading ? "…" : "Refresh"}
+          {headerBusy ? "…" : "Refresh"}
         </button>
       </div>
 
-      {loading ? (
+      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", letterSpacing: "0.1em", marginBottom: 10 }}>
+        LIVE DOSING
+      </div>
+      {doseLoading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          <DoseFeedSkeleton />
+          <DoseFeedSkeleton />
+        </div>
+      ) : doseItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed #14202e",
+            borderRadius: 12,
+            padding: "36px 20px",
+            textAlign: "center",
+            marginBottom: 28,
+            background: "#0e1520",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>
+            No recent dose posts yet. Log a dose from Protocol or Stacks and choose &quot;Post It&quot; to share here
+            (posts expire after 72 hours).
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          {doseItems.map((row, idx) => {
+            const id = typeof row.id === "string" ? row.id : `dose-${idx}`;
+            const handle = typeof row.handle === "string" ? row.handle.trim() : "";
+            const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";
+            const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+            const verified =
+              row.verified_credential != null &&
+              String(row.verified_credential).trim() !== "";
+            const compoundId = typeof row.compound_id === "string" ? row.compound_id.trim() : "";
+            const compoundName = compoundDisplayName(compoundId);
+            const doseLine = formatDoseLine(row.dose_amount, row.dose_unit);
+            const routeLabel = formatRouteLabel(row.route);
+            const sessionPretty = formatSessionLabel(row.session_label);
+            const stackLabel = typeof row.stack_label === "string" && row.stack_label.trim() ? row.stack_label.trim() : null;
+            const createdAt = typeof row.created_at === "string" ? row.created_at : "";
+            const expiresAt = typeof row.expires_at === "string" ? row.expires_at : "";
+            const expiresSoon = isExpiresWithinHours(expiresAt, 6);
+            const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
+
+            return (
+              <div
+                key={id}
+                className="pcard"
+                role="article"
+                style={{
+                  cursor: "default",
+                  transform: "none",
+                  boxShadow: expiresSoon ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
+                  opacity: expiresSoon ? 0.88 : 1,
+                  fontFamily: "'Outfit', sans-serif",
+                  color: "#dde4ef",
+                }}
+              >
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#f8fafc" }}>{handleShown}</span>
+                  {verified ? (
+                    <span
+                      title="Verified"
+                      className="mono"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: "0.06em",
+                        color: "#00d4aa",
+                        border: "1px solid rgba(0, 212, 170, 0.45)",
+                        borderRadius: 6,
+                        padding: "2px 8px",
+                        background: "rgba(0, 212, 170, 0.1)",
+                      }}
+                    >
+                      ✓ VERIFIED
+                    </span>
+                  ) : null}
+                  {expiresSoon ? (
+                    <span className="mono" style={{ fontSize: 10, color: "#94a3b8", marginLeft: "auto" }}>
+                      Expires soon
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "#00d4aa", marginBottom: 6, lineHeight: 1.35 }}>
+                  {compoundName}
+                  <span style={{ color: "#8fa5bf", fontWeight: 500, fontSize: 14 }}>
+                    {" "}
+                    · {doseLine} · {routeLabel}
+                  </span>
+                </div>
+                <div className="mono" style={{ fontSize: 12, color: "#5c6d82", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                  {sessionPretty ? <span>Session: {sessionPretty}</span> : null}
+                  {stackLabel ? <span>Stack: {stackLabel}</span> : null}
+                  {createdAt ? <span>{formatTimeAgo(createdAt)}</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", letterSpacing: "0.1em", marginBottom: 10 }}>
+        SHARED STACKS
+      </div>
+      {stackLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <NetworkFeedSkeleton />
           <NetworkFeedSkeleton />
-          <NetworkFeedSkeleton />
         </div>
-      ) : items.length === 0 ? (
+      ) : stackItems.length === 0 ? (
         <div
           style={{
             border: "1px dashed #14202e",
@@ -152,7 +390,7 @@ export function NetworkTab({ userId }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {items.map((row, idx) => {
+          {stackItems.map((row, idx) => {
             const shareId = typeof row.share_id === "string" ? row.share_id.trim() : "";
             const handle = typeof row.handle === "string" ? row.handle.trim() : "";
             const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "—";

@@ -4,6 +4,7 @@ import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
 import { getStripeCheckoutUrlWithClientRef } from "../lib/checkout.js";
 import { fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
 import { formatPlan, getNextTierId, TIER_RANK } from "../lib/tiers.js";
+import { getSuggestedUpgradeTier, getUpgradeGateCopy } from "../lib/upgradeGateCopy.js";
 
 const ROWS = getUpgradeTierRows();
 
@@ -102,7 +103,10 @@ const mutedDowngradeBtn = {
   cursor: "pointer",
 };
 
-export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
+/**
+ * @param {{ onClose: () => void, user: object, upgradeFocusTier: string | null, setUser: (u: object | null) => void, gateReason?: string | null, planKey?: string }} props
+ */
+export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gateReason = null, planKey = "entry" }) {
   const [subscriptionInfo, setSubscriptionInfo] = useState(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [subscriptionError, setSubscriptionError] = useState(null);
@@ -110,6 +114,12 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
   const [downgradeSubmitting, setDowngradeSubmitting] = useState(false);
   const [downgradeError, setDowngradeError] = useState(null);
   const [hoverTierId, setHoverTierId] = useState(null);
+
+  const gateCopy = gateReason ? getUpgradeGateCopy(gateReason) : null;
+  const gateCheckoutTier =
+    gateReason != null && gateReason !== ""
+      ? getSuggestedUpgradeTier(gateReason, typeof planKey === "string" ? planKey : "entry")
+      : null;
 
   const refetchSubscription = () => {
     setSubscriptionLoading(true);
@@ -470,6 +480,42 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser }) {
           ×
         </button>
       </div>
+
+      {gateCopy ? (
+        <div
+          style={{
+            marginBottom: 18,
+            padding: "16px 18px",
+            borderRadius: 12,
+            border: "1px solid rgba(0, 212, 170, 0.38)",
+            background: "linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(6, 182, 212, 0.06) 100%)",
+          }}
+        >
+          <div className="brand" style={{ fontSize: 17, fontWeight: 700, color: "#e8eef6", marginBottom: 8, lineHeight: 1.3 }}>
+            {gateCopy.title}
+          </div>
+          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.55, marginBottom: gateCheckoutTier && gateCheckoutTier !== "entry" ? 14 : 0, maxWidth: 640 }}>
+            {gateCopy.body}
+          </div>
+          {gateCheckoutTier && gateCheckoutTier !== "entry" ? (
+            <button
+              type="button"
+              className="btn-teal"
+              disabled={actionsDisabled}
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                padding: "10px 18px",
+                borderRadius: 10,
+                opacity: actionsDisabled ? 0.55 : 1,
+              }}
+              onClick={() => void tierAction(gateCheckoutTier)}
+            >
+              {gateCopy.ctaLabel} →
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="upgrade-tier-grid">
         {ROWS.map((row) => (

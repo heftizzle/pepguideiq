@@ -1,3 +1,5 @@
+import { clearStoredAffiliateRef, getStoredAffiliateRef } from "./affiliateRef.js";
+
 /**
  * Stripe Payment Links or Checkout URLs per paid tier (set in `.env.local` / hosting env).
  * Upgrades sync plan via Worker webhook → `update_user_plan` RPC (see README).
@@ -24,6 +26,11 @@ export function getStripeCheckoutUrlWithClientRef(planId, userId) {
   try {
     const u = new URL(base);
     if (userId) u.searchParams.set("client_reference_id", userId);
+    const ref = getStoredAffiliateRef();
+    if (ref) {
+      u.searchParams.set("prefilled_promotion_code", ref);
+      clearStoredAffiliateRef();
+    }
     return u.toString();
   } catch {
     return base;

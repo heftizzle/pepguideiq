@@ -5,6 +5,8 @@ import {
   R2_UPLOAD_ACCEPT_ATTR,
   R2_UPLOAD_ALLOWED_TYPES,
   R2_UPLOAD_MAX_BYTES,
+  appendImageCacheBustParam,
+  shouldResetImageUploadFetchBust,
   uploadImageToR2,
 } from "../lib/r2Upload.js";
 
@@ -31,6 +33,15 @@ export function StackPhotoUpload({
   const [dragOver, setDragOver] = useState(false);
   const [err, setErr] = useState(null);
   const [privateBlobUrl, setPrivateBlobUrl] = useState(null);
+  const [fetchBustMs, setFetchBustMs] = useState(0);
+  const prevStackKeyRef = useRef(typeof stackPhotoKey === "string" ? stackPhotoKey.trim() : "");
+
+  useEffect(() => {
+    const next = typeof stackPhotoKey === "string" ? stackPhotoKey.trim() : "";
+    const prev = prevStackKeyRef.current;
+    prevStackKeyRef.current = next;
+    if (shouldResetImageUploadFetchBust(prev, next)) setFetchBustMs(0);
+  }, [stackPhotoKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +58,8 @@ export function StackPhotoUpload({
         return;
       }
       try {
-        const res = await fetch(`${API_WORKER_URL}/stack-photo`, {
+        const base = `${API_WORKER_URL}/stack-photo`;
+        const res = await fetch(appendImageCacheBustParam(base, fetchBustMs), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok || cancelled) {
@@ -68,7 +80,7 @@ export function StackPhotoUpload({
       cancelled = true;
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [stackPhotoKey, workerConfigured]);
+  }, [stackPhotoKey, workerConfigured, fetchBustMs]);
 
   const gated = !canUpload;
   const noWorker = canUpload && !workerConfigured;
@@ -135,6 +147,7 @@ export function StackPhotoUpload({
       return;
     }
     setErr(null);
+    setFetchBustMs(Date.now());
     await onUploaded();
   }
 

@@ -1,14 +1,25 @@
-/** Server + DB: lowercase letters, digits, underscore; 3–20 chars. */
-export const MEMBER_HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
+/**
+ * Server + DB: letters, digits, underscore, period, hyphen; 3–32; no ..; cannot start or end with `.`
+ * (first/last character must be alphanumeric — same rule as `member_profiles_handle_format_chk`).
+ */
+export const MEMBER_HANDLE_PATTERN = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
 
 /**
- * Normalize user input: trim, lowercase, strip leading @.
+ * Trim and strip a single leading `@`; preserve casing.
+ * @param {unknown} raw
+ */
+export function stripHandleAtPrefix(raw) {
+  let s = String(raw ?? "").trim();
+  if (s.startsWith("@")) s = s.slice(1).trim();
+  return s;
+}
+
+/**
+ * Lowercase canonical form for uniqueness / comparisons (not for display).
  * @param {unknown} raw
  */
 export function normalizeHandleInput(raw) {
-  let s = String(raw ?? "").trim().toLowerCase();
-  if (s.startsWith("@")) s = s.slice(1);
-  return s;
+  return stripHandleAtPrefix(raw).toLowerCase();
 }
 
 /**
@@ -16,15 +27,17 @@ export function normalizeHandleInput(raw) {
  * @returns {boolean}
  */
 export function isValidMemberHandleFormat(raw) {
-  const h = normalizeHandleInput(raw);
-  return MEMBER_HANDLE_PATTERN.test(h);
+  return MEMBER_HANDLE_PATTERN.test(stripHandleAtPrefix(raw));
 }
 
 /**
- * @param {unknown} handle — stored DB value (no @)
+ * @param {unknown} handle — stored canonical handle (lowercase, no @)
+ * @param {unknown} [displayHandle] — optional `member_profiles.display_handle` (as typed)
  */
-export function formatHandleDisplay(handle) {
-  if (typeof handle !== "string") return "";
-  const h = normalizeHandleInput(handle);
-  return h ? `@${h}` : "";
+export function formatHandleDisplay(handle, displayHandle) {
+  const canon = typeof handle === "string" ? handle.trim() : "";
+  const disp = typeof displayHandle === "string" ? displayHandle.trim() : "";
+  const inner = disp ? stripHandleAtPrefix(disp) : stripHandleAtPrefix(canon);
+  if (!inner) return "";
+  return `@${inner}`;
 }

@@ -1,6 +1,6 @@
 # pepguideIQ Roadmap
 
-> Built in 11 days. 151-compound catalog. Live at [pepguideiq.com](https://pepguideiq.com)  
+> Built in 11 days. 153-compound catalog. Live at [pepguideiq.com](https://pepguideiq.com)  
 > Last updated: April 6, 2026
 
 ---

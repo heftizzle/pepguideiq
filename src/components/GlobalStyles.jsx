@@ -296,18 +296,18 @@ export function GlobalStyles() {
         50%{outline-color:rgba(0,212,170,0.9);box-shadow:0 0 18px rgba(0,212,170,0.18)}
       }
       @keyframes pepv-dose-toast-anim{
-        0%{opacity:0;transform:translateY(10px)}
+        0%{opacity:0;transform:translateY(-8px)}
         12%{opacity:1;transform:translateY(0)}
         72%{opacity:1;transform:translateY(0)}
-        100%{opacity:0;transform:translateY(4px)}
+        100%{opacity:0;transform:translateY(-4px)}
       }
       .pepv-dose-toast-wrap{
-        position:fixed;left:50%;bottom:80px;
+        position:fixed;left:50%;top:max(5.25rem,calc(env(safe-area-inset-top,0px) + 3.5rem));
         transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),440px);
         pointer-events:none;box-sizing:border-box;padding:0 12px;
       }
       .pepv-dose-toast-inner{
-        animation:pepv-dose-toast-anim 2.5s cubic-bezier(0.22,1,0.36,1) forwards;
+        animation:pepv-dose-toast-anim 3.5s cubic-bezier(0.22,1,0.36,1) forwards;
         background:#0e1520;border:1px solid #00d4aa;color:#00d4aa;min-height:44px;
         padding:12px 20px;border-radius:10px;font-size:14px;line-height:1.45;text-align:center;
         box-shadow:0 10px 40px rgba(0,0,0,0.5);

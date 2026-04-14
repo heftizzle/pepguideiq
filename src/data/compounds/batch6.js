@@ -12,7 +12,7 @@ export const BATCH6 = [
     tags: ["aromatase inhibitor", "estrogen control", "TRT", "AI", "steroidal", "suicide inhibitor", "protocol support"],
     sourcingNotes: "Widely available pharmaceutical. Dan's recommendation over letrozole for TRT support due to steroidal mechanism and lower rebound risk.",
     warnings: ["Estrogen crash risk — do not over-use", "Joint pain and libido reduction with excessive suppression", "Monitor E2 labs before adjusting dose", "Steroidal structure — mild androgenic activity possible"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "anastrozole",
@@ -27,7 +27,7 @@ export const BATCH6 = [
     tags: ["aromatase inhibitor", "estrogen control", "TRT", "AI", "non-steroidal", "protocol support"],
     sourcingNotes: "Most widely prescribed TRT ancillary. Reversible mechanism — less durable than exemestane but easier to dial in.",
     warnings: ["Estrogen rebound upon discontinuation", "Bone density loss with long-term use/excess suppression", "Monitor E2 labs — over-suppression is common mistake"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "letrozole",
@@ -40,14 +40,14 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "0.5mg", medium: "1mg", high: "2.5mg", frequency: "Every other day (cycle use) or daily (gyno reversal)" },
     tags: ["aromatase inhibitor", "estrogen control", "gynecomastia", "AI", "potent", "protocol support"],
-    sourcingNotes: "Swiss Chems carries. Reserved for gyno reversal protocols or situations where anastrozole/exemestane insufficient. Excessive use is easy — E2 crash happens fast.",
+    sourcingNotes: "Available from research peptide vendors. Reserved for gyno reversal protocols or situations where anastrozole/exemestane insufficient. Excessive use is easy — E2 crash happens fast.",
     warnings: [
       "⚠️ MOST POTENT AI — easy to crash estrogen completely",
       "Bone density, lipid profile, joint health, libido all suffer with over-suppression",
       "Use for short courses only unless directed by physician",
       "Lab monitoring essential",
     ],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "enclomiphene",
@@ -60,9 +60,9 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "12.5mg", medium: "25mg", high: "50mg", frequency: "Daily oral" },
     tags: ["SERM", "testosterone", "fertility", "LH", "FSH", "natty", "HPG axis", "protocol support"],
-    sourcingNotes: "Swiss Chems carries. Preferred over full clomiphene for natty testosterone support — pure trans isomer avoids cis-isomer's estrogenic/visual side effects.",
+    sourcingNotes: "Available from research peptide vendors. Preferred over full clomiphene for natty testosterone support — pure trans isomer avoids cis-isomer's estrogenic/visual side effects.",
     warnings: ["Visual disturbances possible (less than full clomiphene)", "Not effective if primary hypogonadism (testes issue vs pituitary)", "Labs required to verify LH/FSH response"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "clomiphene",
@@ -75,9 +75,9 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "25mg", medium: "50mg", high: "100mg", frequency: "Daily oral (PCT: 4-6 weeks)" },
     tags: ["SERM", "PCT", "testosterone", "fertility", "LH", "FSH", "HPG restart", "protocol support"],
-    sourcingNotes: "Swiss Chems carries. Classic PCT choice. Enclomiphene preferred for TRT support — clomiphene better for full PCT restart.",
+    sourcingNotes: "Available from research peptide vendors. Classic PCT choice. Enclomiphene preferred for TRT support — clomiphene better for full PCT restart.",
     warnings: ["Visual disturbances (blurred vision, floaters) — stop if occurs", "Mood swings from mixed isomer estrogenic activity", "Not for long-term continuous use"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "tamoxifen",
@@ -92,7 +92,7 @@ export const BATCH6 = [
     tags: ["SERM", "PCT", "gynecomastia", "estrogen", "LH", "FSH", "protocol support", "breast tissue"],
     sourcingNotes: "Widely available pharmaceutical. Standard PCT compound. Often stacked with clomiphene: Tamox 20mg + Clomid 50mg.",
     warnings: ["Blood clot risk (DVT) — particularly at higher doses or combined with other risk factors", "May reduce IGF-1 levels — consideration for GH protocol users", "Liver enzyme elevation possible"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "dim",
@@ -106,7 +106,7 @@ export const BATCH6 = [
     dosingRange: { low: "100mg", medium: "200mg", high: "400mg", frequency: "Daily oral with food" },
     tags: ["estrogen", "metabolism", "2-OH pathway", "protocol support", "AI complement", "cruciferous"],
     sourcingNotes:
-      "Supplement category — Codeage DIM-E (enhanced bioavailability with BioPerine) is Dan's preferred source. Not a peptide but essential protocol support compound.",
+      "Supplement category — enhanced-bioavailability DIM with piperine (e.g. DIM-Complex with BioPerine) is a common preferred format. Not a peptide but essential protocol support compound.",
     warnings: [
       "Enhanced absorption forms (DIM-E, BioPerine) significantly outperform standard DIM",
       "May compete with AI — monitor E2 labs when combining",
@@ -140,14 +140,14 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral tablet/capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "12.5mcg", medium: "25mcg", high: "50mcg", frequency: "Daily oral (split dose)" },
     tags: ["thyroid", "metabolic rate", "fat loss", "T3", "thermogenesis", "protocol support", "cutting"],
-    sourcingNotes: "Swiss Chems carries. Used in cutting protocols — typically 4-8 week cycles. Taper off rather than stopping abruptly.",
+    sourcingNotes: "Available from research peptide vendors. Used in cutting protocols — typically 4-8 week cycles. Taper off rather than stopping abruptly.",
     warnings: [
       "Suppresses endogenous thyroid production — taper off slowly",
       "Cardiac risk at high doses — heart rate and blood pressure monitoring",
       "Muscle catabolism at high doses — adequate protein intake essential",
       "Do not combine with other stimulants without physician oversight",
     ],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "levothyroxine-t4",
@@ -160,9 +160,9 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral tablet/capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "25mcg", medium: "100mcg", high: "200mcg", frequency: "Daily oral, fasted AM" },
     tags: ["thyroid", "T4", "metabolic", "hypothyroid", "protocol support", "conversion"],
-    sourcingNotes: "Swiss Chems carries. Preferred over T3 alone for stable levels. Conversion to T3 varies — poor converters may need T3 addition.",
+    sourcingNotes: "Available from research peptide vendors. Preferred over T3 alone for stable levels. Conversion to T3 varies — poor converters may need T3 addition.",
     warnings: ["Same cardiac and suppression caveats as T3 — slightly more forgiving due to slower conversion", "Take fasted — food and supplements (calcium, iron) reduce absorption", "Labs required to dial in dose"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "tesofensine",
@@ -175,7 +175,7 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral capsule", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "0.125mg", medium: "0.25mg", high: "0.5mg", frequency: "Daily oral (accumulates — start very low)" },
     tags: ["weight loss", "appetite suppression", "dopamine", "serotonin", "norepinephrine", "metabolic", "reuptake inhibitor"],
-    sourcingNotes: "Swiss Chems carries. Extremely long half-life — 10+ day accumulation. Start at absolute minimum dose and wait 2+ weeks before assessing effect.",
+    sourcingNotes: "Available from research peptide vendors. Extremely long half-life — 10+ day accumulation. Start at absolute minimum dose and wait 2+ weeks before assessing effect.",
     warnings: [
       "⚠️ VERY LONG HALF-LIFE — accumulates over weeks",
       "Blood pressure and heart rate elevation",
@@ -183,7 +183,7 @@ export const BATCH6 = [
       "Drug interactions with monoamine system medications",
       "Start at 0.125mg and wait before increasing",
     ],
-    tier: "goat",
+    tier: "entry",
   },
   {
     id: "mirabegron",
@@ -196,9 +196,9 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral tablet", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "25mg", medium: "50mg", high: "100mg", frequency: "Daily oral" },
     tags: ["brown adipose", "BAT", "thermogenesis", "metabolic", "beta-3", "fat loss", "protocol support"],
-    sourcingNotes: "Swiss Chems carries. FDA-approved — cleaner safety profile than many metabolic compounds. BAT activation mechanism distinct from other weight loss compounds.",
+    sourcingNotes: "Available from research peptide vendors. FDA-approved — cleaner safety profile than many metabolic compounds. BAT activation mechanism distinct from other weight loss compounds.",
     warnings: ["Blood pressure elevation at higher doses", "Urinary retention possible", "Drug interactions via CYP2D6"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "telmisartan",
@@ -211,9 +211,9 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral tablet", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "20mg", medium: "40mg", high: "80mg", frequency: "Daily oral" },
     tags: ["blood pressure", "cardiovascular", "PPARγ", "insulin sensitivity", "metabolic", "longevity", "ARB"],
-    sourcingNotes: "Swiss Chems carries. FDA-approved pharmaceutical. Bryan Johnson protocol compound. Particularly relevant for those with cardiovascular concerns alongside peptide protocols.",
+    sourcingNotes: "Available from research peptide vendors. FDA-approved pharmaceutical. Bryan Johnson protocol compound. Particularly relevant for those with cardiovascular concerns alongside peptide protocols.",
     warnings: ["Hypotension risk — monitor BP", "Hyperkalemia risk — avoid with high potassium supplements", "Renal monitoring recommended"],
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "oea",
@@ -226,7 +226,7 @@ export const BATCH6 = [
     reconstitution: { solvent: "Oral — lipid suspension preferred", typicalVialMg: null, typicalVolumeMl: null },
     dosingRange: { low: "100mg", medium: "250mg", high: "500mg", frequency: "30-60 min pre-meal" },
     tags: ["satiety", "appetite", "PPARα", "lipid signaling", "fat oxidation", "metabolic", "gut"],
-    sourcingNotes: "Swiss Chems carries. Natural endogenous compound — excellent safety profile. Stack with GLP-1 agents for additive appetite suppression via independent pathway.",
+    sourcingNotes: "Available from research peptide vendors. Natural endogenous compound — excellent safety profile. Stack with GLP-1 agents for additive appetite suppression via independent pathway.",
     warnings: ["Take pre-meal for maximal effect", "Fat-soluble — take with fatty foods or MCT oil for absorption"],
     tier: "entry",
   },
@@ -243,14 +243,14 @@ export const BATCH6 = [
     dosingRange: { low: "25mg", medium: "50mg", high: "75mg", frequency: "Daily topical scalp application" },
     tags: ["hair loss", "DHT", "androgen receptor", "scalp", "topical", "anti-androgen", "alopecia"],
     sourcingNotes:
-      "Swiss Chems carries raw powder. Requires preparation in a carrier solution (ethanol + PG or minoxidil base). Popular in hair loss community as alternative to finasteride without systemic effects.",
+      "Raw powder available from research peptide vendors. Requires preparation in a carrier solution (ethanol + PG or minoxidil base). Popular in hair loss community as alternative to finasteride without systemic effects.",
     warnings: [
       "Raw powder — preparation skill required",
       "Minimal systemic absorption when used correctly — use carrier correctly",
       "Systemic anti-androgen effects possible if overused or carrier is wrong",
       "Research compound — no clinical trial completion",
     ],
-    tier: "elite",
+    tier: "entry",
   },
   {
     id: "tesofensine-ipamorelin",
@@ -290,7 +290,7 @@ export const BATCH6 = [
     tags: ["blend", "tesofensine", "ipamorelin", "metabolic", "GH", "appetite", "subQ", "compounded"],
     popularityRank: 150,
     bioavailability: "~100% (injectable)",
-    tier: "pro",
+    tier: "entry",
     vialSizeOptions: [{ label: "500mcg Teso + 2mg Ipa (2.5mg total)", totalMg: 2.5, bacWaterMl: 2 }],
   },
   {
@@ -334,7 +334,7 @@ export const BATCH6 = [
     tags: ["blend", "GH", "CJC-1295", "ipamorelin", "GHRP-6", "GHRP-2", "secretagogue", "triple stack"],
     popularityRank: 151,
     bioavailability: "~100% (injectable)",
-    tier: "pro",
+    tier: "entry",
     vialSizeOptions: [{ label: "2mg CJC + 2mg Ipa + 2mg GHRP-6 (6mg total)", totalMg: 6, bacWaterMl: 3 }],
   },
   {
@@ -369,7 +369,7 @@ export const BATCH6 = [
       "Stronger metabolic effect than CJC-1295/Ipa. Best for adults targeting visceral fat while preserving muscle. Popular for transitions off GLP-1 medications. Nighttime dosing aligns with natural GH release during deep sleep.",
     popularityRank: 152,
     bioavailability: "~100% (injectable)",
-    tier: "pro",
+    tier: "entry",
   },
   {
     id: "tesa-ipa-cjc",
@@ -399,6 +399,6 @@ export const BATCH6 = [
       "Triple blend from Peptide Sciences. 6:3:3 ratio — Tesamorelin dominant for metabolic effect, Ipamorelin and CJC-1295 No DAC for synergistic pulsatile GH amplification. More comprehensive GH axis coverage than any dual blend.",
     popularityRank: 153,
     bioavailability: "~100% (injectable)",
-    tier: "pro",
+    tier: "entry",
   },
 ];

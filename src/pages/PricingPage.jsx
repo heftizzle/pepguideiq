@@ -1,0 +1,220 @@
+import { useEffect } from "react";
+import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
+import { buildSignupHref, captureAffiliateRefFromLocation } from "../lib/affiliateRef.js";
+import { Logo } from "../components/Logo.jsx";
+
+const BG = "#0d0f14";
+const ACCENT = "#00d4aa";
+
+/** Marketing emojis (override catalog tier emojis on this page). */
+const TIER_EMOJI = {
+  entry: "🌱",
+  pro: "🔬",
+  elite: "⚡",
+  goat: "🐐",
+};
+
+function tierCtaHref(id) {
+  if (id === "entry") return buildSignupHref({});
+  return buildSignupHref({ plan: id });
+}
+
+function tierCtaLabel(id) {
+  return id === "entry" ? "Get Started Free" : "Get Started";
+}
+
+function PricingPage() {
+  useEffect(() => {
+    captureAffiliateRefFromLocation();
+  }, []);
+
+  const rows = getUpgradeTierRows();
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: BG,
+        color: "#dde4ef",
+        padding: "24px 20px 48px",
+        boxSizing: "border-box",
+      }}
+    >
+      <header
+        style={{
+          maxWidth: 1100,
+          margin: "0 auto 40px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <a href="/" style={{ textDecoration: "none", color: "inherit" }}>
+          <Logo />
+        </a>
+        <nav style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 14 }}>
+          <a
+            href="/"
+            style={{
+              color: ACCENT,
+              textDecoration: "none",
+              fontFamily: "'Outfit',sans-serif",
+              fontWeight: 600,
+            }}
+          >
+            Sign in
+          </a>
+        </nav>
+      </header>
+
+      <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center", marginBottom: 36 }}>
+        <h1
+          className="brand"
+          style={{
+            fontSize: "clamp(1.75rem, 4vw, 2.25rem)",
+            fontWeight: 800,
+            margin: "0 0 12px",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          Simple pricing
+        </h1>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 15,
+            color: "#8b9cb3",
+            maxWidth: 520,
+            marginLeft: "auto",
+            marginRight: "auto",
+            lineHeight: 1.55,
+            fontFamily: "'Outfit',sans-serif",
+          }}
+        >
+          Pick the tier that matches your protocol depth. Upgrade or downgrade anytime.
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 16,
+          maxWidth: 1100,
+          margin: "0 auto",
+        }}
+      >
+        {rows.map((row) => {
+          const emoji = TIER_EMOJI[row.id] ?? row.emoji;
+          const borderColor = row.id === "entry" ? "#1e2a3a" : row.color;
+          return (
+            <article
+              key={row.id}
+              style={{
+                background: "#12151c",
+                border: `1px solid ${borderColor}`,
+                borderRadius: 14,
+                padding: "22px 20px 20px",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: row.id === "pro" ? `0 0 0 1px ${ACCENT}22, 0 12px 40px #0006` : "0 8px 32px #0005",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: row.color,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: "0.08em",
+                  marginBottom: 6,
+                }}
+              >
+                {emoji} {row.name}
+              </div>
+              <div className="brand" style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>
+                {row.priceLabel}
+              </div>
+              <p
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#cbd5e1",
+                  lineHeight: 1.4,
+                  fontFamily: "'Outfit',sans-serif",
+                }}
+              >
+                {row.headline}
+              </p>
+              <p
+                style={{
+                  margin: "0 0 18px",
+                  fontSize: 13,
+                  color: "#64748b",
+                  lineHeight: 1.5,
+                  flex: 1,
+                  fontFamily: "'Outfit',sans-serif",
+                }}
+              >
+                {row.subline}
+              </p>
+              <ul
+                style={{
+                  margin: "0 0 20px",
+                  paddingLeft: 18,
+                  fontSize: 12,
+                  color: "#94a3b8",
+                  lineHeight: 1.55,
+                  textAlign: "left",
+                }}
+              >
+                {row.limitBullets.slice(0, 5).map((line) => (
+                  <li key={line} style={{ marginBottom: 4 }}>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href={tierCtaHref(row.id)}
+                className="btn-teal"
+                style={{
+                  display: "block",
+                  textAlign: "center",
+                  textDecoration: "none",
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'Outfit',sans-serif",
+                  background: row.id === "entry" ? "transparent" : `${ACCENT}18`,
+                  border: `2px solid ${row.id === "entry" ? "#2d3d52" : ACCENT}`,
+                  color: row.id === "entry" ? "#94a3b8" : ACCENT,
+                }}
+              >
+                {tierCtaLabel(row.id)}
+              </a>
+            </article>
+          );
+        })}
+      </div>
+
+      <p
+        style={{
+          textAlign: "center",
+          marginTop: 28,
+          fontSize: 12,
+          color: "#475569",
+          fontFamily: "'JetBrains Mono',monospace",
+        }}
+      >
+        Subscriptions on web are billed via Stripe. Mobile may use App Store / Google Play.
+      </p>
+    </div>
+  );
+}
+
+export default PricingPage;
+

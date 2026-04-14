@@ -4,8 +4,16 @@ import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
 import { formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
+import { resolveCatalogBlendBacRefMl } from "../lib/peptideMath.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
-import { insertDoseLog, listPeptideIdsWithDosesOnLocalDay } from "../lib/supabase.js";
+import {
+  getUserStackRowId,
+  insertDoseLog,
+  insertNetworkFeedDosePost,
+  listPeptideIdsWithDosesOnLocalDay,
+} from "../lib/supabase.js";
+import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
+import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
@@ -43,6 +51,11 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
   const [loggingPeptideId, setLoggingPeptideId] = useState(null);
   const [loggedTodayIds, setLoggedTodayIds] = useState(() => new Set());
   const [guardrail, setGuardrail] = useState(null);
+  const [networkPrompt, setNetworkPrompt] = useState(
+    /** @type {null | { insertRow: Record<string, unknown>; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
+  );
+  const [networkPostBusy, setNetworkPostBusy] = useState(false);
+  const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
   const showDoseToast = useShowDoseToast();
   const skipGuardrailForPeptideIdRef = useRef(null);
 
@@ -137,9 +150,10 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
 
     setLoggingPeptideId(peptideId);
     const now = new Date().toISOString();
-    let error = null;
+    /** @type {{ data: { id?: string } | null; error: Error | null }} */
+    let insertRes = { data: null, error: null };
     if (payload.kind === "injectable") {
-      const res = await insertDoseLog({
+      insertRes = await insertDoseLog({
         user_id: userId,
         profile_id: profileId,
         vial_id: payload.vial.id,
@@ -148,9 +162,8 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         notes: null,
         dosed_at: now,
       });
-      error = res.error;
     } else {
-      const res = await insertDoseLog({
+      insertRes = await insertDoseLog({
         user_id: userId,
         profile_id: profileId,
         vial_id: null,
@@ -162,17 +175,65 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         notes: null,
         dosed_at: now,
       });
-      error = res.error;
     }
+    const { error, data: inserted } = insertRes;
     setLoggingPeptideId(null);
     if (error) return;
     setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
     setGuardrail(null);
     void refreshMemberProfiles();
-    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
-    showDoseToast(getDoseLogCelebrationMessage(cat, r.name));
     bumpReload();
+    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
+    const toastMessage = getDoseLogCelebrationMessage(cat, r.name);
+    const doseLogId =
+      inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
+    if (!doseLogId) {
+      showDoseToast(toastMessage);
+      return;
+    }
+    const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
+    const { stackRowId } = await getUserStackRowId(userId, profileId);
+    const insertRow = buildNetworkFeedInsertRow({
+      userId,
+      doseLogId,
+      peptideId,
+      payload,
+      session,
+      stackRowId: stackRowId ?? null,
+      catalogPeptide: cat,
+    });
+    setNetworkPostError(null);
+    setNetworkPrompt({
+      insertRow,
+      compoundName: r.name,
+      previewLine,
+      toastMessage,
+    });
   };
+
+  const dismissNetworkPrompt = useCallback(() => {
+    const msg = networkPrompt?.toastMessage;
+    setNetworkPrompt(null);
+    setNetworkPostError(null);
+    setNetworkPostBusy(false);
+    if (msg) showDoseToast(msg);
+  }, [networkPrompt, showDoseToast]);
+
+  const confirmNetworkPost = useCallback(async () => {
+    if (!networkPrompt?.insertRow) return;
+    setNetworkPostBusy(true);
+    setNetworkPostError(null);
+    const { error } = await insertNetworkFeedDosePost(networkPrompt.insertRow);
+    setNetworkPostBusy(false);
+    if (error) {
+      setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
+      return;
+    }
+    const msg = networkPrompt.toastMessage;
+    setNetworkPrompt(null);
+    setNetworkPostBusy(false);
+    showDoseToast(msg);
+  }, [networkPrompt, showDoseToast]);
 
   const loggableLines = useMemo(() => (lines ?? []).filter((l) => l.display === "ok"), [lines]);
 
@@ -234,6 +295,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
   }
 
   return (
+    <>
     <div style={{ marginBottom: 20 }}>
       <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 4 }}>
         {protocolHeaderLine()}
@@ -324,6 +386,16 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         </div>
       )}
     </div>
+    <PostDoseNetworkSheet
+      open={networkPrompt != null}
+      compoundName={networkPrompt?.compoundName ?? ""}
+      previewLine={networkPrompt?.previewLine ?? ""}
+      busy={networkPostBusy}
+      postError={networkPostError}
+      onPost={confirmNetworkPost}
+      onKeepPrivate={dismissNetworkPrompt}
+    />
+    </>
   );
 }
 
@@ -449,10 +521,11 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
     [line.peptideId, line.name]
   );
   const blendComponents = catalog?.components;
+  const catalogBacRefMl = useMemo(() => resolveCatalogBlendBacRefMl(catalog), [catalog]);
   const derivedMcg = useMemo(() => unitsToMcg(line.units, vial?.concentration_mcg_ml), [line.units, vial?.concentration_mcg_ml]);
   const dosePreview = useMemo(
-    () => formatProtocolInjectableDosePreview(line.units, vial, blendComponents),
-    [line.units, vial, blendComponents]
+    () => formatProtocolInjectableDosePreview(line.units, vial, blendComponents, catalogBacRefMl),
+    [line.units, vial, blendComponents, catalogBacRefMl]
   );
   const timingWarning = getTimingWarning(line.peptideId, session);
   const canLog = derivedMcg != null && derivedMcg > 0 && vial;

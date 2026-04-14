@@ -13,7 +13,7 @@ function initialLetter(displayName) {
 
 /**
  * Bottom-right profile switcher (above main nav). Does not alter other layout.
- * @param {{ onOpenUpgrade?: () => void }} props
+ * @param {{ onOpenUpgrade?: (reason?: string) => void }} props
  */
 export function ProfileSwitcher({ onOpenUpgrade }) {
   const {
@@ -66,7 +66,7 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
     if (error) {
       if (error.message === "Upgrade your plan to add more profiles") {
         setErr(error.message);
-        onOpenUpgrade?.();
+        onOpenUpgrade?.("profile_slots");
       } else {
         setErr(error.message || "Could not add profile");
       }
@@ -170,7 +170,7 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
                     </span>
                     {typeof p.handle === "string" && p.handle ? (
                       <span className="mono" style={{ fontSize: 11, color: "#00d4aa", opacity: 0.9 }}>
-                        {formatHandleDisplay(p.handle)}
+                        {formatHandleDisplay(p.handle, p.display_handle)}
                       </span>
                     ) : null}
                   </span>
@@ -273,7 +273,7 @@ export function ProfileSwitcher({ onOpenUpgrade }) {
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>{label}</span>
           {typeof activeProfile?.handle === "string" && activeProfile.handle ? (
             <span className="mono" style={{ fontSize: 11, color: "#00d4aa", opacity: 0.9, lineHeight: 1.2 }}>
-              {formatHandleDisplay(activeProfile.handle)}
+              {formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}
             </span>
           ) : null}
         </span>

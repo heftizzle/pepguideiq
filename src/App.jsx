@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { PEPTIDES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
@@ -19,9 +20,12 @@ import { DoseLogFAB } from "./components/DoseLogFAB.jsx";
 import { StackShareControls } from "./components/StackShareControls.jsx";
 import { BuildTab } from "./components/BuildTab.jsx";
 import { ProfileTab } from "./components/ProfileTab.jsx";
+import { PeopleSearch } from "./components/PeopleSearch.jsx";
+import { NavTooltips } from "./components/NavTooltips.jsx";
 import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
 import { LegalPage } from "./components/LegalPage.jsx";
+import { AgeGate } from "./components/AgeGate.jsx";
 import { ProfileProvider, useActiveProfile } from "./context/ProfileContext.jsx";
 import { DoseToastProvider } from "./context/DoseToastContext.jsx";
 import {
@@ -32,7 +36,8 @@ import {
   useDemoTour,
 } from "./context/DemoTourContext.jsx";
 import { DemoTourBar, DemoTourHelpButton } from "./components/DemoTourChrome.jsx";
-import { canAddStackRow, getNextTierId, getSavedStackRowLimit } from "./lib/tiers.js";
+import { canAddStackRow, getNextTierId, getSavedStackRowLimit, TIER_ORDER } from "./lib/tiers.js";
+import { getSuggestedUpgradeTier } from "./lib/upgradeGateCopy.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
 import { resolveStability } from "./lib/catalogStability.js";
 import { hasInjectableRoute } from "./lib/doseRouteKind.js";
@@ -49,6 +54,7 @@ import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
 import { formatHandleDisplay } from "./lib/memberProfileHandle.js";
 import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
+import { readAgeVerifiedFromStorage, setAgeVerifiedInStorage } from "./lib/ageVerification.js";
 import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
@@ -396,6 +402,8 @@ function PepGuideIQApp({ user, setUser }) {
   const [stackFeedVisible, setStackFeedVisible] = useState(false);
   const [showAdd, setShowAdd]     = useState(false);
   const [addTarget, setAddTarget] = useState(null);
+  /** False until `user_stacks` for `activeProfileId` has been loaded (avoids stale row counts + load races). */
+  const [stackListReady, setStackListReady] = useState(false);
   const [aiMsgs, setAiMsgs]       = useState([]);
   const [aiInput, setAiInput]     = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -405,6 +413,8 @@ function PepGuideIQApp({ user, setUser }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
+  /** Why the upgrade sheet opened — drives friendly copy + checkout CTA (`upgradeGateCopy.js`). */
+  const [upgradeGateReason, setUpgradeGateReason] = useState(/** @type {string | null} */ (null));
   /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
   /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
@@ -582,47 +592,70 @@ function PepGuideIQApp({ user, setUser }) {
 
   useEffect(() => {
     stackHydrated.current = false;
-    if (!user?.id || !activeProfileId || !isSupabaseConfigured()) {
+    setStackListReady(false);
+    setMyStack([]);
+    setShowAdd(false);
+    setAddTarget(null);
+    if (!user?.id || !activeProfileId) {
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      stackHydrated.current = true;
+      setStackListReady(true);
       return;
     }
     let ignore = false;
-    loadStack(user.id, activeProfileId).then((s) => {
-      if (ignore) return;
-      const raw =
-        s && typeof s === "object" && !Array.isArray(s) && Array.isArray(s.stack)
-          ? s.stack
-          : Array.isArray(s)
-            ? s
-            : [];
-      const stack = raw.map((item) => ({
-        ...item,
-        sessions: normalizeStackSessions(item.sessions),
-      }));
-      setMyStack(stack);
-      let storedName = "";
-      try {
-        if (typeof localStorage !== "undefined" && activeProfileId) {
-          storedName =
-            localStorage.getItem(`pepguideiq.stackDisplay.${user.id}.${activeProfileId}`) ?? "";
+    loadStack(user.id, activeProfileId)
+      .then((s) => {
+        if (ignore) return;
+        const raw =
+          s && typeof s === "object" && !Array.isArray(s) && Array.isArray(s.stack)
+            ? s.stack
+            : Array.isArray(s)
+              ? s
+              : [];
+        const stack = raw.map((item) => ({
+          ...item,
+          sessions: normalizeStackSessions(item.sessions),
+        }));
+        setMyStack(stack);
+        let storedName = "";
+        try {
+          if (typeof localStorage !== "undefined" && activeProfileId) {
+            storedName =
+              localStorage.getItem(`pepguideiq.stackDisplay.${user.id}.${activeProfileId}`) ?? "";
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
-      }
-      setStackName(storedName);
-      setBuildRows(buildRowsFromMyStack(stack));
-      setBuildLocalStackName(storedName);
-      setBuildVialOverrides({});
-      preserveBuildEditorAfterGuideRef.current = false;
-      setStackShareId(
-        s && typeof s === "object" && !Array.isArray(s) && typeof s.shareId === "string" && s.shareId.trim()
-          ? s.shareId.trim()
-          : null
-      );
-      setStackFeedVisible(
-        Boolean(s && typeof s === "object" && !Array.isArray(s) && s.feedVisible === true)
-      );
-      stackHydrated.current = true;
-    });
+        setStackName(storedName);
+        setBuildRows(buildRowsFromMyStack(stack));
+        setBuildLocalStackName(storedName);
+        setBuildVialOverrides({});
+        preserveBuildEditorAfterGuideRef.current = false;
+        setStackShareId(
+          s && typeof s === "object" && !Array.isArray(s) && typeof s.shareId === "string" && s.shareId.trim()
+            ? s.shareId.trim()
+            : null
+        );
+        setStackFeedVisible(
+          Boolean(s && typeof s === "object" && !Array.isArray(s) && s.feedVisible === true)
+        );
+        stackHydrated.current = true;
+        setStackListReady(true);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setMyStack([]);
+        setStackName("");
+        setBuildRows([]);
+        setBuildLocalStackName("");
+        setBuildVialOverrides({});
+        setStackShareId(null);
+        setStackFeedVisible(false);
+        stackHydrated.current = true;
+        setStackListReady(true);
+      });
     return () => {
       ignore = true;
     };
@@ -692,8 +725,12 @@ function PepGuideIQApp({ user, setUser }) {
     setSortMode("popular");
   };
 
-  const savedStackLimit = getSavedStackRowLimit(user?.plan ?? "entry");
-  const canAddToStack = canAddStackRow(user?.plan ?? "entry", myStack.length);
+  const planForStackLimits = useMemo(() => {
+    const p = typeof user?.plan === "string" ? user.plan.trim().toLowerCase() : "";
+    return TIER_ORDER.includes(p) ? p : "entry";
+  }, [user?.plan]);
+  const savedStackLimit = getSavedStackRowLimit(planForStackLimits);
+  const canAddToStack = canAddStackRow(planForStackLimits, myStack.length);
   const canAI = Boolean(user?.id);
   const canUploadStackPhoto = Boolean(user?.id);
   const canVialTracker = Boolean(user?.id);
@@ -713,19 +750,40 @@ function PepGuideIQApp({ user, setUser }) {
     [myStack]
   );
 
-  const openUpgradeModal = () => {
-    setUpgradeFocusTier(getNextTierId(user?.plan));
-    setShowUpgrade(true);
-  };
-  const closeUpgradeModal = () => {
+  const openUpgradeModal = useCallback(
+    (reason) => {
+      const r = typeof reason === "string" && reason.trim() ? reason.trim() : null;
+      setUpgradeGateReason(r);
+      const suggested = r ? getSuggestedUpgradeTier(r, planForStackLimits) : null;
+      setUpgradeFocusTier(suggested ?? getNextTierId(planForStackLimits));
+      setShowUpgrade(true);
+    },
+    [planForStackLimits]
+  );
+  const closeUpgradeModal = useCallback(() => {
     setShowUpgrade(false);
     setUpgradeFocusTier(null);
-  };
+    setUpgradeGateReason(null);
+  }, []);
 
-  const openAdd = (p) => { setAddTarget(p); setShowAdd(true); };
+  const openAdd = (p) => {
+    if (!stackListReady) return;
+    setAddTarget(p);
+    setShowAdd(true);
+  };
   const confirmAdd = ({ dose, frequency, notes }) => {
     if (!addTarget) return;
-    if (!canAddToStack) { openUpgradeModal(); setShowAdd(false); setAddTarget(null); return; }
+    if (!stackListReady) {
+      setShowAdd(false);
+      setAddTarget(null);
+      return;
+    }
+    if (!canAddToStack) {
+      openUpgradeModal("stack_full");
+      setShowAdd(false);
+      setAddTarget(null);
+      return;
+    }
     if (!myStack.find((s) => s.id === addTarget.id)) {
       const stackRowKey = crypto.randomUUID();
       setMyStack((prev) => [
@@ -754,7 +812,10 @@ function PepGuideIQApp({ user, setUser }) {
 
   const sendAI = async () => {
     if (!aiInput.trim() || aiLoading) return;
-    if (!canAI) { openUpgradeModal(); return; }
+    if (!canAI) {
+      openUpgradeModal("ai_guide");
+      return;
+    }
     const userMsg = { role:"user", content:aiInput };
     const msgs = [...aiMsgs, userMsg];
     setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
@@ -806,6 +867,9 @@ function PepGuideIQApp({ user, setUser }) {
               limitReached: data.limit_reached === true,
             },
           ]);
+          if (data.limit_reached === true) {
+            openUpgradeModal("ai_guide");
+          }
           setAiLoading(false);
           return;
         }
@@ -856,9 +920,26 @@ function PepGuideIQApp({ user, setUser }) {
     setAiQueryUsage(null);
     setProtocolDeepLink(null);
     setUser(null);
+    setShowPeopleSearch(false);
   };
 
   const [showHandlePrompt, setShowHandlePrompt] = useState(false);
+  const [showPeopleSearch, setShowPeopleSearch] = useState(false);
+  const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
+
+  useEffect(() => {
+    if (!showPeopleSearch) {
+      setPeopleSearchToken(null);
+      return;
+    }
+    let cancelled = false;
+    void getSessionAccessToken().then((t) => {
+      if (!cancelled) setPeopleSearchToken(t ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showPeopleSearch]);
 
   useEffect(() => {
     if (!user?.id || !activeProfile) {
@@ -891,6 +972,8 @@ function PepGuideIQApp({ user, setUser }) {
   }, [user?.id]);
 
   const mainUiRef = useRef({});
+  /** Bottom nav tab `<button>` elements for `NavTooltips` positioning. */
+  const navTabButtonRefs = useRef(/** @type {Partial<Record<string, HTMLButtonElement | null>>} */ ({}));
 
   mainUiRef.current = {
     user,
@@ -957,6 +1040,7 @@ function PepGuideIQApp({ user, setUser }) {
     handleCategorySelect,
     savedStackLimit,
     canAddToStack,
+    stackListReady,
     canAI,
     canUploadStackPhoto,
     canVialTracker,
@@ -976,6 +1060,8 @@ function PepGuideIQApp({ user, setUser }) {
     librarySearchOpen,
     setLibrarySearchOpen,
     dismissLibrarySearch,
+    setShowPeopleSearch,
+    navTabButtonRefs,
   };
 
   return (
@@ -986,7 +1072,19 @@ function PepGuideIQApp({ user, setUser }) {
     >
       <DoseToastProvider>
         <PepGuideIQMainTree mainUiRef={mainUiRef} />
+        <NavTooltips tabButtonRefs={navTabButtonRefs} />
         <DemoTourBar />
+        {showPeopleSearch && activeProfileId && typeof document !== "undefined"
+          ? createPortal(
+              <PeopleSearch
+                activeProfileId={activeProfileId}
+                workerUrl={API_WORKER_URL}
+                accessToken={peopleSearchToken}
+                onClose={() => setShowPeopleSearch(false)}
+              />,
+              document.body
+            )
+          : null}
       </DoseToastProvider>
     </DemoTourProvider>
   );
@@ -994,6 +1092,7 @@ function PepGuideIQApp({ user, setUser }) {
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const { isHighlighted, stripVisible } = useDemoTour();
+  const [navProfilePillHover, setNavProfilePillHover] = useState(false);
   const {
     user,
     setUser,
@@ -1059,6 +1158,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
     handleCategorySelect,
     savedStackLimit,
     canAddToStack,
+    stackListReady,
     canAI,
     canUploadStackPhoto,
     canVialTracker,
@@ -1078,12 +1178,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
     librarySearchOpen,
     setLibrarySearchOpen,
     dismissLibrarySearch,
+    setShowPeopleSearch,
+    navTabButtonRefs,
   } = mainUiRef.current;
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
   const profileNavTopLabel = useMemo(() => {
-    const disp = formatHandleDisplay(activeProfile?.handle ?? "");
+    const disp = formatHandleDisplay(activeProfile?.handle ?? "", activeProfile?.display_handle);
     if (!disp) return "MY";
     return disp.length > 8 ? `${disp.slice(0, 7)}…` : disp;
   }, [activeProfile?.handle, memberProfilesVersion]);
@@ -1183,28 +1285,43 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           Upgrade
                         </button>
                       )}
-                      <span
+                      <button
+                        type="button"
                         className="mono"
+                        onClick={() => setShowPeopleSearch(true)}
+                        onMouseEnter={() => setNavProfilePillHover(true)}
+                        onMouseLeave={() => setNavProfilePillHover(false)}
                         style={{
                           ...HEADER_ACCOUNT_PILL_BASE,
+                          cursor: "pointer",
                           color: "#8fa5bf",
                           maxWidth: narrowHeader ? 180 : 260,
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 6,
                           minWidth: 0,
+                          border: navProfilePillHover
+                            ? "1px solid rgba(0, 212, 170, 0.42)"
+                            : HEADER_ACCOUNT_PILL_BASE.border,
+                          background: navProfilePillHover
+                            ? "rgba(255, 255, 255, 0.06)"
+                            : HEADER_ACCOUNT_PILL_BASE.background,
+                          transition: "border-color 0.15s ease, background 0.15s ease, filter 0.15s ease",
+                          filter: navProfilePillHover ? "brightness(1.06)" : "none",
                         }}
                         title={
                           memberDisplayRaw !== "—"
-                            ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle)}` : ""}`
+                            ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}` : ""}`
                             : undefined
                         }
                         aria-label={
                           memberDisplayRaw !== "—"
                             ? `Active profile: ${memberDisplayRaw}${
-                                activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle)}` : ""
+                                activeProfile?.handle
+                                  ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}. Open find people.`
+                                  : ". Open find people."
                               }`
-                            : "Active profile"
+                            : "Open find people"
                         }
                       >
                         {resolvedHeaderMemberAvatar ? (
@@ -1256,10 +1373,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </span>
                         {activeProfile?.handle ? (
                           <span className="mono" style={{ fontSize: 12, color: "#00d4aa", opacity: 0.9, flexShrink: 0 }}>
-                            {formatHandleDisplay(activeProfile.handle)}
+                            {formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}
                           </span>
                         ) : null}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => void handleSignOut()}
@@ -1481,10 +1598,19 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         <button
                           type="button"
                           className={inStack?"btn-green":"btn-teal"}
-                          style={{ padding:"5px 10px",fontSize: 13 }}
+                          style={{
+                            padding:"5px 10px",
+                            fontSize: 13,
+                            opacity: inStack ? 1 : !stackListReady ? 0.55 : 1,
+                          }}
                           data-demo-target={cardIdx === 0 ? DEMO_TARGET.library_add_stack : undefined}
                           {...demoHighlightProps(cardIdx === 0 && isHighlighted(DEMO_TARGET.library_add_stack))}
-                          onClick={(e) => { e.stopPropagation(); if (!inStack) openAdd(p); }}
+                          disabled={!inStack && !stackListReady}
+                          title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!inStack && stackListReady) openAdd(p);
+                          }}
                         >
                           {inStack ? "✓ Saved" : "+ Saved Stack"}
                         </button>
@@ -1665,10 +1791,11 @@ function PepGuideIQMainTree({ mainUiRef }) {
               cycleWeeks={buildCycleWeeks}
               setCycleWeeks={setBuildCycleWeeks}
               savedStackLimit={savedStackLimit}
-              onUpgrade={openUpgradeModal}
+              stackListReady={stackListReady}
+              onUpgrade={() => openUpgradeModal("stack_full")}
               primaryCategory={primaryCategory}
               user={user}
-              plan={user?.plan ?? "entry"}
+              plan={planForStackLimits}
             />
           )}
 
@@ -1962,7 +2089,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           "Explain SS-31's mechanism of action",
                           "What's the mitochondrial trinity protocol?",
                         ].map((s) => (
-                          <button type="button" key={s} className="sugg-btn" onClick={() => (canAI ? setAiInput(s) : openUpgradeModal())}>
+                          <button
+                            type="button"
+                            key={s}
+                            className="sugg-btn"
+                            onClick={() => (canAI ? setAiInput(s) : openUpgradeModal("ai_guide"))}
+                          >
                             {s}
                           </button>
                         ))}
@@ -1984,7 +2116,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                       )}
                       {msg.role === "assistant" && msg.limitReached && (
-                        <button type="button" className="btn-teal" onClick={openUpgradeModal} style={{ marginTop: 10, fontSize: 13, padding: "6px 12px" }}>
+                        <button
+                          type="button"
+                          className="btn-teal"
+                          onClick={() => openUpgradeModal("ai_guide")}
+                          style={{ marginTop: 10, fontSize: 13, padding: "6px 12px" }}
+                        >
                           Upgrade for more queries
                         </button>
                       )}
@@ -2132,7 +2269,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <button type="button" className="btn-teal" style={{ fontSize: 13 }}
                   onClick={() => {
                     if (!canAI) {
-                      openUpgradeModal();
+                      openUpgradeModal("ai_guide");
                       return;
                     }
                     setSelPeptide(null);
@@ -2141,8 +2278,19 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   }}>
                   Ask Pep Guide →
                 </button>
-                <button type="button" className={inStack?"btn-green":"btn-teal"} style={{ fontSize: 13 }}
-                  onClick={() => { if (!inStack) { openAdd(p); setSelPeptide(null); } }}>
+                <button
+                  type="button"
+                  className={inStack?"btn-green":"btn-teal"}
+                  style={{ fontSize: 13, opacity: inStack ? 1 : !stackListReady ? 0.55 : 1 }}
+                  disabled={!inStack && !stackListReady}
+                  title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
+                  onClick={() => {
+                    if (!inStack && stackListReady) {
+                      openAdd(p);
+                      setSelPeptide(null);
+                    }
+                  }}
+                >
                   {inStack ? "✓ Saved" : "+ Add to Saved Stack"}
                 </button>
               </div>
@@ -2166,6 +2314,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
             user={user}
             upgradeFocusTier={upgradeFocusTier}
             setUser={setUser}
+            gateReason={upgradeGateReason}
+            planKey={planForStackLimits}
           />
         )}
 
@@ -2206,6 +2356,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
               aria-label={`Library, ${PEPTIDES.length} compounds`}
               data-demo-target={DEMO_TARGET.nav_library}
               {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_library))}
+              ref={(el) => {
+                navTabButtonRefs.current.library = el;
+              }}
               onClick={() => setActiveTab("library")}
               style={{
                 flex: "1 1 0",
@@ -2316,6 +2469,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 aria-label={item.ariaLabel}
                 data-demo-target={item.demoTarget}
                 {...demoHighlightProps(isHighlighted(item.demoTarget))}
+                ref={(el) => {
+                  navTabButtonRefs.current[item.tabId] = el;
+                }}
                 onClick={item.onClick}
                 style={{
                   flex: "1 1 0",
@@ -2433,6 +2589,19 @@ export default function PepGuideIQ() {
   const [legalRoute, setLegalRoute] = useState(() => getNormalizedPathname() === "/legal");
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [user, setUser] = useState(null);
+  const [ageVerified, setAgeVerified] = useState(readAgeVerifiedFromStorage);
+
+  const confirmAgeVerified = useCallback(() => {
+    setAgeVerifiedInStorage();
+    setAgeVerified(true);
+  }, []);
+
+  const exitUnderAge = useCallback(() => {
+    window.location.href = "https://www.google.com";
+  }, []);
+
+  const ageGateOverlay =
+    !ageVerified ? <AgeGate onConfirm={confirmAgeVerified} onExit={exitUnderAge} /> : null;
 
   useEffect(() => {
     const onPop = () => setLegalRoute(getNormalizedPathname() === "/legal");
@@ -2467,6 +2636,7 @@ export default function PepGuideIQ() {
     return (
       <>
         <GlobalStyles />
+        {ageGateOverlay}
         <LegalPage />
       </>
     );
@@ -2476,6 +2646,7 @@ export default function PepGuideIQ() {
     return (
       <>
         <GlobalStyles />
+        {ageGateOverlay}
         <div
           className="mono"
           style={{
@@ -2498,6 +2669,7 @@ export default function PepGuideIQ() {
     return (
       <>
         <GlobalStyles />
+        {ageGateOverlay}
         <AuthScreen onAuth={setUser} />
       </>
     );
@@ -2505,7 +2677,10 @@ export default function PepGuideIQ() {
 
   return (
     <ProfileProvider userId={user.id} plan={user.plan ?? "entry"}>
-      <PepGuideIQApp user={user} setUser={setUser} />
+      <>
+        {ageGateOverlay}
+        <PepGuideIQApp user={user} setUser={setUser} />
+      </>
     </ProfileProvider>
   );
 }

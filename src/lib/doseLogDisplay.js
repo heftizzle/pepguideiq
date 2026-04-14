@@ -1,4 +1,4 @@
-import { scaleBlendComponentsToVial, blendConcentrationsMgPerMl } from "./peptideMath.js";
+import { scaleBlendComponentsToVial, blendConcentrationsMgPerMl, blendRecipeTotalMg } from "./peptideMath.js";
 import { mcgToUnits, unitsToMcg } from "./vialDoseMath.js";
 
 /** @param {unknown} components */
@@ -9,21 +9,25 @@ export function isBlendCatalogComponents(components) {
 /**
  * Per-ingredient concentration (mcg/mL) after reconstitution, scaled to this vial.
  * @param {Record<string, unknown>} vial
- * @param {{ name: string, mg: number }[]} catalogBlendComponents
+ * @param {{ name: string, mg?: number, mgPerMl?: number | null }[]} catalogBlendComponents
+ * @param {number} [catalogBacRefMl=2] — reference BAC mL for catalog rows given as mg/mL
  * @returns {{ name: string, mcgMl: number }[] | null}
  */
-export function blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents) {
+export function blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, catalogBacRefMl = 2) {
   if (!isBlendCatalogComponents(catalogBlendComponents)) return null;
   const vialMgNum = Number(vial?.vial_size_mg);
   const bacMlNum = Number(vial?.bac_water_ml);
-  const recipeSum = catalogBlendComponents.reduce(
+  let recipeSum = catalogBlendComponents.reduce(
     (s, c) => s + (Number.isFinite(Number(c?.mg)) ? Number(c.mg) : 0),
     0
   );
+  if (recipeSum <= 0) {
+    recipeSum = blendRecipeTotalMg(catalogBlendComponents, catalogBacRefMl);
+  }
   if (recipeSum <= 0 || !Number.isFinite(vialMgNum) || vialMgNum <= 0 || !Number.isFinite(bacMlNum) || bacMlNum <= 0) {
     return null;
   }
-  const scaled = scaleBlendComponentsToVial(catalogBlendComponents, recipeSum, vialMgNum);
+  const scaled = scaleBlendComponentsToVial(catalogBlendComponents, recipeSum, vialMgNum, catalogBacRefMl);
   const parts = blendConcentrationsMgPerMl(scaled, bacMlNum);
   if (!parts.length) return null;
   return parts
@@ -59,12 +63,13 @@ export function formatDoseAmountFromMcg(mcg) {
  * Live Protocol / quick-log line: single = "N units = …", blend = "N units — A: … · B: …".
  * @param {number} units
  * @param {Record<string, unknown> | null | undefined} vial
- * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
+ * @param {number} [catalogBacRefMl=2]
  */
-export function formatProtocolInjectableDosePreview(units, vial, catalogBlendComponents) {
+export function formatProtocolInjectableDosePreview(units, vial, catalogBlendComponents, catalogBacRefMl = 2) {
   const u = Number(units);
   if (!Number.isFinite(u) || u <= 0 || !vial) return "—";
-  const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents);
+  const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, catalogBacRefMl);
   if (ing && ing.length >= 2) {
     const parts = [];
     for (const { name, mcgMl } of ing) {
@@ -84,9 +89,10 @@ export function formatProtocolInjectableDosePreview(units, vial, catalogBlendCom
  * Vial Tracker history / calendar secondary line: "N units · …" (single or blend).
  * @param {number | null | undefined} doseMcg
  * @param {Record<string, unknown> | null | undefined} vial
- * @param {{ name: string, mg: number }[] | null | undefined} catalogBlendComponents
+ * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
+ * @param {number} [catalogBacRefMl=2]
  */
-export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendComponents) {
+export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendComponents, catalogBacRefMl = 2) {
   const mcg = Number(doseMcg);
   if (!Number.isFinite(mcg) || mcg <= 0) return "—";
   const conc = Number(vial?.concentration_mcg_ml);
@@ -105,7 +111,7 @@ export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendCom
       ? `${(mcg / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} mg`
       : `${mcg.toLocaleString()} mcg`;
   }
-  const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents);
+  const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, catalogBacRefMl);
   if (ing && ing.length >= 2) {
     const parts = [];
     for (const { name, mcgMl } of ing) {

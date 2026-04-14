@@ -778,7 +778,8 @@ function memberProfilePatchFailureMessage(result, patch) {
     if (code === "23514" || /violates check constraint/i.test(message)) {
       if (Object.prototype.hasOwnProperty.call(patch, "handle")) {
         return {
-          msg: "Handle must be 3–20 characters: lowercase letters, numbers, and underscores only",
+          msg:
+            "Handle must be 3–32 characters: letters, numbers, underscore, period, or hyphen; no ..; cannot start or end with .",
           status: 400,
         };
       }
@@ -1390,14 +1391,15 @@ const MEMBER_PROFILE_ALLOWED_LANGUAGES = new Set(["en", "es", "pt-BR", "fr", "de
 
 const MEMBER_PROFILE_SHIFT_SCHEDULES = new Set(["days", "swings", "mids", "nights", "rotating"]);
 
-const MEMBER_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+/** Aligned with `member_profiles_handle_format_chk`: 3–32, no .., alphanumeric ends, [a-z0-9_.-] middle. */
+const MEMBER_HANDLE_RE = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
 
 const MEMBER_EXPERIENCE_LEVELS = new Set(["beginner", "intermediate", "advanced", "elite"]);
 
-/** @param {string} v */
-function normalizeHandleForPatch(v) {
-  let t = String(v).trim().toLowerCase();
-  if (t.startsWith("@")) t = t.slice(1);
+/** Trim and strip a single leading `@`; preserve casing (display_handle / validation). */
+function stripHandleAtForApi(v) {
+  let t = String(v ?? "").trim();
+  if (t.startsWith("@")) t = t.slice(1).trim();
   return t;
 }
 
@@ -1435,15 +1437,16 @@ async function handleCheckHandleAvailability(request, env, cors) {
   }
   const url = new URL(request.url);
   const raw = url.searchParams.get("handle") ?? url.searchParams.get("h") ?? "";
-  let h = normalizeHandleForPatch(raw);
+  const stripped = stripHandleAtForApi(raw);
   const excludeRaw = url.searchParams.get("exclude") ?? "";
   const excludeProfileId = UUID_RE.test(excludeRaw) ? excludeRaw : undefined;
-  if (!h) {
+  if (!stripped) {
     return jsonResponse({ available: false, reason: "empty" }, 200, cors);
   }
-  if (!MEMBER_HANDLE_RE.test(h)) {
+  if (!MEMBER_HANDLE_RE.test(stripped)) {
     return jsonResponse({ available: false, reason: "invalid_format" }, 200, cors);
   }
+  const h = stripped.toLowerCase();
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, h, excludeProfileId ?? "");
@@ -1481,7 +1484,7 @@ async function handleGetMemberProfiles(request, env, cors) {
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
     userId
-  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,demo_sessions_shown,bio,experience_level,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,current_streak&order=created_at.asc`;
+  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,experience_level,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
   const res = await fetch(sel, {
     headers: {
       apikey: serviceKey,
@@ -1494,6 +1497,273 @@ async function handleGetMemberProfiles(request, env, cors) {
     return jsonResponse({ error: "Could not load profiles" }, 502, cors);
   }
   return jsonResponse({ profiles: rows }, 200, cors);
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @param {string} profileId
+ */
+async function memberProfileOwnedByUser(supabaseUrl, serviceKey, userId, profileId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profileId)}&user_id=eq.${encodeURIComponent(
+      userId
+    )}&select=id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  return res.ok && Array.isArray(rows) && rows.length === 1;
+}
+
+/** Strip characters that break PostgREST `or=(…ilike.*…*)` filters. */
+function sanitizeMemberSearchToken(q) {
+  return String(q ?? "")
+    .toLowerCase()
+    .replace(/[%_*(),]/g, "")
+    .trim()
+    .slice(0, 64);
+}
+
+/**
+ * GET /member-profiles/search?q=… — discover other users' member profiles (auth).
+ */
+async function handleSearchMemberProfiles(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const url = new URL(request.url);
+  const rawQ = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
+  let q = String(rawQ).trim();
+  if (q.startsWith("@")) q = q.slice(1).trim();
+  q = q.toLowerCase();
+  const safe = sanitizeMemberSearchToken(q);
+  if (!safe) {
+    return jsonResponse({ profiles: [] }, 200, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const orClause = `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
+  const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
+    userId
+  )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+
+  const res = await fetch(sel, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    log(env, "warn", "member_profile_search_failed", { userId, status: res.status });
+    return jsonResponse({ error: "Search failed" }, 502, cors);
+  }
+
+  const userIds = [...new Set(rows.map((r) => r?.user_id).filter((x) => typeof x === "string" && x))];
+  /** @type {Record<string, string>} */
+  const planByUser = {};
+  if (userIds.length > 0) {
+    const inList = userIds.join(",");
+    const pr = await fetch(`${supabaseUrl}/rest/v1/profiles?select=id,plan&id=in.(${inList})`, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    });
+    const planRows = await pr.json().catch(() => []);
+    if (Array.isArray(planRows)) {
+      for (const p of planRows) {
+        if (p && typeof p.id === "string") {
+          planByUser[p.id] = normalizePlanTier(typeof p.plan === "string" ? p.plan : "");
+        }
+      }
+    }
+  }
+
+  const profiles = rows.map((row) => ({
+    ...row,
+    plan: planByUser[row.user_id] ?? "entry",
+  }));
+
+  return jsonResponse({ profiles }, 200, cors);
+}
+
+/**
+ * POST /member-follows — body { follower_profile_id, following_profile_id }
+ */
+async function handlePostMemberFollow(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+  const followerId =
+    typeof body.follower_profile_id === "string" ? body.follower_profile_id.trim() : "";
+  const followingId =
+    typeof body.following_profile_id === "string" ? body.following_profile_id.trim() : "";
+  if (!UUID_RE.test(followerId) || !UUID_RE.test(followingId)) {
+    return jsonResponse({ error: "Invalid profile id" }, 400, cors);
+  }
+  if (followerId === followingId) {
+    return jsonResponse({ error: "Cannot follow yourself" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const ok = await memberProfileOwnedByUser(supabaseUrl, serviceKey, userId, followerId);
+  if (!ok) {
+    return jsonResponse({ error: "Forbidden" }, 403, cors);
+  }
+
+  const ins = await fetch(`${supabaseUrl}/rest/v1/member_follows`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ follower_id: followerId, following_id: followingId }),
+  });
+  const text = await ins.text().catch(() => "");
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
+  if (ins.ok && Array.isArray(parsed) && parsed[0] && typeof parsed[0].id === "string") {
+    return jsonResponse({ ok: true, follow_id: parsed[0].id }, 200, cors);
+  }
+  const code =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed) && "code" in parsed
+      ? String(parsed.code)
+      : "";
+  if (ins.status === 409 || code === "23505") {
+    return jsonResponse({ ok: true, already: true }, 200, cors);
+  }
+  log(env, "warn", "member_follow_insert_failed", { status: ins.status, body: String(text).slice(0, 200) });
+  return jsonResponse({ error: "Could not follow" }, ins.status >= 400 ? ins.status : 502, cors);
+}
+
+/**
+ * DELETE /member-follows — body { follower_profile_id, following_profile_id }
+ */
+async function handleDeleteMemberFollow(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+  const followerId =
+    typeof body.follower_profile_id === "string" ? body.follower_profile_id.trim() : "";
+  const followingId =
+    typeof body.following_profile_id === "string" ? body.following_profile_id.trim() : "";
+  if (!UUID_RE.test(followerId) || !UUID_RE.test(followingId)) {
+    return jsonResponse({ error: "Invalid profile id" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const owned = await memberProfileOwnedByUser(supabaseUrl, serviceKey, userId, followerId);
+  if (!owned) {
+    return jsonResponse({ error: "Forbidden" }, 403, cors);
+  }
+
+  const del = await fetch(
+    `${supabaseUrl}/rest/v1/member_follows?follower_id=eq.${encodeURIComponent(
+      followerId
+    )}&following_id=eq.${encodeURIComponent(followingId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Prefer: "return=minimal",
+      },
+    }
+  );
+  if (!del.ok) {
+    log(env, "warn", "member_follow_delete_failed", { status: del.status });
+    return jsonResponse({ error: "Could not unfollow" }, 502, cors);
+  }
+  return jsonResponse({ ok: true }, 200, cors);
+}
+
+/**
+ * GET /member-follows/following?profile_id=… — follower row must belong to auth user.
+ */
+async function handleGetMemberFollowFollowing(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const url = new URL(request.url);
+  const profileId = (url.searchParams.get("profile_id") ?? "").trim();
+  if (!UUID_RE.test(profileId)) {
+    return jsonResponse({ error: "Invalid profile_id" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const owned = await memberProfileOwnedByUser(supabaseUrl, serviceKey, userId, profileId);
+  if (!owned) {
+    return jsonResponse({ error: "Forbidden" }, 403, cors);
+  }
+
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/member_follows?follower_id=eq.${encodeURIComponent(
+      profileId
+    )}&select=following_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    return jsonResponse({ error: "Could not load follows" }, 502, cors);
+  }
+  const following = rows
+    .map((r) => (r && typeof r.following_id === "string" ? r.following_id : ""))
+    .filter(Boolean);
+  return jsonResponse({ following }, 200, cors);
 }
 
 /**
@@ -1623,16 +1893,20 @@ function parseMemberProfilePatchBody(body) {
     const v = body.handle;
     if (v === null) {
       patch.handle = null;
+      patch.display_handle = null;
     } else if (typeof v === "string") {
-      const t = normalizeHandleForPatch(v);
-      if (t === "") {
+      const rawTyped = stripHandleAtForApi(v);
+      if (rawTyped === "") {
         patch.handle = null;
-      } else if (!MEMBER_HANDLE_RE.test(t)) {
+        patch.display_handle = null;
+      } else if (!MEMBER_HANDLE_RE.test(rawTyped)) {
         return {
-          error: "handle must be 3–20 characters: lowercase letters, numbers, and underscores only",
+          error:
+            "handle must be 3–32 characters: letters, numbers, underscore, period, or hyphen; no ..; cannot start or end with .",
         };
       } else {
-        patch.handle = t;
+        patch.handle = rawTyped.toLowerCase();
+        patch.display_handle = rawTyped;
       }
     } else {
       return { error: "handle must be a string or null" };
@@ -1645,7 +1919,7 @@ function parseMemberProfilePatchBody(body) {
     if (v === null) {
       patch.bio = null;
     } else if (typeof v === "string") {
-      const t = v.trim().slice(0, 160);
+      const t = v.trim().slice(0, 500);
       patch.bio = t === "" ? null : t;
     } else {
       return { error: "bio must be a string or null" };
@@ -1678,6 +1952,66 @@ function parseMemberProfilePatchBody(body) {
 }
 
 /**
+ * Move the current front/side/back progress keys into `progress_photo_sets` (prepend) and clear the slots.
+ */
+async function handleArchiveProgressPhotoSet(env, cors, userId, profileId, supabaseUrl, serviceKey) {
+  const selUrl = `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(
+    profileId
+  )}&user_id=eq.${encodeURIComponent(userId)}&select=progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets`;
+  const selRes = await fetch(selUrl, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const rows = await selRes.json().catch(() => []);
+  if (!selRes.ok || !Array.isArray(rows) || rows.length !== 1) {
+    return jsonResponse({ error: "Member profile not found" }, 404, cors);
+  }
+  const row = rows[0];
+  const fk = row && typeof row.progress_photo_front_r2_key === "string" ? row.progress_photo_front_r2_key.trim() : "";
+  const sk = row && typeof row.progress_photo_side_r2_key === "string" ? row.progress_photo_side_r2_key.trim() : "";
+  const bk = row && typeof row.progress_photo_back_r2_key === "string" ? row.progress_photo_back_r2_key.trim() : "";
+  if (!fk || !sk || !bk) {
+    return jsonResponse(
+      { error: "Upload front, side, and back photos before archiving this set" },
+      400,
+      cors
+    );
+  }
+  let existing = row.progress_photo_sets;
+  if (!Array.isArray(existing)) existing = [];
+  const entry = {
+    progress_photo_front_r2_key: fk,
+    progress_photo_front_at: row.progress_photo_front_at ?? null,
+    progress_photo_side_r2_key: sk,
+    progress_photo_side_at: row.progress_photo_side_at ?? null,
+    progress_photo_back_r2_key: bk,
+    progress_photo_back_at: row.progress_photo_back_at ?? null,
+  };
+  const nextSets = [entry, ...existing];
+  const patchResult = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, {
+    progress_photo_sets: nextSets,
+    progress_photo_front_r2_key: null,
+    progress_photo_front_at: null,
+    progress_photo_side_r2_key: null,
+    progress_photo_side_at: null,
+    progress_photo_back_r2_key: null,
+    progress_photo_back_at: null,
+  });
+  if (!patchResult.ok) {
+    const { msg, status } = memberProfilePatchFailureMessage(patchResult, {});
+    log(env, "warn", "progress_photo_archive_failed", {
+      profileId,
+      status: patchResult.status,
+      snippet: String(patchResult.bodyText ?? "").slice(0, 200),
+    });
+    return jsonResponse({ error: msg }, status, cors);
+  }
+  return jsonResponse({ ok: true, archived: true }, 200, cors);
+}
+
+/**
  * PATCH /member-profiles/:profileId — display_name and/or city, state, country, language.
  */
 async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
@@ -1699,12 +2033,23 @@ async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
   }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (body && body.archive_progress_photo_set === true) {
+    const extra = Object.keys(body).filter((k) => k !== "archive_progress_photo_set");
+    if (extra.length > 0) {
+      return jsonResponse(
+        { error: "When archive_progress_photo_set is true, no other fields may be sent in the same request" },
+        400,
+        cors
+      );
+    }
+    return await handleArchiveProgressPhotoSet(env, cors, userId, profileId, supabaseUrl, serviceKey);
+  }
   const parsed = parseMemberProfilePatchBody(body);
   if (parsed.error || !parsed.patch) {
     return jsonResponse({ error: parsed.error ?? "Invalid body" }, 400, cors);
   }
-  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (parsed.patch.handle != null && typeof parsed.patch.handle === "string") {
     const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, parsed.patch.handle, profileId);
     if (taken) {
@@ -2256,8 +2601,24 @@ async function handleRequest(request, env) {
       return handleCheckHandleAvailability(request, env, cors);
     }
 
+    if (url.pathname === "/member-profiles/search" && request.method === "GET") {
+      return handleSearchMemberProfiles(request, env, cors);
+    }
+
     if (url.pathname === "/member-profiles" && request.method === "GET") {
       return handleGetMemberProfiles(request, env, cors);
+    }
+
+    if (url.pathname === "/member-follows/following" && request.method === "GET") {
+      return handleGetMemberFollowFollowing(request, env, cors);
+    }
+
+    if (url.pathname === "/member-follows" && request.method === "POST") {
+      return handlePostMemberFollow(request, env, cors);
+    }
+
+    if (url.pathname === "/member-follows" && request.method === "DELETE") {
+      return handleDeleteMemberFollow(request, env, cors);
     }
 
     const memberProfilePathMatch = url.pathname.match(/^\/member-profiles\/([^/]+)\/?$/);

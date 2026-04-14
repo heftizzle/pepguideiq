@@ -5,10 +5,12 @@ import {
   R2_UPLOAD_ACCEPT_ATTR,
   R2_UPLOAD_ALLOWED_TYPES,
   R2_UPLOAD_MAX_BYTES,
+  appendImageCacheBustParam,
+  shouldResetImageUploadFetchBust,
   uploadImageToR2,
 } from "../lib/r2Upload.js";
 
-function useWorkerObjectUrl(r2Key, workerConfigured) {
+function useWorkerObjectUrl(r2Key, workerConfigured, fetchBustMs = 0) {
   const [objectUrl, setObjectUrl] = useState(null);
 
   useEffect(() => {
@@ -26,7 +28,8 @@ function useWorkerObjectUrl(r2Key, workerConfigured) {
         return;
       }
       try {
-        const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`, {
+        const base = `${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(r2Key)}`;
+        const res = await fetch(appendImageCacheBustParam(base, fetchBustMs), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok || cancelled) {
@@ -47,7 +50,7 @@ function useWorkerObjectUrl(r2Key, workerConfigured) {
       cancelled = true;
       if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [r2Key, workerConfigured]);
+  }, [r2Key, workerConfigured, fetchBustMs]);
 
   return objectUrl;
 }
@@ -59,8 +62,17 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState(null);
-  const imgUrl = useWorkerObjectUrl(r2Key, workerConfigured);
+  const [fetchBustMs, setFetchBustMs] = useState(0);
+  const prevR2KeyRef = useRef(typeof r2Key === "string" ? r2Key.trim() : "");
+  const imgUrl = useWorkerObjectUrl(r2Key, workerConfigured, fetchBustMs);
   const showImage = Boolean(r2Key && imgUrl);
+
+  useEffect(() => {
+    const next = typeof r2Key === "string" ? r2Key.trim() : "";
+    const prev = prevR2KeyRef.current;
+    prevR2KeyRef.current = next;
+    if (shouldResetImageUploadFetchBust(prev, next)) setFetchBustMs(0);
+  }, [r2Key]);
 
   function openPicker() {
     if (uploading) return;
@@ -104,6 +116,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
       return;
     }
     setErr(null);
+    setFetchBustMs(Date.now());
     await onUploaded();
   }
 

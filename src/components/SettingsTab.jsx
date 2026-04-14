@@ -19,7 +19,12 @@ import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context
 import { getCountriesForProfileForm } from "../data/countries.js";
 import { formatLanguageOptionLabel, PROFILE_LANGUAGE_OPTIONS } from "../data/profileLanguages.js";
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
-import { formatHandleDisplay, isValidMemberHandleFormat, normalizeHandleInput } from "../lib/memberProfileHandle.js";
+import {
+  formatHandleDisplay,
+  isValidMemberHandleFormat,
+  normalizeHandleInput,
+  stripHandleAtPrefix,
+} from "../lib/memberProfileHandle.js";
 import { wakeTimeFromInputToApi, wakeTimeToInputValue } from "../lib/sessionSchedule.js";
 
 const SECTION = {
@@ -129,11 +134,27 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   }, [sortedCountries, countryQuery]);
 
   const handleNormalized = useMemo(() => normalizeHandleInput(handleInput), [handleInput]);
-  const storedHandle = typeof activeProfile?.handle === "string" ? activeProfile.handle : "";
-  const handleSaveDisabled =
-    handleSaveBusy ||
-    !isSupabaseConfigured() ||
-    (Boolean(handleNormalized) && handleNormalized !== storedHandle && handleAvailability !== "available");
+  const handleSaveDisabled = useMemo(() => {
+    const norm = normalizeHandleInput(handleInput);
+    const raw = stripHandleAtPrefix(handleInput);
+    const stored = typeof activeProfile?.handle === "string" ? activeProfile.handle : "";
+    const prevDisp =
+      typeof activeProfile?.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : stored;
+    const unchanged = norm === stored && stripHandleAtPrefix(raw) === stripHandleAtPrefix(prevDisp);
+    if (handleSaveBusy || !isSupabaseConfigured()) return true;
+    if (unchanged) return false;
+    if (norm && norm !== stored && handleAvailability !== "available") return true;
+    if (norm && !isValidMemberHandleFormat(handleInput)) return true;
+    return false;
+  }, [
+    handleInput,
+    activeProfile?.handle,
+    activeProfile?.display_handle,
+    handleSaveBusy,
+    handleAvailability,
+  ]);
 
   const refreshUser = useCallback(async () => {
     const u = await getCurrentUser();
@@ -175,7 +196,12 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   useEffect(() => {
     const p = activeProfile;
     if (!p) return;
-    const h = typeof p.handle === "string" ? p.handle : "";
+    const h =
+      typeof p.display_handle === "string" && p.display_handle.trim()
+        ? p.display_handle.trim()
+        : typeof p.handle === "string"
+          ? p.handle
+          : "";
     setHandleInput(h);
     setHandleAvailability("idle");
     setHandleSaveInlineErr(null);
@@ -184,7 +210,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       clearTimeout(handleSaveSuccessTimerRef.current);
       handleSaveSuccessTimerRef.current = null;
     }
-  }, [activeProfile?.id, activeProfile?.handle]);
+  }, [activeProfile?.id, activeProfile?.handle, activeProfile?.display_handle]);
 
   useEffect(() => {
     return () => {
@@ -313,7 +339,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   };
 
   const onHandleInputChange = (e) => {
-    const v = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
+    const v = e.target.value.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 32);
     setHandleInput(v);
     setHandleAvailability("idle");
     setHandleSaveInlineErr(null);
@@ -325,22 +351,34 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   };
 
   const onHandleBlur = async () => {
-    const normalized = normalizeHandleInput(handleInput);
-    setHandleInput(normalized);
+    const raw = stripHandleAtPrefix(handleInput);
+    setHandleInput(raw);
     setHandleSaveInlineErr(null);
-    if (!normalized) {
+    if (!raw) {
       setHandleAvailability("idle");
       return;
     }
-    if (normalized.length < 3) {
+    if (raw.length < 3) {
       setHandleAvailability("short");
       return;
     }
-    if (!isValidMemberHandleFormat(normalized)) {
+    if (!isValidMemberHandleFormat(raw)) {
       setHandleAvailability("invalid");
       return;
     }
-    if (activeProfile && typeof activeProfile.handle === "string" && activeProfile.handle === normalized) {
+    const norm = normalizeHandleInput(raw);
+    const prevShow =
+      typeof activeProfile?.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : typeof activeProfile?.handle === "string"
+          ? activeProfile.handle
+          : "";
+    if (
+      activeProfile &&
+      typeof activeProfile.handle === "string" &&
+      activeProfile.handle === norm &&
+      stripHandleAtPrefix(raw) === stripHandleAtPrefix(prevShow)
+    ) {
       setHandleAvailability("available");
       return;
     }
@@ -349,7 +387,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       return;
     }
     setHandleAvailability("checking");
-    const { available, error, reason } = await checkMemberProfileHandleAvailable(normalized, activeProfileId);
+    const { available, error, reason } = await checkMemberProfileHandleAvailable(raw, activeProfileId);
     if (error) {
       setHandleAvailability("idle");
       setHandleSaveInlineErr(error.message);
@@ -365,12 +403,20 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       setHandleSaveInlineErr("Configure Supabase to save your handle.");
       return;
     }
-    const normalized = normalizeHandleInput(handleInput);
+    const raw = stripHandleAtPrefix(handleInput);
+    const normalized = raw.toLowerCase();
     const prev = typeof activeProfile?.handle === "string" ? activeProfile.handle : "";
+    const prevShow =
+      typeof activeProfile?.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : prev;
+    if (normalized === prev && stripHandleAtPrefix(raw) === stripHandleAtPrefix(prevShow)) {
+      return;
+    }
     if (normalized !== prev) {
-      if (normalized && !isValidMemberHandleFormat(normalized)) {
+      if (normalized && !isValidMemberHandleFormat(raw)) {
         setHandleSaveInlineErr(
-          "Handle must be 3–20 characters: lowercase letters, numbers, and underscores only."
+          "Handle must be 3–32 characters: letters, numbers, underscore, period, or hyphen; no ..; cannot start or end with ."
         );
         return;
       }
@@ -388,7 +434,17 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     }
     setErr(null);
     try {
-      const { error } = await updateMemberProfile(activeProfileId, { handle: normalized || null });
+      let error = null;
+      if (workerOk) {
+        const r = await patchMemberProfileViaWorker(activeProfileId, { handle: raw || null });
+        error = r.error;
+      } else {
+        const r = await updateMemberProfile(activeProfileId, {
+          handle: normalized || null,
+          display_handle: raw || null,
+        });
+        error = r.error;
+      }
       if (error) {
         const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
         const msg0 = error instanceof Error ? error.message : String(error);
@@ -1016,7 +1072,9 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 <span style={{ fontSize: 13, color: "#fbbf24" }}>At least 3 characters</span>
               ) : null}
               {handleAvailability === "invalid" ? (
-                <span style={{ fontSize: 13, color: "#fbbf24" }}>Letters, numbers, underscores only (3–20)</span>
+                <span style={{ fontSize: 13, color: "#fbbf24" }}>
+                  Letters, numbers, underscore, period, or hyphen (3–32); no ..; cannot start or end with .
+                </span>
               ) : null}
               <button
                 type="button"
@@ -1029,7 +1087,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </button>
             </div>
             <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", marginTop: 6 }}>
-              {handleInput.length}/20 · min 3 characters · shown as{" "}
+              {handleInput.length}/32 · min 3 characters · shown as{" "}
               {handleNormalized.length >= 3 && isValidMemberHandleFormat(handleInput)
                 ? formatHandleDisplay(handleInput)
                 : "@handle"}

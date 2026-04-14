@@ -3,8 +3,16 @@ import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
 import { formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
+import { resolveCatalogBlendBacRefMl } from "../lib/peptideMath.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
-import { insertDoseLog, listPeptideIdsWithDosesOnLocalDay } from "../lib/supabase.js";
+import {
+  getUserStackRowId,
+  insertDoseLog,
+  insertNetworkFeedDosePost,
+  listPeptideIdsWithDosesOnLocalDay,
+} from "../lib/supabase.js";
+import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
+import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
 import { isProtocolSessionId } from "../data/protocolSessions.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
@@ -68,6 +76,11 @@ export function ProtocolTab({
   const [loggingPeptideId, setLoggingPeptideId] = useState(null);
   const [loggedTodayIds, setLoggedTodayIds] = useState(() => new Set());
   const [guardrail, setGuardrail] = useState(null);
+  const [networkPrompt, setNetworkPrompt] = useState(
+    /** @type {null | { insertRow: Record<string, unknown>; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
+  );
+  const [networkPostBusy, setNetworkPostBusy] = useState(false);
+  const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
   const showDoseToast = useShowDoseToast();
   const skipGuardrailForPeptideIdRef = useRef(null);
   const deepLinkConsumedRef = useRef(false);
@@ -167,9 +180,10 @@ export function ProtocolTab({
 
     setLoggingPeptideId(peptideId);
     const now = new Date().toISOString();
-    let error = null;
+    /** @type {{ data: { id?: string } | null; error: Error | null }} */
+    let insertRes = { data: null, error: null };
     if (payload.kind === "injectable") {
-      const res = await insertDoseLog({
+      insertRes = await insertDoseLog({
         user_id: userId,
         profile_id: profileId,
         vial_id: payload.vial.id,
@@ -178,9 +192,8 @@ export function ProtocolTab({
         notes: null,
         dosed_at: now,
       });
-      error = res.error;
     } else {
-      const res = await insertDoseLog({
+      insertRes = await insertDoseLog({
         user_id: userId,
         profile_id: profileId,
         vial_id: null,
@@ -192,17 +205,65 @@ export function ProtocolTab({
         notes: null,
         dosed_at: now,
       });
-      error = res.error;
     }
+    const { error, data: inserted } = insertRes;
     setLoggingPeptideId(null);
     if (error) return;
     setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
     setGuardrail(null);
     void refreshMemberProfiles();
-    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
-    showDoseToast(getDoseLogCelebrationMessage(cat, r.name));
     bumpReload();
+    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
+    const toastMessage = getDoseLogCelebrationMessage(cat, r.name);
+    const doseLogId =
+      inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
+    if (!doseLogId) {
+      showDoseToast(toastMessage);
+      return;
+    }
+    const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
+    const { stackRowId } = await getUserStackRowId(userId, profileId);
+    const insertRow = buildNetworkFeedInsertRow({
+      userId,
+      doseLogId,
+      peptideId,
+      payload,
+      session,
+      stackRowId: stackRowId ?? null,
+      catalogPeptide: cat,
+    });
+    setNetworkPostError(null);
+    setNetworkPrompt({
+      insertRow,
+      compoundName: r.name,
+      previewLine,
+      toastMessage,
+    });
   };
+
+  const dismissNetworkPrompt = useCallback(() => {
+    const msg = networkPrompt?.toastMessage;
+    setNetworkPrompt(null);
+    setNetworkPostError(null);
+    setNetworkPostBusy(false);
+    if (msg) showDoseToast(msg);
+  }, [networkPrompt, showDoseToast]);
+
+  const confirmNetworkPost = useCallback(async () => {
+    if (!networkPrompt?.insertRow) return;
+    setNetworkPostBusy(true);
+    setNetworkPostError(null);
+    const { error } = await insertNetworkFeedDosePost(networkPrompt.insertRow);
+    setNetworkPostBusy(false);
+    if (error) {
+      setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
+      return;
+    }
+    const msg = networkPrompt.toastMessage;
+    setNetworkPrompt(null);
+    setNetworkPostBusy(false);
+    showDoseToast(msg);
+  }, [networkPrompt, showDoseToast]);
 
   const emptyBecauseNoStack = protocolBaseRows.length === 0;
 
@@ -247,6 +308,7 @@ export function ProtocolTab({
   }
 
   return (
+    <>
     <div className="mono" style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 100, fontFamily: "'JetBrains Mono', monospace" }}>
       <div style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 24 }}>
         {protocolHeaderLine()}
@@ -350,6 +412,16 @@ export function ProtocolTab({
         </>
       )}
     </div>
+    <PostDoseNetworkSheet
+      open={networkPrompt != null}
+      compoundName={networkPrompt?.compoundName ?? ""}
+      previewLine={networkPrompt?.previewLine ?? ""}
+      busy={networkPostBusy}
+      postError={networkPostError}
+      onPost={confirmNetworkPost}
+      onKeepPrivate={dismissNetworkPrompt}
+    />
+    </>
   );
 }
 
@@ -457,10 +529,11 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
     [row.peptideId, row.name]
   );
   const blendComponents = catalog?.components;
+  const catalogBacRefMl = useMemo(() => resolveCatalogBlendBacRefMl(catalog), [catalog]);
   const derivedMcg = useMemo(() => unitsToMcg(row.units, vial?.concentration_mcg_ml), [row.units, vial]);
   const dosePreview = useMemo(
-    () => formatProtocolInjectableDosePreview(row.units, vial, blendComponents),
-    [row.units, vial, blendComponents]
+    () => formatProtocolInjectableDosePreview(row.units, vial, blendComponents, catalogBacRefMl),
+    [row.units, vial, blendComponents, catalogBacRefMl]
   );
 
   const vialIndex = row.vials.findIndex((v) => v.id === row.selectedVialId);

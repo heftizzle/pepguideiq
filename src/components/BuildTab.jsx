@@ -203,6 +203,7 @@ export function BuildTab({
   cycleWeeks,
   setCycleWeeks,
   savedStackLimit,
+  stackListReady = true,
   onUpgrade,
   primaryCategory,
   user = null,
@@ -496,6 +497,7 @@ export function BuildTab({
   };
 
   const saveStack = () => {
+    if (!stackListReady) return;
     if (Number.isFinite(savedStackLimit) && rows.length > savedStackLimit) {
       onUpgrade();
       return;
@@ -1005,7 +1007,9 @@ export function BuildTab({
       <button
         type="button"
         className={saved ? "btn-teal btn-saved" : "btn-teal"}
-        style={{ width: "100%", marginTop: 16, fontSize: 13 }}
+        style={{ width: "100%", marginTop: 16, fontSize: 13, opacity: stackListReady ? 1 : 0.55 }}
+        disabled={!stackListReady}
+        title={!stackListReady ? "Loading your stack…" : undefined}
         onClick={handleSaveStack}
       >
         {saved ? "✓ Stack Saved!" : "Save Stack"}

@@ -16,6 +16,14 @@ function formatReconstitution(r) {
   return sanitizeVendorRefs(parts.join(". ")) || "Per supplier / protocol";
 }
 
+function defaultBacWaterMlFromRaw(raw) {
+  const nested = Number(raw?.reconstitution?.typicalVolumeMl);
+  if (Number.isFinite(nested) && nested > 0) return nested;
+  const top = Number(raw?.reconstitutionVolumeMl);
+  if (Number.isFinite(top) && top > 0) return top;
+  return 2;
+}
+
 function inferRoute(raw) {
   const blob = `${raw.mechanism} ${raw.name} ${formatReconstitution(raw.reconstitution)}`.toLowerCase();
   const out = [];
@@ -140,36 +148,64 @@ export function normalizeNewCatalogEntry(raw) {
       ? sanitizeVendorRefs(raw.reconstitution)
       : formatReconstitution(raw.reconstitution);
 
-  const normalizedComponents =
-    Array.isArray(raw.components) && raw.components.length > 0
-      ? raw.components
-          .map((c) => ({
-            name: typeof c?.name === "string" ? c.name.trim() : "",
-            mg: Number(c?.mg),
-          }))
-          .filter((c) => c.name && Number.isFinite(c.mg) && c.mg >= 0)
-      : [];
+  const normalizedComponents = [];
+  if (Array.isArray(raw.components) && raw.components.length > 0) {
+    for (const c of raw.components) {
+      const name = typeof c?.name === "string" ? c.name.trim() : "";
+      if (!name) continue;
+      const mg = Number(c?.mg);
+      if (Number.isFinite(mg) && mg >= 0) {
+        normalizedComponents.push({ name, mg });
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(c, "mgPerMl")) {
+        const rawMpm = c.mgPerMl;
+        if (rawMpm === null) normalizedComponents.push({ name, mgPerMl: null });
+        else {
+          const mpm = Number(rawMpm);
+          if (Number.isFinite(mpm) && mpm >= 0) normalizedComponents.push({ name, mgPerMl: mpm });
+        }
+      }
+    }
+  }
   const componentsField = normalizedComponents.length ? { components: normalizedComponents } : {};
 
-  const reconVol = Number(raw.reconstitutionVolumeMl);
+  const defaultBacForVial = defaultBacWaterMlFromRaw(raw);
+
+  let reconVol = Number(raw.reconstitutionVolumeMl);
+  if (!Number.isFinite(reconVol) || reconVol <= 0) {
+    const nestedVol = Number(raw.reconstitution?.typicalVolumeMl);
+    if (normalizedComponents.length >= 2 && Number.isFinite(nestedVol) && nestedVol > 0) {
+      reconVol = nestedVol;
+    }
+  }
   const reconstitutionVolumeField =
     Number.isFinite(reconVol) && reconVol > 0 ? { reconstitutionVolumeMl: reconVol } : {};
 
   const normalizedVialSizeOptions =
     Array.isArray(raw.vialSizeOptions) && raw.vialSizeOptions.length > 0
       ? raw.vialSizeOptions
-          .map((o) => ({
-            label: typeof o?.label === "string" ? o.label.trim() : "",
-            totalMg: Number(o?.totalMg),
-            bacWaterMl: Number(o?.bacWaterMl),
-          }))
+          .map((o) => {
+            if (typeof o === "number" && Number.isFinite(o) && o > 0) {
+              return {
+                label: `${o}mg total vial`,
+                totalMg: o,
+                bacWaterMl: defaultBacForVial,
+              };
+            }
+            return {
+              label: typeof o?.label === "string" ? o.label.trim() : "",
+              totalMg: Number(o?.totalMg),
+              bacWaterMl: Number(o?.bacWaterMl),
+            };
+          })
           .filter(
-            (o) =>
-              o.label &&
-              Number.isFinite(o.totalMg) &&
-              o.totalMg > 0 &&
-              Number.isFinite(o.bacWaterMl) &&
-              o.bacWaterMl > 0
+            (opt) =>
+              opt.label &&
+              Number.isFinite(opt.totalMg) &&
+              opt.totalMg > 0 &&
+              Number.isFinite(opt.bacWaterMl) &&
+              opt.bacWaterMl > 0
           )
       : [];
   const vialSizeOptionsField = normalizedVialSizeOptions.length ? { vialSizeOptions: normalizedVialSizeOptions } : {};

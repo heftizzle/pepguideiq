@@ -12,6 +12,36 @@ export const R2_UPLOAD_ALLOWED_TYPES = new Set([
 export const R2_UPLOAD_ACCEPT_ATTR = "image/jpeg,image/png,image/webp,image/gif";
 
 /**
+ * Append `v` query for cache-busting image/worker URLs (e.g. right after upload).
+ * @param {string} url
+ * @param {number} bustMs — must be > 0 to apply; use `Date.now()` after a successful upload
+ * @returns {string}
+ */
+export function appendImageCacheBustParam(url, bustMs) {
+  const s = String(url ?? "").trim();
+  if (!s) return s;
+  const v = Number(bustMs);
+  if (!Number.isFinite(v) || v <= 0) return s;
+  const sep = s.includes("?") ? "&" : "?";
+  return `${s}${sep}v=${Math.round(v)}`;
+}
+
+/**
+ * Clear a post-upload fetch bust when the R2 key changes to a different object,
+ * or when the key is cleared. Does not clear on first key assignment after empty
+ * (e.g. right after a first successful upload).
+ * @param {string} prevTrimmed
+ * @param {string} nextTrimmed
+ */
+export function shouldResetImageUploadFetchBust(prevTrimmed, nextTrimmed) {
+  const p = String(prevTrimmed ?? "").trim();
+  const n = String(nextTrimmed ?? "").trim();
+  if (p && n && p !== n) return true;
+  if (!n && p) return true;
+  return false;
+}
+
+/**
  * Map fetch errors and HTTP status codes to user-friendly messages.
  * @param {number | null} status
  * @param {string} fallback
@@ -47,8 +77,9 @@ export function validateUploadFile(file) {
 /**
  * Upload an image to the Worker, with two automatic retries on transient
  * failures (network errors and 503). The Worker response is expected to be
- * `{ url, key, private }` — `url` is the canonical, full URL the caller
- * should persist (never construct URLs client-side).
+ * `{ url, key, private }` — on success, `url` includes a one-time cache-bust
+ * query for immediate display; persist storage keys via `key` / profile fields,
+ * not the returned `url`, unless you strip cache params.
  *
  * @param {object} params
  * @param {string} params.path — Worker path, e.g. "/stack-photo".
@@ -128,7 +159,12 @@ export async function uploadImageToR2({ path, file, fields, onState }) {
       }
       const isPrivate =
         body && typeof body === "object" && body.private === true ? true : false;
-      return { ok: true, url: fullUrl, key, private: isPrivate };
+      return {
+        ok: true,
+        url: appendImageCacheBustParam(fullUrl, Date.now()),
+        key,
+        private: isPrivate,
+      };
     }
 
     let serverErr = "";

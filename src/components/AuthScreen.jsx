@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PLANS } from "../data/catalog.js";
+import { captureAffiliateRefFromLocation, getAffiliatePriceDisplay, getStoredAffiliateRef } from "../lib/affiliateRef.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import {
   authResetPassword,
@@ -13,6 +14,60 @@ import {
 } from "../lib/supabase.js";
 import { getTier } from "../lib/tiers.js";
 import { Logo } from "./Logo.jsx";
+
+function AuthPublicNav() {
+  return (
+    <header
+      style={{
+        flexShrink: 0,
+        width: "100%",
+        padding: "12px 24px",
+        boxSizing: "border-box",
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        borderBottom: "1px solid #14202e",
+        background: "#07090e",
+      }}
+    >
+      <a
+        href="/pricing"
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#00d4aa",
+          textDecoration: "none",
+          fontFamily: "'Outfit',sans-serif",
+        }}
+      >
+        Pricing
+      </a>
+    </header>
+  );
+}
+
+/** @param {{ children: import("react").ReactNode }} props */
+function AuthScaffold({ children }) {
+  return (
+    <div style={{ minHeight: "100vh", background: "#07090e", display: "flex", flexDirection: "column" }}>
+      <AuthPublicNav />
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 20,
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const ZXCVBN_STRENGTH_COLORS = ["#ef4444", "#ef4444", "#f97316", "#eab308", "#22c55e"];
 const ZXCVBN_STRENGTH_LABELS = ["Weak", "Weak", "Fair", "Strong", "Very Strong"];
@@ -57,8 +112,15 @@ export function AuthScreen({ onAuth }) {
   const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
   /** Set from dynamic `zxcvbn` (register password strength meter). */
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
+  /** EDON15 / TSource15 (and variants) captured from URL or localStorage — drives 15% off copy on plan cards. */
+  const [partnerDiscountActive, setPartnerDiscountActive] = useState(false);
   const mainWidgetIdRef = useRef(null);
   const plansWidgetIdRef = useRef(null);
+
+  useEffect(() => {
+    captureAffiliateRefFromLocation();
+    setPartnerDiscountActive(Boolean(getStoredAffiliateRef()));
+  }, []);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -358,16 +420,7 @@ export function AuthScreen({ onAuth }) {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#07090e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-        }}
-      >
+      <AuthScaffold>
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Logo style={{ marginBottom: 20 }} />
           <div className="mono" style={{ fontSize: 13, color: "#4a6080", lineHeight: 1.6 }}>
@@ -378,22 +431,13 @@ export function AuthScreen({ onAuth }) {
             <code style={{ color: "#00d4aa" }}>npm run dev</code>.
           </div>
         </div>
-      </div>
+      </AuthScaffold>
     );
   }
 
   if (mode === "forgot") {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#07090e",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 20,
-        }}
-      >
+      <AuthScaffold>
         <div style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <Logo />
@@ -476,23 +520,13 @@ export function AuthScreen({ onAuth }) {
             </a>
           </div>
         </div>
-      </div>
+      </AuthScaffold>
     );
   }
 
   if (mode === "plans") {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#07090e",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px",
-        }}
-      >
+      <AuthScaffold>
         <Logo style={{ marginBottom: 28 }} />
         <div
           className="mono"
@@ -511,6 +545,22 @@ export function AuthScreen({ onAuth }) {
             id="turnstile-widget-plans"
             style={{ display: "flex", justifyContent: "center", marginBottom: 20, minHeight: 65 }}
           />
+        )}
+        {partnerDiscountActive && (
+          <div
+            className="mono"
+            style={{
+              fontSize: 12,
+              color: "#00d4aa",
+              marginBottom: 16,
+              textAlign: "center",
+              maxWidth: 420,
+              lineHeight: 1.5,
+              letterSpacing: "0.04em",
+            }}
+          >
+            Partner code active — 15% off Pro, Elite, and GOAT at checkout.
+          </div>
         )}
         {error && (
           <div
@@ -535,7 +585,9 @@ export function AuthScreen({ onAuth }) {
             width: "100%",
           }}
         >
-          {PLANS.map((plan) => (
+          {PLANS.map((plan) => {
+            const priceDisplay = getAffiliatePriceDisplay(plan.id, partnerDiscountActive);
+            return (
             <div
               key={plan.id}
               style={{
@@ -582,10 +634,34 @@ export function AuthScreen({ onAuth }) {
                 {plan.label}
               </div>
               <div style={{ marginBottom: 14 }}>
-                <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef" }}>
-                  {plan.price}
+                {priceDisplay.strike ? (
+                  <>
+                    <span
+                      style={{
+                        textDecoration: "line-through",
+                        color: "#64748b",
+                        fontSize: 16,
+                        fontWeight: 600,
+                        fontFamily: "'Outfit',sans-serif",
+                      }}
+                    >
+                      {priceDisplay.strike}
+                    </span>
+                    <span
+                      className="brand"
+                      style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef", marginLeft: 10 }}
+                    >
+                      {priceDisplay.main}
+                    </span>
+                  </>
+                ) : (
+                  <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef" }}>
+                    {priceDisplay.main}
+                  </span>
+                )}
+                <span style={{ fontSize: 13, color: "#4a6080", marginLeft: 4 }}>
+                  {plan.period === "forever" ? "forever" : priceDisplay.suffix || plan.period}
                 </span>
-                <span style={{ fontSize: 13, color: "#4a6080", marginLeft: 4 }}>{plan.period}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18, flex: 1 }}>
                 {plan.features.map((f) => (
@@ -613,12 +689,13 @@ export function AuthScreen({ onAuth }) {
                 {busy ? "…" : plan.id === "entry" ? `Start ${getTier("entry").label}` : `Get ${plan.label}`}
               </button>
             </div>
-          ))}
+          );
+          })}
         </div>
         <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0" }}>
           Subscriptions managed via App Store / Google Play on mobile.
         </div>
-      </div>
+      </AuthScaffold>
     );
   }
 
@@ -651,16 +728,7 @@ export function AuthScreen({ onAuth }) {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#07090e",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-      }}
-    >
+    <AuthScaffold>
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Logo />
@@ -843,6 +911,6 @@ export function AuthScreen({ onAuth }) {
           </a>
         </div>
       </div>
-    </div>
+    </AuthScaffold>
   );
 }
