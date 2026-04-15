@@ -416,6 +416,8 @@ async function handleStackAdvisor(request, env) {
 
   let sessionUserId = null;
   let plan = "entry";
+  /** @type {string} */
+  let advisorBiologicalSexLine = "";
   if (supabaseAuthReady(env)) {
     const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
     if (error || !user?.sub) {
@@ -428,6 +430,8 @@ async function handleStackAdvisor(request, env) {
     const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
     plan = await fetchProfilePlan(supabaseUrl, serviceKey, sessionUserId, env);
+    const rawSex = await fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, sessionUserId);
+    advisorBiologicalSexLine = biologicalSexPromptLineFromDb(rawSex);
   } else {
     if (production) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -515,6 +519,10 @@ Tier assignment rules:
 
 Only use peptideId values from the provided catalog.`;
 
+    const stackAdvisorSystemText = advisorBiologicalSexLine
+      ? `${systemPrompt}\n\n${advisorBiologicalSexLine}`
+      : systemPrompt;
+
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return new Response(JSON.stringify({ insight: "", recommendations: [] }), {
@@ -535,7 +543,7 @@ Only use peptideId values from the provided catalog.`;
         body: JSON.stringify({
           model: MODEL_ENTRY_PRO,
           max_tokens: 900,
-          system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: stackAdvisorSystemText, cache_control: { type: "ephemeral" } }],
           messages: [
             {
               role: "user",
@@ -814,6 +822,38 @@ async function fetchProfilePlan(supabaseUrl, serviceKey, userId, env) {
   const rows = await res.json().catch(() => []);
   const row = Array.isArray(rows) ? rows[0] : null;
   return normalizePlanTier(row?.plan, env);
+}
+
+/**
+ * @param {string | null | undefined} raw — profiles.biological_sex
+ * @returns {string} — line for model context, or empty to omit
+ */
+function biologicalSexPromptLineFromDb(raw) {
+  const x = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (x === "male") return "User biological sex: male";
+  if (x === "female") return "User biological sex: female";
+  return "";
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @returns {Promise<string | null>}
+ */
+async function fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, userId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=biological_sex`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  return typeof row?.biological_sex === "string" ? row.biological_sex : null;
 }
 
 /** Cached system prefix for AI Guide (/v1/chat); dynamic user context is a separate block. */
@@ -3762,6 +3802,12 @@ async function handleRequest(request, env) {
       const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
       const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
       plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+      const rawSexChat = await fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, userId);
+      const sexLineChat = biologicalSexPromptLineFromDb(rawSexChat);
+      if (sexLineChat) {
+        const baseSystem = typeof body.system === "string" ? body.system.trim() : "";
+        body.system = baseSystem ? `${baseSystem}\n\n${sexLineChat}` : sexLineChat;
+      }
     } else {
       if (production) {
         return jsonResponse({ error: "Unauthorized" }, 401, cors);

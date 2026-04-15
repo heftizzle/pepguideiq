@@ -14,6 +14,7 @@ import {
   patchMemberProfileViaWorker,
   upsertBodyMetrics,
   updateMemberProfile,
+  updateUserProfile,
 } from "../lib/supabase.js";
 import {
   R2_UPLOAD_ACCEPT_ATTR,
@@ -851,6 +852,24 @@ export function ProfileTab({
       savedFlashTimerRef.current = null;
     }, 2200);
   }, []);
+
+  const setBiologicalSex = useCallback(
+    async (value) => {
+      if (!user?.id) return;
+      if (!["male", "female", "prefer_not_to_say"].includes(value)) return;
+      setErr(null);
+      const prev = user.biological_sex ?? null;
+      setUser((u) => (u ? { ...u, biological_sex: value } : u));
+      const { error } = await updateUserProfile({ biological_sex: value });
+      if (error) {
+        setUser((u) => (u ? { ...u, biological_sex: prev } : u));
+        setErr(error.message);
+        return;
+      }
+      showSavedBriefly();
+    },
+    [user?.id, user?.biological_sex, setUser, showSavedBriefly]
+  );
 
   useEffect(() => {
     return () => {
@@ -2144,6 +2163,49 @@ export function ProfileTab({
               setBodyFatSlider(v);
             }}
           />
+
+          <div ref={setFieldRef("biologicalSex")} style={{ marginTop: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
+                BIOLOGICAL SEX
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[
+                { id: "male", label: "Male" },
+                { id: "female", label: "Female" },
+                { id: "prefer_not_to_say", label: "Prefer not to say" },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => void setBiologicalSex(id)}
+                  style={{
+                    fontSize: 13,
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    border:
+                      user?.biological_sex === id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                    background: user?.biological_sex === id ? "rgba(0,212,170,0.12)" : "transparent",
+                    color: user?.biological_sex === id ? "#00d4aa" : "#6b7c8f",
+                    cursor: "pointer",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>

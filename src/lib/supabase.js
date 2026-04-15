@@ -199,7 +199,7 @@ export async function getCurrentUser() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "email, name, plan, stack_photo_url, stack_photo_r2_key, display_name, avatar_r2_key, default_session"
+      "email, name, plan, biological_sex, stack_photo_url, stack_photo_r2_key, display_name, avatar_r2_key, default_session"
     )
     .eq("id", u.id)
     .maybeSingle();
@@ -227,6 +227,11 @@ export async function getCurrentUser() {
         ? profile.avatar_r2_key.trim()
         : null,
     defaultSession: ["morning", "afternoon", "evening", "night"].includes(ds) ? ds : "morning",
+    biological_sex: (() => {
+      const bs =
+        profile && typeof profile.biological_sex === "string" ? profile.biological_sex.trim().toLowerCase() : "";
+      return bs === "male" || bs === "female" || bs === "prefer_not_to_say" ? bs : null;
+    })(),
     identities: Array.isArray(u.identities) ? u.identities : [],
   };
 }
