@@ -199,6 +199,20 @@ function normalizeProfileDateOfBirth(raw) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
+/**
+ * Read a text-ish column from a profiles row (PostgREST uses snake_case; tolerate camelCase).
+ * @param {Record<string, unknown> | null | undefined} profile
+ * @param {string} snakeKey
+ * @param {string} camelKey
+ */
+function profileTextLower(profile, snakeKey, camelKey) {
+  if (!profile || typeof profile !== "object") return "";
+  const v = profile[snakeKey] ?? profile[camelKey];
+  if (v == null || v === "") return "";
+  if (typeof v === "string") return v.trim().toLowerCase();
+  return String(v).trim().toLowerCase();
+}
+
 export async function getCurrentUser() {
   if (!supabase) return null;
   const { data: auth } = await supabase.auth.getUser();
@@ -208,6 +222,9 @@ export async function getCurrentUser() {
   const { data: profile, error: profileErr } = await supabase.from("profiles").select("*").eq("id", u.id).maybeSingle();
   if (profileErr && import.meta.env.DEV) {
     console.warn("[getCurrentUser] profiles:", profileErr.message);
+  }
+  if (profile != null) {
+    console.log("[getCurrentUser] raw profiles row (before normalization)", profile);
   }
   const stackPhotoKey =
     profile && typeof profile.stack_photo_r2_key === "string" ? profile.stack_photo_r2_key.trim() : null;
@@ -234,18 +251,14 @@ export async function getCurrentUser() {
         : null,
     defaultSession: ["morning", "afternoon", "evening", "night"].includes(ds) ? ds : "morning",
     biological_sex: (() => {
-      const bs =
-        profile && typeof profile.biological_sex === "string" ? profile.biological_sex.trim().toLowerCase() : "";
+      const bs = profileTextLower(profile, "biological_sex", "biologicalSex");
       return bs === "male" || bs === "female" || bs === "prefer_not_to_say" ? bs : null;
     })(),
     cycle_tracking_enabled:
       profile && typeof profile.cycle_tracking_enabled === "boolean" ? profile.cycle_tracking_enabled : null,
     date_of_birth: profile ? normalizeProfileDateOfBirth(profile.date_of_birth) : null,
     training_experience: (() => {
-      const te =
-        profile && typeof profile.training_experience === "string"
-          ? profile.training_experience.trim().toLowerCase()
-          : "";
+      const te = profileTextLower(profile, "training_experience", "trainingExperience");
       return te === "beginner" || te === "intermediate" || te === "advanced" || te === "elite" ? te : null;
     })(),
     identities: Array.isArray(u.identities) ? u.identities : [],

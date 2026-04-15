@@ -47,10 +47,10 @@ const SECTION = {
 };
 
 const EXPERIENCE_OPTIONS = [
-  { id: "beginner", label: "Beginner" },
-  { id: "intermediate", label: "Intermediate" },
-  { id: "advanced", label: "Advanced" },
-  { id: "elite", label: "Elite" },
+  { id: "beginner", label: "🌱 Beginner" },
+  { id: "intermediate", label: "💪 Intermediate" },
+  { id: "advanced", label: "🔥 Advanced" },
+  { id: "elite", label: "⚡ Elite" },
 ];
 
 const GOAL_OPTIONS = [
@@ -922,26 +922,6 @@ export function ProfileTab({
     [user?.id, user?.date_of_birth, setUser, showSavedBriefly]
   );
 
-  const setTrainingExperience = useCallback(
-    async (value) => {
-      if (!user?.id) return;
-      if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
-      setErr(null);
-      const prev = user.training_experience ?? null;
-      setUser((u) => (u ? { ...u, training_experience: value } : u));
-      const { error } = await updateUserProfile({ training_experience: value });
-      if (error) {
-        setUser((u) => (u ? { ...u, training_experience: prev } : u));
-        setErr(error.message);
-        return;
-      }
-      showSavedBriefly();
-      const fresh = await getCurrentUser();
-      if (fresh) setUser(fresh);
-    },
-    [user?.id, user?.training_experience, setUser, showSavedBriefly]
-  );
-
   useEffect(() => {
     return () => {
       if (savedFlashTimerRef.current) window.clearTimeout(savedFlashTimerRef.current);
@@ -1153,10 +1133,10 @@ export function ProfileTab({
         label: "Height",
       },
       {
-        id: "experience_level",
+        id: "training_experience",
         done: Boolean(
-          activeProfile?.experience_level &&
-            EXPERIENCE_OPTIONS.some((o) => o.id === String(activeProfile.experience_level).toLowerCase())
+          user?.training_experience &&
+            EXPERIENCE_OPTIONS.some((o) => o.id === String(user.training_experience).toLowerCase())
         ),
         label: "Level",
       },
@@ -1166,7 +1146,7 @@ export function ProfileTab({
         label: "Stack",
       },
     ];
-  }, [activeProfile, bodyMetricsRow, displayNameShown, savedStackPeptides]);
+  }, [activeProfile, bodyMetricsRow, displayNameShown, savedStackPeptides, user?.training_experience]);
 
   const completionPct = useMemo(() => {
     const n = completionFields.filter((f) => f.done).length;
@@ -1246,12 +1226,24 @@ export function ProfileTab({
     [activeProfileId, socialDrafts, activeProfile, saveProfilePatch]
   );
 
-  const pickExperienceLevel = useCallback(
-    async (id) => {
-      if (String(activeProfile?.experience_level || "").toLowerCase() === id) return;
-      await saveProfilePatch({ experience_level: id });
+  const setTrainingExperience = useCallback(
+    async (value) => {
+      if (!user?.id) return;
+      if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
+      setErr(null);
+      const prev = user.training_experience ?? null;
+      setUser((u) => (u ? { ...u, training_experience: value } : u));
+      const { error } = await updateUserProfile({ training_experience: value });
+      if (error) {
+        setUser((u) => (u ? { ...u, training_experience: prev } : u));
+        setErr(error.message);
+        return;
+      }
+      showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) setUser(fresh);
     },
-    [activeProfile?.experience_level, saveProfilePatch]
+    [user?.id, user?.training_experience, setUser, showSavedBriefly]
   );
 
   const onBodyScanPick = useCallback(
@@ -1907,38 +1899,6 @@ export function ProfileTab({
                 </div>
               ))}
             </div>
-            <div ref={setFieldRef("experience_level")} style={{ marginBottom: 14 }}>
-              <div
-                className="mono"
-                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}
-              >
-                EXPERIENCE LEVEL
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {EXPERIENCE_OPTIONS.map((o) => {
-                  const sel = String(activeProfile?.experience_level || "").toLowerCase() === o.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => void pickExperienceLevel(o.id)}
-                      style={{
-                        fontSize: 13,
-                        padding: "6px 12px",
-                        borderRadius: 999,
-                        border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                        background: sel ? "rgba(0,212,170,0.12)" : "transparent",
-                        color: sel ? "#00d4aa" : "#6b7c8f",
-                        cursor: "pointer",
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span className="pill" style={tierPillStyle(user.plan)}>
                 {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
@@ -2268,7 +2228,7 @@ export function ProfileTab({
             />
           </div>
 
-          <div ref={setFieldRef("trainingExperience")} style={{ marginTop: 14 }}>
+          <div ref={setFieldRef("training_experience")} style={{ marginTop: 14 }}>
             <div
               style={{
                 display: "flex",
@@ -2283,32 +2243,33 @@ export function ProfileTab({
                 TRAINING EXPERIENCE
               </span>
             </div>
+            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 8 }}>
+              Stored in <span style={{ color: "#8fa5bf" }}>profiles.training_experience</span> for protocol and AI safety
+              context.
+            </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {[
-                { id: "beginner", label: "Beginner" },
-                { id: "intermediate", label: "Intermediate" },
-                { id: "advanced", label: "Advanced" },
-                { id: "elite", label: "Elite" },
-              ].map(({ id, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => void setTrainingExperience(id)}
-                  style={{
-                    fontSize: 13,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    border:
-                      user?.training_experience === id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                    background: user?.training_experience === id ? "rgba(0,212,170,0.12)" : "transparent",
-                    color: user?.training_experience === id ? "#00d4aa" : "#6b7c8f",
-                    cursor: "pointer",
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+              {EXPERIENCE_OPTIONS.map((o) => {
+                const sel = String(user?.training_experience ?? "").toLowerCase() === o.id;
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => void setTrainingExperience(o.id)}
+                    style={{
+                      fontSize: 13,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                      background: sel ? "rgba(0,212,170,0.12)" : "transparent",
+                      color: sel ? "#00d4aa" : "#6b7c8f",
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2329,10 +2290,12 @@ export function ProfileTab({
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {[
-                { id: "male", label: "Male" },
-                { id: "female", label: "Female" },
+                { id: "male", label: "♂️ Male" },
+                { id: "female", label: "♀️ Female" },
                 { id: "prefer_not_to_say", label: "Prefer not to say" },
-              ].map(({ id, label }) => (
+              ].map(({ id, label }) => {
+                const sel = String(user?.biological_sex ?? "").toLowerCase() === id;
+                return (
                 <button
                   key={id}
                   type="button"
@@ -2342,18 +2305,20 @@ export function ProfileTab({
                     padding: "4px 10px",
                     borderRadius: 8,
                     border:
-                      user?.biological_sex === id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                    background: user?.biological_sex === id ? "rgba(0,212,170,0.12)" : "transparent",
-                    color: user?.biological_sex === id ? "#00d4aa" : "#6b7c8f",
+                      sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                    background: sel ? "rgba(0,212,170,0.12)" : "transparent",
+                    color: sel ? "#00d4aa" : "#6b7c8f",
                     cursor: "pointer",
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
                   {label}
                 </button>
-              ))}
+              );
+              })}
             </div>
-            {user?.biological_sex === "female" && (user?.cycle_tracking_enabled ?? null) === null ? (
+            {String(user?.biological_sex ?? "").toLowerCase() === "female" &&
+            (user?.cycle_tracking_enabled ?? null) === null ? (
               <div
                 style={{
                   marginTop: 12,
