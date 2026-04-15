@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SettingsTab } from "./SettingsTab.jsx";
 import { BodyMetricStepper } from "./BodyMetricStepper.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
@@ -33,7 +33,7 @@ import {
   storedSocialHandleString,
 } from "../lib/socialProfileLinks.js";
 import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
-import { useActiveProfile } from "../context/ProfileContext.jsx";
+import { ProfileCtx } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
 
@@ -828,7 +828,12 @@ export function ProfileTab({
     return `${ft}'${ins}"`;
   };
 
-  const { activeProfileId, activeProfile, memberProfilesVersion, refreshMemberProfiles } = useActiveProfile();
+  const noopRefreshMemberProfiles = useCallback(async () => {}, []);
+  const profileCtx = useContext(ProfileCtx);
+  const activeProfileId = profileCtx?.activeProfileId ?? null;
+  const activeProfile = profileCtx?.activeProfile ?? null;
+  const memberProfilesVersion = profileCtx?.memberProfilesVersion ?? 0;
+  const refreshMemberProfiles = profileCtx?.refreshMemberProfiles ?? noopRefreshMemberProfiles;
   const demo = useDemoTourOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
@@ -1664,6 +1669,14 @@ export function ProfileTab({
       /* ignore */
     }
   };
+
+  if (!profileCtx) {
+    return (
+      <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", padding: 24 }}>
+        Loading profile…
+      </div>
+    );
+  }
 
   if (!isSupabaseConfigured()) {
     return (

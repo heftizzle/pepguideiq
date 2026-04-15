@@ -5,7 +5,7 @@ import { fetchMemberProfiles } from "../lib/supabase.js";
 
 const LS_KEY = (userId) => `pepguideiq.active_profile_id.${userId}`;
 
-const ProfileCtx = createContext(null);
+export const ProfileCtx = createContext(null);
 
 /**
  * @param {{ userId: string, plan: string, children: import("react").ReactNode }} props
