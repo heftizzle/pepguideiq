@@ -871,6 +871,68 @@ export function ProfileTab({
     [user?.id, user?.biological_sex, setUser, showSavedBriefly]
   );
 
+  const setCycleTrackingConsent = useCallback(
+    async (enabled) => {
+      if (!user?.id) return;
+      setErr(null);
+      const prev = user.cycle_tracking_enabled ?? null;
+      setUser((u) => (u ? { ...u, cycle_tracking_enabled: enabled } : u));
+      const { error } = await updateUserProfile({ cycle_tracking_enabled: enabled });
+      if (error) {
+        setUser((u) => (u ? { ...u, cycle_tracking_enabled: prev } : u));
+        setErr(error.message);
+        return;
+      }
+      showSavedBriefly();
+    },
+    [user?.id, user?.cycle_tracking_enabled, setUser, showSavedBriefly]
+  );
+
+  const setDateOfBirth = useCallback(
+    async (value) => {
+      if (!user?.id) return;
+      setErr(null);
+      const prev = user.date_of_birth ?? null;
+      let normalized = null;
+      if (value === null || value === "") {
+        normalized = null;
+      } else if (typeof value === "string") {
+        const t = value.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return;
+        normalized = t;
+      } else {
+        return;
+      }
+      setUser((u) => (u ? { ...u, date_of_birth: normalized } : u));
+      const { error } = await updateUserProfile({ date_of_birth: normalized });
+      if (error) {
+        setUser((u) => (u ? { ...u, date_of_birth: prev } : u));
+        setErr(error.message);
+        return;
+      }
+      showSavedBriefly();
+    },
+    [user?.id, user?.date_of_birth, setUser, showSavedBriefly]
+  );
+
+  const setTrainingExperience = useCallback(
+    async (value) => {
+      if (!user?.id) return;
+      if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
+      setErr(null);
+      const prev = user.training_experience ?? null;
+      setUser((u) => (u ? { ...u, training_experience: value } : u));
+      const { error } = await updateUserProfile({ training_experience: value });
+      if (error) {
+        setUser((u) => (u ? { ...u, training_experience: prev } : u));
+        setErr(error.message);
+        return;
+      }
+      showSavedBriefly();
+    },
+    [user?.id, user?.training_experience, setUser, showSavedBriefly]
+  );
+
   useEffect(() => {
     return () => {
       if (savedFlashTimerRef.current) window.clearTimeout(savedFlashTimerRef.current);
@@ -2164,6 +2226,75 @@ export function ProfileTab({
             }}
           />
 
+          <div ref={setFieldRef("dateOfBirth")} style={{ marginTop: 14 }}>
+            <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em", display: "block", marginBottom: 6 }}>
+              DATE OF BIRTH
+            </span>
+            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 8 }}>
+              Used for age-appropriate dosing guidance
+            </div>
+            <input
+              type="date"
+              value={user?.date_of_birth ?? ""}
+              onChange={(e) => void setDateOfBirth(e.target.value)}
+              style={{
+                fontSize: 13,
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: "1px solid #243040",
+                background: "#0e1520",
+                color: "#e6edf3",
+                cursor: "pointer",
+                fontFamily: "'JetBrains Mono', monospace",
+                maxWidth: "100%",
+              }}
+            />
+          </div>
+
+          <div ref={setFieldRef("trainingExperience")} style={{ marginTop: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
+                TRAINING EXPERIENCE
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[
+                { id: "beginner", label: "Beginner" },
+                { id: "intermediate", label: "Intermediate" },
+                { id: "advanced", label: "Advanced" },
+                { id: "elite", label: "Elite" },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => void setTrainingExperience(id)}
+                  style={{
+                    fontSize: 13,
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    border:
+                      user?.training_experience === id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                    background: user?.training_experience === id ? "rgba(0,212,170,0.12)" : "transparent",
+                    color: user?.training_experience === id ? "#00d4aa" : "#6b7c8f",
+                    cursor: "pointer",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div ref={setFieldRef("biologicalSex")} style={{ marginTop: 14 }}>
             <div
               style={{
@@ -2205,6 +2336,47 @@ export function ProfileTab({
                 </button>
               ))}
             </div>
+            {user?.biological_sex === "female" && (user?.cycle_tracking_enabled ?? null) === null ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #243040",
+                  background: "rgba(14, 21, 32, 0.45)",
+                }}
+              >
+                <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", lineHeight: 1.45, marginBottom: 10 }}>
+                  Track menstrual cycle for protocol optimization?
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn-teal"
+                    style={{ fontSize: 12, padding: "5px 14px" }}
+                    onClick={() => void setCycleTrackingConsent(true)}
+                  >
+                    Enable
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      fontSize: 12,
+                      padding: "5px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #243040",
+                      background: "transparent",
+                      color: "#6b7c8f",
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                    onClick={() => void setCycleTrackingConsent(false)}
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>

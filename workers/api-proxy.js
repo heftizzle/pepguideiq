@@ -416,8 +416,8 @@ async function handleStackAdvisor(request, env) {
 
   let sessionUserId = null;
   let plan = "entry";
-  /** @type {string} */
-  let advisorBiologicalSexLine = "";
+  /** @type {string[]} */
+  let advisorUserContextLines = [];
   if (supabaseAuthReady(env)) {
     const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
     if (error || !user?.sub) {
@@ -430,8 +430,12 @@ async function handleStackAdvisor(request, env) {
     const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
     plan = await fetchProfilePlan(supabaseUrl, serviceKey, sessionUserId, env);
-    const rawSex = await fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, sessionUserId);
-    advisorBiologicalSexLine = biologicalSexPromptLineFromDb(rawSex);
+    const aiCtx = await fetchProfileAiContextFields(supabaseUrl, serviceKey, sessionUserId);
+    advisorUserContextLines = [
+      biologicalSexPromptLineFromDb(aiCtx.biological_sex),
+      agePromptLineFromDob(aiCtx.date_of_birth),
+      trainingExperiencePromptLineFromDb(aiCtx.training_experience),
+    ].filter(Boolean);
   } else {
     if (production) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -519,9 +523,10 @@ Tier assignment rules:
 
 Only use peptideId values from the provided catalog.`;
 
-    const stackAdvisorSystemText = advisorBiologicalSexLine
-      ? `${systemPrompt}\n\n${advisorBiologicalSexLine}`
-      : systemPrompt;
+    const advisorContextBlock = advisorUserContextLines.length ? advisorUserContextLines.join("\n") : "";
+    const stackAdvisorSystemText = [systemPrompt, advisorContextBlock, AI_AGE_TRAINING_SAFETY_NOTE]
+      .filter(Boolean)
+      .join("\n\n");
 
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -824,6 +829,14 @@ async function fetchProfilePlan(supabaseUrl, serviceKey, userId, env) {
   return normalizePlanTier(row?.plan, env);
 }
 
+/** Milliseconds per mean Gregorian year (365.25 days), per product spec for age-at-request. */
+const MS_PER_YEAR_AGE = 31557600000;
+
+const VALID_TRAINING_EXPERIENCE = new Set(["beginner", "intermediate", "advanced", "elite"]);
+
+const AI_AGE_TRAINING_SAFETY_NOTE =
+  "If the user's age is over 60 or under 25, apply conservative dosing guidance and flag compounds with age-specific risk profiles. If age is unknown, note that recommendations assume a healthy adult and encourage the user to consult a physician.";
+
 /**
  * @param {string | null | undefined} raw — profiles.biological_sex
  * @returns {string} — line for model context, or empty to omit
@@ -836,14 +849,48 @@ function biologicalSexPromptLineFromDb(raw) {
 }
 
 /**
+ * @param {string | null | undefined} isoDate — profiles.date_of_birth (YYYY-MM-DD)
+ * @returns {number | null}
+ */
+function ageFromDateOfBirthAtRequestTime(isoDate) {
+  const s = typeof isoDate === "string" ? isoDate.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const t = new Date(s + "T12:00:00.000Z");
+  if (Number.isNaN(t.getTime())) return null;
+  const age = Math.floor((Date.now() - t.getTime()) / MS_PER_YEAR_AGE);
+  if (!Number.isFinite(age) || age < 0 || age > 120) return null;
+  return age;
+}
+
+/**
+ * @param {string | null | undefined} isoDate
+ * @returns {string} — line for model context, or empty to omit
+ */
+function agePromptLineFromDob(isoDate) {
+  const age = ageFromDateOfBirthAtRequestTime(isoDate);
+  return age != null ? `User age: ${age}` : "";
+}
+
+/**
+ * @param {string | null | undefined} raw — profiles.training_experience
+ * @returns {string} — line for model context, or empty to omit
+ */
+function trainingExperiencePromptLineFromDb(raw) {
+  const x = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (!VALID_TRAINING_EXPERIENCE.has(x)) return "";
+  return `User training experience: ${x}`;
+}
+
+/**
+ * Profile fields used for AI Guide and Stack Advisor safety context (single REST round-trip).
  * @param {string} supabaseUrl
  * @param {string} serviceKey
  * @param {string} userId
- * @returns {Promise<string | null>}
+ * @returns {Promise<{ biological_sex: string | null, date_of_birth: string | null, training_experience: string | null }>}
  */
-async function fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, userId) {
+async function fetchProfileAiContextFields(supabaseUrl, serviceKey, userId) {
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=biological_sex`,
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=biological_sex,date_of_birth,training_experience`,
     {
       headers: {
         apikey: serviceKey,
@@ -853,7 +900,21 @@ async function fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, userId) {
   );
   const rows = await res.json().catch(() => []);
   const row = Array.isArray(rows) ? rows[0] : null;
-  return typeof row?.biological_sex === "string" ? row.biological_sex : null;
+  const sex = typeof row?.biological_sex === "string" ? row.biological_sex.trim() : null;
+  const dobRaw = row?.date_of_birth;
+  const dob =
+    typeof dobRaw === "string"
+      ? dobRaw.trim()
+      : dobRaw instanceof Date && !Number.isNaN(dobRaw.getTime())
+        ? dobRaw.toISOString().slice(0, 10)
+        : null;
+  const teRaw = typeof row?.training_experience === "string" ? row.training_experience.trim().toLowerCase() : "";
+  const training = VALID_TRAINING_EXPERIENCE.has(teRaw) ? teRaw : null;
+  return {
+    biological_sex: sex,
+    date_of_birth: dob && /^\d{4}-\d{2}-\d{2}$/.test(dob) ? dob : null,
+    training_experience: training,
+  };
 }
 
 /** Cached system prefix for AI Guide (/v1/chat); dynamic user context is a separate block. */
@@ -3802,12 +3863,15 @@ async function handleRequest(request, env) {
       const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
       const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
       plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
-      const rawSexChat = await fetchProfileBiologicalSexRaw(supabaseUrl, serviceKey, userId);
-      const sexLineChat = biologicalSexPromptLineFromDb(rawSexChat);
-      if (sexLineChat) {
-        const baseSystem = typeof body.system === "string" ? body.system.trim() : "";
-        body.system = baseSystem ? `${baseSystem}\n\n${sexLineChat}` : sexLineChat;
-      }
+      const chatCtx = await fetchProfileAiContextFields(supabaseUrl, serviceKey, userId);
+      const chatUserLines = [
+        biologicalSexPromptLineFromDb(chatCtx.biological_sex),
+        agePromptLineFromDob(chatCtx.date_of_birth),
+        trainingExperiencePromptLineFromDb(chatCtx.training_experience),
+      ].filter(Boolean);
+      const profileAugment = [chatUserLines.join("\n"), AI_AGE_TRAINING_SAFETY_NOTE].filter(Boolean).join("\n\n");
+      const baseSystem = typeof body.system === "string" ? body.system.trim() : "";
+      body.system = baseSystem ? `${baseSystem}\n\n${profileAugment}` : profileAugment;
     } else {
       if (production) {
         return jsonResponse({ error: "Unauthorized" }, 401, cors);

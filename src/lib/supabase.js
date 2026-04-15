@@ -199,7 +199,7 @@ export async function getCurrentUser() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "email, name, plan, biological_sex, stack_photo_url, stack_photo_r2_key, display_name, avatar_r2_key, default_session"
+      "email, name, plan, biological_sex, cycle_tracking_enabled, date_of_birth, training_experience, stack_photo_url, stack_photo_r2_key, display_name, avatar_r2_key, default_session"
     )
     .eq("id", u.id)
     .maybeSingle();
@@ -231,6 +231,19 @@ export async function getCurrentUser() {
       const bs =
         profile && typeof profile.biological_sex === "string" ? profile.biological_sex.trim().toLowerCase() : "";
       return bs === "male" || bs === "female" || bs === "prefer_not_to_say" ? bs : null;
+    })(),
+    cycle_tracking_enabled:
+      profile && typeof profile.cycle_tracking_enabled === "boolean" ? profile.cycle_tracking_enabled : null,
+    date_of_birth:
+      profile && typeof profile.date_of_birth === "string" && /^\d{4}-\d{2}-\d{2}$/.test(profile.date_of_birth.trim())
+        ? profile.date_of_birth.trim()
+        : null,
+    training_experience: (() => {
+      const te =
+        profile && typeof profile.training_experience === "string"
+          ? profile.training_experience.trim().toLowerCase()
+          : "";
+      return te === "beginner" || te === "intermediate" || te === "advanced" || te === "elite" ? te : null;
     })(),
     identities: Array.isArray(u.identities) ? u.identities : [],
   };
