@@ -53,6 +53,7 @@ export function buildDoseNetworkRouteLabel(catalogPeptide, payloadKind) {
  *   session: string | null,
  *   stackRowId: string | null,
  *   catalogPeptide: Record<string, unknown> | null | undefined,
+ *   feedVisible?: boolean | null,
  * }} args
  */
 export function buildNetworkFeedInsertRow({
@@ -63,6 +64,7 @@ export function buildNetworkFeedInsertRow({
   session,
   stackRowId,
   catalogPeptide,
+  feedVisible,
 }) {
   const route = buildDoseNetworkRouteLabel(catalogPeptide, payload.kind);
   if (payload.kind === "injectable") {
@@ -75,6 +77,7 @@ export function buildNetworkFeedInsertRow({
       route,
       session_label: session && String(session).trim() ? String(session).trim() : null,
       stack_id: stackRowId,
+      public_visible: feedVisible ?? false,
     };
   }
   return {
@@ -86,5 +89,6 @@ export function buildNetworkFeedInsertRow({
     route,
     session_label: session && String(session).trim() ? String(session).trim() : null,
     stack_id: stackRowId,
+    public_visible: feedVisible ?? false,
   };
 }

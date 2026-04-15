@@ -186,7 +186,8 @@ export async function signOut() {
 /** Access token for Worker JWT verification (Authorization: Bearer …). */
 export async function getSessionAccessToken() {
   if (!supabase) return null;
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data } = await supabase.auth.getSession();
+  const session = data?.session;
   return session?.access_token ?? null;
 }
 
@@ -1031,27 +1032,33 @@ export async function insertDoseLog(row) {
  * Saved stack row id for the active member profile (one row per user+profile).
  * @param {string} userId
  * @param {string} profileId
- * @returns {Promise<{ stackRowId: string | null, error: Error | null }>}
+ * @returns {Promise<{ stackRowId: string | null, feedVisible: boolean, error: Error | null }>}
  */
 export async function getUserStackRowId(userId, profileId) {
-  if (!supabase || !userId || !profileId) return { stackRowId: null, error: notConfiguredError() };
+  if (!supabase || !userId || !profileId)
+    return { stackRowId: null, feedVisible: false, error: notConfiguredError() };
   const { data, error } = await supabase
     .from("user_stacks")
-    .select("id")
+    .select("id, feed_visible")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .maybeSingle();
   const id = data && typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;
-  return { stackRowId: id, error: error ?? null };
+  const feedVisible = Boolean(data?.feed_visible);
+  return { stackRowId: id, feedVisible, error: error ?? null };
 }
 
 /**
  * Inserts a network_feed row (migration 033). `expires_at` defaults server-side (+72h).
+ * `public_visible` should match `user_stacks.feed_visible` (see buildNetworkFeedInsertRow + feedVisible).
  * @param {Record<string, unknown>} row
+ * @param {boolean} [feedVisible] — used when row.public_visible is missing (same as user_stacks.feed_visible)
  */
-export async function insertNetworkFeedDosePost(row) {
+export async function insertNetworkFeedDosePost(row, feedVisible) {
   if (!supabase) return { error: notConfiguredError() };
-  const { error } = await supabase.from("network_feed").insert(row);
+  const public_visible =
+    typeof row.public_visible === "boolean" ? row.public_visible : (feedVisible ?? false);
+  const { error } = await supabase.from("network_feed").insert({ ...row, public_visible });
   return { error: error ?? null };
 }
 

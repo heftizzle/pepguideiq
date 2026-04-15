@@ -80,7 +80,7 @@ export function ProtocolTab({
   const [cooldownTick, setCooldownTick] = useState(0);
   const [guardrail, setGuardrail] = useState(null);
   const [networkPrompt, setNetworkPrompt] = useState(
-    /** @type {null | { insertRow: Record<string, unknown>; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
+    /** @type {null | { insertRow: Record<string, unknown>; feedVisible: boolean; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
   );
   const [networkPostBusy, setNetworkPostBusy] = useState(false);
   const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
@@ -246,7 +246,7 @@ export function ProtocolTab({
       return;
     }
     const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
-    const { stackRowId } = await getUserStackRowId(userId, profileId);
+    const { stackRowId, feedVisible } = await getUserStackRowId(userId, profileId);
     const insertRow = buildNetworkFeedInsertRow({
       userId,
       doseLogId,
@@ -255,10 +255,12 @@ export function ProtocolTab({
       session,
       stackRowId: stackRowId ?? null,
       catalogPeptide: cat,
+      feedVisible,
     });
     setNetworkPostError(null);
     setNetworkPrompt({
       insertRow,
+      feedVisible,
       compoundName: r.name,
       previewLine,
       toastMessage,
@@ -277,7 +279,7 @@ export function ProtocolTab({
     if (!networkPrompt?.insertRow) return;
     setNetworkPostBusy(true);
     setNetworkPostError(null);
-    const { error } = await insertNetworkFeedDosePost(networkPrompt.insertRow);
+    const { error } = await insertNetworkFeedDosePost(networkPrompt.insertRow, networkPrompt.feedVisible);
     setNetworkPostBusy(false);
     if (error) {
       setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
