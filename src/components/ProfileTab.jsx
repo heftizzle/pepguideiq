@@ -92,6 +92,39 @@ function goalEmojiFromId(goalId) {
   return i > 0 ? o.label.slice(0, i).trim() : o.label;
 }
 
+const DOB_YEAR_MIN = 1924;
+const DOB_YEAR_MAX = 2006;
+
+/** @param {unknown} iso */
+function splitYmdParts(iso) {
+  if (!iso || typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) {
+    return { m: "", d: "", y: "" };
+  }
+  const [y, mo, da] = iso.trim().split("-");
+  return { y, m: String(Number(mo)), d: String(Number(da)) };
+}
+
+/**
+ * @param {string} mStr
+ * @param {string} dStr
+ * @param {string} yStr
+ * @returns {string | null | undefined} null = clear; string = YYYY-MM-DD; undefined = incomplete/invalid
+ */
+function assembleDob(mStr, dStr, yStr) {
+  const m = String(mStr ?? "").trim();
+  const d = String(dStr ?? "").trim();
+  const y = String(yStr ?? "").trim();
+  if (m === "" && d === "" && y === "") return null;
+  const mi = parseInt(m, 10);
+  const di = parseInt(d, 10);
+  const yi = parseInt(y, 10);
+  if (!Number.isFinite(mi) || !Number.isFinite(di) || !Number.isFinite(yi)) return undefined;
+  if (mi < 1 || mi > 12 || di < 1 || di > 31 || yi < DOB_YEAR_MIN || yi > DOB_YEAR_MAX) return undefined;
+  const t = new Date(yi, mi - 1, di);
+  if (t.getFullYear() !== yi || t.getMonth() !== mi - 1 || t.getDate() !== di) return undefined;
+  return `${String(yi).padStart(4, "0")}-${String(mi).padStart(2, "0")}-${String(di).padStart(2, "0")}`;
+}
+
 function tierPillStyle(plan) {
   return {
     background:
@@ -836,14 +869,19 @@ export function ProfileTab({
     Object.fromEntries(SOCIAL_EDIT_FIELDS.map(({ key }) => [key, ""]))
   );
   const [scanBusy, setScanBusy] = useState(false);
+  /** Local copies of `profiles` fields so App.jsx auth refresh cannot wipe pill/input UI mid-session. */
+  const [bioSex, setBioSex] = useState(() => user?.biological_sex ?? null);
+  const [trainingExp, setTrainingExp] = useState(() => user?.training_experience ?? null);
+  const initDob = splitYmdParts(user?.date_of_birth ?? null);
+  const [dobMonth, setDobMonth] = useState(initDob.m);
+  const [dobDay, setDobDay] = useState(initDob.d);
+  const [dobYear, setDobYear] = useState(initDob.y);
+  const lastCommittedDobRef = useRef(/** @type {string | null} */ (user?.date_of_birth ?? null));
+
   const scanFileRef = useRef(null);
   const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
-  /** Count of in-flight `profiles` PATCH + follow-up getCurrentUser; blocks auth refresh from wiping optimistic fields. */
+  /** While > 0, skip syncing these fields from global `user` (avoids stale auth payload overwriting locals). */
   const profilesSaveInFlightRef = useRef(0);
-  /** Fields we last optimistically merged onto `user` while a save is in flight (re-applied if `onAuthStateChange` overwrites). */
-  const profilesOptimisticRef = useRef(
-    /** @type {Partial<{ biological_sex: string | null; training_experience: string | null; cycle_tracking_enabled: boolean | null; date_of_birth: string | null }>} */ ({})
-  );
 
   const setFieldRef = useCallback((id) => {
     return (el) => {
@@ -860,45 +898,64 @@ export function ProfileTab({
     }, 2200);
   }, []);
 
-  /** Re-merge optimistic `profiles` fields if auth listener replaced `user` mid-save. */
+  /** Hydrate locals from global `user` when it updates from server — not while a profiles save is in flight. */
   useEffect(() => {
-    if (profilesSaveInFlightRef.current <= 0) return;
-    const patch = profilesOptimisticRef.current;
-    if (!user?.id || Object.keys(patch).length === 0) return;
-    let needMerge = false;
-    for (const k of Object.keys(patch)) {
-      const key = /** @type {keyof typeof patch} */ (k);
-      if (user[key] !== patch[key]) needMerge = true;
+    if (!user?.id) {
+      setBioSex(null);
+      setTrainingExp(null);
+      setDobMonth("");
+      setDobDay("");
+      setDobYear("");
+      lastCommittedDobRef.current = null;
+      return;
     }
-    if (needMerge) setUser((prev) => (prev ? { ...prev, ...patch } : prev));
-  }, [user, setUser]);
+    if (profilesSaveInFlightRef.current > 0) return;
+    setBioSex(user.biological_sex ?? null);
+    setTrainingExp(user.training_experience ?? null);
+    const p = splitYmdParts(user.date_of_birth);
+    setDobMonth(p.m);
+    setDobDay(p.d);
+    setDobYear(p.y);
+    lastCommittedDobRef.current = user.date_of_birth ?? null;
+  }, [user?.id, user?.biological_sex, user?.training_experience, user?.date_of_birth]);
+
+  const applyFreshUserToLocalProfileFields = useCallback((fresh) => {
+    if (!fresh) return;
+    setBioSex(fresh.biological_sex ?? null);
+    setTrainingExp(fresh.training_experience ?? null);
+    const p = splitYmdParts(fresh.date_of_birth);
+    setDobMonth(p.m);
+    setDobDay(p.d);
+    setDobYear(p.y);
+    lastCommittedDobRef.current = fresh.date_of_birth ?? null;
+  }, []);
 
   const setBiologicalSex = useCallback(
     async (value) => {
       if (!user?.id) return;
       if (!["male", "female", "prefer_not_to_say"].includes(value)) return;
       setErr(null);
-      const prev = user.biological_sex ?? null;
+      const prev = bioSex;
       profilesSaveInFlightRef.current += 1;
-      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, biological_sex: value };
-      setUser((u) => (u ? { ...u, biological_sex: value } : u));
+      setBioSex(value);
       try {
         const { error } = await updateUserProfile({ biological_sex: value });
         if (error) {
-          setUser((u) => (u ? { ...u, biological_sex: prev } : u));
-          delete profilesOptimisticRef.current.biological_sex;
+          setBioSex(prev);
           setErr(error.message);
           return;
         }
         showSavedBriefly();
         const fresh = await getCurrentUser();
-        if (fresh) setUser(fresh);
+        if (fresh) {
+          setUser(fresh);
+          applyFreshUserToLocalProfileFields(fresh);
+        }
       } finally {
         profilesSaveInFlightRef.current -= 1;
-        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
     },
-    [user?.id, user?.biological_sex, setUser, showSavedBriefly]
+    [user?.id, bioSex, setUser, showSavedBriefly, applyFreshUserToLocalProfileFields]
   );
 
   const setCycleTrackingConsent = useCallback(
@@ -907,63 +964,54 @@ export function ProfileTab({
       setErr(null);
       const prev = user.cycle_tracking_enabled ?? null;
       profilesSaveInFlightRef.current += 1;
-      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, cycle_tracking_enabled: enabled };
       setUser((u) => (u ? { ...u, cycle_tracking_enabled: enabled } : u));
       try {
         const { error } = await updateUserProfile({ cycle_tracking_enabled: enabled });
         if (error) {
           setUser((u) => (u ? { ...u, cycle_tracking_enabled: prev } : u));
-          delete profilesOptimisticRef.current.cycle_tracking_enabled;
           setErr(error.message);
           return;
         }
         showSavedBriefly();
         const fresh = await getCurrentUser();
-        if (fresh) setUser(fresh);
+        if (fresh) {
+          setUser(fresh);
+          applyFreshUserToLocalProfileFields(fresh);
+        }
       } finally {
         profilesSaveInFlightRef.current -= 1;
-        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
     },
-    [user?.id, user?.cycle_tracking_enabled, setUser, showSavedBriefly]
+    [user?.id, user?.cycle_tracking_enabled, setUser, showSavedBriefly, applyFreshUserToLocalProfileFields]
   );
 
-  const setDateOfBirth = useCallback(
-    async (value) => {
-      if (!user?.id) return;
-      setErr(null);
-      const prev = user.date_of_birth ?? null;
-      let normalized = null;
-      if (value === null || value === "") {
-        normalized = null;
-      } else if (typeof value === "string") {
-        const t = value.trim();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return;
-        normalized = t;
-      } else {
+  const tryCommitDateOfBirth = useCallback(async () => {
+    if (!user?.id) return;
+    const normalized = assembleDob(dobMonth, dobDay, dobYear);
+    if (normalized === undefined) return;
+    if (normalized === lastCommittedDobRef.current) return;
+    setErr(null);
+    profilesSaveInFlightRef.current += 1;
+    try {
+      const { error } = await updateUserProfile({ date_of_birth: normalized });
+      if (error) {
+        setErr(error.message);
+        const p = splitYmdParts(lastCommittedDobRef.current ?? null);
+        setDobMonth(p.m);
+        setDobDay(p.d);
+        setDobYear(p.y);
         return;
       }
-      profilesSaveInFlightRef.current += 1;
-      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, date_of_birth: normalized };
-      setUser((u) => (u ? { ...u, date_of_birth: normalized } : u));
-      try {
-        const { error } = await updateUserProfile({ date_of_birth: normalized });
-        if (error) {
-          setUser((u) => (u ? { ...u, date_of_birth: prev } : u));
-          delete profilesOptimisticRef.current.date_of_birth;
-          setErr(error.message);
-          return;
-        }
-        showSavedBriefly();
-        const fresh = await getCurrentUser();
-        if (fresh) setUser(fresh);
-      } finally {
-        profilesSaveInFlightRef.current -= 1;
-        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
+      showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) {
+        setUser(fresh);
+        applyFreshUserToLocalProfileFields(fresh);
       }
-    },
-    [user?.id, user?.date_of_birth, setUser, showSavedBriefly]
-  );
+    } finally {
+      profilesSaveInFlightRef.current -= 1;
+    }
+  }, [user?.id, dobMonth, dobDay, dobYear, setUser, showSavedBriefly, applyFreshUserToLocalProfileFields]);
 
   useEffect(() => {
     return () => {
@@ -1178,8 +1226,7 @@ export function ProfileTab({
       {
         id: "training_experience",
         done: Boolean(
-          user?.training_experience &&
-            EXPERIENCE_OPTIONS.some((o) => o.id === String(user.training_experience).toLowerCase())
+          trainingExp && EXPERIENCE_OPTIONS.some((o) => o.id === String(trainingExp).toLowerCase())
         ),
         label: "Level",
       },
@@ -1189,7 +1236,7 @@ export function ProfileTab({
         label: "Stack",
       },
     ];
-  }, [activeProfile, bodyMetricsRow, displayNameShown, savedStackPeptides, user?.training_experience]);
+  }, [activeProfile, bodyMetricsRow, displayNameShown, savedStackPeptides, trainingExp]);
 
   const completionPct = useMemo(() => {
     const n = completionFields.filter((f) => f.done).length;
@@ -1274,27 +1321,27 @@ export function ProfileTab({
       if (!user?.id) return;
       if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
       setErr(null);
-      const prev = user.training_experience ?? null;
+      const prev = trainingExp;
       profilesSaveInFlightRef.current += 1;
-      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, training_experience: value };
-      setUser((u) => (u ? { ...u, training_experience: value } : u));
+      setTrainingExp(value);
       try {
         const { error } = await updateUserProfile({ training_experience: value });
         if (error) {
-          setUser((u) => (u ? { ...u, training_experience: prev } : u));
-          delete profilesOptimisticRef.current.training_experience;
+          setTrainingExp(prev);
           setErr(error.message);
           return;
         }
         showSavedBriefly();
         const fresh = await getCurrentUser();
-        if (fresh) setUser(fresh);
+        if (fresh) {
+          setUser(fresh);
+          applyFreshUserToLocalProfileFields(fresh);
+        }
       } finally {
         profilesSaveInFlightRef.current -= 1;
-        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
     },
-    [user?.id, user?.training_experience, setUser, showSavedBriefly]
+    [user?.id, trainingExp, setUser, showSavedBriefly, applyFreshUserToLocalProfileFields]
   );
 
   const onBodyScanPick = useCallback(
@@ -2259,24 +2306,92 @@ export function ProfileTab({
               DATE OF BIRTH
             </span>
             <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 8 }}>
-              Used for age-appropriate dosing guidance
+              Used for age-appropriate dosing guidance. Month 1–12, day 1–31, year {DOB_YEAR_MIN}–{DOB_YEAR_MAX}. Tab out or blur
+              to save.
             </div>
-            <input
-              type="date"
-              value={user?.date_of_birth ?? ""}
-              onChange={(e) => void setDateOfBirth(e.target.value)}
-              style={{
-                fontSize: 13,
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #243040",
-                background: "#0e1520",
-                color: "#e6edf3",
-                cursor: "pointer",
-                fontFamily: "'JetBrains Mono', monospace",
-                maxWidth: "100%",
-              }}
-            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                  MONTH
+                </div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={12}
+                  placeholder="1–12"
+                  value={dobMonth}
+                  onChange={(e) => setDobMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  onBlur={() => void tryCommitDateOfBirth()}
+                  className="form-input"
+                  style={{
+                    width: 72,
+                    fontSize: 13,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid #243040",
+                    background: "#0e1520",
+                    color: "#e6edf3",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  aria-label="Birth month"
+                />
+              </div>
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                  DAY
+                </div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  placeholder="1–31"
+                  value={dobDay}
+                  onChange={(e) => setDobDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  onBlur={() => void tryCommitDateOfBirth()}
+                  className="form-input"
+                  style={{
+                    width: 72,
+                    fontSize: 13,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid #243040",
+                    background: "#0e1520",
+                    color: "#e6edf3",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  aria-label="Birth day"
+                />
+              </div>
+              <div>
+                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                  YEAR
+                </div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={DOB_YEAR_MIN}
+                  max={DOB_YEAR_MAX}
+                  placeholder={`${DOB_YEAR_MIN}–${DOB_YEAR_MAX}`}
+                  value={dobYear}
+                  onChange={(e) => setDobYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onBlur={() => void tryCommitDateOfBirth()}
+                  className="form-input"
+                  style={{
+                    width: 88,
+                    fontSize: 13,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    border: "1px solid #243040",
+                    background: "#0e1520",
+                    color: "#e6edf3",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  aria-label="Birth year"
+                />
+              </div>
+            </div>
           </div>
 
           <div ref={setFieldRef("training_experience")} style={{ marginTop: 14 }}>
@@ -2300,7 +2415,7 @@ export function ProfileTab({
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {EXPERIENCE_OPTIONS.map((o) => {
-                const sel = String(user?.training_experience ?? "").toLowerCase() === o.id;
+                const sel = String(trainingExp ?? "").toLowerCase() === o.id;
                 return (
                   <button
                     key={o.id}
@@ -2345,7 +2460,7 @@ export function ProfileTab({
                 { id: "female", label: "♀️ Female" },
                 { id: "prefer_not_to_say", label: "Prefer not to say" },
               ].map(({ id, label }) => {
-                const sel = String(user?.biological_sex ?? "").toLowerCase() === id;
+                const sel = String(bioSex ?? "").toLowerCase() === id;
                 return (
                 <button
                   key={id}
@@ -2368,8 +2483,7 @@ export function ProfileTab({
               );
               })}
             </div>
-            {String(user?.biological_sex ?? "").toLowerCase() === "female" &&
-            (user?.cycle_tracking_enabled ?? null) === null ? (
+            {String(bioSex ?? "").toLowerCase() === "female" && (user?.cycle_tracking_enabled ?? null) === null ? (
               <div
                 style={{
                   marginTop: 12,
