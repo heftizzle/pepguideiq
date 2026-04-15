@@ -218,9 +218,9 @@ function MetricRuler({
  */
 
 /**
- * @param {{ value: number, min: number, max: number, step: number, displayText: string, onCommitValue: (n: number) => void, fastRange?: FastRangeConfig | null }} p
+ * @param {{ value: number, min: number, max: number, step: number, displayText: string, onCommitValue: (n: number) => void, fastRange?: FastRangeConfig | null, locked?: boolean }} p
  */
-export function BodyMetricStepper({ value, min, max, step, displayText, onCommitValue, fastRange = null }) {
+export function BodyMetricStepper({ value, min, max, step, displayText, onCommitValue, fastRange = null, locked = false }) {
   const atMin = value <= min + 1e-8;
   const atMax = value >= max - 1e-8;
 
@@ -229,13 +229,14 @@ export function BodyMetricStepper({ value, min, max, step, displayText, onCommit
   const vizStep = fastRange ? fastRange.step : step;
 
   return (
-    <div style={{ width: "100%", marginBottom: 8 }}>
-      <div style={{ display: "flex", alignItems: "stretch", gap: 10, width: "100%" }}>
+    <div style={{ width: "100%", marginBottom: 8, position: "relative" }}>
+      <div style={{ opacity: locked ? 0.55 : 1 }}>
+        <div style={{ display: "flex", alignItems: "stretch", gap: 10, width: "100%" }}>
         <button
           type="button"
           className="pepv-header-action-btn pepv-header-action-btn--icon"
           aria-label="Decrease"
-          disabled={atMin}
+          disabled={atMin || locked}
           onClick={() => onCommitValue(snapToStep(clamp(value - step, min, max), min, step))}
         >
           ◀
@@ -259,7 +260,7 @@ export function BodyMetricStepper({ value, min, max, step, displayText, onCommit
           type="button"
           className="pepv-header-action-btn pepv-header-action-btn--icon"
           aria-label="Increase"
-          disabled={atMax}
+          disabled={atMax || locked}
           onClick={() => onCommitValue(snapToStep(clamp(value + step, min, max), min, step))}
         >
           ▶
@@ -275,8 +276,25 @@ export function BodyMetricStepper({ value, min, max, step, displayText, onCommit
         value={value}
         valueToSlider={fastRange?.valueToSlider ?? null}
         sliderToValue={fastRange?.sliderToValue ?? null}
-        onScrubModel={fastRange ? onCommitValue : null}
+        onScrubModel={fastRange && !locked ? onCommitValue : null}
       />
+      </div>
+      {locked ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            zIndex: 4,
+            cursor: "not-allowed",
+            touchAction: "none",
+            background: "transparent",
+          }}
+        />
+      ) : null}
     </div>
   );
 }

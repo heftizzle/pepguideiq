@@ -342,6 +342,18 @@ const PROFILE_BODY_FAT_SLIDER_MIN = 3;
 const PROFILE_BODY_FAT_SLIDER_MAX = 60;
 const PROFILE_BODY_FAT_SLIDER_STEP = 0.5;
 
+/** Lock / unlock control for body metric sliders (Goals section). */
+const METRIC_LOCK_BTN = {
+  fontSize: 18,
+  lineHeight: 1,
+  padding: "2px 10px",
+  borderRadius: 8,
+  border: "1px solid #243040",
+  background: "rgba(0,0,0,0.2)",
+  cursor: "pointer",
+  color: "#94a3b8",
+};
+
 const AVATAR_CROP_VIEW = 240;
 const AVATAR_CROP_OUT = 512;
 
@@ -800,6 +812,9 @@ export function ProfileTab({
   const [weightSlider, setWeightSlider] = useState(200);
   const [heightInchesSlider, setHeightInchesSlider] = useState(68);
   const [bodyFatSlider, setBodyFatSlider] = useState(20);
+  const [weightMetricsLocked, setWeightMetricsLocked] = useState(true);
+  const [heightMetricsLocked, setHeightMetricsLocked] = useState(true);
+  const [bodyFatMetricsLocked, setBodyFatMetricsLocked] = useState(true);
   const [stats, setStats] = useState(null);
   const [clientStreakFallback, setClientStreakFallback] = useState(0);
   const [avatarImageNonce, setAvatarImageNonce] = useState(0);
@@ -1199,6 +1214,12 @@ export function ProfileTab({
     };
   }, [user.id, activeProfileId]);
 
+  useEffect(() => {
+    setWeightMetricsLocked(true);
+    setHeightMetricsLocked(true);
+    setBodyFatMetricsLocked(true);
+  }, [activeProfileId]);
+
   /** Prefer `member_profiles.current_streak` (DB trigger on dose_logs); client calc only if column missing (older API). */
   useEffect(() => {
     if (activeProfile != null && typeof activeProfile.current_streak === "number") {
@@ -1221,7 +1242,7 @@ export function ProfileTab({
   }, [activeProfileId]);
 
   const persistHeightInches = async (totalIn) => {
-    if (!user?.id || !activeProfileId) return;
+    if (!user?.id || !activeProfileId) return new Error("Missing profile");
     const v =
       totalIn != null && Number.isFinite(totalIn) && totalIn > 0
         ? snapToStep(clamp(totalIn, PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_MAX), PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_STEP)
@@ -1229,12 +1250,14 @@ export function ProfileTab({
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, {
       height_in: v != null ? v : null,
     });
-    if (error) setErr(error.message);
-    else {
-      setErr(null);
-      void refreshBodyMetricsRow();
-      showSavedBriefly();
+    if (error) {
+      setErr(error.message);
+      return error;
     }
+    setErr(null);
+    void refreshBodyMetricsRow();
+    showSavedBriefly();
+    return null;
   };
 
   const commitHeightInches = async (totalIn) => {
@@ -1243,11 +1266,11 @@ export function ProfileTab({
       PROFILE_HEIGHT_IN_MIN,
       PROFILE_HEIGHT_IN_STEP
     );
-    await persistHeightInches(inches);
+    return persistHeightInches(inches);
   };
 
   const commitWeightDisplay = async (disp) => {
-    if (!user?.id || !activeProfileId) return;
+    if (!user?.id || !activeProfileId) return new Error("Missing profile");
     const wMin = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MIN : PROFILE_WEIGHT_LBS_MIN;
     const wMax = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MAX : PROFILE_WEIGHT_LBS_MAX;
     const wStep = weightUnit === "kg" ? PROFILE_WEIGHT_KG_STEP : PROFILE_WEIGHT_LBS_STEP;
@@ -1257,28 +1280,113 @@ export function ProfileTab({
       weight_lbs: lbs,
       weight_unit: weightUnit,
     });
-    if (error) setErr(error.message);
-    else {
-      setErr(null);
-      void refreshBodyMetricsRow();
-      showSavedBriefly();
+    if (error) {
+      setErr(error.message);
+      return error;
     }
+    setErr(null);
+    void refreshBodyMetricsRow();
+    showSavedBriefly();
+    return null;
   };
 
   const commitBodyFat = async (pctVal) => {
-    if (!user?.id || !activeProfileId) return;
+    if (!user?.id || !activeProfileId) return new Error("Missing profile");
     const v = snapToStep(
       clamp(pctVal, PROFILE_BODY_FAT_MIN, PROFILE_BODY_FAT_MAX),
       PROFILE_BODY_FAT_MIN,
       PROFILE_BODY_FAT_STEP
     );
     const { error } = await upsertBodyMetrics(user.id, activeProfileId, { body_fat_pct: v });
-    if (error) setErr(error.message);
-    else {
-      setErr(null);
-      void refreshBodyMetricsRow();
-      showSavedBriefly();
+    if (error) {
+      setErr(error.message);
+      return error;
     }
+    setErr(null);
+    void refreshBodyMetricsRow();
+    showSavedBriefly();
+    return null;
+  };
+
+  const onWeightUnitPick = (u) => {
+    if (weightMetricsLocked) return;
+    if (u === weightUnit) return;
+    const currentLbs = weightUnit === "kg" ? weightSlider * LBS_TO_KG : weightSlider;
+    setWeightUnit(u);
+    if (u === "kg") {
+      const disp = currentLbs / LBS_TO_KG;
+      setWeightSlider(
+        snapToStep(clamp(disp, PROFILE_WEIGHT_KG_MIN, PROFILE_WEIGHT_KG_MAX), PROFILE_WEIGHT_KG_MIN, PROFILE_WEIGHT_KG_STEP)
+      );
+    } else {
+      setWeightSlider(
+        snapToStep(clamp(currentLbs, PROFILE_WEIGHT_LBS_MIN, PROFILE_WEIGHT_LBS_MAX), PROFILE_WEIGHT_LBS_MIN, PROFILE_WEIGHT_LBS_STEP)
+      );
+    }
+  };
+
+  const saveAndLockWeight = async () => {
+    if (weightMetricsLocked || !user?.id || !activeProfileId) return;
+    const wMin = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MIN : PROFILE_WEIGHT_LBS_MIN;
+    const wMax = weightUnit === "kg" ? PROFILE_WEIGHT_KG_MAX : PROFILE_WEIGHT_LBS_MAX;
+    const wStep = weightUnit === "kg" ? PROFILE_WEIGHT_KG_STEP : PROFILE_WEIGHT_LBS_STEP;
+    const v = snapToStep(clamp(weightSlider, wMin, wMax), wMin, wStep);
+    const lbs = weightUnit === "kg" ? v * LBS_TO_KG : v;
+    const savedLbs =
+      bodyMetricsRow?.weight_lbs != null && Number.isFinite(Number(bodyMetricsRow.weight_lbs))
+        ? Number(bodyMetricsRow.weight_lbs)
+        : null;
+    const savedWu = bodyMetricsRow?.weight_unit === "kg" ? "kg" : "lbs";
+    const dirty = savedLbs == null || Math.abs(savedLbs - lbs) > 1e-4 || weightUnit !== savedWu;
+    if (!dirty) {
+      setWeightMetricsLocked(true);
+      return;
+    }
+    setWeightSlider(v);
+    const err = await commitWeightDisplay(v);
+    if (!err) setWeightMetricsLocked(true);
+  };
+
+  const saveAndLockHeight = async () => {
+    if (heightMetricsLocked || !user?.id || !activeProfileId) return;
+    const inches = snapToStep(
+      clamp(heightInchesSlider, PROFILE_HEIGHT_IN_MIN, PROFILE_HEIGHT_IN_MAX),
+      PROFILE_HEIGHT_IN_MIN,
+      PROFILE_HEIGHT_IN_STEP
+    );
+    const saved =
+      bodyMetricsRow?.height_in != null && Number.isFinite(Number(bodyMetricsRow.height_in))
+        ? Number(bodyMetricsRow.height_in)
+        : null;
+    const dirty = saved == null || Math.abs(saved - inches) > 1e-6;
+    if (!dirty) {
+      setHeightMetricsLocked(true);
+      return;
+    }
+    setHeightInchesSlider(inches);
+    const err = await commitHeightInches(inches);
+    if (!err) setHeightMetricsLocked(true);
+  };
+
+  const saveAndLockBodyFat = async () => {
+    if (bodyFatMetricsLocked || !user?.id || !activeProfileId) return;
+    const v = snapToStep(
+      clamp(bodyFatSlider, PROFILE_BODY_FAT_MIN, PROFILE_BODY_FAT_MAX),
+      PROFILE_BODY_FAT_MIN,
+      PROFILE_BODY_FAT_STEP
+    );
+    const saved =
+      bodyMetricsRow?.body_fat_pct != null && Number.isFinite(Number(bodyMetricsRow.body_fat_pct))
+        ? Number(bodyMetricsRow.body_fat_pct)
+        : null;
+    const dirty = saved == null || Math.abs(saved - v) > 1e-6;
+    if (!dirty) {
+      setBodyFatMetricsLocked(true);
+      return;
+    }
+    setBodyFatSlider(v);
+    const err = await commitBodyFat(v);
+    if (!err) setBodyFatMetricsLocked(true);
   };
 
   const toggleGoalId = async (id) => {
@@ -1802,142 +1910,219 @@ export function ProfileTab({
           </div>
 
           <div ref={setFieldRef("weight")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-            <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
-              WEIGHT
-            </span>
-            <div style={{ display: "flex", gap: 6 }}>
-              {["lbs", "kg"].map((u) => (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 2,
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
+                WEIGHT
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["lbs", "kg"].map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      disabled={weightMetricsLocked}
+                      onClick={() => onWeightUnitPick(u)}
+                      style={{
+                        fontSize: 13,
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                        border: weightUnit === u ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                        background: weightUnit === u ? "rgba(0,212,170,0.12)" : "transparent",
+                        color: weightUnit === u ? "#00d4aa" : "#6b7c8f",
+                        cursor: weightMetricsLocked ? "not-allowed" : "pointer",
+                        opacity: weightMetricsLocked ? 0.45 : 1,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      {u.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
                 <button
-                  key={u}
                   type="button"
+                  style={METRIC_LOCK_BTN}
+                  aria-label={weightMetricsLocked ? "Unlock weight to edit" : "Save weight and lock"}
+                  title={weightMetricsLocked ? "Unlock" : "Save and lock"}
                   onClick={() => {
-                    setWeightUnit(u);
-                    void (async () => {
-                      if (!user?.id || !activeProfileId) return;
-                      const { error } = await upsertBodyMetrics(user.id, activeProfileId, { weight_unit: u });
-                      if (error) setErr(error.message);
-                      else {
-                        setErr(null);
-                        void refreshBodyMetricsRow();
-                        showSavedBriefly();
-                      }
-                    })();
-                  }}
-                  style={{
-                    fontSize: 13,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    border: weightUnit === u ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                    background: weightUnit === u ? "rgba(0,212,170,0.12)" : "transparent",
-                    color: weightUnit === u ? "#00d4aa" : "#6b7c8f",
-                    cursor: "pointer",
-                    fontFamily: "'JetBrains Mono', monospace",
+                    if (weightMetricsLocked) setWeightMetricsLocked(false);
+                    else void saveAndLockWeight();
                   }}
                 >
-                  {u.toUpperCase()}
+                  {weightMetricsLocked ? "🔒" : "🔓"}
                 </button>
-              ))}
+                {!weightMetricsLocked ? (
+                  <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "5px 14px" }} onClick={() => void saveAndLockWeight()}>
+                    Save
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <BodyMetricStepper
-            value={weightSlider}
-            min={wMin}
-            max={wMax}
-            step={wStep}
-            displayText={weightDisplayStr}
-            fastRange={
-              weightUnit === "kg"
-                ? {
-                    min: PROFILE_WEIGHT_SLIDER_KG_MIN,
-                    max: PROFILE_WEIGHT_SLIDER_KG_MAX,
-                    step: PROFILE_WEIGHT_SLIDER_KG_STEP,
-                  }
-                : {
-                    min: PROFILE_WEIGHT_SLIDER_LBS_MIN,
-                    max: PROFILE_WEIGHT_SLIDER_LBS_MAX,
-                    step: PROFILE_WEIGHT_SLIDER_LBS_STEP,
-                  }
-            }
-            onCommitValue={(v) => {
-              setWeightSlider(v);
-              void commitWeightDisplay(v);
-            }}
-          />
+            <BodyMetricStepper
+                locked={weightMetricsLocked}
+                value={weightSlider}
+                min={wMin}
+                max={wMax}
+                step={wStep}
+                displayText={weightDisplayStr}
+                fastRange={
+                  weightUnit === "kg"
+                    ? {
+                        min: PROFILE_WEIGHT_SLIDER_KG_MIN,
+                        max: PROFILE_WEIGHT_SLIDER_KG_MAX,
+                        step: PROFILE_WEIGHT_SLIDER_KG_STEP,
+                      }
+                    : {
+                        min: PROFILE_WEIGHT_SLIDER_LBS_MIN,
+                        max: PROFILE_WEIGHT_SLIDER_LBS_MAX,
+                        step: PROFILE_WEIGHT_SLIDER_LBS_STEP,
+                      }
+                }
+                onCommitValue={(v) => {
+                  setWeightSlider(v);
+                }}
+            />
           </div>
 
           <div ref={setFieldRef("height")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-            <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
-              HEIGHT
-            </span>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 2,
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
+                HEIGHT
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleHeightUnit("imperial")}
+                    style={{
+                      fontSize: 13,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: heightUnit === "imperial" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                      background: heightUnit === "imperial" ? "rgba(0,212,170,0.12)" : "transparent",
+                      color: heightUnit === "imperial" ? "#00d4aa" : "#6b7c8f",
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    FT + IN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleHeightUnit("metric")}
+                    style={{
+                      fontSize: 13,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: heightUnit === "metric" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
+                      background: heightUnit === "metric" ? "rgba(0,212,170,0.12)" : "transparent",
+                      color: heightUnit === "metric" ? "#00d4aa" : "#6b7c8f",
+                      cursor: "pointer",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
+                  >
+                    CM
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  style={METRIC_LOCK_BTN}
+                  aria-label={heightMetricsLocked ? "Unlock height to edit" : "Save height and lock"}
+                  title={heightMetricsLocked ? "Unlock" : "Save and lock"}
+                  onClick={() => {
+                    if (heightMetricsLocked) setHeightMetricsLocked(false);
+                    else void saveAndLockHeight();
+                  }}
+                >
+                  {heightMetricsLocked ? "🔒" : "🔓"}
+                </button>
+                {!heightMetricsLocked ? (
+                  <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "5px 14px" }} onClick={() => void saveAndLockHeight()}>
+                    Save
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <BodyMetricStepper
+                locked={heightMetricsLocked}
+                value={heightInchesSlider}
+                min={PROFILE_HEIGHT_IN_MIN}
+                max={PROFILE_HEIGHT_IN_MAX}
+                step={PROFILE_HEIGHT_IN_STEP}
+                displayText={heightUnit === "imperial" ? heightDisplayStrImperial : heightDisplayStrMetric}
+                fastRange={
+                  heightUnit === "imperial"
+                    ? {
+                        min: PROFILE_HEIGHT_SLIDER_IN_MIN,
+                        max: PROFILE_HEIGHT_SLIDER_IN_MAX,
+                        step: PROFILE_HEIGHT_SLIDER_IN_STEP,
+                      }
+                    : {
+                        min: PROFILE_HEIGHT_SLIDER_CM_MIN,
+                        max: PROFILE_HEIGHT_SLIDER_CM_MAX,
+                        step: PROFILE_HEIGHT_SLIDER_CM_STEP,
+                        valueToSlider: (inches) => Math.round(inches * 2.54),
+                        sliderToValue: (cm) => cm / 2.54,
+                      }
+                }
+                onCommitValue={(v) => {
+                  setHeightInchesSlider(v);
+                }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 2,
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
+              BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
-                onClick={() => toggleHeightUnit("imperial")}
-                style={{
-                  fontSize: 13,
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: heightUnit === "imperial" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                  background: heightUnit === "imperial" ? "rgba(0,212,170,0.12)" : "transparent",
-                  color: heightUnit === "imperial" ? "#00d4aa" : "#6b7c8f",
-                  cursor: "pointer",
-                  fontFamily: "'JetBrains Mono', monospace",
+                style={METRIC_LOCK_BTN}
+                aria-label={bodyFatMetricsLocked ? "Unlock body fat % to edit" : "Save body fat % and lock"}
+                title={bodyFatMetricsLocked ? "Unlock" : "Save and lock"}
+                onClick={() => {
+                  if (bodyFatMetricsLocked) setBodyFatMetricsLocked(false);
+                  else void saveAndLockBodyFat();
                 }}
               >
-                FT + IN
+                {bodyFatMetricsLocked ? "🔒" : "🔓"}
               </button>
-              <button
-                type="button"
-                onClick={() => toggleHeightUnit("metric")}
-                style={{
-                  fontSize: 13,
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: heightUnit === "metric" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                  background: heightUnit === "metric" ? "rgba(0,212,170,0.12)" : "transparent",
-                  color: heightUnit === "metric" ? "#00d4aa" : "#6b7c8f",
-                  cursor: "pointer",
-                  fontFamily: "'JetBrains Mono', monospace",
-                }}
-              >
-                CM
-              </button>
+              {!bodyFatMetricsLocked ? (
+                <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "5px 14px" }} onClick={() => void saveAndLockBodyFat()}>
+                  Save
+                </button>
+              ) : null}
             </div>
           </div>
           <BodyMetricStepper
-            value={heightInchesSlider}
-            min={PROFILE_HEIGHT_IN_MIN}
-            max={PROFILE_HEIGHT_IN_MAX}
-            step={PROFILE_HEIGHT_IN_STEP}
-            displayText={heightUnit === "imperial" ? heightDisplayStrImperial : heightDisplayStrMetric}
-            fastRange={
-              heightUnit === "imperial"
-                ? {
-                    min: PROFILE_HEIGHT_SLIDER_IN_MIN,
-                    max: PROFILE_HEIGHT_SLIDER_IN_MAX,
-                    step: PROFILE_HEIGHT_SLIDER_IN_STEP,
-                  }
-                : {
-                    min: PROFILE_HEIGHT_SLIDER_CM_MIN,
-                    max: PROFILE_HEIGHT_SLIDER_CM_MAX,
-                    step: PROFILE_HEIGHT_SLIDER_CM_STEP,
-                    valueToSlider: (inches) => Math.round(inches * 2.54),
-                    sliderToValue: (cm) => cm / 2.54,
-                  }
-            }
-            onCommitValue={(v) => {
-              setHeightInchesSlider(v);
-              void commitHeightInches(v);
-            }}
-          />
-          </div>
-
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 2, letterSpacing: "0.08em" }}>
-            BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
-          </div>
-          <BodyMetricStepper
+            locked={bodyFatMetricsLocked}
             value={bodyFatSlider}
             min={PROFILE_BODY_FAT_MIN}
             max={PROFILE_BODY_FAT_MAX}
@@ -1950,7 +2135,6 @@ export function ProfileTab({
             }}
             onCommitValue={(v) => {
               setBodyFatSlider(v);
-              void commitBodyFat(v);
             }}
           />
 
