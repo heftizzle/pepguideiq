@@ -45,6 +45,7 @@
 name = "pepguideiq-api-proxy"
 main = "workers/api-proxy.js"
 compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
 
 # Default dev URL: http://127.0.0.1:8787 — set VITE_API_WORKER_URL to match.
 [dev]
