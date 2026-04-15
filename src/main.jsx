@@ -2,6 +2,7 @@ import { StrictMode, useCallback, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./lib/supabase.js";
 import App from "./App.jsx";
+import { AppErrorBoundary } from "./components/AppErrorBoundary.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
 import { PublicStackView } from "./components/PublicStackView.jsx";
 import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.jsx";
@@ -69,7 +70,9 @@ const app =
   ) : profileHandleFromPath.length >= 3 ? (
     <PublicMemberProfileWithAgeGate handle={profileHandleFromPath} />
   ) : (
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   );
 
 createRoot(rootEl).render(<StrictMode>{app}</StrictMode>);

@@ -628,7 +628,7 @@ export function BuildTab({
             items,
           })
           .select("id, stack_name, cycle_weeks, items, created_at")
-          .single();
+          .maybeSingle();
 
         if (inserted) {
           setShoppingHistory((prev) => [inserted, ...prev].slice(0, 10));

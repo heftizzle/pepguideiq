@@ -14,7 +14,8 @@ export function parseFreqFromStack(stackFrequency) {
 
 /** Build Build-tab row list from saved stack items (`myStack`). */
 export function buildRowsFromMyStack(myStack) {
-  return myStack.map((item) => {
+  const list = Array.isArray(myStack) ? myStack : [];
+  return list.map((item) => {
     const freq = parseFreqFromStack(item.stackFrequency);
     return {
       key:
