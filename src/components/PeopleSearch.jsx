@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import {
@@ -11,9 +10,11 @@ import {
 
 /**
  * Vertical offset below the persistent App header (grid-bg z-70: logo row + pill nav).
- * PeopleSearch renders in a portal at z-60, so header paints on top — layout padding clears it (no z-index change).
+ * Parent portals this dialog to `document.body`; root uses z-index above the header so the close control is clickable.
  */
 const PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX = 104;
+/** Match App.jsx fixed bottom nav band so overlay leaves it visible and tappable. */
+const PEOPLE_SEARCH_NAV_RESERVE_PX = "calc(80px + env(safe-area-inset-bottom, 0px))";
 
 function initialsFromProfile(p) {
   const name = typeof p?.display_name === "string" ? p.display_name.trim() : "";
@@ -38,6 +39,26 @@ function bioSnippet(bio) {
  * }} props
  */
 export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose, initialQuery = null }) {
+  const handleClose = useCallback(() => {
+    if (typeof onClose === "function") {
+      try {
+        onClose();
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("pepguide:open-network-tab"));
+    } catch {
+      try {
+        window.history.back();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [onClose]);
+
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [results, setResults] = useState(/** @type {object[]} */ ([]));
@@ -152,18 +173,28 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
       aria-label="Find people"
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: PEOPLE_SEARCH_NAV_RESERVE_PX,
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-start",
         paddingTop: "max(0px, env(safe-area-inset-top, 0px))",
         background: "#07090e",
-        zIndex: 60,
+        /* Above .grid-bg header (z-70) so top-right close is clickable; GlobalStyles .guide-takeover-close is only z-55 */
+        zIndex: 72,
         overflowY: "auto",
         boxSizing: "border-box",
       }}
     >
-      <button type="button" className="guide-takeover-close" onClick={onClose} aria-label="Close">
+      <button
+        type="button"
+        className="guide-takeover-close"
+        onClick={handleClose}
+        aria-label="Close"
+        style={{ zIndex: 72 }}
+      >
         ×
       </button>
 
@@ -347,6 +378,4 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
       </div>
     </div>
   );
-
-  return typeof document !== "undefined" ? createPortal(overlay, document.body) : null;
 }
