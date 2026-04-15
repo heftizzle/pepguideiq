@@ -9,8 +9,9 @@ import {
   getUserStackRowId,
   insertDoseLog,
   insertNetworkFeedDosePost,
-  listPeptideIdsWithDosesOnLocalDay,
+  listLatestDosedAtByPeptideOnLocalDay,
 } from "../lib/supabase.js";
+import { lockMapFromLatestDosedAtIso } from "../lib/protocolLogCooldown.js";
 import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
 import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
@@ -20,11 +21,11 @@ import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
-
-function todayYmd() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import {
+  localTodayYmd,
+  protocolLogCooldownEndsAtMs,
+  subscribeLocalCalendarDayChange,
+} from "../lib/localCalendarDay.js";
 
 function protocolHeaderLine() {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
@@ -74,7 +75,9 @@ export function ProtocolTab({
   const [rows, setRows] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [loggingPeptideId, setLoggingPeptideId] = useState(null);
-  const [loggedTodayIds, setLoggedTodayIds] = useState(() => new Set());
+  /** Interim: peptide_id → epoch ms when "✓ Logged" unlocks (2h or local midnight, whichever first). */
+  const [logLockUntilMs, setLogLockUntilMs] = useState(() => /** @type {Record<string, number>} */ ({}));
+  const [cooldownTick, setCooldownTick] = useState(0);
   const [guardrail, setGuardrail] = useState(null);
   const [networkPrompt, setNetworkPrompt] = useState(
     /** @type {null | { insertRow: Record<string, unknown>; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
@@ -107,12 +110,17 @@ export function ProtocolTab({
   const load = useCallback(async () => {
     if (!userId || !profileId || !isSupabaseConfigured() || !canUse || protocolCandidates.length === 0) {
       setRows([]);
+      setLogLockUntilMs({});
       return;
     }
-    const ymd = todayYmd();
-    const { peptideIds, error: idsError } = await listPeptideIdsWithDosesOnLocalDay(userId, profileId, ymd);
-    if (!idsError && peptideIds) {
-      setLoggedTodayIds(new Set(peptideIds));
+    const ymd = localTodayYmd();
+    const { latestByPeptide, error: latestErr } = await listLatestDosedAtByPeptideOnLocalDay(
+      userId,
+      profileId,
+      ymd
+    );
+    if (!latestErr) {
+      setLogLockUntilMs(lockMapFromLatestDosedAtIso(latestByPeptide));
     }
     const built = [];
     for (const row of protocolCandidates) {
@@ -126,7 +134,22 @@ export function ProtocolTab({
     void load();
   }, [load, reloadTick]);
 
+  useEffect(() => {
+    return subscribeLocalCalendarDayChange(() => setReloadTick((t) => t + 1));
+  }, []);
+
+  useEffect(() => {
+    const now = Date.now();
+    const ends = Object.values(logLockUntilMs).filter((t) => t > now);
+    if (ends.length === 0) return;
+    const ms = Math.min(...ends) - now + 25;
+    const id = window.setTimeout(() => setCooldownTick((x) => x + 1), Math.max(0, ms));
+    return () => window.clearTimeout(id);
+  }, [logLockUntilMs, cooldownTick]);
+
   const bumpReload = () => setReloadTick((t) => t + 1);
+
+  const isLogLocked = (peptideId) => (logLockUntilMs[peptideId] ?? 0) > Date.now();
 
   const updateRowUnits = (peptideId, units) => {
     setRows((prev) =>
@@ -149,7 +172,7 @@ export function ProtocolTab({
     const list = rows ?? [];
     const r = list.find((x) => x.peptideId === peptideId);
     if (!r || loggingPeptideId != null) return;
-    if (loggedTodayIds.has(peptideId)) return;
+    if (isLogLocked(peptideId)) return;
 
     let payload = null;
     if (r.kind === "injectable") {
@@ -209,7 +232,8 @@ export function ProtocolTab({
     const { error, data: inserted } = insertRes;
     setLoggingPeptideId(null);
     if (error) return;
-    setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
+    const lockUntil = protocolLogCooldownEndsAtMs(Date.now());
+    setLogLockUntilMs((prev) => ({ ...prev, [peptideId]: lockUntil }));
     setGuardrail(null);
     void refreshMemberProfiles();
     bumpReload();
@@ -339,7 +363,7 @@ export function ProtocolTab({
                   key={r.peptideId}
                   row={r}
                   session={session}
-                  loggedToday={loggedTodayIds.has(r.peptideId)}
+                  loggedToday={isLogLocked(r.peptideId)}
                   busy={loggingPeptideId === r.peptideId}
                   onUnitsDelta={(delta) => updateRowUnits(r.peptideId, r.units + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}
@@ -350,7 +374,7 @@ export function ProtocolTab({
                   key={r.peptideId}
                   row={r}
                   session={session}
-                  loggedToday={loggedTodayIds.has(r.peptideId)}
+                  loggedToday={isLogLocked(r.peptideId)}
                   busy={loggingPeptideId === r.peptideId}
                   onDoseDelta={(delta) => updateRowDoseCount(r.peptideId, r.doseCount + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}

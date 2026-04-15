@@ -314,9 +314,26 @@ const PROFILE_HEIGHT_IN_MIN = 36;
 const PROFILE_HEIGHT_IN_MAX = 96;
 const PROFILE_HEIGHT_IN_STEP = 0.25;
 
+/** Fast-entry sliders (full stepper min/max unchanged). */
+const PROFILE_WEIGHT_SLIDER_LBS_MIN = 50;
+const PROFILE_WEIGHT_SLIDER_LBS_MAX = 400;
+const PROFILE_WEIGHT_SLIDER_LBS_STEP = 1;
+const PROFILE_WEIGHT_SLIDER_KG_MIN = 20;
+const PROFILE_WEIGHT_SLIDER_KG_MAX = 200;
+const PROFILE_WEIGHT_SLIDER_KG_STEP = 1;
+const PROFILE_HEIGHT_SLIDER_IN_MIN = 48;
+const PROFILE_HEIGHT_SLIDER_IN_MAX = 96;
+const PROFILE_HEIGHT_SLIDER_IN_STEP = 1;
+const PROFILE_HEIGHT_SLIDER_CM_MIN = Math.round(48 * 2.54);
+const PROFILE_HEIGHT_SLIDER_CM_MAX = Math.round(96 * 2.54);
+const PROFILE_HEIGHT_SLIDER_CM_STEP = 1;
+
 const PROFILE_BODY_FAT_MIN = 1;
 const PROFILE_BODY_FAT_MAX = 70;
 const PROFILE_BODY_FAT_STEP = 0.1;
+const PROFILE_BODY_FAT_SLIDER_MIN = 3;
+const PROFILE_BODY_FAT_SLIDER_MAX = 60;
+const PROFILE_BODY_FAT_SLIDER_STEP = 0.5;
 
 const AVATAR_CROP_VIEW = 240;
 const AVATAR_CROP_OUT = 512;
@@ -1719,7 +1736,7 @@ export function ProfileTab({
           </div>
 
           <div ref={setFieldRef("weight")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
               WEIGHT
             </span>
@@ -1763,6 +1780,19 @@ export function ProfileTab({
             max={wMax}
             step={wStep}
             displayText={weightDisplayStr}
+            fastRange={
+              weightUnit === "kg"
+                ? {
+                    min: PROFILE_WEIGHT_SLIDER_KG_MIN,
+                    max: PROFILE_WEIGHT_SLIDER_KG_MAX,
+                    step: PROFILE_WEIGHT_SLIDER_KG_STEP,
+                  }
+                : {
+                    min: PROFILE_WEIGHT_SLIDER_LBS_MIN,
+                    max: PROFILE_WEIGHT_SLIDER_LBS_MAX,
+                    step: PROFILE_WEIGHT_SLIDER_LBS_STEP,
+                  }
+            }
             onCommitValue={(v) => {
               setWeightSlider(v);
               void commitWeightDisplay(v);
@@ -1771,7 +1801,7 @@ export function ProfileTab({
           </div>
 
           <div ref={setFieldRef("height")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
               HEIGHT
             </span>
@@ -1816,6 +1846,21 @@ export function ProfileTab({
             max={PROFILE_HEIGHT_IN_MAX}
             step={PROFILE_HEIGHT_IN_STEP}
             displayText={heightUnit === "imperial" ? heightDisplayStrImperial : heightDisplayStrMetric}
+            fastRange={
+              heightUnit === "imperial"
+                ? {
+                    min: PROFILE_HEIGHT_SLIDER_IN_MIN,
+                    max: PROFILE_HEIGHT_SLIDER_IN_MAX,
+                    step: PROFILE_HEIGHT_SLIDER_IN_STEP,
+                  }
+                : {
+                    min: PROFILE_HEIGHT_SLIDER_CM_MIN,
+                    max: PROFILE_HEIGHT_SLIDER_CM_MAX,
+                    step: PROFILE_HEIGHT_SLIDER_CM_STEP,
+                    valueToSlider: (inches) => Math.round(inches * 2.54),
+                    sliderToValue: (cm) => cm / 2.54,
+                  }
+            }
             onCommitValue={(v) => {
               setHeightInchesSlider(v);
               void commitHeightInches(v);
@@ -1823,7 +1868,7 @@ export function ProfileTab({
           />
           </div>
 
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
+          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 2, letterSpacing: "0.08em" }}>
             BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
           </div>
           <BodyMetricStepper
@@ -1832,6 +1877,11 @@ export function ProfileTab({
             max={PROFILE_BODY_FAT_MAX}
             step={PROFILE_BODY_FAT_STEP}
             displayText={bodyFatDisplayStr}
+            fastRange={{
+              min: PROFILE_BODY_FAT_SLIDER_MIN,
+              max: PROFILE_BODY_FAT_SLIDER_MAX,
+              step: PROFILE_BODY_FAT_SLIDER_STEP,
+            }}
             onCommitValue={(v) => {
               setBodyFatSlider(v);
               void commitBodyFat(v);

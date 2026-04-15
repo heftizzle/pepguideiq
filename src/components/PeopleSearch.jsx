@@ -9,6 +9,12 @@ import {
   unfollowMemberProfile,
 } from "../lib/follows.js";
 
+/**
+ * Vertical offset below the persistent App header (grid-bg z-70: logo row + pill nav).
+ * PeopleSearch renders in a portal at z-60, so header paints on top — layout padding clears it (no z-index change).
+ */
+const PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX = 88;
+
 function initialsFromProfile(p) {
   const name = typeof p?.display_name === "string" ? p.display_name.trim() : "";
   if (name) return name.slice(0, 2).toUpperCase();
@@ -150,7 +156,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-start",
-        paddingTop: "max(48px, env(safe-area-inset-top))",
+        paddingTop: "max(0px, env(safe-area-inset-top, 0px))",
         background: "#07090e",
         zIndex: 60,
         overflowY: "auto",
@@ -166,6 +172,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           maxWidth: 560,
           width: "100%",
           margin: "0 auto",
+          paddingTop: PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX,
           paddingLeft: "max(12px, env(safe-area-inset-left))",
           paddingRight: "max(12px, env(safe-area-inset-right))",
           display: "flex",
@@ -235,8 +242,33 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                 const snippet = bioSnippet(p.bio);
                 const av = typeof p.avatar_url === "string" && p.avatar_url.trim() ? p.avatar_url.trim() : "";
 
+                const canOpenProfile = typeof p.handle === "string" && Boolean(normalizeHandleInput(p.handle));
+
                 return (
-                  <div key={id} className="scard" style={{ alignItems: "stretch" }}>
+                  <div
+                    key={id}
+                    className="scard"
+                    style={{
+                      alignItems: "stretch",
+                      cursor: canOpenProfile ? "pointer" : "default",
+                    }}
+                    onClick={() => {
+                      const ch = normalizeHandleInput(p.handle ?? "");
+                      if (ch) openPublicMemberProfile(ch);
+                    }}
+                    onKeyDown={
+                      canOpenProfile
+                        ? (e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.preventDefault();
+                            const ch = normalizeHandleInput(p.handle ?? "");
+                            if (ch) openPublicMemberProfile(ch);
+                          }
+                        : undefined
+                    }
+                    role={canOpenProfile ? "link" : undefined}
+                    tabIndex={canOpenProfile ? 0 : undefined}
+                  >
                     <div
                       style={{
                         width: 40,
@@ -265,21 +297,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                       style={{
                         flex: "1 1 0",
                         minWidth: 0,
-                        cursor: typeof p.handle === "string" && normalizeHandleInput(p.handle) ? "pointer" : "default",
                       }}
-                      onClick={() => {
-                        const ch = normalizeHandleInput(p.handle ?? "");
-                        if (ch) openPublicMemberProfile(ch);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" && e.key !== " ") return;
-                        const ch = normalizeHandleInput(p.handle ?? "");
-                        if (!ch) return;
-                        e.preventDefault();
-                        openPublicMemberProfile(ch);
-                      }}
-                      role={typeof p.handle === "string" && normalizeHandleInput(p.handle) ? "link" : undefined}
-                      tabIndex={typeof p.handle === "string" && normalizeHandleInput(p.handle) ? 0 : undefined}
                     >
                       <div className="brand" style={{ fontSize: 15, fontWeight: 600, color: "#00d4aa", lineHeight: 1.3 }}>
                         {handleLine || "—"}
@@ -298,7 +316,10 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         type="button"
                         className="btn-green"
                         disabled={busy || !id}
-                        onClick={() => void toggleFollow(id, false)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void toggleFollow(id, false);
+                        }}
                         style={{ flexShrink: 0, alignSelf: "center" }}
                       >
                         Following
@@ -308,7 +329,10 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         type="button"
                         className="btn-teal"
                         disabled={busy || !id}
-                        onClick={() => void toggleFollow(id, true)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void toggleFollow(id, true);
+                        }}
                         style={{ flexShrink: 0, alignSelf: "center" }}
                       >
                         Follow

@@ -910,19 +910,53 @@ export async function listPeptideIdsWithDosesOnLocalDay(userId, profileId, ymd) 
     .map((x) => parseInt(x, 10));
   if (!Y || !Mo || !D) return { peptideIds: [], error: null };
   const start = new Date(Y, Mo - 1, D, 0, 0, 0, 0);
-  const end = new Date(Y, Mo - 1, D, 23, 59, 59, 999);
+  const nextLocalMidnight = new Date(Y, Mo - 1, D + 1, 0, 0, 0, 0);
   const { data, error } = await supabase
     .from("dose_logs")
     .select("peptide_id")
     .eq("user_id", userId)
     .eq("profile_id", profileId)
     .gte("dosed_at", start.toISOString())
-    .lte("dosed_at", end.toISOString());
+    .lt("dosed_at", nextLocalMidnight.toISOString());
   if (error) return { peptideIds: [], error };
   const peptideIds = [
     ...new Set((data ?? []).map((r) => r.peptide_id).filter((id) => typeof id === "string" && id)),
   ];
   return { peptideIds, error: null };
+}
+
+/**
+ * Latest `dosed_at` per peptide on a local calendar day (interim 2h log cooldown after last dose).
+ * @param {string} ymd `YYYY-MM-DD` (same local Y/M/D as `localTodayYmd()` in the app)
+ * @returns {Promise<{ latestByPeptide: Record<string, string>, error: Error | null }>}
+ */
+export async function listLatestDosedAtByPeptideOnLocalDay(userId, profileId, ymd) {
+  if (!supabase || !profileId) return { latestByPeptide: {}, error: notConfiguredError() };
+  const [Y, Mo, D] = String(ymd)
+    .split("-")
+    .map((x) => parseInt(x, 10));
+  if (!Y || !Mo || !D) return { latestByPeptide: {}, error: null };
+  const start = new Date(Y, Mo - 1, D, 0, 0, 0, 0);
+  const nextLocalMidnight = new Date(Y, Mo - 1, D + 1, 0, 0, 0, 0);
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("peptide_id, dosed_at")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .gte("dosed_at", start.toISOString())
+    .lt("dosed_at", nextLocalMidnight.toISOString())
+    .order("dosed_at", { ascending: false });
+  if (error) return { latestByPeptide: {}, error };
+  /** @type {Record<string, string>} */
+  const latestByPeptide = {};
+  for (const r of data ?? []) {
+    const pid = r.peptide_id;
+    if (typeof pid !== "string" || !pid) continue;
+    if (latestByPeptide[pid]) continue;
+    const at = r.dosed_at;
+    if (typeof at === "string" && at) latestByPeptide[pid] = at;
+  }
+  return { latestByPeptide, error: null };
 }
 
 /**

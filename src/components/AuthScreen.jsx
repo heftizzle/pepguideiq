@@ -112,6 +112,8 @@ export function AuthScreen({ onAuth }) {
   const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
   /** Set from dynamic `zxcvbn` (register password strength meter). */
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
+  /** Login / signup password field visibility (default hidden). */
+  const [showPassword, setShowPassword] = useState(false);
   /** EDON15 / TSource15 (and variants) captured from URL or localStorage — drives 15% off copy on plan cards. */
   const [partnerDiscountActive, setPartnerDiscountActive] = useState(false);
   const mainWidgetIdRef = useRef(null);
@@ -121,6 +123,10 @@ export function AuthScreen({ onAuth }) {
     captureAffiliateRefFromLocation();
     setPartnerDiscountActive(Boolean(getStoredAffiliateRef()));
   }, []);
+
+  useEffect(() => {
+    if (mode === "login" || mode === "register") setShowPassword(false);
+  }, [mode]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -770,15 +776,52 @@ export function AuthScreen({ onAuth }) {
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
-            <input
-              className="form-input"
-              style={{ width: "100%" }}
-              type="password"
-              value={form.password}
-              placeholder="••••••••"
-              onChange={onPasswordChange}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-            />
+            <div style={{ position: "relative", width: "100%" }}>
+              <input
+                className="form-input"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  paddingRight: 44,
+                }}
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                placeholder="••••••••"
+                onChange={onPasswordChange}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 40,
+                  minHeight: 40,
+                  padding: 0,
+                  margin: 0,
+                  border: "none",
+                  borderRadius: 6,
+                  background: "transparent",
+                  color: "#8fa5bf",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  fontFamily: "inherit",
+                }}
+              >
+                <span aria-hidden="true">{showPassword ? "👁‍🗨" : "👁"}</span>
+              </button>
+            </div>
           </div>
           {registerPasswordStrength}
           {mode === "register" && signupPolicyErrors.length > 0 && (

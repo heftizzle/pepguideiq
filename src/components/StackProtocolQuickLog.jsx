@@ -10,19 +10,20 @@ import {
   getUserStackRowId,
   insertDoseLog,
   insertNetworkFeedDosePost,
-  listPeptideIdsWithDosesOnLocalDay,
+  listLatestDosedAtByPeptideOnLocalDay,
 } from "../lib/supabase.js";
+import { lockMapFromLatestDosedAtIso } from "../lib/protocolLogCooldown.js";
 import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
 import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
-
-function todayYmd() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import {
+  localTodayYmd,
+  protocolLogCooldownEndsAtMs,
+  subscribeLocalCalendarDayChange,
+} from "../lib/localCalendarDay.js";
 
 function protocolHeaderLine() {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
@@ -49,7 +50,8 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
   const [lines, setLines] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
   const [loggingPeptideId, setLoggingPeptideId] = useState(null);
-  const [loggedTodayIds, setLoggedTodayIds] = useState(() => new Set());
+  const [logLockUntilMs, setLogLockUntilMs] = useState(() => /** @type {Record<string, number>} */ ({}));
+  const [cooldownTick, setCooldownTick] = useState(0);
   const [guardrail, setGuardrail] = useState(null);
   const [networkPrompt, setNetworkPrompt] = useState(
     /** @type {null | { insertRow: Record<string, unknown>; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
@@ -67,12 +69,17 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
   const load = useCallback(async () => {
     if (!userId || !profileId || !isSupabaseConfigured() || !canUse || protocolRows.length === 0) {
       setLines([]);
+      setLogLockUntilMs({});
       return;
     }
-    const ymd = todayYmd();
-    const { peptideIds, error: idsError } = await listPeptideIdsWithDosesOnLocalDay(userId, profileId, ymd);
-    if (!idsError && peptideIds) {
-      setLoggedTodayIds(new Set(peptideIds));
+    const ymd = localTodayYmd();
+    const { latestByPeptide, error: latestErr } = await listLatestDosedAtByPeptideOnLocalDay(
+      userId,
+      profileId,
+      ymd
+    );
+    if (!latestErr) {
+      setLogLockUntilMs(lockMapFromLatestDosedAtIso(latestByPeptide));
     }
     const built = [];
     for (const row of protocolRows) {
@@ -91,7 +98,22 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     void load();
   }, [load, reloadTick]);
 
+  useEffect(() => {
+    return subscribeLocalCalendarDayChange(() => setReloadTick((t) => t + 1));
+  }, []);
+
+  useEffect(() => {
+    const now = Date.now();
+    const ends = Object.values(logLockUntilMs).filter((t) => t > now);
+    if (ends.length === 0) return;
+    const ms = Math.min(...ends) - now + 25;
+    const id = window.setTimeout(() => setCooldownTick((x) => x + 1), ms);
+    return () => window.clearTimeout(id);
+  }, [logLockUntilMs, cooldownTick]);
+
   const bumpReload = () => setReloadTick((t) => t + 1);
+
+  const isLogLocked = (peptideId) => (logLockUntilMs[peptideId] ?? 0) > Date.now();
 
   const updateInjectableUnits = (peptideId, units) => {
     setLines((prev) =>
@@ -118,7 +140,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     const list = lines ?? [];
     const entry = list.find((e) => e.display === "ok" && e.row.peptideId === peptideId);
     if (!entry || loggingPeptideId != null) return;
-    if (loggedTodayIds.has(peptideId)) return;
+    if (isLogLocked(peptideId)) return;
 
     const r = entry.row;
     let payload = null;
@@ -179,7 +201,8 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     const { error, data: inserted } = insertRes;
     setLoggingPeptideId(null);
     if (error) return;
-    setLoggedTodayIds((prev) => new Set([...prev, peptideId]));
+    const lockUntil = protocolLogCooldownEndsAtMs(Date.now());
+    setLogLockUntilMs((prev) => ({ ...prev, [peptideId]: lockUntil }));
     setGuardrail(null);
     void refreshMemberProfiles();
     bumpReload();
@@ -328,7 +351,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
               line={entry.row}
               isLast={last}
               session={session}
-              loggedToday={loggedTodayIds.has(entry.row.peptideId)}
+              loggedToday={isLogLocked(entry.row.peptideId)}
               busy={loggingPeptideId === entry.row.peptideId}
               onUnitsDelta={(delta) => updateInjectableUnits(entry.row.peptideId, entry.row.units + delta)}
               onDoseDelta={(delta) => updateNonInjectableCount(entry.row.peptideId, entry.row.doseCount + delta)}
