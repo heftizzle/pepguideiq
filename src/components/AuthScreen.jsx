@@ -143,7 +143,12 @@ export function AuthScreen({ onAuth }) {
     }
     let cancelled = false;
     (async () => {
-      const { default: zxcvbn } = await import("zxcvbn");
+      const mod = await import("zxcvbn");
+      const zxcvbn = mod?.default;
+      if (typeof zxcvbn !== "function") {
+        if (!cancelled) setRegisterStrengthScore(null);
+        return;
+      }
       const result = zxcvbn(form.password);
       if (!cancelled) setRegisterStrengthScore(result.score);
     })();
@@ -334,7 +339,12 @@ export function AuthScreen({ onAuth }) {
           setError("");
           return;
         }
-        const { default: zxcvbn } = await import("zxcvbn");
+        const mod = await import("zxcvbn");
+        const zxcvbn = mod?.default;
+        if (typeof zxcvbn !== "function") {
+          setError("Could not verify password strength. Please try again.");
+          return;
+        }
         const zx = zxcvbn(form.password);
         if (zx.score < 2) {
           setError("Password is too common or predictable. Try a passphrase.");
