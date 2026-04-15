@@ -3,7 +3,7 @@ import { getCategoryCssVars } from "../data/catalog.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
-import { supabase } from "../lib/supabase.js";
+import { getSessionAccessToken, supabase } from "../lib/supabase.js";
 import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
@@ -308,17 +308,33 @@ export function BuildTab({
 
           const compactCatalog = buildAdvisorCatalogPayload(catalog, primaryCategory);
 
+          const accessToken = await getSessionAccessToken();
+          if (!accessToken) {
+            if (myId === advisorFetchGen.current) {
+              setAdvisorData(null);
+              setAdvisorError("Sign in to use AI Guide.");
+            }
+            return;
+          }
+
           const res = await fetch(`${API_WORKER_URL}/ai-guide`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-User-Id": user?.id ?? "anon",
-              "X-User-Plan": plan ?? "entry",
+              Authorization: `Bearer ${accessToken}`,
             },
             body: JSON.stringify({ currentStack, catalog: compactCatalog }),
           });
 
           if (myId !== advisorFetchGen.current) return;
+
+          if (res.status === 401) {
+            if (myId === advisorFetchGen.current) {
+              setAdvisorData(null);
+              setAdvisorError("Session expired or not signed in. Sign in again to use AI Guide.");
+            }
+            return;
+          }
 
           if (res.status === 429) {
             const data = await res.json().catch(() => ({}));

@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src/ --ext .js,.jsx",
-    "deploy:worker": "wrangler deploy"
+    "deploy:worker": "wrangler deploy --config wrangler.worker.toml"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^3.10.0",

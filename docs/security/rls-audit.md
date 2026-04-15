@@ -88,14 +88,7 @@ A live Supabase project may add grants or policies outside this repo; confirm wi
 
 ### ai_queries
 
-- RLS enabled: yes (`001_initial_schema.sql`)
-- anon SELECT: denied
-- anon INSERT: denied
-- anon UPDATE: denied
-- anon DELETE: denied
-- authenticated: `ai_queries: select own` — SELECT own rows; `ai_queries: insert own` — INSERT with `user_id = auth.uid()`; **no DELETE policy** (clients cannot DELETE own rows via RLS)
-- Status: ✅ OK
-- Notes: No client DELETE is not a security hole; it limits user-initiated cleanup unless added later.
+- **Removed** in `047_network_feed_public_visible_indexes_ai_queries_drop.sql` (unused; Worker uses KV + `query_log` for usage). `get_daily_ai_count` now counts from `query_log`.
 
 ---
 

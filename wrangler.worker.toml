@@ -1,18 +1,19 @@
 # ── FIRST DEPLOY CHECKLIST ──────────────────────────────────────
 # 1. Set secrets (all required before deploy):
-#    npx wrangler secret put ANTHROPIC_API_KEY
-#    npx wrangler secret put SUPABASE_URL
-#    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#    npx wrangler secret put ANTHROPIC_API_KEY --config wrangler.worker.toml
+#    npx wrangler secret put SUPABASE_URL --config wrangler.worker.toml
+#    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --config wrangler.worker.toml
 #
-# 2. Optional (Stripe — set when ready):
-#    npx wrangler secret put STRIPE_SECRET_KEY
-#    npx wrangler secret put STRIPE_WEBHOOK_SECRET
+# 2. Stripe (when using billing):
+#    npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.worker.toml
+#    npx wrangler secret put STRIPE_WEBHOOK_SECRET --config wrangler.worker.toml
+#    Set Worker vars (not secrets): STRIPE_PRICE_ID_PRO, STRIPE_PRICE_ID_ELITE, STRIPE_PRICE_ID_GOAT — required for POST /stripe/create-subscription
 #
 # Turnstile (bot check on login/signup — set when using VITE_TURNSTILE_SITE_KEY in the app):
-#    npx wrangler secret put TURNSTILE_SECRET_KEY
+#    npx wrangler secret put TURNSTILE_SECRET_KEY --config wrangler.worker.toml
 #
 # 3. Deploy:
-#    npx wrangler deploy
+#    npx wrangler deploy --config wrangler.worker.toml
 #
 # 4. Copy Worker URL from deploy output
 #    → add to .env.local:
@@ -20,7 +21,7 @@
 #    → restart Vite: npm run dev
 #
 # Local Worker (wrangler dev):
-#   Terminal 1: npx wrangler dev   → default http://localhost:8787
+#   Terminal 1: npx wrangler dev --config wrangler.worker.toml   → default http://localhost:8787
 #   .env.local:  VITE_API_WORKER_URL=http://localhost:8787
 #   (no trailing slash). Restart Vite after changing env.
 #   Same-origin option: VITE_API_WORKER_URL=http://localhost:5173/api-worker

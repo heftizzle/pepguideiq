@@ -3,7 +3,8 @@
  *
  * Secrets: wrangler secret put ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  * Optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
- * Vars: ALLOWED_ORIGIN (exact origin, e.g. https://pepguideiq.com; omit or * for dev),
+ * Vars: STRIPE_PRICE_ID_PRO, STRIPE_PRICE_ID_ELITE, STRIPE_PRICE_ID_GOAT (required for create-subscription),
+ *       ALLOWED_ORIGIN (exact origin, e.g. https://pepguideiq.com; omit or * for dev),
  *       ENVIRONMENT=production (strict: require Supabase + KV for /v1/chat, fail closed on rate limit)
  */
 
@@ -21,7 +22,7 @@ const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };
 
 /** Max Netflix-style member_profiles per account (Free/Pro: 1, Elite: 2, GOAT: 4). */
 function memberProfileSlotLimit(plan) {
-  const p = normalizePlanTier(plan);
+  const p = normalizePlanTier(plan, undefined);
   if (p === "goat") return 4;
   if (p === "elite") return 2;
   return 1;
@@ -52,6 +53,40 @@ const STACK_PHOTO_TYPES = new Map([
   ["image/gif", "gif"],
 ]);
 
+/**
+ * Verify file magic bytes match claimed image/* (defense against MIME spoofing).
+ * JPEG FF D8 FF; PNG 89 50 4E 47; WEBP RIFF..WEBP; GIF GIF8.
+ * @param {ArrayBuffer} buf
+ * @param {string} mime — lowercase e.g. image/jpeg
+ */
+function imageMagicMatchesClaimedMime(buf, mime) {
+  const u = new Uint8Array(buf.slice(0, 16));
+  if (u.length < 3) return false;
+  if (mime === "image/jpeg") {
+    return u[0] === 0xff && u[1] === 0xd8 && u[2] === 0xff;
+  }
+  if (mime === "image/png") {
+    return u.length >= 4 && u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4e && u[3] === 0x47;
+  }
+  if (mime === "image/gif") {
+    return u.length >= 4 && u[0] === 0x47 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x38;
+  }
+  if (mime === "image/webp") {
+    if (u.length < 12) return false;
+    return (
+      u[0] === 0x52 &&
+      u[1] === 0x49 &&
+      u[2] === 0x46 &&
+      u[3] === 0x46 &&
+      u[8] === 0x57 &&
+      u[9] === 0x45 &&
+      u[10] === 0x42 &&
+      u[11] === 0x50
+    );
+  }
+  return false;
+}
+
 /** Content-Type from stored R2 object's filename extension (fallback when metadata is missing). */
 function contentTypeFromKey(key) {
   const m = String(key ?? "").toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -65,11 +100,12 @@ function contentTypeFromKey(key) {
 }
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+/** Messages API version header (required). Latest per https://platform.claude.com/docs/en/api/versioning (Apr 2026). */
 const ANTHROPIC_VERSION = "2023-06-01";
 
 const CORS_BASE = {
   "Access-Control-Allow-Methods": "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-User-Id, X-User-Plan",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -102,8 +138,11 @@ const SECURITY_HEADERS = {
 };
 
 // ─── Rate Limiting ───
-const RATE_LIMIT_STORE = new Map();
-
+/**
+ * IP sliding-window limits (RATE_LIMIT_KV, keys `iprl:<type>:<ip>`). This is
+ * defense-in-depth for auth/api/R2 routes. Primary usage and abuse control for
+ * paid upstreams is daily per-user KV (`rl:<userId>:<date>`, advisor keys, etc.).
+ */
 const RATE_LIMITS = {
   auth: { windowMs: 60_000, max: 10 },
   api: { windowMs: 60_000, max: 60 },
@@ -149,23 +188,51 @@ async function verifyTurnstile(token, env) {
 }
 
 /**
+ * Sliding-window IP rate limit using RATE_LIMIT_KV.
+ * @param {Record<string, unknown>} env
  * @param {string} ip
  * @param {"auth" | "api" | "r2_read" | "r2_write"} type
+ * @returns {Promise<{ limited: boolean, retryAfter?: number, serviceUnavailable?: boolean }>}
  */
-function checkRateLimit(ip, type) {
+async function checkIpRateLimit(env, ip, type) {
+  const kv = env.RATE_LIMIT_KV;
   const cfg = RATE_LIMITS[type] ?? RATE_LIMITS.api;
-  const key = `${type}:${ip}`;
-  const now = Date.now();
-  let entry = RATE_LIMIT_STORE.get(key);
-  if (!entry || now > entry.windowStart + cfg.windowMs) {
-    entry = { count: 0, windowStart: now };
+  if (!kv) {
+    if (isProduction(env)) {
+      log(env, "error", "rate_limit_kv_required_ip", { type });
+      return { limited: true, retryAfter: 60, serviceUnavailable: true };
+    }
+    return { limited: false };
   }
-  entry.count += 1;
-  RATE_LIMIT_STORE.set(key, entry);
-  if (entry.count > cfg.max) {
-    const retryAfter = Math.max(1, Math.ceil((entry.windowStart + cfg.windowMs - now) / 1000));
+
+  const key = `iprl:${type}:${ip}`;
+  const now = Date.now();
+  const { windowMs, max } = cfg;
+
+  const raw = await kv.get(key);
+  /** @type {number[]} */
+  let stamps = [];
+  if (raw) {
+    try {
+      const o = JSON.parse(raw);
+      if (o && Array.isArray(o.t)) {
+        stamps = o.t.filter((x) => typeof x === "number" && now - x < windowMs);
+      }
+    } catch {
+      /* corrupted — treat as empty */
+    }
+  }
+
+  if (stamps.length >= max) {
+    stamps.sort((a, b) => a - b);
+    const oldest = stamps[0];
+    const retryAfter = Math.max(1, Math.ceil((oldest + windowMs - now) / 1000));
     return { limited: true, retryAfter };
   }
+
+  stamps.push(now);
+  const ttlSec = Math.min(90_000, Math.max(120, Math.ceil((windowMs / 1000) * 3)));
+  await kv.put(key, JSON.stringify({ t: stamps }), { expirationTtl: ttlSec });
   return { limited: false };
 }
 
@@ -321,7 +388,9 @@ function normalizeMessages(messages) {
 
 // ─── AI GUIDE (stack recommendations) ───────────────────────────────────────
 /**
- * POST /ai-guide (aliases: /ai-stack-advisor, /stack-advisor) — Build-tab stack suggestions (permissive CORS; empty 200 on parse/upstream failure).
+ * POST /ai-guide (aliases: /ai-stack-advisor, /stack-advisor) — Build-tab stack suggestions (permissive CORS).
+ * Upstream / transport failures → 502 { error }; invalid model JSON on 200 → empty insight/recommendations.
+ * Auth: same session + fetchProfilePlan pattern as POST /v1/chat (no client-supplied plan or user id).
  * @param {Request} request
  * @param {Record<string, string | undefined>} env
  */
@@ -329,12 +398,48 @@ async function handleStackAdvisor(request, env) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-User-Id, X-User-Plan",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const production = isProduction(env);
+  if (production && !supabaseAuthReady(env)) {
+    log(env, "error", "production_missing_supabase", { route: "stack_advisor" });
+    return new Response(
+      JSON.stringify({ error: "Server misconfiguration: Supabase auth is required" }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  let sessionUserId = null;
+  let plan = "entry";
+  if (supabaseAuthReady(env)) {
+    const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+    if (error || !user?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    sessionUserId = user.sub;
+    const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+    const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    plan = await fetchProfilePlan(supabaseUrl, serviceKey, sessionUserId, env);
+  } else {
+    if (production) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    log(env, "warn", "dev_mode_stack_advisor_without_supabase", {});
+  }
+
+  const advisorRateUserId = sessionUserId ?? "anon";
+  const dailyLimit = DAILY_ADVISOR_LIMIT[plan] ?? DAILY_ADVISOR_LIMIT.entry;
 
   try {
     const { currentStack, catalog } = await request.json();
@@ -352,14 +457,9 @@ async function handleStackAdvisor(request, env) {
       });
     }
 
-    const userId = request.headers.get("X-User-Id") ?? "anon";
-    const planRaw = request.headers.get("X-User-Plan") ?? "entry";
-    const plan = String(planRaw).toLowerCase();
-    const dailyLimit = DAILY_ADVISOR_LIMIT[plan] ?? DAILY_ADVISOR_LIMIT.entry;
-
     if (dailyLimit < 999 && env.RATE_LIMIT_KV) {
       const today = new Date().toISOString().split("T")[0];
-      const kvKey = `advisor:${userId}:${today}`;
+      const kvKey = `advisor:${advisorRateUserId}:${today}`;
       const count = parseInt((await env.RATE_LIMIT_KV.get(kvKey)) ?? "0", 10);
 
       if (count >= dailyLimit) {
@@ -368,7 +468,7 @@ async function handleStackAdvisor(request, env) {
             insight: "",
             recommendations: [],
             rateLimited: true,
-            limitMessage: `You've used your ${dailyLimit} daily AI Guide calls on the ${planRaw} plan.`,
+            limitMessage: `You've used your ${dailyLimit} daily AI Guide calls on the ${plan} plan.`,
           }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -423,44 +523,75 @@ Only use peptideId values from the provided catalog.`;
       });
     }
 
-    const anthropicRes = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-      },
-      body: JSON.stringify({
-        model: MODEL_ENTRY_PRO,
-        max_tokens: 900,
-        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Available catalog (filtered, not in stack already):\n${JSON.stringify(compactCatalog)}`,
-                cache_control: { type: "ephemeral" },
-              },
-              {
-                type: "text",
-                text: `Current stack: ${JSON.stringify(currentStack)}\n\nAssess the stack and return exactly 4 recommendations in the required JSON shape (each with peptideId, name, reason, and tier).`,
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!anthropicRes.ok) {
-      throw new Error(`Anthropic API error: ${anthropicRes.status}`);
+    let anthropicRes;
+    try {
+      anthropicRes = await fetch(ANTHROPIC_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+        },
+        body: JSON.stringify({
+          model: MODEL_ENTRY_PRO,
+          max_tokens: 900,
+          system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Available catalog (filtered, not in stack already):\n${JSON.stringify(compactCatalog)}`,
+                  cache_control: { type: "ephemeral" },
+                },
+                {
+                  type: "text",
+                  text: `Current stack: ${JSON.stringify(currentStack)}\n\nAssess the stack and return exactly 4 recommendations in the required JSON shape (each with peptideId, name, reason, and tier).`,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    } catch (fetchErr) {
+      log(env, "error", "stack_advisor_fetch_failed", { message: String(fetchErr) });
+      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const anthropicData = await anthropicRes.json();
+    if (!anthropicRes.ok) {
+      log(env, "warn", "stack_advisor_anthropic_status", { status: anthropicRes.status });
+      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let anthropicData;
+    try {
+      anthropicData = await anthropicRes.json();
+    } catch (jsonErr) {
+      log(env, "error", "stack_advisor_anthropic_json", { message: String(jsonErr) });
+      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const rawText = anthropicData.content?.[0]?.text ?? "";
     const cleaned = rawText.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      return new Response(JSON.stringify({ insight: "", recommendations: [] }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const catalogIdSet = new Set(catalog.map((c) => (c && c.id ? String(c.id) : "")).filter(Boolean));
     const ADVISOR_TIERS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
@@ -497,8 +628,8 @@ Only use peptideId values from the provided catalog.`;
     });
   } catch (err) {
     log(env, "error", "stack_advisor_error", { message: String(err) });
-    return new Response(JSON.stringify({ insight: "", recommendations: [] }), {
-      status: 200,
+    return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+      status: 502,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -510,12 +641,21 @@ function modelForPlan(plan) {
   return MODEL_ENTRY_PRO;
 }
 
+/** Anthropic max_tokens ceiling by plan (M11). */
+function maxTokensCapForPlan(plan, env) {
+  const p = normalizePlanTier(plan, env);
+  if (p === "goat") return 4096;
+  if (p === "elite") return 2048;
+  return 1024;
+}
+
 /**
+ * Read-only daily query budget check (does not consume a query). Increment after Anthropic success.
  * @param {import("@cloudflare/workers-types").KVNamespace | undefined} kv
  * @param {string | null} userId
  * @param {string} plan
  */
-async function checkDailyQueryRateLimit(env, kv, userId, plan) {
+async function readDailyQueryRateLimit(env, kv, userId, plan) {
   const production = isProduction(env);
   if (!kv) {
     const msg = "RATE_LIMIT_KV not bound — rate limiting disabled";
@@ -538,16 +678,51 @@ async function checkDailyQueryRateLimit(env, kv, userId, plan) {
   const raw = await kv.get(key);
   let current = { count: 0 };
   if (raw) {
-    try { current = JSON.parse(raw); } catch { /* corrupted KV entry — reset */ }
+    try {
+      current = JSON.parse(raw);
+    } catch {
+      /* corrupted KV entry — reset */
+    }
   }
 
   if (current.count >= limit) {
     return { allowed: false, count: current.count, limit };
   }
+  return { allowed: true, count: current.count, limit };
+}
 
+/**
+ * Consume one daily query slot after a successful Anthropic response (M4).
+ * @param {import("@cloudflare/workers-types").KVNamespace | undefined} kv
+ * @param {string | null} userId
+ * @param {string} plan
+ */
+async function incrementDailyQueryRateLimit(env, kv, userId, plan) {
+  const production = isProduction(env);
+  if (!kv) {
+    if (production) {
+      return { count: 0, limit: 0 };
+    }
+    return { count: 0, limit: 99 };
+  }
+  if (!userId) {
+    return { count: 0, limit: 0 };
+  }
+  const limit = DAILY_QUERY_LIMIT[plan] ?? DAILY_QUERY_LIMIT.entry;
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `rl:${userId}:${today}`;
+  const raw = await kv.get(key);
+  let current = { count: 0 };
+  if (raw) {
+    try {
+      current = JSON.parse(raw);
+    } catch {
+      /* reset */
+    }
+  }
   const next = { count: current.count + 1 };
   await kv.put(key, JSON.stringify(next), { expirationTtl: 90000 });
-  return { allowed: true, count: next.count, limit };
+  return { count: next.count, limit };
 }
 
 function logUsage(env, userId, plan, model, tokenCount) {
@@ -610,12 +785,23 @@ function supabaseAuthReady(env) {
   return Boolean((env.SUPABASE_URL ?? "").trim() && (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim());
 }
 
-function normalizePlanTier(p) {
+/**
+ * @param {unknown} p
+ * @param {Record<string, string | undefined> | undefined} env — when set, unknown non-empty tiers log a warning (L9).
+ */
+function normalizePlanTier(p, env) {
   const x = typeof p === "string" ? p.trim().toLowerCase() : "";
-  return VALID_PLAN_TIERS.has(x) ? x : "entry";
+  if (VALID_PLAN_TIERS.has(x)) return x;
+  if (x && env) {
+    log(env, "warn", "unknown_plan_tier", { received: String(p) });
+  }
+  return "entry";
 }
 
-async function fetchProfilePlan(supabaseUrl, serviceKey, userId) {
+/**
+ * @param {Record<string, string | undefined> | undefined} [env]
+ */
+async function fetchProfilePlan(supabaseUrl, serviceKey, userId, env) {
   const res = await fetch(
     `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=plan`,
     {
@@ -627,7 +813,7 @@ async function fetchProfilePlan(supabaseUrl, serviceKey, userId) {
   );
   const rows = await res.json().catch(() => []);
   const row = Array.isArray(rows) ? rows[0] : null;
-  return normalizePlanTier(row?.plan);
+  return normalizePlanTier(row?.plan, env);
 }
 
 /** Cached system prefix for AI Guide (/v1/chat); dynamic user context is a separate block. */
@@ -676,13 +862,20 @@ function injectCatalogCacheIntoMessages(messages, catalog) {
   return out;
 }
 
-/** Map Stripe Price id → app plan tier (env overrides defaults from product catalog). */
+function stripePriceIdsConfigured(env) {
+  const pro = String(env.STRIPE_PRICE_ID_PRO ?? "").trim();
+  const elite = String(env.STRIPE_PRICE_ID_ELITE ?? "").trim();
+  const goat = String(env.STRIPE_PRICE_ID_GOAT ?? "").trim();
+  return Boolean(pro && elite && goat);
+}
+
+/** Map Stripe Price id → app plan tier (requires STRIPE_PRICE_ID_* on the Worker). */
 function planFromStripePriceId(priceId, env) {
   const id = String(priceId ?? "").trim();
-  if (!id) return null;
-  const pro = String(env.STRIPE_PRICE_ID_PRO ?? "price_1TM98cDtHiMNTdJ0FMxPf94X").trim();
-  const elite = String(env.STRIPE_PRICE_ID_ELITE ?? "price_1TMCfYDtHiMNTdJ0urEVgoxc").trim();
-  const goat = String(env.STRIPE_PRICE_ID_GOAT ?? "price_1TMCjnDtHiMNTdJ0CiOHHmQD").trim();
+  if (!id || !stripePriceIdsConfigured(env)) return null;
+  const pro = String(env.STRIPE_PRICE_ID_PRO).trim();
+  const elite = String(env.STRIPE_PRICE_ID_ELITE).trim();
+  const goat = String(env.STRIPE_PRICE_ID_GOAT).trim();
   if (id === pro) return "pro";
   if (id === elite) return "elite";
   if (id === goat) return "goat";
@@ -690,10 +883,11 @@ function planFromStripePriceId(priceId, env) {
 }
 
 function stripePriceIdForPaidPlan(plan, env) {
-  const p = normalizePlanTier(plan);
-  if (p === "pro") return String(env.STRIPE_PRICE_ID_PRO ?? "price_1TM98cDtHiMNTdJ0FMxPf94X").trim();
-  if (p === "elite") return String(env.STRIPE_PRICE_ID_ELITE ?? "price_1TMCfYDtHiMNTdJ0urEVgoxc").trim();
-  if (p === "goat") return String(env.STRIPE_PRICE_ID_GOAT ?? "price_1TMCjnDtHiMNTdJ0CiOHHmQD").trim();
+  if (!stripePriceIdsConfigured(env)) return "";
+  const p = normalizePlanTier(plan, env);
+  if (p === "pro") return String(env.STRIPE_PRICE_ID_PRO).trim();
+  if (p === "elite") return String(env.STRIPE_PRICE_ID_ELITE).trim();
+  if (p === "goat") return String(env.STRIPE_PRICE_ID_GOAT).trim();
   return "";
 }
 
@@ -709,7 +903,7 @@ function tierPlanFromStripeSubscription(subscr, env) {
     (typeof subscr.items?.data?.[0]?.price?.metadata?.plan === "string" &&
       subscr.items.data[0].price.metadata.plan.trim().toLowerCase()) ||
     "";
-  return VALID_PLAN_TIERS.has(m) ? m : "entry";
+  return normalizePlanTier(m, env);
 }
 
 async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
@@ -896,6 +1090,10 @@ async function handleStripeCreateSubscription(request, env, cors) {
   if (!stripeKey) {
     return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
   }
+  if (!stripePriceIdsConfigured(env)) {
+    log(env, "error", "stripe_price_ids_missing", {});
+    return jsonResponse({ error: "Missing Stripe price configuration" }, 500, cors);
+  }
   const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
   if (authErr || !sessionUser?.sub) {
     return jsonResponse({ error: "Unauthorized" }, 401, cors);
@@ -909,7 +1107,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
     return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
   }
   const planRaw = typeof body?.plan === "string" ? body.plan.trim().toLowerCase() : "";
-  const plan = normalizePlanTier(planRaw);
+  const plan = normalizePlanTier(planRaw, env);
   if (!["pro", "elite", "goat"].includes(plan)) {
     return jsonResponse({ error: "plan must be pro, elite, or goat" }, 400, cors);
   }
@@ -1231,7 +1429,7 @@ async function handleCreateMemberProfile(request, env, cors) {
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
   const limit = memberProfileSlotLimit(plan);
 
   const countRes = await fetch(
@@ -1530,6 +1728,38 @@ async function handleScheduleDowngrade(request, env, cors) {
     return jsonResponse({ error: "target_plan must be lower than current plan" }, 400, cors);
   }
 
+  const subscriptionId = typeof subscr.id === "string" ? subscr.id.trim() : "";
+  if (!subscriptionId) {
+    return jsonResponse({ error: "No active subscription to schedule against" }, 400, cors);
+  }
+
+  const cancelBody = new URLSearchParams();
+  cancelBody.set("cancel_at_period_end", "true");
+  const cancelRes = await fetch(
+    `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: cancelBody.toString(),
+    }
+  );
+  const cancelData = await cancelRes.json().catch(() => ({}));
+  if (!cancelRes.ok) {
+    return jsonResponse(
+      {
+        error:
+          cancelData.error?.message ||
+          cancelData.error ||
+          `Stripe error (${cancelRes.status})`,
+      },
+      cancelRes.status >= 400 && cancelRes.status < 600 ? cancelRes.status : 502,
+      cors
+    );
+  }
+
   const ok = await supabasePatchProfile(supabaseUrl, serviceKey, userId, {
     pending_plan: target,
     pending_plan_date: new Date(subscr.current_period_end * 1000).toISOString(),
@@ -1559,7 +1789,7 @@ async function handleUploadStackPhoto(request, env, cors) {
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
   if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
     return jsonResponse({ error: "Pro plan or higher required to upload stack photos" }, 403, cors);
   }
@@ -1603,6 +1833,10 @@ async function handleUploadStackPhoto(request, env, cors) {
   }
   if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
     return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
+  }
+
+  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
   }
 
   try {
@@ -1702,8 +1936,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 /** R2 keys allowed for public GET /avatars/{key} (member profile or legacy account avatar JPEG). */
 const AVATAR_R2_KEY_RE = new RegExp(
-  `^${UUID_RE.source.slice(1, -1)}/(?:member-profiles/${UUID_RE.source.slice(1, -1)}/avatar\\.jpg|avatar\\.jpg)$`,
-  "i"
+  `^${UUID_RE.source.slice(1, -1)}/(?:member-profiles/${UUID_RE.source.slice(1, -1)}/avatar\\.jpg|avatar\\.jpg)$`
 );
 
 /**
@@ -1931,16 +2164,15 @@ async function handleGetMemberProfiles(request, env, cors) {
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-  let out = await fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, "1");
-  const transient =
-    !out.ok && ((out.status >= 500 && out.status < 600) || out.status === 0);
-  if (transient) {
-    await new Promise((r) => setTimeout(r, 500));
-    out = await fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, "2");
-  }
+  const out = await fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, "1");
   if (!out.ok) {
     const upstream = out.status;
-    const clientStatus = upstream >= 400 && upstream < 500 ? upstream : 502;
+    const clientStatus =
+      upstream === 0 || (upstream >= 500 && upstream < 600)
+        ? 503
+        : upstream >= 400 && upstream < 500
+          ? upstream
+          : 502;
     log(env, "warn", "member_profile_get_list_failed", {
       userId,
       upstreamStatus: upstream,
@@ -2061,7 +2293,7 @@ async function handleSearchMemberProfiles(request, env, cors) {
     if (Array.isArray(planRows)) {
       for (const p of planRows) {
         if (p && typeof p.id === "string") {
-          planByUser[p.id] = normalizePlanTier(typeof p.plan === "string" ? p.plan : "");
+          planByUser[p.id] = normalizePlanTier(typeof p.plan === "string" ? p.plan : "", env);
         }
       }
     }
@@ -2148,7 +2380,7 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     });
     const planRows = await pr.json().catch(() => []);
     if (Array.isArray(planRows) && planRows[0] && typeof planRows[0].plan === "string") {
-      plan = normalizePlanTier(planRows[0].plan);
+      plan = normalizePlanTier(planRows[0].plan, env);
     }
   }
 
@@ -2905,7 +3137,7 @@ async function handlePostStackPhoto(request, env, cors) {
     typeof memberProfileIdRaw === "string" ? memberProfileIdRaw.trim() : "";
 
   if (kind === "body_scan") {
-    const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+    const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
     if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
       return jsonResponse({ error: "Pro plan or higher required for InBody / DEXA scan upload" }, 403, cors);
     }
@@ -3010,6 +3242,10 @@ async function handlePostStackPhoto(request, env, cors) {
   }
   if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
     return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
+  }
+
+  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
   }
 
   if (kind === "vial") {
@@ -3155,7 +3391,7 @@ async function handleStripeWebhook(request, env) {
               ? session.customer.id
               : "";
         let plan =
-          (typeof session.metadata?.plan === "string" && normalizePlanTier(session.metadata.plan)) ||
+          (typeof session.metadata?.plan === "string" && normalizePlanTier(session.metadata.plan, env)) ||
           "entry";
         if (userId && customerId) {
           const subId =
@@ -3348,9 +3584,15 @@ async function handleRequest(request, env) {
       } else {
         rlType = "api";
       }
-      const ipRl = checkRateLimit(ip, rlType);
+      const ipRl = await checkIpRateLimit(env, ip, rlType);
       if (ipRl.limited) {
-        return rateLimitResponse(ipRl.retryAfter);
+        if (ipRl.serviceUnavailable) {
+          return new Response(
+            JSON.stringify({ error: "Rate limiting unavailable" }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return rateLimitResponse(ipRl.retryAfter ?? 60);
       }
     }
 
@@ -3519,16 +3761,16 @@ async function handleRequest(request, env) {
       userId = user.sub;
       const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
       const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-      plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId);
+      plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
     } else {
       if (production) {
         return jsonResponse({ error: "Unauthorized" }, 401, cors);
       }
-      plan = normalizePlanTier(body.plan);
+      plan = normalizePlanTier(body.plan, env);
       log(env, "warn", "dev_mode_chat_without_supabase", {});
     }
 
-    const rl = await checkDailyQueryRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
+    const rl = await readDailyQueryRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
     if (rl.error) {
       return jsonResponse({ error: rl.error }, 503, cors);
     }
@@ -3546,6 +3788,7 @@ async function handleRequest(request, env) {
     }
 
     const model = modelForPlan(plan);
+    const maxTokCap = maxTokensCapForPlan(plan, env);
 
     const baseMsgs = normalizeMessages(body.messages).slice(-10);
     const catalogForCache = Array.isArray(body.catalog) ? body.catalog : null;
@@ -3553,7 +3796,7 @@ async function handleRequest(request, env) {
 
     const payload = {
       model,
-      max_tokens: Math.min(body.max_tokens ?? 1024, 1024),
+      max_tokens: Math.min(body.max_tokens ?? maxTokCap, maxTokCap),
       messages,
       system: buildChatSystemBlocks(body),
     };
@@ -3585,6 +3828,8 @@ async function handleRequest(request, env) {
       );
     }
 
+    const usageAfter = await incrementDailyQueryRateLimit(env, env.RATE_LIMIT_KV, userId, plan);
+
     const block = Array.isArray(data.content)
       ? data.content.find((c) => c.type === "text")
       : null;
@@ -3600,8 +3845,8 @@ async function handleRequest(request, env) {
         id: data.id,
         role: "assistant",
         usage: {
-          queries_today: rl.count,
-          queries_limit: rl.limit,
+          queries_today: usageAfter.count,
+          queries_limit: usageAfter.limit,
           plan,
         },
       },

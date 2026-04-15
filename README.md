@@ -38,7 +38,7 @@ The Anthropic key stays on the Worker only (`wrangler secret put ANTHROPIC_API_K
 
 1. `npm install`
 2. `npx wrangler login`
-3. `npx wrangler secret put ANTHROPIC_API_KEY` (and Supabase + optional Stripe secrets — see [`.env.example`](./.env.example))
+3. `npx wrangler secret put ANTHROPIC_API_KEY --config wrangler.worker.toml` (and Supabase + optional Stripe secrets — see [`.env.example`](./.env.example); add `--config wrangler.worker.toml` to each `wrangler secret put`)
 4. `npm run deploy:worker`
 5. Set **`VITE_API_WORKER_URL`** to the deployed Worker URL (no trailing slash).
 
@@ -50,7 +50,7 @@ Worker entry: [`workers/api-proxy.js`](./workers/api-proxy.js). Notable routes:
 | `GET /stack-photo` | Authenticated download of the user’s stack image from R2. |
 | `POST /stripe/webhook` | Stripe → `update_user_plan` + `stripe_customer_id` sync. |
 
-**Production:** set Worker vars `ENVIRONMENT=production` and `ALLOWED_ORIGIN=https://your-domain.com` (see commented `[vars]` in [`wrangler.toml`](./wrangler.toml)). Rate limiting requires KV; in production the Worker **fails closed** if KV is missing.
+**Production:** set Worker vars `ENVIRONMENT=production` and `ALLOWED_ORIGIN=https://your-domain.com` (see commented `[vars]` in [`wrangler.worker.toml`](./wrangler.worker.toml)). Rate limiting requires KV; in production the Worker **fails closed** if KV is missing.
 
 ### Stripe billing
 
