@@ -60,7 +60,7 @@ jobs:
           VITE_API_WORKER_URL: ${{ secrets.VITE_API_WORKER_URL }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name pepguideiq --branch main
+        run: npx wrangler pages deploy dist --project-name pepguideiq --branch main --config wrangler.pages.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
