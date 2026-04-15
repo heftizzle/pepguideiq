@@ -838,6 +838,12 @@ export function ProfileTab({
   const [scanBusy, setScanBusy] = useState(false);
   const scanFileRef = useRef(null);
   const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
+  /** Count of in-flight `profiles` PATCH + follow-up getCurrentUser; blocks auth refresh from wiping optimistic fields. */
+  const profilesSaveInFlightRef = useRef(0);
+  /** Fields we last optimistically merged onto `user` while a save is in flight (re-applied if `onAuthStateChange` overwrites). */
+  const profilesOptimisticRef = useRef(
+    /** @type {Partial<{ biological_sex: string | null; training_experience: string | null; cycle_tracking_enabled: boolean | null; date_of_birth: string | null }>} */ ({})
+  );
 
   const setFieldRef = useCallback((id) => {
     return (el) => {
@@ -854,22 +860,43 @@ export function ProfileTab({
     }, 2200);
   }, []);
 
+  /** Re-merge optimistic `profiles` fields if auth listener replaced `user` mid-save. */
+  useEffect(() => {
+    if (profilesSaveInFlightRef.current <= 0) return;
+    const patch = profilesOptimisticRef.current;
+    if (!user?.id || Object.keys(patch).length === 0) return;
+    let needMerge = false;
+    for (const k of Object.keys(patch)) {
+      const key = /** @type {keyof typeof patch} */ (k);
+      if (user[key] !== patch[key]) needMerge = true;
+    }
+    if (needMerge) setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, [user, setUser]);
+
   const setBiologicalSex = useCallback(
     async (value) => {
       if (!user?.id) return;
       if (!["male", "female", "prefer_not_to_say"].includes(value)) return;
       setErr(null);
       const prev = user.biological_sex ?? null;
+      profilesSaveInFlightRef.current += 1;
+      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, biological_sex: value };
       setUser((u) => (u ? { ...u, biological_sex: value } : u));
-      const { error } = await updateUserProfile({ biological_sex: value });
-      if (error) {
-        setUser((u) => (u ? { ...u, biological_sex: prev } : u));
-        setErr(error.message);
-        return;
+      try {
+        const { error } = await updateUserProfile({ biological_sex: value });
+        if (error) {
+          setUser((u) => (u ? { ...u, biological_sex: prev } : u));
+          delete profilesOptimisticRef.current.biological_sex;
+          setErr(error.message);
+          return;
+        }
+        showSavedBriefly();
+        const fresh = await getCurrentUser();
+        if (fresh) setUser(fresh);
+      } finally {
+        profilesSaveInFlightRef.current -= 1;
+        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
-      showSavedBriefly();
-      const fresh = await getCurrentUser();
-      if (fresh) setUser(fresh);
     },
     [user?.id, user?.biological_sex, setUser, showSavedBriefly]
   );
@@ -879,16 +906,24 @@ export function ProfileTab({
       if (!user?.id) return;
       setErr(null);
       const prev = user.cycle_tracking_enabled ?? null;
+      profilesSaveInFlightRef.current += 1;
+      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, cycle_tracking_enabled: enabled };
       setUser((u) => (u ? { ...u, cycle_tracking_enabled: enabled } : u));
-      const { error } = await updateUserProfile({ cycle_tracking_enabled: enabled });
-      if (error) {
-        setUser((u) => (u ? { ...u, cycle_tracking_enabled: prev } : u));
-        setErr(error.message);
-        return;
+      try {
+        const { error } = await updateUserProfile({ cycle_tracking_enabled: enabled });
+        if (error) {
+          setUser((u) => (u ? { ...u, cycle_tracking_enabled: prev } : u));
+          delete profilesOptimisticRef.current.cycle_tracking_enabled;
+          setErr(error.message);
+          return;
+        }
+        showSavedBriefly();
+        const fresh = await getCurrentUser();
+        if (fresh) setUser(fresh);
+      } finally {
+        profilesSaveInFlightRef.current -= 1;
+        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
-      showSavedBriefly();
-      const fresh = await getCurrentUser();
-      if (fresh) setUser(fresh);
     },
     [user?.id, user?.cycle_tracking_enabled, setUser, showSavedBriefly]
   );
@@ -908,16 +943,24 @@ export function ProfileTab({
       } else {
         return;
       }
+      profilesSaveInFlightRef.current += 1;
+      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, date_of_birth: normalized };
       setUser((u) => (u ? { ...u, date_of_birth: normalized } : u));
-      const { error } = await updateUserProfile({ date_of_birth: normalized });
-      if (error) {
-        setUser((u) => (u ? { ...u, date_of_birth: prev } : u));
-        setErr(error.message);
-        return;
+      try {
+        const { error } = await updateUserProfile({ date_of_birth: normalized });
+        if (error) {
+          setUser((u) => (u ? { ...u, date_of_birth: prev } : u));
+          delete profilesOptimisticRef.current.date_of_birth;
+          setErr(error.message);
+          return;
+        }
+        showSavedBriefly();
+        const fresh = await getCurrentUser();
+        if (fresh) setUser(fresh);
+      } finally {
+        profilesSaveInFlightRef.current -= 1;
+        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
-      showSavedBriefly();
-      const fresh = await getCurrentUser();
-      if (fresh) setUser(fresh);
     },
     [user?.id, user?.date_of_birth, setUser, showSavedBriefly]
   );
@@ -1232,16 +1275,24 @@ export function ProfileTab({
       if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
       setErr(null);
       const prev = user.training_experience ?? null;
+      profilesSaveInFlightRef.current += 1;
+      profilesOptimisticRef.current = { ...profilesOptimisticRef.current, training_experience: value };
       setUser((u) => (u ? { ...u, training_experience: value } : u));
-      const { error } = await updateUserProfile({ training_experience: value });
-      if (error) {
-        setUser((u) => (u ? { ...u, training_experience: prev } : u));
-        setErr(error.message);
-        return;
+      try {
+        const { error } = await updateUserProfile({ training_experience: value });
+        if (error) {
+          setUser((u) => (u ? { ...u, training_experience: prev } : u));
+          delete profilesOptimisticRef.current.training_experience;
+          setErr(error.message);
+          return;
+        }
+        showSavedBriefly();
+        const fresh = await getCurrentUser();
+        if (fresh) setUser(fresh);
+      } finally {
+        profilesSaveInFlightRef.current -= 1;
+        if (profilesSaveInFlightRef.current <= 0) profilesOptimisticRef.current = {};
       }
-      showSavedBriefly();
-      const fresh = await getCurrentUser();
-      if (fresh) setUser(fresh);
     },
     [user?.id, user?.training_experience, setUser, showSavedBriefly]
   );

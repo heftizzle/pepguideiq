@@ -200,15 +200,28 @@ function normalizeProfileDateOfBirth(raw) {
 }
 
 /**
+ * Raw column from profiles row (missing key → undefined, not null).
+ * @param {Record<string, unknown> | null | undefined} profile
+ * @param {string} snakeKey
+ * @param {string} camelKey
+ */
+function profileFieldRaw(profile, snakeKey, camelKey) {
+  if (!profile || typeof profile !== "object") return undefined;
+  if (Object.prototype.hasOwnProperty.call(profile, snakeKey)) return profile[snakeKey];
+  if (Object.prototype.hasOwnProperty.call(profile, camelKey)) return profile[camelKey];
+  return undefined;
+}
+
+/**
  * Read a text-ish column from a profiles row (PostgREST uses snake_case; tolerate camelCase).
+ * Treats undefined, null, and "" as empty (same as missing).
  * @param {Record<string, unknown> | null | undefined} profile
  * @param {string} snakeKey
  * @param {string} camelKey
  */
 function profileTextLower(profile, snakeKey, camelKey) {
-  if (!profile || typeof profile !== "object") return "";
-  const v = profile[snakeKey] ?? profile[camelKey];
-  if (v == null || v === "") return "";
+  const v = profileFieldRaw(profile, snakeKey, camelKey);
+  if (v === undefined || v === null || v === "") return "";
   if (typeof v === "string") return v.trim().toLowerCase();
   return String(v).trim().toLowerCase();
 }
@@ -223,9 +236,16 @@ export async function getCurrentUser() {
   if (profileErr && import.meta.env.DEV) {
     console.warn("[getCurrentUser] profiles:", profileErr.message);
   }
-  if (profile != null) {
-    console.log("[getCurrentUser] raw profiles row (before normalization)", profile);
-  }
+  // Always log once per call so production DevTools can confirm fetch + key names (row may be null).
+  console.log("[getCurrentUser] profiles query (before normalization)", {
+    userId: u.id,
+    postgrestError: profileErr?.message ?? null,
+    rowPresent: profile != null,
+    rowKeys: profile && typeof profile === "object" ? Object.keys(profile) : [],
+    biological_sex_raw: profileFieldRaw(profile, "biological_sex", "biologicalSex"),
+    training_experience_raw: profileFieldRaw(profile, "training_experience", "trainingExperience"),
+    fullRow: profile,
+  });
   const stackPhotoKey =
     profile && typeof profile.stack_photo_r2_key === "string" ? profile.stack_photo_r2_key.trim() : null;
   const stackPhotoUrlLegacy =
