@@ -191,18 +191,24 @@ export async function getSessionAccessToken() {
   return session?.access_token ?? null;
 }
 
+/** @param {unknown} raw — PostgREST date / timestamptz string */
+function normalizeProfileDateOfBirth(raw) {
+  if (raw == null) return null;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
 export async function getCurrentUser() {
   if (!supabase) return null;
   const { data: auth } = await supabase.auth.getUser();
   const u = auth?.user;
   if (!u) return null;
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "email, name, plan, biological_sex, cycle_tracking_enabled, date_of_birth, training_experience, stack_photo_url, stack_photo_r2_key, display_name, avatar_r2_key, default_session"
-    )
-    .eq("id", u.id)
-    .maybeSingle();
+  // Use * so one missing migration column does not fail the whole row (explicit list → REST 400 → profile null).
+  const { data: profile, error: profileErr } = await supabase.from("profiles").select("*").eq("id", u.id).maybeSingle();
+  if (profileErr && import.meta.env.DEV) {
+    console.warn("[getCurrentUser] profiles:", profileErr.message);
+  }
   const stackPhotoKey =
     profile && typeof profile.stack_photo_r2_key === "string" ? profile.stack_photo_r2_key.trim() : null;
   const stackPhotoUrlLegacy =
@@ -234,10 +240,7 @@ export async function getCurrentUser() {
     })(),
     cycle_tracking_enabled:
       profile && typeof profile.cycle_tracking_enabled === "boolean" ? profile.cycle_tracking_enabled : null,
-    date_of_birth:
-      profile && typeof profile.date_of_birth === "string" && /^\d{4}-\d{2}-\d{2}$/.test(profile.date_of_birth.trim())
-        ? profile.date_of_birth.trim()
-        : null,
+    date_of_birth: profile ? normalizeProfileDateOfBirth(profile.date_of_birth) : null,
     training_experience: (() => {
       const te =
         profile && typeof profile.training_experience === "string"

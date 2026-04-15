@@ -9,6 +9,7 @@ import {
   checkMemberProfileHandleAvailable,
   fetchBodyMetrics,
   fetchUserProfileStats,
+  getCurrentUser,
   getSessionAccessToken,
   listRecentDosedAtDates,
   patchMemberProfileViaWorker,
@@ -867,6 +868,8 @@ export function ProfileTab({
         return;
       }
       showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) setUser(fresh);
     },
     [user?.id, user?.biological_sex, setUser, showSavedBriefly]
   );
@@ -884,6 +887,8 @@ export function ProfileTab({
         return;
       }
       showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) setUser(fresh);
     },
     [user?.id, user?.cycle_tracking_enabled, setUser, showSavedBriefly]
   );
@@ -911,6 +916,8 @@ export function ProfileTab({
         return;
       }
       showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) setUser(fresh);
     },
     [user?.id, user?.date_of_birth, setUser, showSavedBriefly]
   );
@@ -929,6 +936,8 @@ export function ProfileTab({
         return;
       }
       showSavedBriefly();
+      const fresh = await getCurrentUser();
+      if (fresh) setUser(fresh);
     },
     [user?.id, user?.training_experience, setUser, showSavedBriefly]
   );
@@ -2226,7 +2235,15 @@ export function ProfileTab({
             }}
           />
 
-          <div ref={setFieldRef("dateOfBirth")} style={{ marginTop: 14 }}>
+          <div
+            style={{
+              position: "relative",
+              zIndex: 2,
+              marginTop: 14,
+              isolation: "isolate",
+            }}
+          >
+          <div ref={setFieldRef("dateOfBirth")} style={{ marginTop: 0 }}>
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em", display: "block", marginBottom: 6 }}>
               DATE OF BIRTH
             </span>
@@ -2377,6 +2394,7 @@ export function ProfileTab({
                 </div>
               </div>
             ) : null}
+          </div>
           </div>
 
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>
