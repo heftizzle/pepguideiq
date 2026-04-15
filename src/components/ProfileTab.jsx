@@ -1940,6 +1940,7 @@ export function ProfileTab({
                         color: weightUnit === u ? "#00d4aa" : "#6b7c8f",
                         cursor: weightMetricsLocked ? "not-allowed" : "pointer",
                         opacity: weightMetricsLocked ? 0.45 : 1,
+                        pointerEvents: weightMetricsLocked ? "none" : "auto",
                         fontFamily: "'JetBrains Mono', monospace",
                       }}
                     >
@@ -2010,6 +2011,7 @@ export function ProfileTab({
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
+                    disabled={heightMetricsLocked}
                     onClick={() => toggleHeightUnit("imperial")}
                     style={{
                       fontSize: 13,
@@ -2018,7 +2020,9 @@ export function ProfileTab({
                       border: heightUnit === "imperial" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: heightUnit === "imperial" ? "rgba(0,212,170,0.12)" : "transparent",
                       color: heightUnit === "imperial" ? "#00d4aa" : "#6b7c8f",
-                      cursor: "pointer",
+                      cursor: heightMetricsLocked ? "not-allowed" : "pointer",
+                      opacity: heightMetricsLocked ? 0.45 : 1,
+                      pointerEvents: heightMetricsLocked ? "none" : "auto",
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
                   >
@@ -2026,6 +2030,7 @@ export function ProfileTab({
                   </button>
                   <button
                     type="button"
+                    disabled={heightMetricsLocked}
                     onClick={() => toggleHeightUnit("metric")}
                     style={{
                       fontSize: 13,
@@ -2034,7 +2039,9 @@ export function ProfileTab({
                       border: heightUnit === "metric" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: heightUnit === "metric" ? "rgba(0,212,170,0.12)" : "transparent",
                       color: heightUnit === "metric" ? "#00d4aa" : "#6b7c8f",
-                      cursor: "pointer",
+                      cursor: heightMetricsLocked ? "not-allowed" : "pointer",
+                      opacity: heightMetricsLocked ? 0.45 : 1,
+                      pointerEvents: heightMetricsLocked ? "none" : "auto",
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
                   >
