@@ -6,6 +6,8 @@ import { fetchMemberProfiles, getCurrentUser, getSessionAccessToken } from "../l
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 import { publicProfileGoalLabel } from "../data/publicProfileGoalLabels.js";
 import { followMemberProfile, getMyFollowing, unfollowMemberProfile } from "../lib/follows.js";
+import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
+import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
 
 const TIER_EMOJI = {
   entry: "🌱",
@@ -283,6 +285,10 @@ export function PublicMemberProfilePage({
               ))}
             </div>
           ) : null}
+
+          <MemberProfileSocialIconRow profile={profile} />
+
+          <PublicProfileFastingBlock publicFast={profile.public_fast} />
 
           {bio ? (
             <div style={{ fontSize: 15, lineHeight: 1.55, color: "#cbd5e1", marginBottom: 24, whiteSpace: "pre-wrap" }}>

@@ -13,7 +13,7 @@ import {
  * Vertical offset below the persistent App header (grid-bg z-70: logo row + pill nav).
  * PeopleSearch renders in a portal at z-60, so header paints on top — layout padding clears it (no z-index change).
  */
-const PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX = 88;
+const PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX = 104;
 
 function initialsFromProfile(p) {
   const name = typeof p?.display_name === "string" ? p.display_name.trim() : "";

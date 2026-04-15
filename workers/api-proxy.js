@@ -1861,7 +1861,7 @@ function normalizeWakeTimeForPatch(s) {
 async function fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, attemptLabel) {
   const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
     userId
-  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
+  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,instagram_handle,tiktok_handle,facebook_handle,snapchat_handle,linkedin_handle,x_handle,youtube_handle,rumble_handle,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
   try {
     const res = await fetch(sel, {
       headers: {
@@ -2076,6 +2076,32 @@ async function handleSearchMemberProfiles(request, env, cors) {
 }
 
 /**
+ * Optional active fast visible on public profile (`public_visible` + `ended_at` null).
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} memberProfileId
+ * @returns {Promise<{ fast_type: string, started_at: string, target_hours: number } | null>}
+ */
+async function fetchPublicActiveFastForProfile(supabaseUrl, serviceKey, memberProfileId) {
+  const fastUrl = `${supabaseUrl}/rest/v1/member_fasts?member_profile_id=eq.${encodeURIComponent(
+    memberProfileId
+  )}&ended_at=is.null&public_visible=eq.true&select=fast_type,started_at,target_hours&limit=1`;
+  const fr = await fetch(fastUrl, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+    },
+  });
+  const fastRows = await fr.json().catch(() => []);
+  if (!fr.ok || !Array.isArray(fastRows) || !fastRows[0]) return null;
+  const f = fastRows[0];
+  if (typeof f.fast_type !== "string" || typeof f.started_at !== "string") return null;
+  const th = typeof f.target_hours === "number" ? f.target_hours : Number(f.target_hours);
+  if (!Number.isFinite(th)) return null;
+  return { fast_type: f.fast_type, started_at: f.started_at, target_hours: th };
+}
+
+/**
  * GET /member-profiles/public?handle=foo — no auth. Public member card fields for a unique @handle.
  */
 async function handleGetMemberProfilePublic(request, env, cors) {
@@ -2126,6 +2152,15 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     }
   }
 
+  let publicFast = null;
+  if (typeof row.id === "string" && row.id) {
+    try {
+      publicFast = await fetchPublicActiveFastForProfile(supabaseUrl, serviceKey, row.id);
+    } catch {
+      publicFast = null;
+    }
+  }
+
   const profile = {
     id: row.id,
     handle: row.handle,
@@ -2133,9 +2168,18 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     display_name: row.display_name,
     avatar_url: row.avatar_url,
     bio: row.bio,
+    instagram_handle: row.instagram_handle,
+    tiktok_handle: row.tiktok_handle,
+    facebook_handle: row.facebook_handle,
+    snapchat_handle: row.snapchat_handle,
+    linkedin_handle: row.linkedin_handle,
+    x_handle: row.x_handle,
+    youtube_handle: row.youtube_handle,
+    rumble_handle: row.rumble_handle,
     experience_level: row.experience_level,
     goals: row.goals,
     plan,
+    public_fast: publicFast,
   };
 
   return jsonResponse({ profile }, 200, cors);
@@ -2307,6 +2351,118 @@ async function handleGetMemberFollowFollowing(request, env, cors) {
   return jsonResponse({ following }, 200, cors);
 }
 
+const MEMBER_SOCIAL_HANDLE_MAX_LEN = 80;
+
+function memberSocialTryDecode(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+function memberSocialFirstPathSegment(raw) {
+  const s = memberSocialTryDecode(String(raw ?? "").trim());
+  if (!s) return "";
+  return s.split("/")[0].split("?")[0].split("#")[0] ?? "";
+}
+
+/**
+ * Normalize optional social handle fields for PATCH (mirror `src/lib/socialProfileLinks.js`).
+ * @param {string} columnKey
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function normalizeMemberSocialHandlePatch(columnKey, raw) {
+  let s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return "";
+
+  switch (columnKey) {
+    case "instagram_handle":
+      s = s.replace(/^https?:\/\/(www\.)?instagram\.com\//i, "");
+      s = s.replace(/^@+/, "");
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "tiktok_handle":
+      s = s.replace(/^https?:\/\/(www\.)?tiktok\.com\/@?/i, "");
+      s = s.replace(/^@+/, "");
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "facebook_handle":
+      s = s.replace(/^https?:\/\/(www\.)?facebook\.com\//i, "");
+      s = s.replace(/^@+/, "");
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "snapchat_handle":
+      s = s.replace(/^https?:\/\/(www\.)?snapchat\.com\/add\//i, "");
+      s = s.replace(/^@+/, "");
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "linkedin_handle":
+      s = s.replace(/^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\//i, "");
+      s = s.replace(/^\/+/, "");
+      if (!s) return "";
+      {
+        const lower = s.toLowerCase();
+        if (lower.startsWith("in/")) {
+          s = s.slice(3);
+        } else if (lower.startsWith("pub/")) {
+          s = s.slice(4);
+        } else if (lower.startsWith("company/")) {
+          s = `company/${s.slice(8).split("/")[0]}`;
+          return s.slice(0, MEMBER_SOCIAL_HANDLE_MAX_LEN);
+        }
+      }
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "x_handle":
+      s = s.replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com)\//i, "");
+      s = s.replace(/^@+/, "");
+      s = memberSocialFirstPathSegment(s);
+      break;
+    case "youtube_handle":
+      s = s.replace(/^https?:\/\/(www\.)?youtube\.com\//i, "");
+      s = s.replace(/^https?:\/\/youtu\.be\//i, "");
+      s = s.replace(/^@+/, "");
+      {
+        const lower = s.toLowerCase();
+        if (lower.startsWith("c/")) {
+          s = s.slice(2).split("/")[0] ?? "";
+        } else if (lower.startsWith("user/")) {
+          s = s.slice(5).split("/")[0] ?? "";
+        } else if (lower.startsWith("channel/")) {
+          s = s.slice(8).split("/")[0] ?? "";
+        } else if (lower.startsWith("@")) {
+          s = s.slice(1).split("/")[0] ?? "";
+        } else {
+          s = memberSocialFirstPathSegment(s);
+        }
+      }
+      break;
+    case "rumble_handle":
+      s = s.replace(/^https?:\/\/(www\.)?rumble\.com\//i, "");
+      s = memberSocialTryDecode(s.split("?")[0].split("#")[0] ?? "");
+      {
+        const parts = s.split("/").filter(Boolean);
+        const p0 = (parts[0] ?? "").toLowerCase();
+        if (p0 === "c" && parts[1]) {
+          s = `c/${parts[1]}`;
+        } else if (p0 === "user" && parts[1]) {
+          s = `user/${parts[1]}`;
+        } else if (parts[0]) {
+          s = `c/${parts[0]}`;
+        } else {
+          s = "";
+        }
+      }
+      break;
+    default:
+      s = memberSocialFirstPathSegment(s.replace(/^@+/, ""));
+  }
+
+  return s.slice(0, MEMBER_SOCIAL_HANDLE_MAX_LEN);
+}
+
 /**
  * Build PATCH payload for member_profiles from JSON body.
  * At least one supported field must be present (display_name, locale, shift_schedule, wake_time, …).
@@ -2465,6 +2621,31 @@ function parseMemberProfilePatchBody(body) {
     } else {
       return { error: "bio must be a string or null" };
     }
+  }
+
+  const socialHandleKeys = [
+    "instagram_handle",
+    "tiktok_handle",
+    "facebook_handle",
+    "snapchat_handle",
+    "linkedin_handle",
+    "x_handle",
+    "youtube_handle",
+    "rumble_handle",
+  ];
+  for (const key of socialHandleKeys) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    hasKey = true;
+    const v = body[key];
+    if (v === null) {
+      patch[key] = null;
+      continue;
+    }
+    if (typeof v !== "string") {
+      return { error: `${key} must be a string or null` };
+    }
+    const t = normalizeMemberSocialHandlePatch(key, v);
+    patch[key] = t === "" ? null : t;
   }
 
   if (Object.prototype.hasOwnProperty.call(body, "experience_level")) {

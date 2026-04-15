@@ -24,6 +24,13 @@ import {
   uploadImageToR2,
 } from "../lib/r2Upload.js";
 import { isValidMemberHandleFormat, normalizeHandleInput, stripHandleAtPrefix } from "../lib/memberProfileHandle.js";
+import {
+  SOCIAL_EDIT_FIELDS,
+  SOCIAL_HANDLE_MAX_LEN,
+  normalizeSocialHandleForColumn,
+  storedSocialHandleString,
+} from "../lib/socialProfileLinks.js";
+import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -808,6 +815,9 @@ export function ProfileTab({
   const [handleDraft, setHandleDraft] = useState("@");
   const [handleHint, setHandleHint] = useState("");
   const [bioDraft, setBioDraft] = useState("");
+  const [socialDrafts, setSocialDrafts] = useState(() =>
+    Object.fromEntries(SOCIAL_EDIT_FIELDS.map(({ key }) => [key, ""]))
+  );
   const [scanBusy, setScanBusy] = useState(false);
   const scanFileRef = useRef(null);
   const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
@@ -930,6 +940,14 @@ export function ProfileTab({
           : "";
     setHandleDraft(show ? `@${stripHandleAtPrefix(show)}` : "@");
     setBioDraft(typeof activeProfile.bio === "string" ? activeProfile.bio : "");
+    setSocialDrafts(
+      Object.fromEntries(
+        SOCIAL_EDIT_FIELDS.map(({ key }) => [
+          key,
+          typeof activeProfile[key] === "string" ? activeProfile[key] : "",
+        ])
+      )
+    );
   }, [activeProfile, activeProfileId, memberProfilesVersion]);
 
   useEffect(() => {
@@ -1111,6 +1129,17 @@ export function ProfileTab({
     if (t === saved) return;
     await saveProfilePatch({ bio: t || null });
   }, [activeProfileId, bioDraft, activeProfile?.bio, saveProfilePatch]);
+
+  const commitSocialField = useCallback(
+    async (key) => {
+      if (!activeProfileId) return;
+      const normalized = normalizeSocialHandleForColumn(key, socialDrafts[key] ?? "");
+      const saved = storedSocialHandleString(activeProfile?.[key]);
+      if (normalized === saved) return;
+      await saveProfilePatch({ [key]: normalized || null });
+    },
+    [activeProfileId, socialDrafts, activeProfile, saveProfilePatch]
+  );
 
   const pickExperienceLevel = useCallback(
     async (id) => {
@@ -1643,6 +1672,43 @@ export function ProfileTab({
                 {bioDraft.length}/500
               </div>
             </div>
+            <div style={{ marginBottom: 14 }}>
+              <div
+                className="mono"
+                style={{ fontSize: 11, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}
+              >
+                SOCIAL LINKS
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", marginBottom: 10, lineHeight: 1.45 }}>
+                Optional — username or handle only (links are built on your public profile). Paste a profile URL if
+                easier; we keep the handle.
+              </div>
+              {SOCIAL_EDIT_FIELDS.map((field) => (
+                <div key={field.key} style={{ marginBottom: 10 }}>
+                  <div className="mono" style={{ fontSize: 10, color: "#8fa5bf", marginBottom: 4 }}>
+                    {field.label.toUpperCase()}
+                  </div>
+                  <input
+                    className="form-input"
+                    style={{ fontSize: 13, width: "100%", fontFamily: "'JetBrains Mono', monospace" }}
+                    value={socialDrafts[field.key] ?? ""}
+                    onChange={(e) =>
+                      setSocialDrafts((prev) => ({
+                        ...prev,
+                        [field.key]: e.target.value.slice(0, Math.max(200, SOCIAL_HANDLE_MAX_LEN * 3)),
+                      }))
+                    }
+                    onBlur={() => void commitSocialField(field.key)}
+                    placeholder={field.placeholder}
+                    maxLength={200}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-label={field.label}
+                  />
+                </div>
+              ))}
+            </div>
             <div ref={setFieldRef("experience_level")} style={{ marginBottom: 14 }}>
               <div
                 className="mono"
@@ -2047,6 +2113,14 @@ export function ProfileTab({
           </>
         )}
       </Card>
+
+      <div style={SECTION}>Fasting</div>
+      <FastingTrackerSection
+        userId={user.id}
+        activeProfileId={activeProfileId}
+        setErr={setErr}
+        showSavedBriefly={showSavedBriefly}
+      />
 
       <div style={SECTION}>Labs</div>
       <Card>
