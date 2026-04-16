@@ -15,9 +15,18 @@ A research-peptide reference and personal-protocol tracker. Production: [pepguid
 - Cloudflare KV — per-user daily AI query rate limit (namespace binding: `RATE_LIMIT_KV`)
 - Cloudflare Pages — static hosting
 - Cloudflare Turnstile — bot check on auth
-- Stripe Payment Links + webhook (no `@stripe/stripe-js` in deps, despite the file that imports it)
+- Stripe Elements (embedded checkout) + Payment Links + webhook. Elements path uses `@stripe/stripe-js` + `@stripe/react-stripe-js` client-side; the Worker issues the PaymentIntent `client_secret`.
 
-Production deps, exhaustive: `@supabase/supabase-js`, `react`, `react-dom`. Dev: `vite`, `@vitejs/plugin-react`, `wrangler`. Anything else you want to `import` has to be added to `package.json` first — don't assume it's installed.
+Production deps (7, exhaustive):
+- `@stripe/react-stripe-js` ^3.10.0 — `<Elements>`, `<PaymentElement>`, hooks
+- `@stripe/stripe-js` ^5.10.0 — `loadStripe`
+- `@supabase/supabase-js` ^2.49.1
+- `react` ^19.0.0
+- `react-dom` ^19.0.0
+- `react-markdown` ^9.0.3 — renders AI Guide assistant messages
+- `zxcvbn` ^4.4.2 — lazy-loaded in AuthScreen for password strength
+
+Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`ing anything else, add it to `package.json` first.
 
 ## Commands
 
@@ -55,7 +64,7 @@ Subdirectory briefs: `src/CLAUDE.md`, `workers/CLAUDE.md`, `supabase/CLAUDE.md`.
 - **Tier emojis are 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** Source: `src/lib/tiers.js`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.
-- **`@stripe/stripe-js` is NOT installed** even though `src/lib/stripeBrowser.js` imports it. Nothing currently imports `stripeBrowser.js` into the bundle, so the build works. If you change that, you break the build — add the dep or delete the file first.
+- **Stripe Elements is live.** Primary checkout is embedded Elements via `UpgradePlanModal.jsx` → Worker `POST /stripe/create-subscription` → PaymentIntent `client_secret`. Payment Links are the fallback / alternative path.
 - **Only `EDON15` and `TSource15` are recognized affiliate codes.** Other codes in the Rewardful dashboard (Primo15, Pete15, etc.) are silently dropped by `normalizeAffiliateRef()`. Whitelist more before marketing them.
 - **Plan (tier) is server-authoritative.** The `profiles.plan` column has a trigger that rejects direct updates. Only `update_user_plan(uuid, text)` via the service-role Worker can change it.
 - **Session IDs are `morning`, `afternoon`, `evening`, `night` — exactly 4.** See `src/data/protocolSessions.js`.

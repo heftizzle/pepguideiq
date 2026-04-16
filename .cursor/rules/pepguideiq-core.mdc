@@ -12,14 +12,18 @@ You are working on pepguideIQ, a research-peptide reference and personal-protoco
 - React 19.0 + Vite 6 — **no router library**, **no state-management library**, **no Tailwind**, **no CSS modules**
 - Supabase (Postgres + Auth + RLS)
 - Cloudflare Workers, R2, KV, Pages, Turnstile
-- Stripe Payment Links + webhook (no Elements; the `@stripe/stripe-js` dep is NOT installed)
+- Stripe Elements (embedded checkout) + Payment Links + webhook. Uses `@stripe/stripe-js` + `@stripe/react-stripe-js` on client.
 
-`package.json` production deps — exhaustive:
-- `@supabase/supabase-js`
-- `react`
-- `react-dom`
+`package.json` production deps — exhaustive (7):
+- `@stripe/react-stripe-js` ^3.10.0
+- `@stripe/stripe-js` ^5.10.0
+- `@supabase/supabase-js` ^2.49.1
+- `react` ^19.0.0
+- `react-dom` ^19.0.0
+- `react-markdown` ^9.0.3 (renders AI Guide output)
+- `zxcvbn` ^4.4.2 (password strength, lazy-loaded)
 
-Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`. **Do not `import` any other library without first adding it to `package.json`.**
+Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import` any other library without first adding it to `package.json`.**
 
 ## Corrections to common assumptions
 

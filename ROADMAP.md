@@ -57,7 +57,6 @@
 - [ ] Demo tour steps wired for BUILD tab
 - [ ] KLOW protocol dose logs appearing on calendar view
 - [ ] Tighten CSP `connect-src` (currently permissive `https: wss:`) to exact Worker + Supabase origins
-- [ ] Install `@stripe/stripe-js` in `package.json` OR delete `src/lib/stripeBrowser.js` — it imports a dep that isn't installed (dormant today, build breaks if anything imports it)
 
 ---
 

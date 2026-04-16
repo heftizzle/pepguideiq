@@ -118,7 +118,7 @@ Everything goes through `src/lib/supabase.js` (57 exports) or explicit `fetch()`
 - **Config**: `config.js` (env vars + is*Configured helpers)
 - **Auth / data layer**: `supabase.js` (57 exports — auth, body metrics, member profiles, stacks, vials, dose logs, feed, notifications)
 - **Tiers / plans**: `tiers.js`, `upgradeGateCopy.js`
-- **Stripe**: `checkout.js`, `stripeBrowser.js` (dormant), `stripeSubscription.js`
+- **Stripe**: `checkout.js` (Payment Links), `stripeBrowser.js` (lazy `loadStripe` singleton, used by UpgradePlanModal), `stripeSubscription.js` (Elements via `/stripe/create-subscription`)
 - **Affiliate**: `affiliateRef.js`
 - **Age gate**: `ageVerification.js`
 - **Peptide math**: `peptideMath.js` (blend dose), `vialDoseMath.js` (units ↔ mcg), `peptideBioavailability.js`
