@@ -195,7 +195,13 @@ export function PublicMemberProfilePage({
         position: "relative",
       }}
     >
-      <button type="button" className="guide-takeover-close" onClick={onClose} aria-label="Close profile">
+      <button
+        type="button"
+        className="guide-takeover-close"
+        style={{ zIndex: 72 }}
+        onClick={onClose}
+        aria-label="Close profile"
+      >
         ×
       </button>
 

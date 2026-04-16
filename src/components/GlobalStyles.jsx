@@ -193,7 +193,7 @@ export function GlobalStyles() {
       }
       /* AI Guide full-screen takeover — open/close use same duration per breakpoint */
       .guide-takeover-root{
-        position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;box-sizing:border-box;
+        position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;box-sizing:border-box;
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
         background:rgba(5,10,18,0.92);backdrop-filter:blur(2px);
         background:#07090e !important;

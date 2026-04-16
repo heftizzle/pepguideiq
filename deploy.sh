@@ -1,4 +1,7 @@
 #!/bin/bash
+# WSL/Git Bash: ensure Windows Node is on PATH for the npm-installed `pnpm` shim.
+export PATH="$PATH:/mnt/c/Program Files/nodejs"
+
 set -e
 
 echo "Building app..."

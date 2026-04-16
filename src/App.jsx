@@ -2006,6 +2006,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             aria-modal="true"
             aria-label="AI Guide"
             className={`guide-takeover-root${guideExiting ? " guide-takeover-root--exit" : ""}`}
+            style={{ zIndex: 72 }}
             onClick={onGuideTakeoverRootClick}
             onAnimationEnd={handleGuideTakeoverAnimationEnd}
           >
@@ -2013,6 +2014,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               type="button"
               className="guide-takeover-close"
               aria-label="Close AI Guide"
+              style={{ zIndex: 72 }}
               onClick={(e) => {
                 e.stopPropagation();
                 beginCloseGuide();
