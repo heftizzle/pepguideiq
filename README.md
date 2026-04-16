@@ -7,11 +7,11 @@ Repository: [github.com/heftizzle/pepguideiq](https://github.com/heftizzle/pepgu
 ## Development
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
-Build: `npm run build` — output in `dist/`.
+Build: `pnpm run build` — output in `dist/`.
 
 ### Environment variables
 
@@ -36,10 +36,10 @@ Apply migrations in order under [`supabase/migrations/`](./supabase/migrations/)
 
 The Anthropic key stays on the Worker only (`wrangler secret put ANTHROPIC_API_KEY`), never in the browser.
 
-1. `npm install`
-2. `npx wrangler login`
-3. `npx wrangler secret put ANTHROPIC_API_KEY --config wrangler.worker.toml` (and Supabase + optional Stripe secrets — see [`.env.example`](./.env.example); add `--config wrangler.worker.toml` to each `wrangler secret put`)
-4. `npm run deploy:worker`
+1. `pnpm install`
+2. `pnpm exec wrangler login`
+3. `pnpm exec wrangler secret put ANTHROPIC_API_KEY --config wrangler.worker.toml` (and Supabase + optional Stripe secrets — see [`.env.example`](./.env.example); add `--config wrangler.worker.toml` to each `wrangler secret put`)
+4. `pnpm run deploy:worker`
 5. Set **`VITE_API_WORKER_URL`** to the deployed Worker URL (no trailing slash).
 
 Worker entry: [`workers/api-proxy.js`](./workers/api-proxy.js). Notable routes:
@@ -75,7 +75,7 @@ The app uses **Supabase Auth** (`signIn`, `signUp`, `signOut`, `getCurrentUser` 
 
 ### CI
 
-GitHub Actions runs `npm ci`, `npm audit --audit-level=high`, and `npm run build` on pushes and pull requests (see [`.github/workflows/ci.yml`](./github/workflows/ci.yml)).
+GitHub Actions runs `pnpm install --frozen-lockfile`, `pnpm audit --audit-level=high`, and `pnpm run build` on pushes and pull requests (see [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)).
 
 ### Security headers (Cloudflare Pages)
 

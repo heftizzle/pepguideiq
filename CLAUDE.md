@@ -32,12 +32,12 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`i
 
 | Command | What |
 |---|---|
-| `npm run dev` | Vite dev server, port 5173 |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the prod build |
-| `npm run deploy:worker` | Deploy Worker (`wrangler deploy --config wrangler.worker.toml`) |
+| `pnpm run dev` | Vite dev server, port 5173 |
+| `pnpm run build` | Production build to `dist/` |
+| `pnpm run preview` | Preview the prod build |
+| `pnpm run deploy:worker` | Deploy Worker (`wrangler deploy --config wrangler.worker.toml`) |
 | `./deploy.sh` | Full deploy: build + Worker + Pages |
-| `npx wrangler dev --config wrangler.worker.toml` | Local Worker on port 8787 |
+| `pnpm exec wrangler dev --config wrangler.worker.toml` | Local Worker on port 8787 |
 
 Local Worker + Vite same-origin option: set `VITE_API_WORKER_URL=http://localhost:5173/api-worker` and Vite proxies to 8787 (see `vite.config.js`).
 
@@ -103,7 +103,7 @@ Worker vars (non-secret, Cloudflare dashboard or `[vars]` in toml):
 
 ## CI / deploy
 
-`.github/workflows/ci.yml`: on every push to `main` + all PRs → `npm ci`, `npm audit --audit-level=high` (fails on high/critical), `npm run build`. On `main` only: deploys Worker + Pages.
+`.github/workflows/ci.yml`: on every push to `main` + all PRs → `pnpm install --frozen-lockfile`, `pnpm audit --audit-level=high` (fails on high/critical), `pnpm run build`. On `main` only: deploys Worker + Pages.
 
 Required repo secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, all `VITE_*` env vars.
 

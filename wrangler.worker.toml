@@ -18,7 +18,7 @@
 # 4. Copy Worker URL from deploy output
 #    → add to .env.local:
 #      VITE_API_WORKER_URL=https://pepguideiq-api-proxy.YOUR-SUBDOMAIN.workers.dev
-#    → restart Vite: npm run dev
+#    → restart Vite: pnpm run dev
 #
 # Local Worker (wrangler dev):
 #   Terminal 1: npx wrangler dev --config wrangler.worker.toml   → default http://localhost:8787
