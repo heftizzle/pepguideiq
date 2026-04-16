@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useActiveProfile } from "./ProfileContext.jsx";
 
-/** @typedef {'core'|'profile'|'body'|'schedule'|'stack'|'share'|'guide'|'score'} DemoFlowKey */
+/** @typedef {'core'|'profile'|'body'|'schedule'|'stack'|'share'|'guide'|'score'|'build'} DemoFlowKey */
 
 /** Bottom nav NETWORK tab emoji — keep in sync with App.jsx + NetworkTab.jsx empty state. */
 export const NETWORK_TAB_EMOJI = "🌐";
@@ -34,6 +34,9 @@ export const DEMO_TARGET = {
   profile_score: "profile_score",
   protocol_log_dose: "protocol_log_dose",
   stack_share: "stack_share",
+  /** BUILD tab (`stackBuilder`): compound search + save */
+  build_catalog_search: "build_catalog_search",
+  build_save_stack: "build_save_stack",
 };
 
 /** @param {string} session */
@@ -107,6 +110,19 @@ const STATIC_FLOWS = {
       text: "Review the score card to see how your pepguideIQ Score is explained",
     },
   ],
+  build: [
+    { target: DEMO_TARGET.nav_build, tab: "stackBuilder", text: "Open the BUILD tab" },
+    {
+      target: DEMO_TARGET.build_catalog_search,
+      tab: "stackBuilder",
+      text: "Search the catalog and add compounds to your builder",
+    },
+    {
+      target: DEMO_TARGET.build_save_stack,
+      tab: "stackBuilder",
+      text: "Save your stack to update your saved protocol",
+    },
+  ],
 };
 
 /**
@@ -124,6 +140,7 @@ export const HELP_SECTIONS = [
   { key: "profile", label: "Set Up Your Profile — avatar, display name, handle" },
   { key: "body", label: "Body Metrics & Goal — goal selector, weight, height, body fat" },
   { key: "schedule", label: "Schedule & Settings — default session, wake time, shift schedule" },
+  { key: "build", label: "BUILD tab — search catalog, build protocol, save stack" },
   { key: "score", label: "Your pepguideIQ Score — score card explanation" },
   { key: "guide", label: "AI Guide — how to use the AI Guide" },
 ];
