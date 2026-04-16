@@ -220,7 +220,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
         ) : key ? (
-          <span className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
+          <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
             …
           </span>
         ) : (
@@ -239,7 +239,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
             </span>
             <span
               className="mono"
-              style={{ fontSize: 9, color: "#5c6d82", lineHeight: 1.15, textAlign: "center" }}
+              style={{ fontSize: 9, color: "#b0bec5", lineHeight: 1.15, textAlign: "center" }}
             >
               Add photo
             </span>
@@ -368,7 +368,7 @@ function SelectPill({ children, active, onClick }) {
         justifyContent: "center",
         border: `1px solid ${active ? "#00d4aa" : "#14202e"}`,
         background: active ? "#00d4aa14" : "transparent",
-        color: active ? "#00d4aa" : "#8fa5bf",
+        color: active ? "#00d4aa" : "#b0bec5",
       }}
     >
       {children}
@@ -693,7 +693,7 @@ function DoseHistoryCalendar({
 
     const isPast = t < todayMs && !isToday;
     const baseBg = isToday ? "rgba(0, 212, 170, 0.14)" : "#07090e";
-    const numColor = isPast ? "#5a6d82" : "#8fa5bf";
+    const numColor = isPast ? "#b0bec5" : "#b0bec5";
     const borderColor = isToday ? "#00d4aa" : "#14202e";
     const borderWidth = isToday ? 2 : 1;
 
@@ -799,7 +799,7 @@ function DoseHistoryCalendar({
           className="mono"
           style={{
             fontSize: 12,
-            color: "#8fa5bf",
+            color: "#b0bec5",
             letterSpacing: "0.06em",
             minWidth: 160,
             textAlign: "center",
@@ -849,7 +849,7 @@ function DoseHistoryCalendar({
                 style={{
                   textAlign: "center",
                   fontSize: 12,
-                  color: "#8fa5bf",
+                  color: "#b0bec5",
                   padding: "4px 0",
                   letterSpacing: "0.06em",
                 }}
@@ -944,7 +944,7 @@ function DoseHistoryCalendar({
                   }}
                 >
                   <div style={{ color: "#dde4ef", marginBottom: meta ? 4 : 0 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: "#8fa5bf" }}>
+                  <div style={{ fontSize: 12, color: "#b0bec5" }}>
                     {amount}
                     {meta ? ` · ${meta}` : ""}
                   </div>
@@ -1088,7 +1088,7 @@ function VialRow({
               <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
                 Reconstituted {formatShortDate(vial.reconstituted_at)}
               </div>
-              <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 4, lineHeight: 1.45, wordBreak: "break-word" }}>
+              <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginTop: 4, lineHeight: 1.45, wordBreak: "break-word" }}>
                 {blendTileCatalog ? (
                   blendConcParts.length > 0 ? (
                     blendConcParts.map((p, idx) => {
@@ -1173,7 +1173,7 @@ function VialRow({
                     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
                   }}
                 >
-                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.45, marginBottom: 10 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.45, marginBottom: 10 }}>
                     {stabilityNote ||
                       "Use within 28 days refrigerated. Conservative recommendation — some sources cite up to 60 days."}
                   </div>
@@ -1230,7 +1230,7 @@ function VialRow({
                 RECENT
               </div>
               {doses.map((d) => (
-                <div key={d.id} className="mono" style={{ fontSize: 13, color: "#8fa5bf", padding: "2px 0" }}>
+                <div key={d.id} className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: "2px 0" }}>
                   {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl)}
                   {d.notes ? ` · ${d.notes}` : ""}
                 </div>
@@ -1600,7 +1600,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           VIAL TRACKER
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
           Upgrade to Pro to use Vial Tracker
         </div>
       </div>
@@ -1617,7 +1617,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
       )}
 
-      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginBottom: 8, lineHeight: 1.45 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 8, lineHeight: 1.45 }}>
         Inventory and history only — log doses from Protocol or Stacks quick log.
       </div>
 
@@ -1794,7 +1794,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
                 BLEND CALCULATOR
               </div>
-              <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginBottom: 12, lineHeight: 1.45 }}>
+              <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12, lineHeight: 1.45 }}>
                 Uses vial total and BAC water (mL) above. Adjust draw volume to see each component per injection.
               </div>
               {blendTotalMg <= 0 && (
@@ -1842,7 +1842,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                     }}
                   >
                     <thead>
-                      <tr style={{ borderBottom: "1px solid #1e2a38", color: "#8fa5bf" }}>
+                      <tr style={{ borderBottom: "1px solid #1e2a38", color: "#b0bec5" }}>
                         <th style={{ textAlign: "left", padding: "8px 6px 8px 0" }}>Component</th>
                         <th style={{ textAlign: "right", padding: "8px 6px" }}>mg / vial</th>
                         <th style={{ textAlign: "right", padding: "8px 6px" }}>mg / draw</th>
@@ -1915,17 +1915,17 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                 LIVE RESULTS
               </div>
               {effectiveBlendComponents ? (
-                <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5, wordBreak: "break-word" }}>
+                <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5, wordBreak: "break-word" }}>
                   <span style={{ color: "#a0a0b0" }}>Blend conc.</span> {formatBlendConcMgPerMl(liveBlendConcParts)}
                 </div>
               ) : (
-                <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+                <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
                   Concentration: {formatConc(addFormCalc.concentration)}
                 </div>
               )}
               {addFormCalc.want != null && (
                 <>
-                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 8 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginTop: 8 }}>
                     Volume to inject: {formatVolumeMl(addFormCalc.vol)} mL
                   </div>
                   <div
@@ -1944,7 +1944,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                       {addFormCalc.units.toFixed(1)} units on a 100-unit (1 mL) syringe
                     </div>
                   </div>
-                  <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginTop: 8 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginTop: 8 }}>
                     Total doses per vial: {addFormCalc.totalDoses.toLocaleString()} dose{addFormCalc.totalDoses === 1 ? "" : "s"}
                   </div>
                   <div

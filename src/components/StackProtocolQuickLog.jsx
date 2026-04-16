@@ -288,7 +288,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
           TODAY — QUICK LOG
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>Upgrade to Pro to log doses from your stack</div>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>Upgrade to Pro to log doses from your stack</div>
       </div>
     );
   }
@@ -312,7 +312,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
         <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 8 }}>
           TODAY — QUICK LOG
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.45 }}>
           Nothing to quick-log yet — add active vials for injectables in Vial Tracker, or add oral / nasal compounds to your stack.
         </div>
       </div>
@@ -341,7 +341,7 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
                 }}
               >
                 <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{entry.name}</div>
-                <div className="mono" style={{ fontSize: 12, color: "#5c6d82", marginTop: 6, lineHeight: 1.45 }}>
+                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 6, lineHeight: 1.45 }}>
                   Injectable — no active vial today. Add or reconstitute in Vial Tracker.
                 </div>
               </div>
@@ -472,7 +472,7 @@ function QuickNonInjectableRow({ line, isLast, session, loggedToday, busy, onDos
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{line.name}</div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
           {line.routeKind === "oral" ? "Oral" : line.routeKind === "intranasal" ? "Intranasal" : "Topical"}
         </div>
       </div>
@@ -528,7 +528,7 @@ function QuickNonInjectableRow({ line, isLast, session, loggedToday, busy, onDos
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#6b7c8f", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
               : {}),
           }}
         >
@@ -569,7 +569,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>{line.name}</div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", maxWidth: 260 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", maxWidth: 260 }}>
           {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
           {line.vials.length > 1 ? " (active vial — Vial Tracker)" : ""}
         </div>
@@ -626,7 +626,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#6b7c8f", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
               : {}),
           }}
         >

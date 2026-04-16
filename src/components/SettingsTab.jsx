@@ -49,7 +49,7 @@ function tierPillStyle(plan) {
   return {
     background:
       plan === "goat" ? "#a855f720" : plan === "elite" ? "#f59e0b20" : plan === "pro" ? "#00d4aa20" : "#14202e",
-    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#8fa5bf",
+    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#b0bec5",
     border: `1px solid ${
       plan === "goat" ? "#a855f730" : plan === "elite" ? "#f59e0b30" : plan === "pro" ? "#00d4aa30" : "#14202e"
     }`,
@@ -641,7 +641,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 borderRadius: 12,
                 border: defaultSession === s.id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                 background: defaultSession === s.id ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
-                color: defaultSession === s.id ? "#00d4aa" : "#8fa5bf",
+                color: defaultSession === s.id ? "#00d4aa" : "#b0bec5",
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
                 display: "inline-flex",
@@ -667,7 +667,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div>
-              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Shift schedule</div>
+              <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Shift schedule</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {SHIFT_SCHEDULE_OPTIONS.map((opt) => {
                   const on = scheduleShift === opt.id;
@@ -682,7 +682,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                         borderRadius: 10,
                         border: on ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                         background: on ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
-                        color: on ? "#00d4aa" : "#8fa5bf",
+                        color: on ? "#00d4aa" : "#b0bec5",
                         fontSize: 12,
                         cursor: scheduleBusy ? "default" : "pointer",
                         fontFamily: "'JetBrains Mono', monospace",
@@ -700,7 +700,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               data-demo-target={DEMO_TARGET.profile_wake}
               {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_wake)))}
             >
-              <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Wake time</div>
+              <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Wake time</div>
               <input
                 className="form-input"
                 type="time"
@@ -709,7 +709,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 onChange={(e) => setWakeTimeInput(e.target.value)}
                 disabled={scheduleBusy}
               />
-              <div style={{ fontSize: 12, color: "#6b7c8f", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
+              <div style={{ fontSize: 12, color: "#b0bec5", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
                 Your wake time personalizes dose reminders and protocol guardrails to your schedule.
               </div>
             </div>
@@ -725,7 +725,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
               Shift schedule and wake time are included with Elite and GOAT — personalize protocol timing for shift work.
             </div>
             <button type="button" className="btn-teal" style={{ fontSize: 13, alignSelf: "flex-start" }} onClick={onOpenUpgrade}>
@@ -783,7 +783,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>City</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>City</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -795,7 +795,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             />
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>State / region</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>State / region</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -807,7 +807,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             />
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Country (ISO alpha-2)</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Country (ISO alpha-2)</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box", marginBottom: 8 }}
@@ -826,7 +826,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               }}
             >
               {filteredCountries.length === 0 ? (
-                <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", padding: "10px 12px" }}>
+                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", padding: "10px 12px" }}>
                   No matches
                 </div>
               ) : (
@@ -862,7 +862,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               )}
             </div>
             {localeCountryCode ? (
-              <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", marginTop: 6 }}>
+              <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 6 }}>
                 Selected: {localeCountryCode}
                 <button
                   type="button"
@@ -871,7 +871,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   style={{
                     marginLeft: 10,
                     fontSize: 12,
-                    color: "#8fa5bf",
+                    color: "#b0bec5",
                     background: "none",
                     border: "none",
                     cursor: localeBusy ? "default" : "pointer",
@@ -886,7 +886,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             ) : null}
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Language preference</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Language preference</div>
             <select
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -919,7 +919,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           marginBottom: 6,
           textAlign: "center",
           fontSize: 12,
-          color: "#5c6b7e",
+          color: "#b0bec5",
           lineHeight: 1.6,
         }}
       >
@@ -940,7 +940,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Current plan</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Current plan</div>
             <span className="pill" style={tierPillStyle(user.plan)}>
               {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
             </span>
@@ -998,7 +998,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                       fontSize: 12,
                       padding: "2px 8px",
                       borderRadius: 6,
-                      color: on ? "#00d4aa" : "#6b7c8f",
+                      color: on ? "#00d4aa" : "#b0bec5",
                       border: `1px solid ${on ? "rgba(0,212,170,0.35)" : "#243040"}`,
                     }}
                   >
@@ -1018,7 +1018,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Profile display name</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Profile display name</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <input
                 className="form-input"
@@ -1043,7 +1043,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             data-demo-target={DEMO_TARGET.profile_handle}
             {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_handle)))}
           >
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Public handle</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Public handle</div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
               <div
                 style={{
@@ -1058,7 +1058,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   padding: "0 10px",
                 }}
               >
-                <span className="mono" style={{ fontSize: 13, color: "#6b7c8f", flexShrink: 0, userSelect: "none" }}>
+                <span className="mono" style={{ fontSize: 13, color: "#b0bec5", flexShrink: 0, userSelect: "none" }}>
                   @
                 </span>
                 <input
@@ -1082,7 +1082,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 />
               </div>
               {handleAvailability === "checking" ? (
-                <span className="mono" style={{ fontSize: 12, color: "#8fa5bf" }}>
+                <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
                   …
                 </span>
               ) : null}
@@ -1112,7 +1112,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 {handleSaveBusy ? "…" : "Save handle"}
               </button>
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", marginTop: 6 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginTop: 6 }}>
               {handleInput.length}/32 · min 3 characters · shown as{" "}
               {handleNormalized.length >= 3 && isValidMemberHandleFormat(handleInput)
                 ? formatHandleDisplay(handleInput)
@@ -1152,7 +1152,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Change email</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Change email</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <input
                 className="form-input"
@@ -1168,7 +1168,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>Change password</div>
+            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Change password</div>
             <button type="button" className="btn-teal" style={{ fontSize: 13 }} disabled={busy} onClick={() => void onSendPasswordReset()}>
               Send password reset email
             </button>
@@ -1203,7 +1203,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             {demoResetBusy ? "…" : "Reset demo session counter (→ 0)"}
           </button>
           <div className="mono" style={{ fontSize: 11, color: "#475569", marginTop: 10, lineHeight: 1.5 }}>
-            Console: <code style={{ color: "#94a3b8" }}>await window.pepguideIQ?.resetDemoSessions()</code>
+            Console: <code style={{ color: "#b0bec5" }}>await window.pepguideIQ?.resetDemoSessions()</code>
           </div>
         </Card>
       )}

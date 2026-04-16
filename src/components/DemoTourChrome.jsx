@@ -262,7 +262,7 @@ export function DemoTourBar() {
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-            <div className="mono" style={{ fontSize: 11, color: "#5c6d82", letterSpacing: "0.08em", marginBottom: 4 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.08em", marginBottom: 4 }}>
               PEPGUIDE IQ · {flowKey ? `${stepIndex + 1} / ${total}` : "Tips"}
             </div>
             {sessionCount === 1 ? (
@@ -283,7 +283,7 @@ export function DemoTourBar() {
                   style={{
                     fontFamily: "'Outfit', sans-serif",
                     fontSize: 12,
-                    color: "#5c6d82",
+                    color: "#b0bec5",
                     lineHeight: 1.4,
                     marginBottom: 8,
                   }}
@@ -307,7 +307,7 @@ export function DemoTourBar() {
               borderRadius: 10,
               border: "1px solid #243040",
               background: "rgba(255,255,255,0.04)",
-              color: "#8fa5bf",
+              color: "#b0bec5",
               cursor: "pointer",
               fontSize: 20,
               lineHeight: 1,

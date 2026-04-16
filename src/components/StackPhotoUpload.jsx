@@ -255,7 +255,7 @@ export function StackPhotoUpload({
               justifyContent: "center",
               background: "rgba(7,9,14,0.75)",
               fontSize: 13,
-              color: "#8fa5bf",
+              color: "#b0bec5",
               zIndex: 2,
             }}
           >

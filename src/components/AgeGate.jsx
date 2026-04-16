@@ -97,7 +97,7 @@ export function AgeGate({ onConfirm, onExit }) {
             className="mono"
             style={{
               fontSize: "clamp(12px, 3.2vw, 13px)",
-              color: "#8fa5bf",
+              color: "#b0bec5",
               lineHeight: 1.55,
               marginBottom: 20,
               textAlign: "center",
@@ -182,7 +182,7 @@ export function AgeGate({ onConfirm, onExit }) {
               gap: 10,
               cursor: "pointer",
               fontSize: 13,
-              color: "#94a3b8",
+              color: "#b0bec5",
               lineHeight: 1.4,
               marginBottom: 20,
               fontFamily: "'Outfit', sans-serif",
@@ -234,7 +234,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 letterSpacing: "0.05em",
                 background: "transparent",
                 border: "1px solid #2a4055",
-                color: "#8fa5bf",
+                color: "#b0bec5",
                 transition: "border-color 0.2s, color 0.2s, background 0.2s",
               }}
             >

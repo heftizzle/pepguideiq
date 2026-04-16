@@ -213,7 +213,7 @@ export function StackShareControls({
               className="mono"
               style={{
                 fontSize: 12,
-                color: "#8fa5bf",
+                color: "#b0bec5",
                 wordBreak: "break-all",
                 lineHeight: 1.45,
                 marginBottom: 12,

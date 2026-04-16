@@ -37,7 +37,7 @@ const NAV_LINK = {
   fontWeight: 500,
 };
 
-const NAV_MUTED = { color: "#5c6b7e" };
+const NAV_MUTED = { color: "#b0bec5" };
 
 const SECTION_HDR = {
   fontFamily: "'JetBrains Mono', monospace",

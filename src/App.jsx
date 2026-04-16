@@ -1589,7 +1589,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                                 style={{
                                   fontSize: 13,
                                   opacity: 0.65,
-                                  color: "#8fa5bf",
+                                  color: "#b0bec5",
                                   marginTop: 3,
                                   lineHeight: 1.35,
                                   fontWeight: 400,
@@ -1610,7 +1610,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                                     style={{
                                       fontSize: 13,
                                       opacity: 0.8,
-                                      color: "#8fa5bf",
+                                      color: "#b0bec5",
                                       marginTop: 4,
                                       lineHeight: 1.45,
                                     }}
@@ -1636,14 +1636,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             onClick={(e) => e.stopPropagation()}
                             style={{
                               fontSize: 13,
-                              color: ba.warn ? "#f59e0b" : "#6b7c8f",
+                              color: ba.warn ? "#f59e0b" : "#b0bec5",
                               marginBottom: 10,
                               lineHeight: 1.45,
                             }}
                             title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
                           >
                             {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                            <span style={{ color: ba.warn ? "#fbbf24" : "#8fa5bf" }}>Bioavailability: </span>
+                            <span style={{ color: ba.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
                             {ba.text}
                           </div>
                         );
@@ -1889,7 +1889,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     });
                     if (injectableRows.length === 0) {
                       return (
-                        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5 }}>
+                        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
                           No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
                         </div>
                       );
@@ -1986,7 +1986,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     padding: "10px 14px",
                     fontSize: 12,
                     letterSpacing: "0.08em",
-                    color: "#7c6d6d",
+                    color: "#b8b0b0",
                     background: "rgba(255,255,255,0.02)",
                     border: "1px solid #2a2224",
                     borderRadius: 10,
@@ -2132,12 +2132,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       </span>
                       Goals
                       {goals.length > 0 ? (
-                        <span className="mono" style={{ color: "#8fa5bf", fontSize: 12 }}>
+                        <span className="mono" style={{ color: "#b0bec5", fontSize: 12 }}>
                           {" "}
                           ({goals.length})
                         </span>
                       ) : null}
-                      <span className="mono" style={{ marginLeft: "auto", color: "#8fa5bf", fontSize: 11 }}>
+                      <span className="mono" style={{ marginLeft: "auto", color: "#b0bec5", fontSize: 11 }}>
                         {goalsOpen ? "▲" : "▼"}
                       </span>
                     </button>
@@ -2214,7 +2214,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       {msg.role === "user" ? (
                         <div style={{ whiteSpace: "pre-wrap", color: "#dde4ef" }}>{msg.content}</div>
                       ) : (
-                        <div style={{ color: "#8fa5bf" }}>
+                        <div style={{ color: "#b0bec5" }}>
                           <ReactMarkdown components={AI_GUIDE_MARKDOWN_COMPONENTS}>{msg.content}</ReactMarkdown>
                         </div>
                       )}
@@ -2266,7 +2266,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     </button>
                   </div>
                   {canAI && aiQueryUsage != null && (
-                    <div style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", marginTop: 4 }}>
+                    <div style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", marginTop: 4 }}>
                       {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
                       {aiQueryUsage.today >= aiQueryUsage.limit && (
                         <span style={{ color: "#f97316", marginLeft: 8 }}>· Limit reached</span>
@@ -2300,7 +2300,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       style={{
                         fontSize: 13,
                         opacity: 0.65,
-                        color: "#8fa5bf",
+                        color: "#b0bec5",
                         marginTop: 4,
                         lineHeight: 1.4,
                         fontWeight: 400,
@@ -2314,18 +2314,18 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
                 <div style={{ display:"flex",gap:8,alignItems:"center" }}>
                   <span className="pill pill--category">{pCat}</span>
-                  <button type="button" style={{ background:"none",border:"none",color:"#8fa5bf",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
+                  <button type="button" style={{ background:"none",border:"none",color:"#b0bec5",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
               <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize: 13,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
               {baDetail && (
                 <div
                   className="mono"
-                  style={{ fontSize: 13, color: baDetail.warn ? "#f59e0b" : "#8fa5bf", marginBottom: 12, lineHeight: 1.45 }}
+                  style={{ fontSize: 13, color: baDetail.warn ? "#f59e0b" : "#b0bec5", marginBottom: 12, lineHeight: 1.45 }}
                   title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
                 >
                   {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#6b7c8f" }}>Bioavailability: </span>
+                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
                   {baDetail.text}
                 </div>
               )}
@@ -2487,7 +2487,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 10,
                   lineHeight: 1,
                   letterSpacing: "0.03em",
-                  color: libraryNavActive ? "#00d4aa" : "rgb(92, 109, 130)",
+                  color: libraryNavActive ? "#00d4aa" : "#b0bec5",
                   fontWeight: 500,
                 }}
                 aria-hidden
@@ -2506,7 +2506,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 13,
                   lineHeight: 1.15,
                   letterSpacing: "0.06em",
-                  color: libraryNavActive ? "#00d4aa" : "#5c6d82",
+                  color: libraryNavActive ? "#00d4aa" : "#b0bec5",
                   fontWeight: 500,
                   textAlign: "center",
                 }}
@@ -2594,7 +2594,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       fontWeight: 500,
                       margin: 0,
                       padding: 0,
-                      color: item.isActive ? "#00d4aa" : "rgb(92, 109, 130)",
+                      color: item.isActive ? "#00d4aa" : "#b0bec5",
                     }}
                     aria-hidden
                   >
@@ -2613,7 +2613,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     fontSize: 13,
                     lineHeight: 1.15,
                     letterSpacing: "0.06em",
-                    color: item.isActive ? "#00d4aa" : "#5c6d82",
+                    color: item.isActive ? "#00d4aa" : "#b0bec5",
                     fontWeight: 500,
                     textAlign: "center",
                   }}
@@ -2660,7 +2660,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   flex: "1 1 140px",
                   border: "1px solid #243040",
                   background: "rgba(255,255,255,0.04)",
-                  color: "#8fa5bf",
+                  color: "#b0bec5",
                 }}
                 onClick={dismissHandlePrompt}
               >

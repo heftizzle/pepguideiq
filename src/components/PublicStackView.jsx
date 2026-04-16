@@ -73,7 +73,7 @@ export function PublicStackView({ shareId }) {
         <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
           <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
         </div>
-        <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.12em", marginBottom: 28 }}>
+        <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.12em", marginBottom: 28 }}>
           SHARED STACK
         </div>
 
@@ -127,12 +127,12 @@ export function PublicStackView({ shareId }) {
                         {name}
                       </div>
                       {doseLine && (
-                        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", marginBottom: 6 }}>
+                        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>
                           {doseLine}
                         </div>
                       )}
                       {sessions.length > 0 && (
-                        <div className="mono" style={{ fontSize: 12, color: "#6b7c8f" }}>
+                        <div className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
                           Sessions: {sessions.join(", ")}
                         </div>
                       )}
@@ -161,7 +161,7 @@ export function PublicStackView({ shareId }) {
               View on pepguideIQ
             </a>
 
-            <p style={{ marginTop: 24, fontSize: 12, color: "#8fa5bf", lineHeight: 1.5 }}>
+            <p style={{ marginTop: 24, fontSize: 12, color: "#b0bec5", lineHeight: 1.5 }}>
               Research compounds only. Not medical advice. Consult a qualified professional.
             </p>
           </>

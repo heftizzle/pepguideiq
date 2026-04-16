@@ -176,7 +176,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             borderRadius: 10,
             border: "1px solid #243040",
             background: "rgba(255,255,255,0.06)",
-            color: "#8fa5bf",
+            color: "#b0bec5",
             cursor: "pointer",
             fontSize: 20,
             lineHeight: 1,
@@ -209,7 +209,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
           }}
         >
           {showEmpty ? (
-            <div className="mono" style={{ padding: "14px 16px", fontSize: 13, color: "#6b7c8f" }}>
+            <div className="mono" style={{ padding: "14px 16px", fontSize: 13, color: "#b0bec5" }}>
               No compounds found
             </div>
           ) : (
@@ -242,7 +242,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
                     {nameHit ? highlightMatch(p.name, inputValue.trim()) : p.name}
                   </div>
                   {aliasHit ? (
-                    <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginTop: 4 }}>
+                    <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 4 }}>
                       {highlightMatch(String(aliasHit), inputValue.trim())}
                     </div>
                   ) : null}

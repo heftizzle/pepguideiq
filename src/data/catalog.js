@@ -297,7 +297,7 @@ const PLAN_CONFIG = [
   {
     id: "entry",
     period: "forever",
-    color: "#8fa5bf",
+    color: "#b0bec5",
     features: [
       `${TIERS.entry.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,
       `${TIERS.entry.stack_advisor_calls_per_day} Stack Advisor calls/day`,

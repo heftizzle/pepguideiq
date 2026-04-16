@@ -38,7 +38,7 @@ export class AppErrorBoundary extends Component {
             boxSizing: "border-box",
             padding: 24,
             background: "#07090e",
-            color: "#8fa5bf",
+            color: "#b0bec5",
             fontSize: 13,
             lineHeight: 1.55,
             fontFamily: "'JetBrains Mono', monospace",
@@ -62,7 +62,7 @@ export class AppErrorBoundary extends Component {
             <div
               style={{
                 fontSize: 11,
-                color: "#6b7c8f",
+                color: "#b0bec5",
                 marginBottom: 16,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",

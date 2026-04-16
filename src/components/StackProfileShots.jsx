@@ -160,7 +160,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
         {showImage ? (
           <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : r2Key ? (
-          <span className="mono" style={{ fontSize: 12, color: "#8fa5bf" }}>
+          <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
             Loading…
           </span>
         ) : (
@@ -168,7 +168,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
             <span style={{ fontSize: 32, lineHeight: 1, opacity: 0.8 }} aria-hidden>
               📷
             </span>
-            <span className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.08em" }}>
+            <span className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.08em" }}>
               STACK SHOT
             </span>
           </div>

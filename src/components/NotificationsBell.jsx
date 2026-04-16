@@ -306,7 +306,7 @@ export function NotificationsBell({ userId, userGoals }) {
             flexShrink: 0,
           }}
         >
-          <span className="mono" style={{ fontSize: 11, color: "#6b7c8f", letterSpacing: "0.12em" }}>
+          <span className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.12em" }}>
             NOTIFICATIONS
           </span>
           <button
@@ -329,7 +329,7 @@ export function NotificationsBell({ userId, userGoals }) {
         </div>
         <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
           {rows.length === 0 ? (
-            <div className="mono" style={{ padding: 20, fontSize: 13, color: "#6b7c8f", textAlign: "center" }}>
+            <div className="mono" style={{ padding: 20, fontSize: 13, color: "#b0bec5", textAlign: "center" }}>
               No notifications yet.
             </div>
           ) : (
@@ -387,7 +387,7 @@ export function NotificationsBell({ userId, userGoals }) {
                     ) : (
                       <span style={{ fontWeight: 700, color: "#00d4aa" }}>{label}</span>
                     )}{" "}
-                    <span style={{ color: "#94a3b8" }}>{body}</span>
+                    <span style={{ color: "#b0bec5" }}>{body}</span>
                   </div>
                   <div className="mono" style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
                     {ago}

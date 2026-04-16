@@ -229,7 +229,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   if (!userId) {
     return (
       <div style={{ padding: "48px 0", textAlign: "center" }}>
-        <div className="mono" style={{ color: "#6b7c8f", fontSize: 14 }}>
+        <div className="mono" style={{ color: "#b0bec5", fontSize: 14 }}>
           Sign in to browse the Network feed.
         </div>
       </div>
@@ -239,7 +239,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   if (!isSupabaseConfigured()) {
     return (
       <div style={{ padding: "48px 0", textAlign: "center" }}>
-        <div className="mono" style={{ color: "#6b7c8f", fontSize: 14 }}>
+        <div className="mono" style={{ color: "#b0bec5", fontSize: 14 }}>
           Configure Supabase to use Network.
         </div>
       </div>
@@ -276,7 +276,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
         </button>
       </div>
 
-      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", letterSpacing: "0.1em", marginBottom: 10 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
         LIVE DOSING
       </div>
       {doseLoading ? (
@@ -295,7 +295,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             background: "#0e1520",
           }}
         >
-          <div style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>
+          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>
             No recent dose posts yet. Log a dose from Protocol or Stacks and choose &quot;Post It&quot; to share here
             (posts expire after 72 hours).
           </div>
@@ -379,19 +379,19 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                     </span>
                   ) : null}
                   {expiresSoon ? (
-                    <span className="mono" style={{ fontSize: 10, color: "#94a3b8", marginLeft: "auto" }}>
+                    <span className="mono" style={{ fontSize: 10, color: "#b0bec5", marginLeft: "auto" }}>
                       Expires soon
                     </span>
                   ) : null}
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "#00d4aa", marginBottom: 6, lineHeight: 1.35 }}>
                   {compoundName}
-                  <span style={{ color: "#8fa5bf", fontWeight: 500, fontSize: 14 }}>
+                  <span style={{ color: "#b0bec5", fontWeight: 500, fontSize: 14 }}>
                     {" "}
                     · {doseLine} · {routeLabel}
                   </span>
                 </div>
-                <div className="mono" style={{ fontSize: 12, color: "#5c6d82", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
                   {sessionPretty ? <span>Session: {sessionPretty}</span> : null}
                   {stackLabel ? <span>Stack: {stackLabel}</span> : null}
                   {createdAt ? <span>{formatTimeAgo(createdAt)}</span> : null}
@@ -402,7 +402,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
         </div>
       )}
 
-      <div className="mono" style={{ fontSize: 12, color: "#5c6d82", letterSpacing: "0.1em", marginBottom: 10 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
         SHARED STACKS
       </div>
       {stackLoading ? (
@@ -422,7 +422,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
           <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.35 }} aria-hidden>
             {NETWORK_TAB_EMOJI}
           </div>
-          <div style={{ fontSize: 14, color: "#8fa5bf", lineHeight: 1.55, maxWidth: 360, margin: "0 auto" }}>
+          <div style={{ fontSize: 14, color: "#b0bec5", lineHeight: 1.55, maxWidth: 360, margin: "0 auto" }}>
             No stacks shared yet. Be the first — share your stack from the Stacks tab.
           </div>
         </div>
@@ -510,15 +510,15 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "center" }}>
-                  <span className="mono" style={{ fontSize: 13, color: "#6b7c8f" }}>
+                  <span className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
                     {compoundLabel}
                   </span>
-                  <span className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+                  <span className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
                     pepguideIQ{" "}
                     <span style={{ color: "#00d4aa", fontWeight: 700 }}>{score}</span>
                   </span>
                   {updatedAt ? (
-                    <span className="mono" style={{ fontSize: 12, color: "#5c6d82" }}>
+                    <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
                       {formatTimeAgo(updatedAt)}
                     </span>
                   ) : null}

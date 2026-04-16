@@ -226,7 +226,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <span className="mono" style={{ fontSize: 15, color: "#6b7c8f", flexShrink: 0 }}>
+          <span className="mono" style={{ fontSize: 15, color: "#b0bec5", flexShrink: 0 }}>
             @
           </span>
           <input
@@ -251,15 +251,15 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           }}
         >
           {!accessToken ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", padding: 12 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 12 }}>
               Loading session…
             </div>
           ) : emptyQuery ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", padding: 8 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 8 }}>
               Search for people by handle or name
             </div>
           ) : showNoResults ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", padding: 8 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 8 }}>
               No users found for @{debounced.replace(/^@/, "").trim()}
             </div>
           ) : (
@@ -334,10 +334,10 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         {handleLine || "—"}
                       </div>
                       {dispName ? (
-                        <div style={{ fontSize: 13, color: "#6b7c8f", marginTop: 2 }}>{dispName}</div>
+                        <div style={{ fontSize: 13, color: "#b0bec5", marginTop: 2 }}>{dispName}</div>
                       ) : null}
                       {snippet ? (
-                        <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginTop: 6, lineHeight: 1.45 }}>
+                        <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginTop: 6, lineHeight: 1.45 }}>
                           {snippet}
                         </div>
                       ) : null}

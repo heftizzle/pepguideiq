@@ -20,7 +20,7 @@ const cardStyle = {
   borderRadius: 8,
   padding: "6px 10px",
   fontSize: 11,
-  color: "#8fa5bf",
+  color: "#b0bec5",
   fontFamily: "'Outfit', sans-serif",
   whiteSpace: "normal",
   textAlign: "center",

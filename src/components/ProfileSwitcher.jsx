@@ -181,7 +181,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               </button>
             ) : null}
           </div>
-          <div className="mono" style={{ fontSize: 11, color: "#5c6d82", letterSpacing: "0.1em", marginBottom: 8 }}>
+          <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 8 }}>
             PROFILES
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -289,7 +289,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
           </div>
           {canAddProfile && (
             <form onSubmit={(e) => void submitAdd(e)} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1a2632" }}>
-              <div className="mono" style={{ fontSize: 11, color: "#5c6d82", letterSpacing: "0.08em", marginBottom: 6 }}>
+              <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.08em", marginBottom: 6 }}>
                 ADD PROFILE
               </div>
               <input

@@ -60,7 +60,7 @@ function tierLimitBullets(id) {
  */
 export function getUpgradeTierRows() {
   const colors = {
-    entry: "#8fa5bf",
+    entry: "#b0bec5",
     pro: "#00d4aa",
     elite: "#f59e0b",
     goat: "#a855f7",

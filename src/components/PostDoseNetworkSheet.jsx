@@ -107,7 +107,7 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
             style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 12,
-              color: "#8fa5bf",
+              color: "#b0bec5",
               lineHeight: 1.45,
               textAlign: "center",
               marginBottom: 6,
@@ -159,7 +159,7 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
                 cursor: busy ? "default" : "pointer",
                 border: "1px solid #243040",
                 background: "rgba(255,255,255,0.04)",
-                color: "#8fa5bf",
+                color: "#b0bec5",
                 borderRadius: 10,
               }}
             >

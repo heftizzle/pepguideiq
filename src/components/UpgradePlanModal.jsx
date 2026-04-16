@@ -94,7 +94,7 @@ function UpgradePaymentInner({ planLabel, onBack, onCompleted, setPayError }) {
       <div className="brand" style={{ fontSize: 16, fontWeight: 700, color: "#e8eef6" }}>
         Complete checkout — {planLabel}
       </div>
-      <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
         Encrypted card details. PepGuideIQ never stores your full card number on our servers.
       </div>
       <PaymentElement />
@@ -170,7 +170,7 @@ const mutedDowngradeBtn = {
   fontSize: 13,
   borderRadius: 10,
   border: "1px solid #4a6080",
-  color: "#8fa5bf",
+  color: "#b0bec5",
   background: "transparent",
   cursor: "pointer",
 };
@@ -324,7 +324,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
           <div className="brand" style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", marginBottom: 10 }}>
             {isEntryTarget ? "⚠️  Moving to Entry (Free)" : "⏳  Confirm downgrade"}
           </div>
-          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55, marginBottom: 14 }}>
             {isEntryTarget ? (
               <>
                 You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
@@ -545,7 +545,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
               {price}
             </span>
             {suffix ? (
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>{suffix}</span>
+              <span style={{ fontSize: 12, color: "#b0bec5", fontWeight: 500 }}>{suffix}</span>
             ) : null}
           </div>
         </div>
@@ -608,13 +608,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 }}>
           <div>
             <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Secure checkout</div>
-            <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginTop: 4 }}>
+            <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 4 }}>
               {formatPlan(paymentStep.planId)} — powered by Stripe
             </div>
           </div>
           <button
             type="button"
-            style={{ background: "none", border: "none", color: "#8fa5bf", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+            style={{ background: "none", border: "none", color: "#b0bec5", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
             onClick={() => {
               setPaymentStep(null);
               setPaySubmitError(null);
@@ -656,7 +656,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         </div>
         <button
           type="button"
-          style={{ background: "none", border: "none", color: "#8fa5bf", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+          style={{ background: "none", border: "none", color: "#b0bec5", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
           onClick={onClose}
           aria-label="Close"
         >
@@ -700,7 +700,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
           <div className="brand" style={{ fontSize: 17, fontWeight: 700, color: "#e8eef6", marginBottom: 8, lineHeight: 1.3 }}>
             {gateCopy.title}
           </div>
-          <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.55, marginBottom: gateCheckoutTier && gateCheckoutTier !== "entry" ? 14 : 0, maxWidth: 640 }}>
+          <div style={{ fontSize: 14, color: "#b0bec5", lineHeight: 1.55, marginBottom: gateCheckoutTier && gateCheckoutTier !== "entry" ? 14 : 0, maxWidth: 640 }}>
             {gateCopy.body}
           </div>
           {gateCheckoutTier && gateCheckoutTier !== "entry" ? (

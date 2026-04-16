@@ -202,12 +202,12 @@ export function PublicMemberProfilePage({
       <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
         <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
       </div>
-      <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", letterSpacing: "0.12em", marginBottom: 28 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.12em", marginBottom: 28 }}>
         PUBLIC PROFILE
       </div>
 
       {loading ? (
-        <div className="mono" style={{ fontSize: 14, color: "#6b7c8f" }}>
+        <div className="mono" style={{ fontSize: 14, color: "#b0bec5" }}>
           Loading…
         </div>
       ) : err ? (
@@ -249,7 +249,7 @@ export function PublicMemberProfilePage({
               ) : null}
               <div
                 className="mono"
-                style={{ fontSize: 12, color: "#5c6d82", marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}
+                style={{ fontSize: 12, color: "#b0bec5", marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}
               >
                 <span title="Plan tier" aria-hidden>
                   {tierEmoji(plan)}
@@ -260,7 +260,7 @@ export function PublicMemberProfilePage({
           </div>
 
           {exp ? (
-            <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginBottom: 12 }}>
+            <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12 }}>
               Experience: <span style={{ color: "#cbd5e1" }}>{exp.replace(/_/g, " ")}</span>
             </div>
           ) : null}
@@ -273,7 +273,7 @@ export function PublicMemberProfilePage({
                   className="mono"
                   style={{
                     fontSize: 11,
-                    color: "#94a3b8",
+                    color: "#b0bec5",
                     border: "1px solid #243040",
                     borderRadius: 8,
                     padding: "4px 10px",
@@ -295,7 +295,7 @@ export function PublicMemberProfilePage({
               {bio}
             </div>
           ) : (
-            <div className="mono" style={{ fontSize: 13, color: "#5c6d82", marginBottom: 24 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginBottom: 24 }}>
               No bio yet.
             </div>
           )}

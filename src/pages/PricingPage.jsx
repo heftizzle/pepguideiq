@@ -166,7 +166,7 @@ function PricingPage() {
                   margin: "0 0 20px",
                   paddingLeft: 18,
                   fontSize: 12,
-                  color: "#94a3b8",
+                  color: "#b0bec5",
                   lineHeight: 1.55,
                   textAlign: "left",
                 }}
@@ -191,7 +191,7 @@ function PricingPage() {
                   fontFamily: "'Outfit',sans-serif",
                   background: row.id === "entry" ? "transparent" : `${ACCENT}18`,
                   border: `2px solid ${row.id === "entry" ? "#2d3d52" : ACCENT}`,
-                  color: row.id === "entry" ? "#94a3b8" : ACCENT,
+                  color: row.id === "entry" ? "#b0bec5" : ACCENT,
                 }}
               >
                 {tierCtaLabel(row.id)}

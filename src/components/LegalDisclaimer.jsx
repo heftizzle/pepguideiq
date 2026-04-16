@@ -10,7 +10,7 @@ export function LegalDisclaimer() {
         padding: "14px 16px",
         borderTop: "1px solid #14202e",
         fontSize: 13,
-        color: "#8fa5bf",
+        color: "#b0bec5",
         lineHeight: 1.55,
         maxWidth: 1200,
         marginLeft: "auto",
@@ -25,7 +25,7 @@ export function LegalDisclaimer() {
           marginTop: 10,
           textAlign: "center",
           fontSize: 12,
-          color: "#5c6b7e",
+          color: "#b0bec5",
           lineHeight: 1.6,
           fontFamily: "'Outfit', sans-serif",
         }}

@@ -129,7 +129,7 @@ function tierPillStyle(plan) {
   return {
     background:
       plan === "goat" ? "#a855f720" : plan === "elite" ? "#f59e0b20" : plan === "pro" ? "#00d4aa20" : "#14202e",
-    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#8fa5bf",
+    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#b0bec5",
     border: `1px solid ${
       plan === "goat" ? "#a855f730" : plan === "elite" ? "#f59e0b30" : plan === "pro" ? "#00d4aa30" : "#14202e"
     }`,
@@ -197,7 +197,7 @@ function PepguideStatsStrip({ stats, demoHighlightProps, demoHighlighted }) {
   const valueStyle = { fontSize: 16, fontWeight: 700, color: "#00d4aa", lineHeight: 1.2 };
   const labelStyle = {
     fontSize: 12,
-    color: "#8fa5bf",
+    color: "#b0bec5",
     marginTop: 4,
     lineHeight: 1.25,
     fontFamily: "'JetBrains Mono', monospace",
@@ -386,7 +386,7 @@ const METRIC_LOCK_BTN = {
   border: "1px solid #243040",
   background: "rgba(0,0,0,0.2)",
   cursor: "pointer",
-  color: "#94a3b8",
+  color: "#b0bec5",
 };
 
 const AVATAR_CROP_VIEW = 240;
@@ -461,7 +461,7 @@ function AvatarCropModal({ open, imageUrl, busy, onCancel, onConfirm }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ fontSize: 16, fontWeight: 700, color: "#dde4ef", marginBottom: 6 }}>Adjust photo</div>
-        <div className="mono" style={{ fontSize: 12, color: "#6b7c8f", marginBottom: 14, lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 14, lineHeight: 1.45 }}>
           Drag to reposition the photo inside the circle.
         </div>
         <div
@@ -757,7 +757,7 @@ function ProfilePrivatePhotoSlot({
 
   return (
     <div style={{ flex: "1 1 120px", minWidth: 100, maxWidth: 200 }}>
-      <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 6, letterSpacing: "0.08em" }}>
+      <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 6, letterSpacing: "0.08em" }}>
         {label}
       </div>
       <button
@@ -781,7 +781,7 @@ function ProfilePrivatePhotoSlot({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#8fa5bf",
+          color: "#b0bec5",
           fontSize: 12,
           padding: 8,
           textAlign: "center",
@@ -802,7 +802,7 @@ function ProfilePrivatePhotoSlot({
         </div>
       ) : null}
       {uploadedLabel ? (
-        <div className="mono" style={{ fontSize: 9, color: "#8fa5bf", marginTop: 4, lineHeight: 1.3 }}>
+        <div className="mono" style={{ fontSize: 9, color: "#b0bec5", marginTop: 4, lineHeight: 1.3 }}>
           {uploadedLabel}
         </div>
       ) : null}
@@ -1686,7 +1686,7 @@ export function ProfileTab({
 
   if (!profileCtx) {
     return (
-      <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", padding: 24 }}>
+      <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 24 }}>
         Loading profile…
       </div>
     );
@@ -1764,7 +1764,7 @@ export function ProfileTab({
         </div>
       )}
       {savedFlash ? (
-        <div className="mono" style={{ fontSize: 12, color: "#5a6d82", marginBottom: 10, letterSpacing: "0.04em" }}>
+        <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 10, letterSpacing: "0.04em" }}>
           Saved ✓
         </div>
       ) : null}
@@ -1920,7 +1920,7 @@ export function ProfileTab({
             <div
               style={{
                 fontSize: 13,
-                color: "#6b7c8f",
+                color: "#b0bec5",
                 marginBottom: 12,
                 lineHeight: 1.35,
                 wordBreak: "break-word",
@@ -1957,7 +1957,7 @@ export function ProfileTab({
                   className="mono"
                   style={{
                     fontSize: 11,
-                    color: handleHint === "Available" ? "#00d4aa" : "#6b7c8f",
+                    color: handleHint === "Available" ? "#00d4aa" : "#b0bec5",
                     marginTop: 4,
                   }}
                 >
@@ -1983,7 +1983,7 @@ export function ProfileTab({
                 rows={3}
                 aria-label="Bio"
               />
-              <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginTop: 4, textAlign: "right" }}>
+              <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginTop: 4, textAlign: "right" }}>
                 {bioDraft.length}/500
               </div>
             </div>
@@ -1994,13 +1994,13 @@ export function ProfileTab({
               >
                 SOCIAL LINKS
               </div>
-              <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", marginBottom: 10, lineHeight: 1.45 }}>
+              <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 10, lineHeight: 1.45 }}>
                 Optional — username or handle only (links are built on your public profile). Paste a profile URL if
                 easier; we keep the handle.
               </div>
               {SOCIAL_EDIT_FIELDS.map((field) => (
                 <div key={field.key} style={{ marginBottom: 10 }}>
-                  <div className="mono" style={{ fontSize: 10, color: "#8fa5bf", marginBottom: 4 }}>
+                  <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
                     {field.label.toUpperCase()}
                   </div>
                   <input
@@ -2028,7 +2028,7 @@ export function ProfileTab({
               <span className="pill" style={tierPillStyle(user.plan)}>
                 {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
               </span>
-              <span style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.4 }}>
+              <span style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.4 }}>
                 {streakCount <= 0
                   ? "Beginner — log your first dose to start your streak"
                   : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} streak`}
@@ -2055,7 +2055,7 @@ export function ProfileTab({
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
               GOALS
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginBottom: 10, lineHeight: 1.45 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 10, lineHeight: 1.45 }}>
               Tap to select multiple (up to {GOAL_PICK_MAX}).
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -2072,7 +2072,7 @@ export function ProfileTab({
                       borderRadius: 999,
                       border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: sel ? "rgba(0,212,170,0.12)" : "transparent",
-                      color: sel ? "#00d4aa" : "#6b7c8f",
+                      color: sel ? "#00d4aa" : "#b0bec5",
                       cursor: "pointer",
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
@@ -2112,7 +2112,7 @@ export function ProfileTab({
                         borderRadius: 8,
                         border: weightUnit === u ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                         background: weightUnit === u ? "rgba(0,212,170,0.12)" : "transparent",
-                        color: weightUnit === u ? "#00d4aa" : "#6b7c8f",
+                        color: weightUnit === u ? "#00d4aa" : "#b0bec5",
                         cursor: weightMetricsLocked ? "not-allowed" : "pointer",
                         opacity: weightMetricsLocked ? 0.45 : 1,
                         pointerEvents: weightMetricsLocked ? "none" : "auto",
@@ -2194,7 +2194,7 @@ export function ProfileTab({
                       borderRadius: 8,
                       border: heightUnit === "imperial" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: heightUnit === "imperial" ? "rgba(0,212,170,0.12)" : "transparent",
-                      color: heightUnit === "imperial" ? "#00d4aa" : "#6b7c8f",
+                      color: heightUnit === "imperial" ? "#00d4aa" : "#b0bec5",
                       cursor: heightMetricsLocked ? "not-allowed" : "pointer",
                       opacity: heightMetricsLocked ? 0.45 : 1,
                       pointerEvents: heightMetricsLocked ? "none" : "auto",
@@ -2213,7 +2213,7 @@ export function ProfileTab({
                       borderRadius: 8,
                       border: heightUnit === "metric" ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: heightUnit === "metric" ? "rgba(0,212,170,0.12)" : "transparent",
-                      color: heightUnit === "metric" ? "#00d4aa" : "#6b7c8f",
+                      color: heightUnit === "metric" ? "#00d4aa" : "#b0bec5",
                       cursor: heightMetricsLocked ? "not-allowed" : "pointer",
                       opacity: heightMetricsLocked ? 0.45 : 1,
                       pointerEvents: heightMetricsLocked ? "none" : "auto",
@@ -2281,7 +2281,7 @@ export function ProfileTab({
             }}
           >
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
-              BODY FAT % <span style={{ color: "#6b7c8f", fontWeight: 400 }}>(optional)</span>
+              BODY FAT % <span style={{ color: "#b0bec5", fontWeight: 400 }}>(optional)</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
@@ -2332,13 +2332,13 @@ export function ProfileTab({
             <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em", display: "block", marginBottom: 6 }}>
               DATE OF BIRTH
             </span>
-            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 8 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", lineHeight: 1.45, marginBottom: 8 }}>
               Used for age-appropriate dosing guidance. Month 1–12, day 1–31, year {DOB_YEAR_MIN}–{DOB_YEAR_MAX}. Tab out or blur
               to save.
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
               <div>
-                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4, letterSpacing: "0.06em" }}>
                   MONTH
                 </div>
                 <input
@@ -2365,7 +2365,7 @@ export function ProfileTab({
                 />
               </div>
               <div>
-                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4, letterSpacing: "0.06em" }}>
                   DAY
                 </div>
                 <input
@@ -2392,7 +2392,7 @@ export function ProfileTab({
                 />
               </div>
               <div>
-                <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginBottom: 4, letterSpacing: "0.06em" }}>
+                <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4, letterSpacing: "0.06em" }}>
                   YEAR
                 </div>
                 <input
@@ -2436,9 +2436,8 @@ export function ProfileTab({
                 TRAINING EXPERIENCE
               </span>
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 8 }}>
-              Stored in <span style={{ color: "#8fa5bf" }}>profiles.training_experience</span> for protocol and AI safety
-              context.
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", lineHeight: 1.45, marginBottom: 8 }}>
+              For protocol and AI safety context.
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {EXPERIENCE_OPTIONS.map((o) => {
@@ -2454,7 +2453,7 @@ export function ProfileTab({
                       borderRadius: 8,
                       border: sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                       background: sel ? "rgba(0,212,170,0.12)" : "transparent",
-                      color: sel ? "#00d4aa" : "#6b7c8f",
+                      color: sel ? "#00d4aa" : "#b0bec5",
                       cursor: "pointer",
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
@@ -2466,7 +2465,7 @@ export function ProfileTab({
             </div>
           </div>
 
-          <div ref={setFieldRef("biologicalSex")} style={{ marginTop: 14 }}>
+          <div ref={setFieldRef("gender")} style={{ marginTop: 14 }}>
             <div
               style={{
                 display: "flex",
@@ -2478,7 +2477,7 @@ export function ProfileTab({
               }}
             >
               <span className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em" }}>
-                BIOLOGICAL SEX
+                GENDER
               </span>
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -2500,7 +2499,7 @@ export function ProfileTab({
                     border:
                       sel ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
                     background: sel ? "rgba(0,212,170,0.12)" : "transparent",
-                    color: sel ? "#00d4aa" : "#6b7c8f",
+                    color: sel ? "#00d4aa" : "#b0bec5",
                     cursor: "pointer",
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
@@ -2520,7 +2519,7 @@ export function ProfileTab({
                   background: "rgba(14, 21, 32, 0.45)",
                 }}
               >
-                <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", lineHeight: 1.45, marginBottom: 10 }}>
+                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", lineHeight: 1.45, marginBottom: 10 }}>
                   Track menstrual cycle for protocol optimization?
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -2540,7 +2539,7 @@ export function ProfileTab({
                       borderRadius: 8,
                       border: "1px solid #243040",
                       background: "transparent",
-                      color: "#6b7c8f",
+                      color: "#b0bec5",
                       cursor: "pointer",
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
@@ -2558,7 +2557,7 @@ export function ProfileTab({
             <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
               BODY COMPOSITION SCAN
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#6b7c8f", lineHeight: 1.45, marginBottom: 10 }}>
+            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", lineHeight: 1.45, marginBottom: 10 }}>
               InBody, DEXA, or any body comp scan
               <br />
               — auto-populates metrics (Pro+)
@@ -2641,7 +2640,7 @@ export function ProfileTab({
               <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #1e2a38" }}>
                 <div
                   className="mono"
-                  style={{ fontSize: 11, color: "#6b7c8f", marginBottom: 10, letterSpacing: "0.08em" }}
+                  style={{ fontSize: 11, color: "#b0bec5", marginBottom: 10, letterSpacing: "0.08em" }}
                 >
                   PREVIOUS SETS
                 </div>
@@ -2697,14 +2696,14 @@ export function ProfileTab({
             </div>
             <div
               className="mono"
-              style={{ fontSize: 11, color: "#8fa5bf", marginTop: 8, textAlign: "center", lineHeight: 1.45 }}
+              style={{ fontSize: 11, color: "#b0bec5", marginTop: 8, textAlign: "center", lineHeight: 1.45 }}
             >
               Saves this front/side/back trio and clears slots for your next check-in.
             </div>
           </>
         ) : (
           <>
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5, marginBottom: 12 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5, marginBottom: 12 }}>
               Front, side, and back progress photos — included with Pro and above.
             </div>
             <button type="button" className="btn-teal" style={{ fontSize: 13 }} onClick={onOpenUpgrade}>
@@ -2724,7 +2723,7 @@ export function ProfileTab({
 
       <div style={SECTION}>Labs</div>
       <Card>
-        <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
           Coming soon — upload labs and track biomarkers over time.
         </div>
       </Card>
@@ -2736,7 +2735,7 @@ export function ProfileTab({
             ACTIVE STACK
           </div>
           {savedStackPeptides.length === 0 ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5 }}>
+            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
               No active stack saved yet
             </div>
           ) : (
@@ -2750,7 +2749,7 @@ export function ProfileTab({
                     padding: "4px 10px",
                     background: "rgba(0,212,170,0.08)",
                     border: "1px solid rgba(0,212,170,0.25)",
-                    color: "#94a3b8",
+                    color: "#b0bec5",
                   }}
                 >
                   {p.name}

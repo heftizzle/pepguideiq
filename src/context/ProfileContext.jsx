@@ -124,7 +124,7 @@ export function ProfileProvider({ userId, plan, children }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#6b7c8f",
+          color: "#b0bec5",
           fontSize: 13,
           background: "#07090e",
         }}

@@ -439,7 +439,7 @@ export function AuthScreen({ onAuth }) {
       <AuthScaffold>
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Logo style={{ marginBottom: 20 }} />
-          <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.6 }}>
+          <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.6 }}>
             Copy <code style={{ color: "#00d4aa" }}>.env.example</code> to{" "}
             <code style={{ color: "#00d4aa" }}>.env.local</code> and set{" "}
             <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_URL</code> and{" "}
@@ -519,7 +519,7 @@ export function AuthScreen({ onAuth }) {
               marginTop: 20,
               textAlign: "center",
               fontSize: 12,
-              color: "#5c6b7e",
+              color: "#b0bec5",
               lineHeight: 1.6,
             }}
           >
@@ -675,7 +675,7 @@ export function AuthScreen({ onAuth }) {
                     {priceDisplay.main}
                   </span>
                 )}
-                <span style={{ fontSize: 13, color: "#8fa5bf", marginLeft: 4 }}>
+                <span style={{ fontSize: 13, color: "#b0bec5", marginLeft: 4 }}>
                   {plan.period === "forever" ? "forever" : priceDisplay.suffix || plan.period}
                 </span>
               </div>
@@ -683,7 +683,7 @@ export function AuthScreen({ onAuth }) {
                 {plan.features.map((f) => (
                   <div key={f} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
                     <span style={{ color: plan.color, fontSize: 13, marginTop: 2, flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5 }}>{f}</span>
+                    <span style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>{f}</span>
                   </div>
                 ))}
               </div>
@@ -822,7 +822,7 @@ export function AuthScreen({ onAuth }) {
                   border: "none",
                   borderRadius: 6,
                   background: "transparent",
-                  color: "#8fa5bf",
+                  color: "#b0bec5",
                   cursor: "pointer",
                   fontSize: 18,
                   lineHeight: 1,
@@ -947,7 +947,7 @@ export function AuthScreen({ onAuth }) {
             marginTop: 20,
             textAlign: "center",
             fontSize: 12,
-            color: "#5c6b7e",
+            color: "#b0bec5",
             lineHeight: 1.6,
           }}
         >

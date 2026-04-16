@@ -317,7 +317,7 @@ export function ProtocolTab({
             cursor: "pointer",
           }}
         >
-          <div style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
             Upgrade to Pro to run protocol logging with vials.
           </div>
         </div>
@@ -327,7 +327,7 @@ export function ProtocolTab({
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="mono" style={{ fontSize: 13, color: "#b0bec5", fontFamily: "'JetBrains Mono', monospace" }}>
         Configure Supabase to use Protocol.
       </div>
     );
@@ -341,7 +341,7 @@ export function ProtocolTab({
       </div>
 
       {emptyBecauseNoStack && (
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
           No stack saved — build your stack in Saved Stacks first.
         </div>
       )}
@@ -351,7 +351,7 @@ export function ProtocolTab({
       )}
 
       {!emptyBecauseNoStack && rows !== null && rows.length === 0 && (
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
           No compounds in this session — edit Saved Stacks to assign morning / afternoon / evening / night.
         </div>
       )}
@@ -455,7 +455,7 @@ function ProtocolMissingVialRow({ name }) {
   return (
     <div style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}>
       <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600, marginBottom: 6 }}>{name}</div>
-      <div className="mono" style={{ fontSize: 13, color: "#6b7c8f", lineHeight: 1.5 }}>
+      <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
         Injectable — no active vial today. Add or reconstitute a vial in Vial Tracker.
       </div>
     </div>
@@ -472,7 +472,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>{row.name}</div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf" }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
           {row.routeKind === "oral" ? "Oral" : row.routeKind === "intranasal" ? "Intranasal" : "Topical"}
         </div>
       </div>
@@ -537,7 +537,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#6b7c8f", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
               : {}),
           }}
         >
@@ -580,7 +580,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>
           {row.name}
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#8fa5bf", textAlign: "right", maxWidth: 280 }}>
+        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", maxWidth: 280 }}>
           {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
           {row.vials.length > 1 ? " (active vial — change in Vial Tracker)" : ""}
         </div>
@@ -646,7 +646,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#6b7c8f", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
               : {}),
           }}
         >

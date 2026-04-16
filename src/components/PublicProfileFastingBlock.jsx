@@ -38,9 +38,9 @@ export function PublicProfileFastingBlock({ publicFast }) {
       <div style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", marginBottom: 6 }}>
         {fastTypeLabel(publicFast.fast_type)}
       </div>
-      <div className="mono" style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 8 }}>
         Elapsed <span style={{ color: "#00d4aa" }}>{formatElapsedDuration(prog.elapsedMs)}</span>
-        <span style={{ color: "#5c6d82" }}> · </span>
+        <span style={{ color: "#b0bec5" }}> · </span>
         Target {formatTargetSummary(publicFast.target_hours)}
       </div>
       <div style={{ height: 6, borderRadius: 999, background: "#1e2a38", overflow: "hidden" }}>
@@ -54,7 +54,7 @@ export function PublicProfileFastingBlock({ publicFast }) {
           }}
         />
       </div>
-      <div className="mono" style={{ fontSize: 10, color: "#6b7c8f", marginTop: 6 }}>
+      <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginTop: 6 }}>
         {prog.progressPct.toFixed(1)}% of goal
         {prog.overTarget ? " · past target" : ""}
       </div>

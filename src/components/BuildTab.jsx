@@ -676,7 +676,7 @@ export function BuildTab({
       <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.1em", marginBottom: 12 }}>
         COMPOUND BUILDER
       </div>
-      <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginBottom: 6 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 6 }}>
         STACK NAME
       </div>
       <input
@@ -687,7 +687,7 @@ export function BuildTab({
         onChange={(e) => setLocalName(e.target.value)}
         aria-label="Stack name"
       />
-      <div className="mono" style={{ fontSize: 12, color: "#8fa5bf", marginBottom: 6 }}>
+      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 6 }}>
         ADD COMPOUND
       </div>
       <LibrarySearchInput
@@ -749,7 +749,7 @@ export function BuildTab({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.length === 0 ? (
-          <div className="mono" style={{ color: "#5c6d82", fontSize: 13, padding: "12px 0" }}>
+          <div className="mono" style={{ color: "#b0bec5", fontSize: 13, padding: "12px 0" }}>
             Add compounds from search above
           </div>
         ) : (
@@ -885,7 +885,7 @@ export function BuildTab({
               </span>
               AI Guide
             </div>
-            <span className="mono" style={{ fontSize: 10, color: "#5c6d82", letterSpacing: "0.12em" }}>
+            <span className="mono" style={{ fontSize: 10, color: "#b0bec5", letterSpacing: "0.12em" }}>
               BETA
             </span>
           </div>
@@ -962,7 +962,7 @@ export function BuildTab({
                               <div
                                 style={{
                                   fontSize: 13,
-                                  color: "#8fa5bf",
+                                  color: "#b0bec5",
                                   lineHeight: 1.5,
                                   flex: "1 1 auto",
                                   minWidth: 0,
@@ -1039,7 +1039,7 @@ export function BuildTab({
         HOW MUCH DO I NEED?
       </div>
       <div style={{ marginBottom: 14 }}>
-        <div className="mono" style={{ fontSize: 11, color: "#8fa5bf", marginBottom: 4 }}>
+        <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 4 }}>
           CYCLE LENGTH (WEEKS)
         </div>
         <input
@@ -1054,7 +1054,7 @@ export function BuildTab({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.length === 0 ? (
-          <div className="mono" style={{ color: "#5c6d82", fontSize: 13 }}>Add compounds to calculate</div>
+          <div className="mono" style={{ color: "#b0bec5", fontSize: 13 }}>Add compounds to calculate</div>
         ) : (
           cycleLines.map((L) => (
             <div
@@ -1073,7 +1073,7 @@ export function BuildTab({
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ display: "block" }}>
-                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
                     Dose (builder)
                   </span>
                   <input
@@ -1084,11 +1084,11 @@ export function BuildTab({
                   />
                 </label>
                 <div>
-                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>Frequency</span>
+                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>Frequency</span>
                   <div style={{ marginTop: 4 }}>{L.freqLabel}</div>
                 </div>
                 <label style={{ display: "block" }}>
-                  <span className="mono" style={{ fontSize: 10, color: "#6b7c8f" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
                     Vial size (mg)
                   </span>
                   <input
@@ -1104,7 +1104,7 @@ export function BuildTab({
                     }
                   />
                 </label>
-                <div className="mono" style={{ fontSize: 12, color: "#8fa5bf" }}>
+                <div className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
                   {L.totalMg != null ? (
                     <>
                       ~{Math.round(L.totalMg * 1000) / 1000}mg for cycle
@@ -1180,7 +1180,7 @@ export function BuildTab({
             <span className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.08em" }}>
               📋 ORDER HISTORY ({shoppingHistory.length})
             </span>
-            <span className="mono" style={{ fontSize: 10, color: "#8fa5bf" }}>
+            <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
               {historyOpen ? "▲" : "▼"}
             </span>
           </button>
@@ -1228,17 +1228,17 @@ export function BuildTab({
                           marginBottom: 6,
                         }}
                       >
-                        <span className="mono" style={{ fontSize: 11, color: "#8fa5bf" }}>
+                        <span className="mono" style={{ fontSize: 11, color: "#b0bec5" }}>
                           {date} · {entry.cycle_weeks}wk
                         </span>
-                        <span className="brand" style={{ fontSize: 11, color: "#8fa5bf" }}>
+                        <span className="brand" style={{ fontSize: 11, color: "#b0bec5" }}>
                           {entry.stack_name}
                         </span>
                       </div>
 
                       <ul style={{ margin: "0 0 8px 0", paddingLeft: 14, lineHeight: 1.6 }}>
                         {(entry.items ?? []).map((item, i) => (
-                          <li key={i} className="mono" style={{ fontSize: 11, color: "#5c6d82" }}>
+                          <li key={i} className="mono" style={{ fontSize: 11, color: "#b0bec5" }}>
                             {item.name} · {item.vials}× {item.vialSize}mg
                           </li>
                         ))}
