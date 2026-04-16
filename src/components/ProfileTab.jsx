@@ -887,6 +887,8 @@ export function ProfileTab({
   const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
   /** While > 0, skip syncing these fields from global `user` (avoids stale auth payload overwriting locals). */
   const profilesSaveInFlightRef = useRef(0);
+  /** Monotonic counter: bumped before each profiles save so earlier saves don't overwrite later optimistic state. */
+  const profilesSaveSeqRef = useRef(0);
 
   const setFieldRef = useCallback((id) => {
     return (el) => {
@@ -941,6 +943,7 @@ export function ProfileTab({
       if (!["male", "female", "prefer_not_to_say"].includes(value)) return;
       setErr(null);
       const prev = bioSex;
+      const seq = ++profilesSaveSeqRef.current;
       profilesSaveInFlightRef.current += 1;
       setBioSex(value);
       try {
@@ -954,7 +957,9 @@ export function ProfileTab({
         const fresh = await getCurrentUser();
         if (fresh) {
           setUser(fresh);
-          applyFreshUserToLocalProfileFields(fresh);
+          if (seq === profilesSaveSeqRef.current) {
+            applyFreshUserToLocalProfileFields(fresh);
+          }
         }
       } finally {
         profilesSaveInFlightRef.current -= 1;
@@ -968,6 +973,7 @@ export function ProfileTab({
       if (!user?.id) return;
       setErr(null);
       const prev = user.cycle_tracking_enabled ?? null;
+      const seq = ++profilesSaveSeqRef.current;
       profilesSaveInFlightRef.current += 1;
       setUser((u) => (u ? { ...u, cycle_tracking_enabled: enabled } : u));
       try {
@@ -981,7 +987,9 @@ export function ProfileTab({
         const fresh = await getCurrentUser();
         if (fresh) {
           setUser(fresh);
-          applyFreshUserToLocalProfileFields(fresh);
+          if (seq === profilesSaveSeqRef.current) {
+            applyFreshUserToLocalProfileFields(fresh);
+          }
         }
       } finally {
         profilesSaveInFlightRef.current -= 1;
@@ -996,6 +1004,7 @@ export function ProfileTab({
     if (normalized === undefined) return;
     if (normalized === lastCommittedDobRef.current) return;
     setErr(null);
+    const seq = ++profilesSaveSeqRef.current;
     profilesSaveInFlightRef.current += 1;
     try {
       const { error } = await updateUserProfile({ date_of_birth: normalized });
@@ -1011,7 +1020,9 @@ export function ProfileTab({
       const fresh = await getCurrentUser();
       if (fresh) {
         setUser(fresh);
-        applyFreshUserToLocalProfileFields(fresh);
+        if (seq === profilesSaveSeqRef.current) {
+          applyFreshUserToLocalProfileFields(fresh);
+        }
       }
     } finally {
       profilesSaveInFlightRef.current -= 1;
@@ -1327,6 +1338,7 @@ export function ProfileTab({
       if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
       setErr(null);
       const prev = trainingExp;
+      const seq = ++profilesSaveSeqRef.current;
       profilesSaveInFlightRef.current += 1;
       setTrainingExp(value);
       try {
@@ -1340,7 +1352,9 @@ export function ProfileTab({
         const fresh = await getCurrentUser();
         if (fresh) {
           setUser(fresh);
-          applyFreshUserToLocalProfileFields(fresh);
+          if (seq === profilesSaveSeqRef.current) {
+            applyFreshUserToLocalProfileFields(fresh);
+          }
         }
       } finally {
         profilesSaveInFlightRef.current -= 1;
