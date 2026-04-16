@@ -1,0 +1,148 @@
+---
+description: pepguideIQ frontend — React 19 + Vite shell, component tree, state conventions, storage keys, data layer
+globs: src/**/*
+alwaysApply: false
+---
+
+# Frontend rules
+
+## Entry point
+
+`src/main.jsx` routes by URL path — **no router library**:
+- `/pricing` → `<PricingPage />`
+- `/stack/{id}` → `<AgeGate /> + <PublicStackView shareId />`
+- `/profile/{handle}` → `<AgeGate /> + <PublicMemberProfilePage handle />`
+- else → `<AppErrorBoundary><App /></AppErrorBoundary>`
+
+## Shell tree
+
+```
+<PepGuideIQ>  (default export of App.jsx, line 2687)
+  ├── <AgeGate /> (if !ageVerified)
+  ├── <AuthScreen /> (if !user)
+  └── <ProfileProvider userId plan>
+       └── <DoseToastProvider>
+            └── <DemoTourProvider>
+                 └── <PepGuideIQApp>  (holds the giant state surface, line 386)
+                      └── <PepGuideIQMainTree>  (line 1207)
+                           ├── Header: <Logo /> <ProfileSwitcher /> <NotificationsBell />
+                           ├── Tab content (one of 8)
+                           ├── <NavTooltips />
+                           └── <DoseLogFAB />
+```
+
+## Context providers and hooks
+
+| Provider | Hook | Purpose |
+|---|---|---|
+| `ProfileContext` | `useActiveProfile()` | member_profiles list + active profile id. Throws outside provider. |
+| `DoseToastContext` | `useShowDoseToast()` | Post-log toast. No-op outside provider. |
+| `DemoTourContext` | `useDemoTour()` / `useDemoTourOptional()` | Onboarding tour. Highlights via `data-demo-target` + `demoHighlightProps()`. |
+
+## State conventions
+
+- `useState` grouped thematically at the top of component functions.
+- **No `useReducer` anywhere in the codebase.**
+- **No Redux, Zustand, Jotai, MobX.**
+- Cross-tab data lives in `ProfileContext` or is lifted into `PepGuideIQApp`.
+
+## Styling
+
+- Inline `style={{...}}` objects.
+- Global classes in `GlobalStyles.jsx`: `brand`, `mono`, `btn-red`, `btn-teal`, `form-input`, `scard`, `pcard`, `pill--category`, `search-input`.
+- Category colors from `CAT_COLORS` in `src/data/catalog.js`. Use `getCategoryCssVars(cat)` to set `--cc` and `--cc-rgb` custom properties.
+
+## Storage keys (don't collide)
+
+| Key | Storage | Shape |
+|---|---|---|
+| `pepv_age_verified_v2` | localStorage | `{t: number, v: 1}` |
+| `pepv_age_verified` | localStorage | legacy boolean fallback |
+| `pepguide_ref` | localStorage | affiliate ref string |
+| `pepv_last_tab` | sessionStorage | tab id string |
+| `pepguideiq.active_profile_id.{userId}` | localStorage | member_profile uuid |
+
+## Component prop signatures (don't hallucinate)
+
+```jsx
+<ProtocolTab />
+<BuildTab ... />
+<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade demoAnchorFirst />
+<SettingsTab user setUser onOpenUpgrade onSignOut onBack />
+<ProfileTab user setUser ... />
+<StackProtocolQuickLog userId profileId protocolRows canUse onUpgrade wakeTime />
+<NetworkTab userId scrollToDosePostId onConsumedDosePostScrollTarget />
+<DoseLogFAB onSessionPicked />
+<NotificationsBell userId userGoals />
+<UpgradePlanModal onClose user upgradeFocusTier setUser gateReason planKey />
+<ProfileSwitcher onOpenUpgrade onGoToProfileSettings navTooltipAnchorRef />
+<PeopleSearch activeProfileId workerUrl accessToken onClose initialQuery />
+<PublicStackView shareId />
+<PublicMemberProfilePage handle onClose includeGlobalStyles />
+<FastingTrackerSection userId activeProfileId setErr showSavedBriefly />
+<BodyMetricStepper value min max step displayText onCommitValue fastRange locked />
+<AddToStackForm peptide onCancel onSave={({dose, frequency, notes}) => …} />
+<SavedStackEntryRow item catColor catLabel onUpdate onRemove />
+<Modal onClose children maxWidth={580} label="Dialog" variant="default" />
+<PostDoseNetworkSheet open compoundName previewLine busy postError onPost onKeepPrivate />
+<AgeGate onConfirm onExit />
+```
+
+## Saved stack row shape (JSONB in `user_stacks.stack`)
+
+```js
+{
+  id: string,                    // canonical catalog peptide id
+  name: string,
+  category: string,
+  stackDose: string,             // user's dose; falls back to catalog startDose
+  stackFrequency: string,        // "Daily", "2x/week", etc.
+  stackNotes: string,
+  sessions: ("morning"|"afternoon"|"evening"|"night")[],  // default = all 4
+  stackRowKey: string,           // stable uuid for list rendering
+  addedDate: string,
+  startDose?: string,            // catalog fallback
+  stackPeptideId?: string        // only when differs from canonical id
+}
+```
+
+Normalize with `normalizeStackSessions(s)` from `components/SavedStackEntryRow.jsx`.
+
+## `src/lib/` utility map
+
+42 modules, grouped by concern:
+
+- **Config**: `config.js`
+- **Data layer**: `supabase.js` (57 exports)
+- **Tiers/plans**: `tiers.js`, `upgradeGateCopy.js`
+- **Stripe**: `checkout.js`, `stripeBrowser.js` (dormant, has missing dep), `stripeSubscription.js`
+- **Affiliate**: `affiliateRef.js`
+- **Age gate**: `ageVerification.js`
+- **Peptide math**: `peptideMath.js`, `vialDoseMath.js`, `peptideBioavailability.js`
+- **Protocol logic**: `doseRouteKind.js`, `protocolDoseRows.js`, `protocolGuardrails.js`, `protocolLogCooldown.js`, `protocolMessages.js`, `sessionSchedule.js`
+- **Time**: `localCalendarDay.js`, `streakUtils.js`
+- **Catalog utilities**: `advisorCatalogPayload.js`, `catalogStability.js`, `catalogVendorSanitize.js`, `normalizeNewCatalogEntry.js`, `resolveStackCatalogPeptide.js`
+- **Member profile**: `memberAvatarUrl.js`, `memberFasts.js`, `memberProfileHandle.js`, `publicMemberProfile.js`, `openPublicProfile.js`, `socialProfileLinks.js`
+- **Stack sharing**: `stackShare.js`
+- **Social graph**: `follows.js`
+- **Dose display**: `doseLogCelebration.js`, `doseLogDisplay.js`, `doseNetworkFeed.js`
+- **Upload**: `r2Upload.js`
+- **Builder**: `buildRowsFromMyStack.js`
+- **External links**: `finnrickUrl.js` (validates https finnrick.com only)
+
+**Grep before inventing a new util.**
+
+## Adding a compound
+
+1. Pick a batch file in `src/data/compounds/` or add `batchN.js` + register in `index.js`.
+2. Follow the JSDoc schema at the top of `src/data/catalog.js`.
+3. Stability: set `stabilityDays` explicitly or let `resolveStability()` infer.
+4. Popularity: set `popularityRank` explicitly or let `attachPopularityRanks()` auto-fill.
+5. For Finnrick verification, set `finnrickUrl` (https + `finnrick.com` host only).
+
+## Watch-fors
+
+- Some legacy rows still inline in `PEPTIDES_CORE` in `catalog.js`. Batch-file entries win on id collision. Prefer editing the batch file.
+- `VialTracker.jsx` has its own date helpers — match the existing style (`todayYmd`, `localYmdFromIso`) instead of pulling `localCalendarDay.js` into it.
+- `ProfileTab.jsx` nests `<SettingsTab>` via `subView` toggle. Don't duplicate settings chrome.
+- `useMemberAvatarSrc()` returns either a cache-busted https URL or an object URL — safe to set directly as `<img src>`.

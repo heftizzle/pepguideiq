@@ -1,0 +1,140 @@
+---
+description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 25 routes. Model routing, rate limits, security invariants.
+globs: workers/**/*
+alwaysApply: false
+---
+
+# Worker rules
+
+Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700. **There is no framework** (no Hono, no itty-router) — raw `fetch` event handlers.
+
+## Routes (exactly 25 — do not invent)
+
+### AI
+- `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`.
+
+### Stripe (6)
+- `POST /stripe/webhook` — handles `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`
+- `GET /stripe/subscription`
+- `POST /stripe/subscription/schedule-downgrade`
+- `POST /stripe/create-customer`
+- `POST /stripe/create-subscription`
+- `POST /stripe/create-portal-session`
+
+### Auth-adjacent (2)
+- `POST /turnstile/verify`
+- `POST /account/delete` — service-role cascading delete
+
+### Member profiles (7)
+- `GET /member-profiles` — list caller's profiles
+- `POST /member-profiles` — create (plan slot limit)
+- `PATCH /member-profiles/{id}` — update many fields
+- `DELETE /member-profiles/{id}` — non-default only
+- `GET /member-profiles/handle-available?handle=`
+- `GET /member-profiles/public?handle=` — **no auth**
+- `GET /member-profiles/search?q=`
+
+### Social (3)
+- `POST /member-follows`
+- `DELETE /member-follows`
+- `GET /member-follows/following?profile_id=`
+
+### R2 images (5)
+- `POST /stack-photo` — multipart upload to `stack-photos` R2 bucket
+- `POST /upload-stack-photo` — alias
+- `GET /stack-photo?key=…` — authenticated private read (caller's prefix only)
+- `GET /avatars/{key}` — **public** read, no auth, no rate limit. Never rate-limit these.
+- `POST /avatars` / `PUT /avatars`
+
+## Model routing
+
+```js
+const MODEL_ENTRY_PRO  = "claude-haiku-4-5-20251001";
+const MODEL_ELITE_GOAT = "claude-sonnet-4-6";
+```
+
+`modelForPlan(plan)` returns one. **Plan is read from `public.profiles.plan` via service role — never from the client payload.**
+
+## max_tokens caps
+
+| Plan | Cap |
+|---|---|
+| Entry / Pro | 1024 |
+| Elite | 2048 |
+| GOAT | 4096 |
+
+`maxTokensCapForPlan(plan, env)` is the source of truth.
+
+## Daily query limits
+
+| Plan | Limit |
+|---|---|
+| Entry | 2 |
+| Pro | 4 |
+| Elite | 8 |
+| GOAT | 16 |
+
+Counter in KV at `rl:{userId}:{YYYY-MM-DD}` with 90,000s TTL.
+
+- `readDailyQueryRateLimit` **before** the Anthropic call (to check)
+- `incrementDailyQueryRateLimit` **after** a successful response (don't charge failed calls)
+
+## IP rate limits
+
+`checkIpRateLimit(env, ip, type)` — types: `r2_write`, `r2_read`, `auth`, `api`. Public avatar reads (`GET/HEAD/OPTIONS /avatars/{key}`) bypass entirely. **Fails-closed in production if KV is missing.**
+
+## Bindings (`wrangler.worker.toml`)
+
+```toml
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "8e4c0ecee5b54a81abf179e58624fd33"
+preview_id = "2239fd8dcc6f40fdaf903993ff5a1cd8"
+
+[[r2_buckets]]
+binding = "STACK_PHOTOS"
+bucket_name = "stack-photos"
+```
+
+## Secrets
+
+- `ANTHROPIC_API_KEY`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `TURNSTILE_SECRET_KEY`
+
+## Vars
+
+- `ENVIRONMENT=production` — enables fail-closed KV + strict CORS
+- `ALLOWED_ORIGIN=https://pepguideiq.com` — exact origin, no wildcard
+- `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_ELITE`, `STRIPE_PRICE_ID_GOAT`
+
+## Security invariants — must hold
+
+1. Never trust client-supplied `plan`. Always `fetchProfilePlan()` via service role.
+2. Stripe webhook signature verification required (`verifyStripeWebhookSignature`). Never skip.
+3. Image uploads must pass `imageMagicMatchesClaimedMime()` — reject if magic bytes don't match claimed MIME.
+4. R2 private reads must check ownership — key must start with caller's user id prefix.
+5. Service role bypasses RLS — always check ownership explicitly in the handler when writing.
+6. Turnstile verify is one-shot per token. Don't replay.
+
+## Common helpers (don't re-invent)
+
+- `getSessionUser(env, authHeader)` — resolves Supabase user from Bearer token
+- `normalizePlanTier(p, env)` — canonicalizes to `entry`/`pro`/`elite`/`goat`
+- `fetchProfilePlan(url, key, userId, env)` — server-side plan read
+- `fetchProfileAiContextFields(url, key, userId)` — biological_sex, DOB, training_experience
+- `jsonResponse(body, status, cors)` — standard JSON response
+- `applySecurityHeaders(response)` — adds CSP-ish headers
+- `corsHeaders(env, request)` — origin-gated; production requires exact match
+- `publicAvatarCorsHeaders()` — relaxed CORS for public avatar reads
+- `log(env, level, msg, extra)` — structured log. Never `console.log`.
+
+## Adding a new route
+
+1. Add dispatch line around line 3720: `if (url.pathname === "/your-route" && request.method === "…") return handler(request, env, cors);`
+2. Implement `handler(request, env, cors)` in the handler section above (alphabetical-ish grouping).
+3. Rate-limit type defaults to `api` — change in dispatch if write or auth path.
+4. Always `return jsonResponse({...}, status, cors)`.
+5. Read the user via `getSessionUser(env, request.headers.get("authorization"))`. Explicit 401 on missing token.
+6. Verify ownership before any service-role write.

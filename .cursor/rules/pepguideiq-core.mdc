@@ -1,0 +1,73 @@
+---
+description: pepguideIQ core facts and hard rules — prevents common AI hallucinations about stack, counts, tier emojis, and architecture
+alwaysApply: true
+---
+
+# pepguideIQ — core rules
+
+You are working on pepguideIQ, a research-peptide reference and personal-protocol tracker. Production: pepguideiq.com. Soft launch: May 1, 2026.
+
+## Stack (exact — do not invent)
+
+- React 19.0 + Vite 6 — **no router library**, **no state-management library**, **no Tailwind**, **no CSS modules**
+- Supabase (Postgres + Auth + RLS)
+- Cloudflare Workers, R2, KV, Pages, Turnstile
+- Stripe Payment Links + webhook (no Elements; the `@stripe/stripe-js` dep is NOT installed)
+
+`package.json` production deps — exhaustive:
+- `@supabase/supabase-js`
+- `react`
+- `react-dom`
+
+Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`. **Do not `import` any other library without first adding it to `package.json`.**
+
+## Corrections to common assumptions
+
+- **Catalog has 171 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count, use `PEPTIDES.length`.
+- **51 Supabase migrations** (`001` through `050` plus `045a`).
+- **Tier emojis: 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** NOT 🌱 for Entry.
+- **Tier IDs: `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", "basic", "premium", or "pro+".
+- **Session IDs: `morning`, `afternoon`, `evening`, `night` — exactly 4.** Emojis: 🌞 🌅 🌙 🌑.
+- **Tab IDs: `library`, `guide`, `stackBuilder`, `stack`, `network`, `vialTracker`, `protocol`, `profile` — exactly 8.** `PEPV_VALID_TABS` in `src/App.jsx`.
+- **Only `EDON15` and `TSource15` are wired affiliate codes** in `src/lib/affiliateRef.js`. Other codes in Rewardful dashboard are silently dropped.
+- **Plan is server-authoritative.** Never update `profiles.plan` from the client — trigger rejects with `42501`. Only `update_user_plan(uuid, text)` via service role can change it.
+
+## Data layer
+
+All Supabase access goes through `src/lib/supabase.js` (57 exported functions). All Worker calls use `fetch(\`${API_WORKER_URL}/...\`)` with `Authorization: Bearer <token>` where the token comes from `getSessionAccessToken()`.
+
+Worker routes (25 total, list in `workers/CLAUDE.md`). Do not invent routes.
+
+## AI Guide / Stack Advisor request contract
+
+```
+POST ${API_WORKER_URL}/v1/chat
+Authorization: Bearer <supabase_access_token>
+body: { messages: [{role, content}], system: string, catalog: [...] }
+response: { text: string, usage: { queries_today, queries_limit } }
+```
+
+Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCategoryFn)` from `src/lib/advisorCatalogPayload.js`.
+
+## Hard rules
+
+1. Do not introduce a CSS framework, router, or state library.
+2. Do not invent new tab IDs, session IDs, or tier IDs.
+3. Do not invent Worker routes. Check `workers/CLAUDE.md` for the complete list.
+4. Do not set `profiles.plan` from the client. Use `update_user_plan` RPC.
+5. Do not remove DB columns the frontend reads. Deprecate first, delete later.
+6. Do not persist R2 URLs with cache-bust params (`?v=…`). Store the key only.
+7. For any count (compounds, migrations, users) — import and count. Do not infer from constants or stale docs.
+8. Inline styles only. Use existing global classes in `src/components/GlobalStyles.jsx`: `brand`, `mono`, `btn-red`, `btn-teal`, `form-input`, `scard`, `pcard`, `pill--category`.
+
+## When you need deeper context
+
+- Frontend questions → see `.cursor/rules/frontend.mdc` (auto-loads when working in `src/`)
+- Worker questions → see `.cursor/rules/worker.mdc` (auto-loads when working in `workers/`)
+- Database questions → see `.cursor/rules/supabase.mdc` (auto-loads when working in `supabase/`)
+
+When the user asks a question about a specific subsystem, you can `@mention` the relevant rule file to load it manually.
+
+## When facts drift
+
+If the user tells you the count, schema, or tier structure has changed, update the relevant rule file and `CLAUDE.md` in the same commit. Don't let the rules drift from reality.

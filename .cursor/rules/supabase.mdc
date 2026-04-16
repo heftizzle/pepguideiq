@@ -1,0 +1,104 @@
+---
+description: pepguideIQ database — 12 tables, 15 RPCs, RLS model, 51 migrations. Plan-lock trigger, member_profiles pattern, migration discipline.
+globs: supabase/**/*
+alwaysApply: false
+---
+
+# Supabase rules
+
+**51 migrations** through `050_profiles_age_training.sql` plus `045a`. Apply in strict order. `supabase db push` or paste into SQL Editor — both work.
+
+## Tables (12)
+
+| Table | Purpose |
+|---|---|
+| `profiles` | One row per auth user. `plan`, Stripe IDs, `stack_photo_r2_key`, demographics (`biological_sex`, `date_of_birth`, `training_experience`). |
+| `user_stacks` | One row per `(user_id, profile_id)`. `stack` JSONB holds compounds. `public_share_id`, `share_feed_visible`. |
+| `user_vials` | `peptide_id`, `concentration_mcg_ml`, `bac_water_ml`, `vial_size_mg`, `reconstituted_at`, `expires_at`, `desired_dose_mcg`, `photo_r2_key`, `status`. |
+| `dose_logs` | `peptide_id`, `vial_id` (null for oral/nasal/topical), `dose_mcg` OR `dose_count`+`dose_unit`, `dosed_at`, `session_label`, `route_kind`. |
+| `member_profiles` | Sub-profiles per user. `display_name`, `handle`, `display_handle`, `avatar_url`, `bio`, `goals`, `language`, `wake_time`, `schedule_shift`, `demo_sessions_shown`, `current_streak`, `consecutive_days`, `is_default`, `social_*_handle`, `locale_*`. |
+| `body_metrics` | Scoped per profile. Weight/height/BF%, InBody/DEXA fields. |
+| `member_follows` | `(follower_id, following_id)`, unique constraint. |
+| `network_feed` | `stack_id` for stack shares, `dose_log_id` for dose posts. `public_visible` flag, `expires_at` TTL. |
+| `notifications` | `user_id`, `actor_id`, `type`, `read_at`, `nav_target`. |
+| `member_fasts` | `fast_type`, `started_at`, `target_hours`, `ended_at`. |
+| `shopping_lists` | Saved shopping list snapshots. |
+| `query_log` | AI query analytics. **Not** for rate limiting — that's KV. |
+
+**Removed in migration 047:** `ai_queries`. Do not reference it.
+
+## RPCs (15)
+
+| RPC | Purpose |
+|---|---|
+| `update_user_plan(uuid, text)` | **The only way to change `profiles.plan`.** Sets `app.allow_plan_change` session flag. Revoked from PUBLIC, granted to `service_role`. |
+| `get_daily_ai_count(uuid)` | Legacy; KV is primary rate limit now. |
+| `get_network_feed()` | Feed joined with `member_profiles` + `user_stacks` for caller. Filtered by ownership + follow graph. |
+| `get_public_network_dose_feed()` | Public dose feed (no auth). Filters by `public_visible = true AND expires_at > now()`. |
+| `get_shared_stack(text)` | Public read of stack by share id. |
+| `get_follow_counts(uuid)` | Follower + following counts. |
+| `get_user_profile_stats(uuid)` | Aggregated stats for a member profile. |
+| `recalculate_member_profile_streak(uuid)` | Called by dose_logs trigger. |
+| `increment_member_profile_demo_sessions(uuid)` | Called when user enters main app. |
+| `member_profile_public_by_handle_lookup(text)` | Case-insensitive handle resolver. |
+| `handle_new_user()` | Trigger fn: seeds `profiles` + empty `user_stacks` on signup. |
+| `set_updated_at()` | Generic updated_at trigger fn. |
+| `notify_new_follower_from_follow()` | Inserts notification on new follow. |
+| `dose_logs_touch_member_streak()` | Calls streak recalculation. |
+| `profiles_enforce_plan_change()` | Rejects plan updates without session flag. |
+
+## Triggers
+
+- `on_auth_user_created` on `auth.users` → creates `profiles` + empty `user_stacks`
+- `profiles_enforce_plan_change` on `profiles` BEFORE UPDATE → rejects plan changes unless `app.allow_plan_change = 'true'`
+- `*_updated_at` on 8 tables → BEFORE UPDATE, calls `set_updated_at()`
+- `dose_logs_recalc_member_streak` on `dose_logs` AFTER INSERT/UPDATE/DELETE → `recalculate_member_profile_streak`
+- `member_follows_notify_followee` on `member_follows` AFTER INSERT → inserts `notifications`
+
+## RLS model
+
+Every table has RLS enabled. Policies are `auth.uid() = user_id` style, except:
+
+- `member_profiles: select own` — scoped via user_id match (not profile_id)
+- `network_feed: select public active` — public filtered by `public_visible = true AND expires_at > now()`
+- `user_stacks: select network feed` — lets followers see feed-visible stacks
+- `member_follows: select authenticated` — anyone signed in can read (for counters)
+
+**Read `docs/security/rls-audit.md` before touching policies.**
+
+## Schema invariants
+
+- `profiles.plan` ∈ `('entry', 'pro', 'elite', 'goat')` — CHECK in 001
+- `member_profiles.handle` lowercase, 3–32 chars, regex `^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9]$`, no `..`, `member_profiles_handle_format_chk`
+- `member_profiles.bio` ≤ 500 chars (migration 031)
+- `member_fasts.target_hours` > 0, ≤ 2160 (90 days, client-enforced)
+- `user_stacks` unique on `(user_id, profile_id)` — one stack per profile slot
+- One default `member_profile` per user (`is_default = true`)
+
+## Critical migrations
+
+- `001_initial_schema.sql` — baseline
+- `008_plan_and_stack_photo_security.sql` — plan-lock trigger + `stack_photo_r2_key`. **Critical; never bypass.**
+- `013_member_profiles.sql` — biggest refactor. Introduces `(user_id, profile_id)` dual-key pattern.
+- `029_member_profiles_current_streak.sql` — streak recalculation trigger
+- `032_member_follows.sql` — social graph
+- `036_notifications_new_follower.sql` — notifications + follow trigger
+- `045a_user_stacks_stack_name_rename.sql` — out-of-order migration (sorts between 045 and 046)
+- `047_network_feed_public_visible_indexes_ai_queries_drop.sql` — drops `ai_queries`, adds indexes, updates `get_network_feed`
+
+## Adding a migration
+
+1. File: `supabase/migrations/NNN_short_name.sql` — `NNN` zero-padded, strictly monotonic
+2. Idempotent DDL: `CREATE ... IF NOT EXISTS`, `DROP ... IF EXISTS`, `CREATE OR REPLACE FUNCTION`
+3. Guard column adds with `ADD COLUMN IF NOT EXISTS`
+4. New table must include: RLS enable + baseline policies + `updated_at` trigger
+5. **Never remove a column the frontend reads.** Deprecate first, delete in a follow-up migration after the frontend stops reading it
+6. Test against a Supabase branch before production
+
+## Hard rules
+
+- Do not update `profiles.plan` directly. Use `update_user_plan(uuid, text)` via service role.
+- Do not reference `ai_queries`. It's gone.
+- Do not assume `stack_name` exists on `user_stacks` — removed in `045a`.
+- Do not use `SECURITY DEFINER` on new RPCs without also setting `search_path = public` and revoking from `PUBLIC`.
+- Do not let Supabase's schema migrator auto-drop indexes. Always `DROP INDEX IF EXISTS` explicitly when that's the intent.
