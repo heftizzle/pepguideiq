@@ -104,6 +104,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   const [pwdResetSent, setPwdResetSent] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  /** Inline error inside delete-account modal only (global `err` is not used for this flow). */
+  const [deleteAccountErr, setDeleteAccountErr] = useState(/** @type {string | null} */ (null));
   const [showDeleteProfile, setShowDeleteProfile] = useState(false);
   const [deleteProfileBusy, setDeleteProfileBusy] = useState(false);
   const [demoResetBusy, setDemoResetBusy] = useState(false);
@@ -550,16 +552,19 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
 
   const onConfirmDelete = async () => {
     setDeleteBusy(true);
-    setErr(null);
+    setDeleteAccountErr(null);
     const { error } = await deleteAccountViaWorker();
     setDeleteBusy(false);
     if (error) {
-      setErr(error.message);
-      setShowDelete(false);
+      setDeleteAccountErr(error.message);
       return;
     }
+    setDeleteAccountErr(null);
     setShowDelete(false);
     await onSignOut();
+    if (typeof window !== "undefined") {
+      window.location.replace(`${window.location.origin}/`);
+    }
   };
 
   if (!isSupabaseConfigured()) {
@@ -1208,15 +1213,29 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         </Card>
       )}
 
-      <div style={{ ...SECTION, color: "#f87171" }}>Danger zone</div>
+      <div style={{ ...SECTION, color: "#f87171" }}>Danger Zone</div>
       <Card
         style={{
-          border: "1px solid rgba(248, 113, 113, 0.45)",
-          background: "rgba(127, 29, 29, 0.14)",
+          border: "1px solid rgba(248, 113, 113, 0.5)",
+          background: "rgba(69, 10, 10, 0.35)",
         }}
       >
-        <button type="button" className="btn-red" style={{ fontSize: 13, width: "100%" }} onClick={() => setShowDelete(true)}>
-          Delete Account
+        <button
+          type="button"
+          className="btn-red"
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            width: "100%",
+            minHeight: 48,
+            boxSizing: "border-box",
+          }}
+          onClick={() => {
+            setDeleteAccountErr(null);
+            setShowDelete(true);
+          }}
+        >
+          Delete My Account
         </button>
       </Card>
 
@@ -1250,27 +1269,47 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       )}
 
       {showDelete && (
-        <Modal onClose={() => setShowDelete(false)} maxWidth={420} label="Delete account">
+        <Modal
+          onClose={() => {
+            if (deleteBusy) return;
+            setShowDelete(false);
+            setDeleteAccountErr(null);
+          }}
+          maxWidth={420}
+          label="Delete account"
+        >
           <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 12px", color: "#fde68a", lineHeight: 1.35 }}>
             Sad to see you go, but love to watch ya leave. 🙂
           </h2>
-          <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, marginBottom: 20, whiteSpace: "pre-line" }}>
-            {`This permanently deletes your account, stack, vials, and dose history. There is no undo.
-
-Just kidding about the notarized, certified USPS letter via Pony Express. We're not like your gym.`}
+          <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, marginBottom: 16 }}>
+            This permanently deletes your account, stack, vials, and dose history. There is no undo.
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <button type="button" className="btn-teal" style={{ fontSize: 13, flex: "1 1 120px" }} onClick={() => setShowDelete(false)}>
+          {deleteAccountErr ? (
+            <div className="mono" style={{ fontSize: 13, color: "#f87171", marginBottom: 16, lineHeight: 1.45 }}>
+              {deleteAccountErr}
+            </div>
+          ) : null}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13, width: "100%", minHeight: 44 }}
+              disabled={deleteBusy}
+              onClick={() => {
+                setShowDelete(false);
+                setDeleteAccountErr(null);
+              }}
+            >
               Never mind
             </button>
             <button
               type="button"
               className="btn-red"
-              style={{ fontSize: 13, flex: "1 1 120px" }}
+              style={{ fontSize: 14, fontWeight: 600, width: "100%", minHeight: 48 }}
               disabled={deleteBusy}
               onClick={() => void onConfirmDelete()}
             >
-              {deleteBusy ? "…" : "Yes, delete everything"}
+              {deleteBusy ? "Deleting…" : "Yes, delete everything"}
             </button>
           </div>
         </Modal>

@@ -1472,8 +1472,65 @@ function memberProfilePatchFailureMessage(result, patch) {
   return { msg: "Could not update profile", status: 502 };
 }
 
+async function stripeCancelSubscriptionById(env, stripeKey, subscriptionId) {
+  const sid = typeof subscriptionId === "string" ? subscriptionId.trim() : "";
+  if (!sid || !stripeKey) return;
+  const r = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(sid)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  if (!r.ok && r.status !== 404) {
+    log(env, "warn", "stripe_subscription_delete_failed", { subscriptionId: sid, status: r.status });
+  }
+}
+
+async function stripeCancelAllSubscriptionsForCustomer(env, stripeKey, customerId) {
+  const cid = typeof customerId === "string" ? customerId.trim() : "";
+  if (!cid || !stripeKey) return;
+  const qs = new URLSearchParams({ customer: cid, limit: "100" });
+  const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const j = await listRes.json().catch(() => ({}));
+  const subs = Array.isArray(j?.data) ? j.data : [];
+  for (const s of subs) {
+    const id = typeof s?.id === "string" ? s.id.trim() : "";
+    if (!id) continue;
+    const st = typeof s?.status === "string" ? s.status : "";
+    if (st === "canceled" || st === "incomplete_expired") continue;
+    await stripeCancelSubscriptionById(env, stripeKey, id);
+  }
+}
+
+/** Best-effort: stack photos, vials, avatars, and member profile uploads use keys under `${userId}/`. */
+async function deleteUserR2Prefix(env, bucket, userId) {
+  const prefix = `${userId}/`;
+  let cursor;
+  for (let page = 0; page < 200; page++) {
+    let listed;
+    try {
+      listed = await bucket.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+    } catch (e) {
+      log(env, "warn", "r2_list_failed_account_delete", { userId, message: String(e) });
+      break;
+    }
+    const objects = Array.isArray(listed?.objects) ? listed.objects : [];
+    for (const obj of objects) {
+      const key = obj && typeof obj.key === "string" ? obj.key : "";
+      if (!key || !key.startsWith(prefix)) continue;
+      try {
+        await bucket.delete(key);
+      } catch (e) {
+        log(env, "warn", "r2_delete_failed_account_delete", { key, message: String(e) });
+      }
+    }
+    if (!listed?.truncated) break;
+    cursor = listed.cursor;
+  }
+}
+
 /**
- * Authenticated POST — delete the signed-in user via Supabase Auth Admin API (service role).
+ * Authenticated POST — cancel Stripe subs, remove R2 objects for this user, then delete auth user (DB cascades).
  */
 async function handleDeleteAccount(request, env, cors) {
   if (!supabaseAuthReady(env)) {
@@ -1486,6 +1543,38 @@ async function handleDeleteAccount(request, env, cors) {
   const userId = sessionUser.sub;
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const stripeKey = typeof env.STRIPE_SECRET_KEY === "string" ? env.STRIPE_SECRET_KEY.trim() : "";
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id,stripe_subscription_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const customerId =
+    row && typeof row.stripe_customer_id === "string" ? row.stripe_customer_id.trim() : "";
+  const subscriptionId =
+    row && typeof row.stripe_subscription_id === "string" ? row.stripe_subscription_id.trim() : "";
+
+  if (stripeKey) {
+    if (subscriptionId) {
+      await stripeCancelSubscriptionById(env, stripeKey, subscriptionId);
+    }
+    if (customerId) {
+      await stripeCancelAllSubscriptionsForCustomer(env, stripeKey, customerId);
+    }
+  }
+
+  const bucket = env.STACK_PHOTOS;
+  if (bucket) {
+    await deleteUserR2Prefix(env, bucket, userId);
+  }
+
   const delUrl = `${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`;
   const res = await fetch(delUrl, {
     method: "DELETE",
@@ -1499,7 +1588,7 @@ async function handleDeleteAccount(request, env, cors) {
     log(env, "error", "admin_delete_user_failed", { status: res.status, body: String(t).slice(0, 240) });
     return jsonResponse({ error: "Could not delete account" }, 502, cors);
   }
-  return jsonResponse({ ok: true }, 200, cors);
+  return jsonResponse({ success: true }, 200, cors);
 }
 
 /**
@@ -3438,6 +3527,9 @@ async function handlePostStackPhoto(request, env, cors) {
   return jsonResponse({ url, key, private: !isPublic }, 200, cors);
 }
 
+const isUUID = (s) =>
+  typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 /**
  * Stripe → Supabase sync. Configure Payment Links / Checkout with client_reference_id = Supabase user UUID
  * and subscription or price metadata `plan` = entry|pro|elite|goat.
@@ -3481,19 +3573,27 @@ async function handleStripeWebhook(request, env) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data?.object ?? {};
-        const userId =
-          (typeof session.client_reference_id === "string" && session.client_reference_id) ||
-          (typeof session.metadata?.supabase_user_id === "string" && session.metadata.supabase_user_id) ||
-          "";
         const customerId =
           typeof session.customer === "string"
             ? session.customer
             : session.customer && typeof session.customer === "object"
               ? session.customer.id
               : "";
+        const userId =
+          session.metadata?.supabase_user_id ||
+          (isUUID(session.client_reference_id) ? session.client_reference_id : null);
         let plan =
           (typeof session.metadata?.plan === "string" && normalizePlanTier(session.metadata.plan, env)) ||
           "entry";
+        if (!userId) {
+          log(env, "warn", "stripe_checkout_session_user_unresolved", {
+            eventId,
+            client_reference_id:
+              typeof session.client_reference_id === "string" ? session.client_reference_id : "",
+            customerId: customerId || "",
+          });
+          break;
+        }
         if (userId && customerId) {
           const subId =
             typeof session.subscription === "string"

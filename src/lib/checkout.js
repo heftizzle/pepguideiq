@@ -16,7 +16,7 @@ export function getStripeCheckoutUrl(planId) {
 }
 
 /**
- * Appends `client_reference_id` so the Worker Stripe webhook can map Checkout to `auth.users` (migration 008+).
+ * Appends `client_reference_id` and `metadata[supabase_user_id]` so the Worker Stripe webhook can map Checkout to `auth.users`.
  * @param {"pro"|"elite"|"goat"} planId
  * @param {string} [userId] Supabase user UUID
  */
@@ -25,7 +25,10 @@ export function getStripeCheckoutUrlWithClientRef(planId, userId) {
   if (!base) return "";
   try {
     const u = new URL(base);
-    if (userId) u.searchParams.set("client_reference_id", userId);
+    if (userId) {
+      u.searchParams.set("client_reference_id", userId);
+      u.searchParams.set("metadata[supabase_user_id]", userId);
+    }
     const ref = getStoredAffiliateRef();
     if (ref) {
       u.searchParams.set("prefilled_promotion_code", ref);

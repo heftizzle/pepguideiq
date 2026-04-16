@@ -2,14 +2,36 @@ import { formatPrice, getTier } from "./tiers.js";
 
 const STORAGE_KEY = "pepguide_ref";
 
+/** Recognized affiliate refs (Rewardful / Stripe). Keys are lowercase for case-insensitive match. */
+const AFFILIATE_REF_BY_LOWER = Object.freeze({
+  primo15: "Primo15",
+  pete15: "Pete15",
+  tsource15: "Tsource15",
+  edon15: "EDON15",
+  ironresolve15: "ironresolve15",
+  elite15: "Elite15",
+  otmen15: "OTMen15",
+  palmer15: "Palmer15",
+  ryba15: "Ryba15",
+  fire15: "Fire15",
+  lake15: "Lake15",
+});
+
 /** @param {unknown} raw */
 export function normalizeAffiliateRef(raw) {
   if (raw == null) return null;
   const s = String(raw).trim();
   if (!s) return null;
   const lower = s.toLowerCase();
-  if (lower === "edon15") return "EDON15";
-  if (lower === "tsource15") return "TSource15";
+  return AFFILIATE_REF_BY_LOWER[lower] ?? null;
+}
+
+export function getRewardfulReferral() {
+  try {
+    if (window.Rewardful && window.Rewardful.referral) {
+      return window.Rewardful.referral;
+    }
+  } catch (_) {}
   return null;
 }
 
