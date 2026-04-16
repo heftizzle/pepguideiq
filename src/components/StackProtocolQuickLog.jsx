@@ -41,11 +41,11 @@ function clampUnits(u) {
 
 /**
  * Today's quick log on Stacks tab — same per-compound LOG DOSE pattern as Protocol (no vial management).
- * @param {{ userId: string, profileId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string, wakeTime?: string | null }} props
+ * @param {{ userId: string, profileId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string, wakeTime?: string | null, shiftSchedule?: string | null }} props
  */
-export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse, onUpgrade, wakeTime = null }) {
+export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse, onUpgrade, wakeTime = null, shiftSchedule = null }) {
   const { refreshMemberProfiles } = useActiveProfile();
-  const session = useMemo(() => inferProtocolSessionForNow(wakeTime), [wakeTime]);
+  const session = useMemo(() => inferProtocolSessionForNow(wakeTime, shiftSchedule), [wakeTime, shiftSchedule]);
 
   const [lines, setLines] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);

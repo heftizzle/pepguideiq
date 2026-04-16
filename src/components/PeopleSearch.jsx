@@ -8,11 +8,6 @@ import {
   unfollowMemberProfile,
 } from "../lib/follows.js";
 
-/**
- * Vertical offset below the persistent App header (grid-bg z-70: logo row + pill nav).
- * Parent portals this dialog to `document.body`; root uses z-index above the header so the close control is clickable.
- */
-const PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX = 104;
 /** Match App.jsx fixed bottom nav band so overlay leaves it visible and tappable. */
 const PEOPLE_SEARCH_NAV_RESERVE_PX = "calc(80px + env(safe-area-inset-bottom, 0px))";
 
@@ -203,7 +198,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           maxWidth: 560,
           width: "100%",
           margin: "0 auto",
-          paddingTop: PEOPLE_SEARCH_CLEAR_BELOW_HEADER_PX,
+          paddingTop: "var(--pepv-top-header-height, 104px)",
           paddingLeft: "max(12px, env(safe-area-inset-left))",
           paddingRight: "max(12px, env(safe-area-inset-right))",
           display: "flex",
@@ -307,7 +302,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         borderRadius: "50%",
                         overflow: "hidden",
                         flexShrink: 0,
-                        background: "#0b0f17",
+                        background: "#0e1520",
                         border: "1px solid #243040",
                         display: "flex",
                         alignItems: "center",

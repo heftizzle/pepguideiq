@@ -2,7 +2,7 @@ export function GlobalStyles() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;800&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap');
-      :root{--bg-primary:#07090e}
+      :root{--bg-primary:#07090e;--pepv-top-header-height:104px}
       html{
         min-height:100%;
         background-color:var(--bg-primary);
@@ -99,7 +99,7 @@ export function GlobalStyles() {
       .pepv-protocol-session-pill--active{
         box-shadow:0 0 0 1px rgba(0,212,170,0.5),0 0 14px rgba(0,212,170,0.22),0 0 4px rgba(0,212,170,0.15);
       }
-      .search-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:10px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%}
+      .search-input{background:#0e1520;border:1px solid #14202e;color:#dde4ef;padding:10px 14px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%}
       .search-input:focus{border-color:#00d4aa50}
       .search-input::placeholder{color:#a0a0b0}
       @media (max-width:767px){
@@ -134,7 +134,7 @@ export function GlobalStyles() {
         animation:pepvAdvisorSkeletonPulse 1.15s ease-in-out infinite;
       }
       .btn-green{background:#10b98115;border:1px solid #10b981;color:#10b981;padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500}
-      .btn-red{background:transparent;border:1px solid #ef4444;color:#ef4444;padding:6px 11px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s}
+      .btn-red{background:transparent;border:1px solid #ef4444;color:#ef4444;padding:10px 14px;border-radius:8px;min-height:44px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s}
       .btn-red:hover{background:#ef444418}
       .cat-btn{background:transparent;border:1px solid #14202e;color:#b0bec5;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;white-space:nowrap;transition:all .2s;font-family:'Outfit',sans-serif}
       .cat-btn.active{border-color:#00d4aa;color:#00d4aa;background:#00d4aa10}
@@ -154,8 +154,8 @@ export function GlobalStyles() {
       .ai-msg{padding:12px 14px;border-radius:8px;margin:6px 0;font-size:13px;line-height:1.65;animation:fi .3s ease}
       @keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
       .ai-user{background:#00d4aa0e;border:1px solid #00d4aa18;margin-left:32px}
-      .ai-bot{background:#0b0f17;border:1px solid #14202e;margin-right:32px}
-      .ai-input{background:#0b0f17;border:1px solid #14202e;color:#dde4ef;padding:11px 13px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;resize:none;flex:1;transition:border-color .2s}
+      .ai-bot{background:#0e1520;border:1px solid #14202e;margin-right:32px}
+      .ai-input{background:#0e1520;border:1px solid #14202e;color:#dde4ef;padding:11px 13px;border-radius:7px;font-family:'Outfit',sans-serif;font-size:13px;outline:none;resize:none;flex:1;transition:border-color .2s}
       .ai-input:focus{border-color:#00d4aa50}
       .scard{background:#0e1520;border:1px solid #14202e;border-radius:10px;padding:18px 20px;display:flex;align-items:center;gap:14px;transition:border-color .2s}
       .scard:hover{border-color:#1e2e40}
@@ -163,7 +163,7 @@ export function GlobalStyles() {
       .form-input:focus{border-color:#00d4aa50}
       .pulse{animation:pulse 2s infinite}
       @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-      .sugg-btn{background:#0b0f17;border:1px solid #14202e;color:#b0bec5;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
+      .sugg-btn{background:#0e1520;border:1px solid #14202e;color:#b0bec5;padding:9px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;text-align:left;transition:all .2s;width:100%}
       .sugg-btn:hover{border-color:#00d4aa30;color:#b0bec5}
       .guide-sidebar{scrollbar-width:thin}
       .modal-backdrop--sheet{align-items:flex-end;justify-content:center;padding:0}
@@ -206,7 +206,7 @@ export function GlobalStyles() {
         position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));
         z-index:55;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;
         display:flex;align-items:center;justify-content:center;
-        border:1px solid #243040;border-radius:12px;background:#0b0f17;color:#b0bec5;
+        border:1px solid #243040;border-radius:12px;background:#0e1520;color:#b0bec5;
         font-size:22px;line-height:1;cursor:pointer;font-family:'Outfit',sans-serif;
         box-shadow:0 4px 20px rgba(0,0,0,.45);
         transition:color .15s,border-color .15s,background .15s;
@@ -361,6 +361,7 @@ export function GlobalStyles() {
         border-bottom:1px solid #0e1822;
         position:relative;
         z-index:220;
+        scroll-margin-top:var(--pepv-top-header-height);
       }
       @media (max-width:767px){
         .pepv-library-mobile-search-panel{
@@ -372,8 +373,8 @@ export function GlobalStyles() {
       /* Persistent header — shared action control (App.jsx + header icons). */
       .pepv-header-action-btn{
         box-sizing:border-box;
-        height:36px;
-        min-width:36px;
+        height:44px;
+        min-width:44px;
         padding:0 12px;
         border-radius:8px;
         border:1px solid #1e3040;

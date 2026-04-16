@@ -2524,6 +2524,57 @@ async function fetchPublicActiveFastForProfile(supabaseUrl, serviceKey, memberPr
 }
 
 /**
+ * Public follow counts for a member profile.
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} memberProfileId
+ * @returns {Promise<{ follower_count: number, following_count: number } | null>}
+ */
+async function fetchFollowCountsForProfile(supabaseUrl, serviceKey, memberProfileId) {
+  const rpcUrl = `${supabaseUrl}/rest/v1/rpc/get_follow_counts`;
+  const res = await fetch(rpcUrl, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_profile_id: memberProfileId }),
+  });
+  const row = await res.json().catch(() => null);
+  if (!res.ok || !row || typeof row !== "object") return null;
+  const followerCount = Number(row.follower_count);
+  const followingCount = Number(row.following_count);
+  return {
+    follower_count: Number.isFinite(followerCount) && followerCount >= 0 ? followerCount : 0,
+    following_count: Number.isFinite(followingCount) && followingCount >= 0 ? followingCount : 0,
+  };
+}
+
+/**
+ * Public stack share id for a member profile when a share link already exists.
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} memberProfileId
+ * @returns {Promise<string | null>}
+ */
+async function fetchPublicStackShareIdForProfile(supabaseUrl, serviceKey, memberProfileId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/user_stacks?profile_id=eq.${encodeURIComponent(memberProfileId)}&select=share_id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows) || !rows[0]) return null;
+  const shareId = typeof rows[0].share_id === "string" ? rows[0].share_id.trim() : "";
+  return shareId || null;
+}
+
+/**
  * GET /member-profiles/public?handle=foo — no auth. Public member card fields for a unique @handle.
  */
 async function handleGetMemberProfilePublic(request, env, cors) {
@@ -2575,11 +2626,23 @@ async function handleGetMemberProfilePublic(request, env, cors) {
   }
 
   let publicFast = null;
+  let followCounts = null;
+  let publicStackShareId = null;
   if (typeof row.id === "string" && row.id) {
     try {
       publicFast = await fetchPublicActiveFastForProfile(supabaseUrl, serviceKey, row.id);
     } catch {
       publicFast = null;
+    }
+    try {
+      followCounts = await fetchFollowCountsForProfile(supabaseUrl, serviceKey, row.id);
+    } catch {
+      followCounts = null;
+    }
+    try {
+      publicStackShareId = await fetchPublicStackShareIdForProfile(supabaseUrl, serviceKey, row.id);
+    } catch {
+      publicStackShareId = null;
     }
   }
 
@@ -2600,7 +2663,14 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     rumble_handle: row.rumble_handle,
     experience_level: row.experience_level,
     goals: row.goals,
+    city: row.city,
+    state: row.state,
+    country: row.country,
+    shift_schedule: row.shift_schedule,
     plan,
+    follower_count: followCounts?.follower_count ?? 0,
+    following_count: followCounts?.following_count ?? 0,
+    public_stack_share_id: publicStackShareId,
     public_fast: publicFast,
   };
 

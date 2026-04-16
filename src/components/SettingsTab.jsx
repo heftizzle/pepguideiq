@@ -26,6 +26,11 @@ import {
   normalizeHandleInput,
   stripHandleAtPrefix,
 } from "../lib/memberProfileHandle.js";
+import {
+  formatMemberProfileLocation,
+  formatShiftScheduleLabel,
+  formatWakeTimeLabel,
+} from "../lib/memberProfileMeta.js";
 import { wakeTimeFromInputToApi, wakeTimeToInputValue } from "../lib/sessionSchedule.js";
 
 const SECTION = {
@@ -65,7 +70,7 @@ function Card({ children, style = {} }) {
   return (
     <div
       style={{
-        background: "#0b0f17",
+        background: "#0e1520",
         border: "1px solid #1e2a38",
         borderRadius: 12,
         padding: 16,
@@ -139,6 +144,15 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   }, [sortedCountries, countryQuery]);
 
   const handleNormalized = useMemo(() => normalizeHandleInput(handleInput), [handleInput]);
+  const localeSummary = useMemo(
+    () => formatMemberProfileLocation({ city: localeCity, state: localeState, country: localeCountryCode }),
+    [localeCity, localeState, localeCountryCode]
+  );
+  const scheduleSummary = useMemo(() => {
+    const shift = formatShiftScheduleLabel(scheduleShift);
+    const wake = formatWakeTimeLabel(wakeTimeFromInputToApi(wakeTimeInput));
+    return [shift, wake ? `Wake ${wake}` : ""].filter(Boolean).join(" · ");
+  }, [scheduleShift, wakeTimeInput]);
   const handleSaveDisabled = useMemo(() => {
     const norm = normalizeHandleInput(handleInput);
     const raw = stripHandleAtPrefix(handleInput);
@@ -325,7 +339,10 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         language: localeLanguageTag || "en",
       });
       if (error) setErr(error.message);
-      else await refreshMemberProfiles();
+      else {
+        await refreshMemberProfiles();
+        setMsg("Locale saved.");
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save locale");
     } finally {
@@ -352,7 +369,10 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         wake_time: wt,
       });
       if (error) setErr(error.message);
-      else await refreshMemberProfiles();
+      else {
+        await refreshMemberProfiles();
+        setMsg("Schedule saved.");
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not save schedule");
     } finally {
@@ -443,8 +463,23 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         return;
       }
       if (normalized && handleAvailability !== "available") {
-        setHandleSaveInlineErr("Blur the handle field to check availability, or fix errors before saving.");
-        return;
+        if (!workerOk) {
+          setHandleSaveInlineErr("Fix handle errors before saving.");
+          return;
+        }
+        setHandleAvailability("checking");
+        const { available, error, reason } = await checkMemberProfileHandleAvailable(raw, activeProfileId);
+        if (error) {
+          setHandleAvailability("idle");
+          setHandleSaveInlineErr(error.message);
+          return;
+        }
+        if (!available || reason === "taken") {
+          setHandleAvailability("taken");
+          setHandleSaveInlineErr("This handle is already taken.");
+          return;
+        }
+        setHandleAvailability("available");
       }
     }
     setHandleSaveBusy(true);
@@ -485,7 +520,13 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         handleSaveSuccessTimerRef.current = null;
       }, 4000);
     } catch (e) {
-      setHandleSaveInlineErr(e instanceof Error ? e.message : "Could not save handle");
+      const msg = e instanceof Error ? e.message : "Could not save handle";
+      if (/already taken|duplicate|unique constraint/i.test(msg)) {
+        setHandleAvailability("taken");
+        setHandleSaveInlineErr("This handle is already taken.");
+      } else {
+        setHandleSaveInlineErr(msg);
+      }
     } finally {
       setHandleSaveBusy(false);
     }
@@ -717,6 +758,11 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               <div style={{ fontSize: 12, color: "#b0bec5", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
                 Your wake time personalizes dose reminders and protocol guardrails to your schedule.
               </div>
+              {scheduleSummary ? (
+                <div className="mono" style={{ fontSize: 12, color: "#8fa3b8", marginTop: 8 }}>
+                  Current: {scheduleSummary}
+                </div>
+              ) : null}
             </div>
             <button
               type="button"
@@ -906,6 +952,11 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               ))}
             </select>
           </div>
+          {localeSummary ? (
+            <div className="mono" style={{ fontSize: 12, color: "#8fa3b8" }}>
+              Current: {localeSummary}
+            </div>
+          ) : null}
           <button
             type="button"
             className="btn-teal"

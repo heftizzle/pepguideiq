@@ -10,6 +10,14 @@ export function sessionFromClockFallback() {
   return "night";
 }
 
+const SHIFT_SCHEDULE_WAKE_FALLBACK = {
+  days: "07:00:00",
+  swings: "10:00:00",
+  nights: "15:00:00",
+  mids: "19:00:00",
+  rotating: null,
+};
+
 /**
  * @param {string | null | undefined} wakeTime — Postgres TIME as "HH:MM:SS" or "HH:MM"
  * @returns {"morning"|"afternoon"|"evening"|"night"|null} null if unset or outside defined windows
@@ -33,8 +41,15 @@ export function inferSessionFromWakeTime(wakeTime) {
  * @param {string | null | undefined} wakeTime
  * @returns {"morning"|"afternoon"|"evening"|"night"}
  */
-export function inferProtocolSessionForNow(wakeTime) {
-  return inferSessionFromWakeTime(wakeTime) ?? sessionFromClockFallback();
+export function inferProtocolSessionForNow(wakeTime, shiftSchedule = null) {
+  const fromWake = inferSessionFromWakeTime(wakeTime);
+  if (fromWake) return fromWake;
+  const scheduleKey = typeof shiftSchedule === "string" ? shiftSchedule.trim().toLowerCase() : "";
+  const fallbackWake =
+    Object.prototype.hasOwnProperty.call(SHIFT_SCHEDULE_WAKE_FALLBACK, scheduleKey)
+      ? SHIFT_SCHEDULE_WAKE_FALLBACK[scheduleKey]
+      : null;
+  return inferSessionFromWakeTime(fallbackWake) ?? sessionFromClockFallback();
 }
 
 /** @param {unknown} wakeTime */

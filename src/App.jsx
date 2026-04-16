@@ -1205,6 +1205,7 @@ function PepGuideIQApp({ user, setUser }) {
 }
 
 function PepGuideIQMainTree({ mainUiRef }) {
+  const topHeaderRef = useRef(null);
   const { isHighlighted, stripVisible } = useDemoTour();
   const {
     user,
@@ -1301,6 +1302,28 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
+  useLayoutEffect(() => {
+    const el = topHeaderRef.current;
+    if (!el || typeof document === "undefined") return;
+    const root = document.documentElement;
+    const writeHeight = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height || 0);
+      if (h > 0) root.style.setProperty("--pepv-top-header-height", `${h}px`);
+    };
+    writeHeight();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", writeHeight);
+      return () => window.removeEventListener("resize", writeHeight);
+    }
+    const ro = new ResizeObserver(writeHeight);
+    ro.observe(el);
+    window.addEventListener("resize", writeHeight);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", writeHeight);
+    };
+  }, [activeTab, librarySearchOpen, narrowHeader]);
+
   return (
     <>
         <GlobalStyles />
@@ -1313,6 +1336,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
         >
 
           <div
+            ref={topHeaderRef}
             className="grid-bg"
             style={{
               borderBottom: "1px solid #0e1822",
@@ -1784,6 +1808,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       canUse={canVialTracker}
                       onUpgrade={openUpgradeModal}
                       wakeTime={activeProfile?.wake_time ?? null}
+                      shiftSchedule={activeProfile?.shift_schedule ?? null}
                     />
                   )}
                   {myStack.map((p) => (
@@ -1947,6 +1972,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               onUpgrade={openUpgradeModal}
               initialSession={protocolDeepLink}
               wakeTime={activeProfile?.wake_time ?? null}
+              shiftSchedule={activeProfile?.shift_schedule ?? null}
               onDeepLinkConsumed={() => {}}
               onLoggedNavigateLibrary={() => setActiveTab("library")}
               userPlan={user?.plan ?? "entry"}

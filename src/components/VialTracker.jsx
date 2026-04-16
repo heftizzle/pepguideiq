@@ -7,6 +7,7 @@ import {
   getEarliestDosedAtForPeptideIds,
   getSessionAccessToken,
   insertUserVial,
+  listDoseLogsForVialIdsRange,
   listDoseLogsForPeptideIdsRange,
   listRecentDosesForVial,
   listVialsForPeptideIds,
@@ -20,7 +21,11 @@ import {
   shouldResetImageUploadFetchBust,
   uploadImageToR2,
 } from "../lib/r2Upload.js";
-import { persistVialPeptideId, vialQueryPeptideIds } from "../lib/resolveStackCatalogPeptide.js";
+import {
+  findCatalogPeptideForStackRow,
+  persistVialPeptideId,
+  vialQueryPeptideIds,
+} from "../lib/resolveStackCatalogPeptide.js";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { formatInjectableDoseHistoryAmount, isBlendCatalogComponents } from "../lib/doseLogDisplay.js";
 import {
@@ -1262,6 +1267,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const resolvePeptideName = useCallback(
     (id) => {
       if (id && typeof id === "string" && peptideNameById.has(id)) return peptideNameById.get(id);
+      const catalogMatch = findCatalogPeptideForStackRow({ id });
+      if (catalogMatch?.name) return catalogMatch.name;
       return compoundName;
     },
     [peptideNameById, compoundName]
@@ -1447,7 +1454,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     if (gen !== reloadGen.current) return;
     setEarliestDosedAtIso(typeof earliest === "string" && earliest ? earliest : null);
     const { startIso, endIso } = doseHistoryFetchRangeIso(new Date(), earliest ?? null);
-    const { doses: cal } = await listDoseLogsForPeptideIdsRange(
+    const { doses: peptideLogs } = await listDoseLogsForPeptideIdsRange(
       userId,
       profileId,
       calendarPeptideIds,
@@ -1455,7 +1462,18 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
       endIso
     );
     if (gen !== reloadGen.current) return;
-    setCalendarDoses(cal ?? []);
+    const vialIds = (v ?? [])
+      .map((row) => row.id)
+      .filter((x) => typeof x === "string" && String(x).trim());
+    const { doses: vialLogs } = await listDoseLogsForVialIdsRange(userId, profileId, vialIds, startIso, endIso);
+    if (gen !== reloadGen.current) return;
+    const deduped = new Map();
+    for (const log of [...(peptideLogs ?? []), ...(vialLogs ?? [])]) {
+      const id = typeof log?.id === "string" ? log.id : "";
+      if (!id || deduped.has(id)) continue;
+      deduped.set(id, log);
+    }
+    setCalendarDoses([...deduped.values()]);
     setLoading(false);
   }, [userId, profileId, vialLookupIds, canUse]);
 

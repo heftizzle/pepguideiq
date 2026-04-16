@@ -201,7 +201,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             maxHeight: 280,
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
-            background: "#0b0f17",
+            background: "#0e1520",
             border: "1px solid #1a2840",
             borderRadius: 10,
             boxShadow: "0 12px 40px rgba(0,0,0,0.55)",

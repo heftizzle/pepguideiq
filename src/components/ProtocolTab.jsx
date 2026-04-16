@@ -50,6 +50,7 @@ function clampUnits(u) {
  *   onUpgrade: () => void;
  *   initialSession: string | null;
  *   wakeTime?: string | null;
+ *   shiftSchedule?: string | null;
  *   onDeepLinkConsumed: () => void;
  *   onLoggedNavigateLibrary: () => void;
  *   userPlan?: string;
@@ -63,13 +64,14 @@ export function ProtocolTab({
   onUpgrade,
   initialSession,
   wakeTime = null,
+  shiftSchedule = null,
   onDeepLinkConsumed,
   onLoggedNavigateLibrary: _onLoggedNavigateLibrary,
   userPlan: _userPlan = "entry",
 }) {
   const session = useMemo(
-    () => (isProtocolSessionId(initialSession) ? initialSession : inferProtocolSessionForNow(wakeTime)),
-    [initialSession, wakeTime]
+    () => (isProtocolSessionId(initialSession) ? initialSession : inferProtocolSessionForNow(wakeTime, shiftSchedule)),
+    [initialSession, wakeTime, shiftSchedule]
   );
 
   const [rows, setRows] = useState(null);

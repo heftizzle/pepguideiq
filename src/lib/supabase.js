@@ -1102,6 +1102,31 @@ export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideI
   return { doses: data ?? [], error: error ?? null };
 }
 
+/**
+ * Dose logs for one or more vial ids in an inclusive wall-time range.
+ * Useful for tracker/calendar views where vial identity is more authoritative than peptide_id.
+ * @param {string} userId
+ * @param {string} profileId
+ * @param {string[]} vialIds
+ * @param {string} startIso
+ * @param {string} endIso
+ */
+export async function listDoseLogsForVialIdsRange(userId, profileId, vialIds, startIso, endIso) {
+  const ids = [...new Set((vialIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };
+  if (ids.length === 0) return { doses: [], error: null };
+  let q = supabase
+    .from("dose_logs")
+    .select("id, vial_id, peptide_id, dosed_at, dose_mcg, notes, dose_count, dose_unit, protocol_session")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .gte("dosed_at", startIso)
+    .lte("dosed_at", endIso);
+  q = ids.length === 1 ? q.eq("vial_id", ids[0]) : q.in("vial_id", ids);
+  const { data, error } = await q.order("dosed_at", { ascending: false });
+  return { doses: data ?? [], error: error ?? null };
+}
+
 export async function listDoseLogsForPeptideRange(userId, profileId, peptideId, startIso, endIso) {
   return listDoseLogsForPeptideIdsRange(userId, profileId, [peptideId], startIso, endIso);
 }

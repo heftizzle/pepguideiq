@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
 export function AddToStackForm({ peptide, onCancel, onSave }) {
-  const [dose, setDose] = useState(() => peptide.startDose ?? "");
+  const [dose, setDose] = useState("");
   const [frequency, setFrequency] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    setDose(peptide.startDose ?? "");
+    setDose("");
     setFrequency("");
     setNotes("");
   }, [peptide.id]);
@@ -18,7 +18,12 @@ export function AddToStackForm({ peptide, onCancel, onSave }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>DOSE</div>
-          <input className="form-input" value={dose} placeholder={peptide.startDose} onChange={(e) => setDose(e.target.value)} />
+          <input
+            className="form-input"
+            value={dose}
+            placeholder={peptide.startDose ?? "Optional dose"}
+            onChange={(e) => setDose(e.target.value)}
+          />
         </div>
         <div>
           <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>FREQUENCY</div>

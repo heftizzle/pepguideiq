@@ -4,8 +4,10 @@ import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../
 import { fetchPublicMemberProfileByHandle } from "../lib/publicMemberProfile.js";
 import { fetchMemberProfiles, getCurrentUser, getSessionAccessToken } from "../lib/supabase.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatMemberProfileLocation, formatShiftScheduleLabel } from "../lib/memberProfileMeta.js";
 import { publicProfileGoalLabel } from "../data/publicProfileGoalLabels.js";
 import { followMemberProfile, getMyFollowing, unfollowMemberProfile } from "../lib/follows.js";
+import { buildStackShareUrl } from "../lib/stackShare.js";
 import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
 
@@ -180,6 +182,14 @@ export function PublicMemberProfilePage({
   const dispName = typeof profile?.display_name === "string" ? profile.display_name.trim() : "";
   const av = typeof profile?.avatar_url === "string" ? profile.avatar_url.trim() : "";
   const plan = typeof profile?.plan === "string" ? profile.plan.trim().toLowerCase() : "entry";
+  const locationLine = formatMemberProfileLocation(profile);
+  const followerCount = Number.isFinite(Number(profile?.follower_count)) ? Number(profile.follower_count) : 0;
+  const followingCount = Number.isFinite(Number(profile?.following_count)) ? Number(profile.following_count) : 0;
+  const shiftLabel = formatShiftScheduleLabel(profile?.shift_schedule);
+  const publicStackShareId =
+    typeof profile?.public_stack_share_id === "string" && profile.public_stack_share_id.trim()
+      ? profile.public_stack_share_id.trim()
+      : "";
 
   const inner = (
     <div
@@ -230,7 +240,7 @@ export function PublicMemberProfilePage({
                 borderRadius: "50%",
                 overflow: "hidden",
                 flexShrink: 0,
-                background: "#0b0f17",
+                background: "#0e1520",
                 border: "1px solid #243040",
                 display: "flex",
                 alignItems: "center",
@@ -255,19 +265,60 @@ export function PublicMemberProfilePage({
               ) : null}
               <div
                 className="mono"
-                style={{ fontSize: 12, color: "#b0bec5", marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}
+                style={{
+                  fontSize: 12,
+                  color: "#b0bec5",
+                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
               >
                 <span title="Plan tier" aria-hidden>
                   {tierEmoji(plan)}
                 </span>
                 <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{plan}</span>
+                {locationLine ? (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{locationLine}</span>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
 
+          {(followerCount > 0 || followingCount > 0) ? (
+            <div
+              className="mono"
+              style={{
+                fontSize: 12,
+                color: "#b0bec5",
+                marginBottom: 14,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px 14px",
+              }}
+            >
+              <span>
+                <span style={{ color: "#dde4ef" }}>{followerCount}</span> follower{followerCount === 1 ? "" : "s"}
+              </span>
+              <span>
+                <span style={{ color: "#dde4ef" }}>{followingCount}</span> following
+              </span>
+            </div>
+          ) : null}
+
           {exp ? (
             <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12 }}>
               Experience: <span style={{ color: "#cbd5e1" }}>{exp.replace(/_/g, " ")}</span>
+            </div>
+          ) : null}
+
+          {shiftLabel ? (
+            <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12 }}>
+              Schedule: <span style={{ color: "#cbd5e1" }}>{shiftLabel}</span>
             </div>
           ) : null}
 
@@ -329,9 +380,29 @@ export function PublicMemberProfilePage({
                   {followBusy ? "…" : "Follow"}
                 </button>
               )}
+              {publicStackShareId ? (
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 14 }}
+                  onClick={() => window.location.assign(buildStackShareUrl(publicStackShareId))}
+                >
+                  View shared stack
+                </button>
+              ) : null}
             </div>
           ) : !effectiveViewerProfileId && !effectiveViewerToken && profile ? (
             <div style={{ marginBottom: 20 }}>
+              {publicStackShareId ? (
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 14, marginRight: 10 }}
+                  onClick={() => window.location.assign(buildStackShareUrl(publicStackShareId))}
+                >
+                  View shared stack
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="btn-teal"

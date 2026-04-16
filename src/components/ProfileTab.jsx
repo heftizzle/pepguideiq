@@ -145,7 +145,7 @@ function Card({ children, style = {} }) {
   return (
     <div
       style={{
-        background: "#0b0f17",
+        background: "#0e1520",
         border: "1px solid #1e2a38",
         borderRadius: 12,
         padding: 16,
@@ -235,7 +235,7 @@ function PepguideStatsStrip({ stats, demoHighlightProps, demoHighlighted }) {
       data-demo-target={DEMO_TARGET.profile_score}
       {...demoHighlightProps(Boolean(demoHighlighted))}
       style={{
-        background: "#0b0f17",
+        background: "#0e1520",
         border: "1px solid #14202e",
         borderRadius: 10,
         padding: "14px 20px",
@@ -1182,13 +1182,23 @@ export function ProfileTab({
         if (workerOk) {
           const { error } = await patchMemberProfileViaWorker(activeProfileId, patch);
           if (error) {
-            setErr(error.message);
+            const msg = typeof error.message === "string" ? error.message : "Save failed";
+            if ("handle" in patch && /already taken|duplicate|unique constraint/i.test(msg)) {
+              setErr("This handle is already taken.");
+            } else {
+              setErr(msg);
+            }
             return false;
           }
         } else {
           const { error } = await updateMemberProfile(activeProfileId, patch);
           if (error) {
-            setErr(error.message);
+            const msg = typeof error.message === "string" ? error.message : "Save failed";
+            if ("handle" in patch && /already taken|duplicate|unique constraint/i.test(msg)) {
+              setErr("This handle is already taken.");
+            } else {
+              setErr(msg);
+            }
             return false;
           }
         }
@@ -1302,6 +1312,17 @@ export function ProfileTab({
     if (!isValidMemberHandleFormat(rawTyped)) {
       setErr("Handle: 3–32 chars; letters, numbers, _, ., or -; no .. or . at start/end");
       return;
+    }
+    if (workerOk) {
+      const { available, reason, error } = await checkMemberProfileHandleAvailable(rawTyped, activeProfileId);
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      if (!available || reason === "taken") {
+        setErr("This handle is already taken.");
+        return;
+      }
     }
     if (workerOk) {
       await saveProfilePatch({ handle: rawTyped });
