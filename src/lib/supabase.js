@@ -345,14 +345,50 @@ export async function upsertBodyMetrics(userId, profileId, patch) {
  */
 export async function updateUserProfile(patch) {
   if (!supabase) return { error: notConfiguredError() };
-  const { data: auth } = await supabase.auth.getUser();
-  const id = auth?.user?.id;
-  if (!id) return { error: new Error("Not signed in") };
-  const { error } = await supabase
-    .from("profiles")
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  return { error: error ?? null };
+  const {
+    data: { session },
+    error: sessionErr,
+  } = await supabase.auth.getSession();
+  if (sessionErr) return { error: sessionErr };
+  const token = session?.access_token;
+  const id = session?.user?.id;
+  if (!id || !token) return { error: new Error("Not signed in") };
+  // Use the same Supabase origin + anon key as the singleton client, but send JWT explicitly.
+  // Some flows validated auth via getUser() while PostgREST PATCH omitted Authorization (403 RLS).
+  const supabaseUrl = url.replace(/\/$/, "");
+  const payload = { ...patch, updated_at: new Date().toISOString() };
+  const restUrl = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}`;
+  const res = await fetch(restUrl, {
+    method: "PATCH",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    try {
+      const errBody = await res.json();
+      if (errBody && typeof errBody === "object" && typeof errBody.message === "string") {
+        msg = errBody.message;
+      } else if (typeof errBody === "string") {
+        msg = errBody;
+      }
+    } catch {
+      try {
+        const t = await res.text();
+        if (t) msg = t.length > 400 ? `${t.slice(0, 400)}…` : t;
+      } catch {
+        /* ignore */
+      }
+    }
+    return { error: new Error(msg) };
+  }
+  return { error: null };
 }
 
 /**

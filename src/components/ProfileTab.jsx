@@ -941,10 +941,10 @@ export function ProfileTab({
     async (value) => {
       if (!user?.id) return;
       if (!["male", "female", "prefer_not_to_say"].includes(value)) return;
+      profilesSaveInFlightRef.current += 1;
       setErr(null);
       const prev = bioSex;
       const seq = ++profilesSaveSeqRef.current;
-      profilesSaveInFlightRef.current += 1;
       setBioSex(value);
       try {
         const { error } = await updateUserProfile({ biological_sex: value });
@@ -971,10 +971,10 @@ export function ProfileTab({
   const setCycleTrackingConsent = useCallback(
     async (enabled) => {
       if (!user?.id) return;
+      profilesSaveInFlightRef.current += 1;
       setErr(null);
       const prev = user.cycle_tracking_enabled ?? null;
       const seq = ++profilesSaveSeqRef.current;
-      profilesSaveInFlightRef.current += 1;
       setUser((u) => (u ? { ...u, cycle_tracking_enabled: enabled } : u));
       try {
         const { error } = await updateUserProfile({ cycle_tracking_enabled: enabled });
@@ -1003,9 +1003,9 @@ export function ProfileTab({
     const normalized = assembleDob(dobMonth, dobDay, dobYear);
     if (normalized === undefined) return;
     if (normalized === lastCommittedDobRef.current) return;
+    profilesSaveInFlightRef.current += 1;
     setErr(null);
     const seq = ++profilesSaveSeqRef.current;
-    profilesSaveInFlightRef.current += 1;
     try {
       const { error } = await updateUserProfile({ date_of_birth: normalized });
       if (error) {
@@ -1336,10 +1336,10 @@ export function ProfileTab({
     async (value) => {
       if (!user?.id) return;
       if (!["beginner", "intermediate", "advanced", "elite"].includes(value)) return;
+      profilesSaveInFlightRef.current += 1;
       setErr(null);
       const prev = trainingExp;
       const seq = ++profilesSaveSeqRef.current;
-      profilesSaveInFlightRef.current += 1;
       setTrainingExp(value);
       try {
         const { error } = await updateUserProfile({ training_experience: value });
