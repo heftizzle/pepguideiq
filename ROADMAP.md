@@ -1,6 +1,6 @@
 # pepguideIQ Roadmap
 
-> Built in 22 days. 171-compound catalog. 51 Supabase migrations. Live at [pepguideiq.com](https://pepguideiq.com)
+> Built in 22 days. 171-compound catalog. 53 Supabase migrations. Live at [pepguideiq.com](https://pepguideiq.com)
 > Last updated: April 16, 2026
 > Soft launch target: **May 1, 2026**. 1K-user goal: August 1, 2026.
 
@@ -18,32 +18,29 @@
 - [x] Supabase Pro upgrade
 - [x] Supabase Auth URL config — Site URL `https://pepguideiq.com` + Redirect URLs wildcard
 - [x] `dan@pepguideiq.com` live
+- [x] `hello@pepguideiq.com` live (alias → dan@, zero cost)
 - [x] Resend SMTP — transactional emails from `noreply@pepguideiq.com`
-- [ ] PgBouncer connection pooling (separate from Pro — still needs wiring)
-- [ ] Account deletion flow verified end-to-end
-- [ ] `hello@pepguideiq.com` live
+- [x] DMARC record live — `_dmarc.pepguideiq.com` TXT in Cloudflare; full SPF + DKIM + DMARC stack
+- [x] PgBouncer — confirmed not needed (Supabase JS client uses REST/PostgREST); connection pooling enabled at size 15
+- [x] Rewardful affiliate tracking — all 11 codes whitelisted in `src/lib/affiliateRef.js`, case-insensitive; snippet + referral ID capture wired; webhook handles Rewardful referral string vs UUID
+- [x] Account deletion flow — Stripe subscription cancel → R2 cleanup → auth delete; verified end-to-end twice
+- [x] Signup trigger fixed — `handle_new_user` atomically creates `profiles` + `member_profiles` + `user_stacks` (migration 053)
 - [ ] Liability insurance for the LLC
-- [ ] Rewardful affiliate tracking — only `EDON15` and `TSource15` whitelisted in `src/lib/affiliateRef.js` today; add `Primo15`, `Pete15`, `ironresolve15`, `KwElite15`, `OTMax15` before marketing
 
 ---
 
 ## 🟡 Active — Cursor Queue
 > In progress or queued for immediate execution
 
-1. Find People `X` button broken — full-screen trap, no nav, `onClick` dead; needs `history.back()` fallback
-2. AI Guide `X` button
-3. Locale fields (city / state / country)
-4. Shift schedule
-5. Handles unique constraint
-6. PgBouncer wiring
-7. Mobile layout
-8. Pills nowrap
-9. Search bar overlap
-10. Profile card tap nav
-11. Followers / Following / Shared Stacks
-12. Dose interval lock
-13. Rewardful + Stripe referral ID
-14. Account deletion flow
+1. Locale fields (city / state / country)
+2. Shift schedule
+3. Handles unique constraint
+4. Mobile layout
+5. Pills nowrap
+6. Search bar overlap
+7. Profile card tap nav
+8. Followers / Following / Shared Stacks
+9. Dose interval lock
 
 ---
 
@@ -123,6 +120,7 @@
 - [ ] Trivy or Snyk security scanning in CI
 - [ ] Dependabot / Renovate for automated dep PRs
 - [ ] SBOM generation on every release
+- [ ] PITR (Point-in-Time Recovery) — add post-500 users; $100/mo Supabase add-on
 
 ---
 
@@ -150,9 +148,15 @@
 - [x] Turnstile bot check on auth
 - [x] IP rate limiting (r2_write / r2_read / auth / api tiers) in Worker
 - [x] Server-authoritative plan enforcement (trigger + `update_user_plan` RPC, migration 008)
-- [x] 51 Supabase migrations through `050_profiles_age_training.sql`
+- [x] 53 Supabase migrations through `053_fix_handle_new_user_trigger.sql`
 - [x] Network feed + member follows + notifications
 - [x] Fasting tracker (6 fast types, member_fasts table, public toggle)
 - [x] Demo tour (6-step core walkthrough, session-count gated)
 - [x] Age gate (`pepv_age_verified_v2` localStorage, v=1)
 - [x] ToS + Privacy Policy + Research Use Waiver at `/legal`
+- [x] Rewardful affiliate integration — 11-code whitelist, case-insensitive, referral ID capture, webhook UUID resolution
+- [x] Account deletion — Stripe cancel + R2 cleanup + auth delete + `window.location.replace` redirect
+- [x] Find People X button — z-index fix + `history.back()` fallback
+- [x] AI Guide X button — z-index fix, clean Library landing
+- [x] DMARC + SPF + DKIM — full email auth stack on `pepguideiq.com`
+- [x] `hello@pepguideiq.com` — Google Workspace alias, zero additional cost
