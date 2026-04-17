@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Supabase rules
 
-**51 migrations** through `050_profiles_age_training.sql` plus `045a`. Apply in strict order. `supabase db push` or paste into SQL Editor — both work.
+**54 migrations** through `053_fix_handle_new_user_trigger.sql` plus `045a`. Apply in strict order. `supabase db push` or paste into SQL Editor — both work.
 
 ## Tables (12)
 

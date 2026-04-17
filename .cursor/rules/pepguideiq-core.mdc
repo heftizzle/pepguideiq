@@ -64,6 +64,11 @@ Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCateg
 7. For any count (compounds, migrations, users) — import and count. Do not infer from constants or stale docs.
 8. Inline styles only. Use existing global classes in `src/components/GlobalStyles.jsx`: `brand`, `mono`, `btn-red`, `btn-teal`, `form-input`, `scard`, `pcard`, `pill--category`.
 
+9. Before building or modifying any UI component, read `DESIGN.md` at the repo root. Use its color tokens, spacing scale, and component patterns. Never introduce colors, fonts, or spacing values not defined there.
+
+10. Affiliate codes — exactly 11, case-insensitive: `Primo15`, `Pete15`, `Tsource15`, `EDON15`, `ironresolve15`, `Palmer15`, `Ryba15`, `Fire15`, `Lake15`, `OTMen15`, `Elite15`. All normalized via `normalizeAffiliateRef()`. Any code not in this list is silently dropped.
+
+
 ## When you need deeper context
 
 - Frontend questions → see `.cursor/rules/frontend.mdc` (auto-loads when working in `src/`)

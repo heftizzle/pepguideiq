@@ -93,12 +93,12 @@ function getInitialFabPosition() {
   }
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const defX = defaultOffsetX();
+  const defX = w > 768 ? snapOffsetXForSide("right") : defaultOffsetX();
   const defTop = defaultFabTop();
   const stored = readStoredFabPosition();
   let ox = defX;
   let top = defTop;
-  if (stored) {
+  if (stored && w <= 768) {
     ox = stored.offsetX;
     top = stored.top;
   }
@@ -480,8 +480,11 @@ export function DoseLogFAB({ onSessionPicked }) {
           height: "auto",
           borderRadius: FAB_SIZE / 2,
           border: "1px solid rgba(0, 212, 170, 0.55)",
-          background: "linear-gradient(145deg, rgba(0, 212, 170, 0.22), rgba(7, 9, 14, 0.95))",
+          background: "rgba(0, 212, 170, 0.18)",
           boxShadow: "0 6px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 212, 170, 0.12)",
+          touchAction: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
           cursor: expanded ? "default" : "grab",
           display: "flex",
           flexDirection: "column",

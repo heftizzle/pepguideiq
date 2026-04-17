@@ -51,6 +51,7 @@ alwaysApply: false
 - Inline `style={{...}}` objects.
 - Global classes in `GlobalStyles.jsx`: `brand`, `mono`, `btn-red`, `btn-teal`, `form-input`, `scard`, `pcard`, `pill--category`, `search-input`.
 - Category colors from `CAT_COLORS` in `src/data/catalog.js`. Use `getCategoryCssVars(cat)` to set `--cc` and `--cc-rgb` custom properties.
+- **Design system:** Read `DESIGN.md` at the repo root before building or modifying any UI component. Use its color tokens, spacing scale, and component patterns. Never introduce colors, fonts, or spacing values not defined there.
 
 ## Storage keys (don't collide)
 
