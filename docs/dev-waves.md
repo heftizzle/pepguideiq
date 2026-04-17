@@ -16,7 +16,11 @@ Excludes non-engineering work (e.g. liability insurance, FinCEN calendar). Each 
 | [x] | Handles: DB uniqueness + format | Covered by migrations (`member_profiles_handle_*`, `041` lookup). |
 | [ ] | Handle UX + conflict recovery in Settings | Surface `23505` / unique failures cleanly, preserve optimistic editing state, and add explicit retry copy in [src/components/SettingsTab.jsx](/Users/johnny/repos/pepguideiq/src/components/SettingsTab.jsx) and handle update paths in [src/lib/supabase.js](/Users/johnny/repos/pepguideiq/src/lib/supabase.js). Independent PR. |
 | [ ] | Dose interval lock product spec | Define per-compound lock semantics before implementation: lock window source of truth, override rules, blend behavior, and interaction with same-day logging. Main code hotspot is [src/lib/protocolGuardrails.js](/Users/johnny/repos/pepguideiq/src/lib/protocolGuardrails.js) plus protocol quick-log flows in [src/App.jsx](/Users/johnny/repos/pepguideiq/src/App.jsx). Blocks the implementation row below. |
-| [ ] | Dose interval lock implementation | Add productized lock metadata and enforcement to protocol logging, quick-log entry points, and saved stack flows; update user-facing copy and tests/manual QA cases. Expected touchpoints: [src/lib/protocolGuardrails.js](/Users/johnny/repos/pepguideiq/src/lib/protocolGuardrails.js), [src/App.jsx](/Users/johnny/repos/pepguideiq/src/App.jsx), [src/components/BuildTab.jsx](/Users/johnny/repos/pepguideiq/src/components/BuildTab.jsx), [src/components/VialTracker.jsx](/Users/johnny/repos/pepguideiq/src/components/VialTracker.jsx), [src/lib/supabase.js](/Users/johnny/repos/pepguideiq/src/lib/supabase.js). Depends on the spec row. |
+| [ ] | Dose interval lock: rules map + latest-dose query | Replace the generic cooldown lookup with a rule-driven config and a reliable “latest dose for compound” query across Protocol and Stack quick-log flows. Main touchpoints: [src/lib/protocolGuardrails.js](/Users/johnny/repos/pepguideiq/src/lib/protocolGuardrails.js), [src/lib/supabase.js](/Users/johnny/repos/pepguideiq/src/lib/supabase.js). Depends on the spec row. |
+| [ ] | Dose interval lock: Protocol tab enforcement | Apply lock state, unlock-time messaging, and disabled-button behavior in [src/components/ProtocolTab.jsx](/Users/johnny/repos/pepguideiq/src/components/ProtocolTab.jsx). Depends on the rules/query row. |
+| [ ] | Dose interval lock: Stack quick-log enforcement | Mirror the Protocol behavior in [src/components/StackProtocolQuickLog.jsx](/Users/johnny/repos/pepguideiq/src/components/StackProtocolQuickLog.jsx). Depends on the rules/query row. |
+| [ ] | Dose interval lock: saved-stack / builder affordance audit | Decide whether stack editing/building surfaces need lock visibility or only the active log surfaces do. If needed, touch [src/App.jsx](/Users/johnny/repos/pepguideiq/src/App.jsx) and [src/components/BuildTab.jsx](/Users/johnny/repos/pepguideiq/src/components/BuildTab.jsx). Depends on the spec row. |
+| [ ] | Dose interval lock: QA matrix + regression notes | Cover weekly GLP rows, same-day duplicates, cross-midnight behavior, blend ids, and local-time display edge cases. Depends on both enforcement rows. |
 
 ## Wave B - Active queue (profile and UX)
 
@@ -58,20 +62,52 @@ Keep these as unchecked epic rows in this doc and split into child tickets later
 
 | Status | Effort | Scope / likely files / dependencies |
 |--------|--------|-------------------------------------|
-| [ ] | Language packs / i18n foundation | Introduce a translation architecture before adding Spanish-first locale packs. This is a cross-app effort touching copy embedded throughout [src/App.jsx](/Users/johnny/repos/pepguideiq/src/App.jsx) and large component files. |
-| [ ] | Feed engagement epic | Likes, comments, and notifications on feed posts; likely spans Worker routes, Supabase schema, feed queries, and network/profile UI surfaces. |
-| [ ] | Product upload epic | Personal product upload flows, storage, validation, and profile/stack integration. |
-| [ ] | Dosing intelligence epic | Dosing guide per compound, titration schedule builder, smart protocols, and dose reminders. Shared product area; ticket together later to avoid fragmented scheduling logic. |
-| [ ] | History and export epic | PDF export, dose history calendar redesign, never-miss visual tracking, and inventory/remaining volume extensions. Strong overlap with [src/components/VialTracker.jsx](/Users/johnny/repos/pepguideiq/src/components/VialTracker.jsx). |
-| [ ] | Identity and auth expansion epic | Biometric / Google / Apple login plus associated auth UX and account-linking work. |
-| [ ] | Stack Builder V2 epic | Coach mode, templates, and optional vial linkage. Main feature area: [src/components/BuildTab.jsx](/Users/johnny/repos/pepguideiq/src/components/BuildTab.jsx). |
-| [ ] | Mobile app / offline epic | Capacitor packaging and PWA offline support. This is platform work, not a pre-launch patch set. |
-| [ ] | AI Guide RAG epic | Pgvector, embeddings, retrieval orchestration, and guide prompt changes. Requires design and schema work before implementation. |
-| [ ] | Profile health hub epic | Progress photos, scans, labs, consent/waiver flows, and profile visibility rules. |
-| [ ] | Ecosystem integrations epic | Oasis purity data, Finnrick partnership depth, Coinbase Commerce, Reddit feed integration. Each needs partner/API due diligence before coding. |
-| [ ] | Catalog expansion epic | Vitamins/supplements wing plus anabolics/HRT support, including explicit compliance and UX boundaries. |
-| [ ] | Community systems epic | Leaderboard, percentile, vendor ratings, and richer network identity layers. |
-| [ ] | DevSecOps hardening epic | Container base-image pinning, dependency pinning, scanner in CI, Dependabot/Renovate, SBOM generation, and PITR decision point. Should become its own milestone after beta stabilizes. |
+| [ ] | I18n foundation: copy inventory + translation key strategy | Introduce the translation architecture before adding language packs. Inventory hardcoded UI copy across [src/App.jsx](/Users/johnny/repos/pepguideiq/src/App.jsx) and the large tab components, define key naming, and pick runtime loading strategy. |
+| [ ] | I18n foundation: locale precedence + formatting utilities | Define how browser locale, saved profile language, and future app-level overrides interact. Add shared date/number/plural formatting helpers before text translation lands. Depends on the copy/key strategy row. |
+| [ ] | Language pack: Spanish | First translation pack once the foundation rows are stable. Include compact mobile-surface QA and legal-copy review. |
+| [ ] | Language packs: follow-on locales | Portuguese, French, German, Japanese, Mandarin once Spanish is proven. Depends on the Spanish row. |
+| [ ] | Feed engagement: likes data model + endpoints | Schema, RLS, Worker routes, and optimistic client helpers for likes on feed posts. |
+| [ ] | Feed engagement: comments data model + UI | Comment storage, threading limits, composer UI, and feed/profile rendering. Depends on the likes/endpoints row if notifications share the same nav model. |
+| [ ] | Feed engagement: notification fan-out + unread UX | Notification creation, badges, unread state, and nav targets for likes/comments. Depends on likes/comments rows. |
+| [ ] | Feed engagement: moderation/report controls | Basic reporting, delete rules, and abuse boundaries before opening comments broadly. |
+| [ ] | Product upload: storage model + metadata form | Personal product upload schema, storage pathing, validation, and the first upload/edit UI. |
+| [ ] | Product upload: stack/profile integration surfaces | Where uploaded products appear and how they connect to stacks, vials, or profile context. Depends on the storage/model row. |
+| [ ] | Dosing intelligence: per-compound guide data model | Decide whether structured dosing-guide content lives in catalog rows, sidecar files, or DB-backed content. |
+| [ ] | Dosing intelligence: titration builder UX | Build the titration schedule creator once dosing-guide structure exists. Depends on the guide data-model row. |
+| [ ] | Dosing intelligence: smart protocol planner | Multi-phase cycling, planner reorder, and schedule-aware helpers. Depends on titration builder semantics. |
+| [ ] | Dosing intelligence: reminder rules + delivery model | Define how protocol intelligence feeds reminders without duplicating mobile/offline notification work. Depends on the planner row and notification-platform direction. |
+| [ ] | History/export: dose history calendar redesign | Improve the calendar/day-detail UX in [src/components/VialTracker.jsx](/Users/johnny/repos/pepguideiq/src/components/VialTracker.jsx) before layering exports and analytics on top. |
+| [ ] | History/export: missed-dose and continuity views | “Never miss a dose” visual tracking and continuity indicators. Depends on the calendar redesign row. |
+| [ ] | History/export: PDF/export pipeline | Export generation, branding, and privacy-safe content selection. Depends on the redesigned history surfaces. |
+| [ ] | History/export: remaining volume / inventory extensions | Expand vial remaining-volume tracking and inventory summaries. Can run alongside export work if the shared tracker model stays stable. |
+| [ ] | Identity/auth: Google provider rollout | Provider config, callback handling, account-linking, and auth-screen UX. |
+| [ ] | Identity/auth: Apple provider rollout | Apple auth plus platform-specific callback/testing needs. Depends on the shared OAuth account-linking decisions from the Google row. |
+| [ ] | Identity/auth: biometric re-entry UX | Device-level unlock/re-entry for mobile/PWA shells after the auth-provider work is settled. |
+| [ ] | Stack Builder V2: stack templates | Save/reuse protocol frameworks in [src/components/BuildTab.jsx](/Users/johnny/repos/pepguideiq/src/components/BuildTab.jsx). |
+| [ ] | Stack Builder V2: planner reorder | Reordering and editing flow improvements once templates exist. |
+| [ ] | Stack Builder V2: vial linkage | Optional vial-to-stack associations and any necessary tracker/build data wiring. Depends on template/reorder semantics. |
+| [ ] | Stack Builder V2: coach mode | Client roster, assignment flows, visibility rules, and pricing implications. Depends on the core V2 rows. |
+| [ ] | Mobile/offline: Capacitor shell spike | App shell packaging, nav behavior, auth callback handling, and native-bridge feasibility. |
+| [ ] | Mobile/offline: offline cache boundaries | Decide what is safe to cache offline for catalog, stacks, vials, and calculators. Depends on the shell spike. |
+| [ ] | Mobile/offline: sync + conflict model | Reconnect behavior, stale writes, and background refresh strategy. Depends on the cache-boundary row. |
+| [ ] | AI Guide RAG: corpus prep + embedding pipeline | Catalog/dose-history corpus prep, embedding job, and update triggers. |
+| [ ] | AI Guide RAG: vector schema + retrieval layer | pgvector schema, retrieval queries, and ranking logic. Depends on corpus prep. |
+| [ ] | AI Guide RAG: prompt integration + plan controls | Inject retrieval into guide prompts, add plan-aware guardrails, and validate privacy boundaries. Depends on the retrieval layer. |
+| [ ] | Profile health hub: progress photo gallery + privacy model | Public/private visibility and photo-set UX. |
+| [ ] | Profile health hub: scans/labs schema + upload flow | DEXA/InBody/lab ingestion, storage, and metadata model. Depends on the privacy model row. |
+| [ ] | Profile health hub: consent/waiver UX | Explicit consent boundaries before exposing richer health records. Depends on the schema/privacy rows. |
+| [ ] | Ecosystem integrations: purity/vendor data partner review | Oasis and Finnrick depth need partner/API diligence before implementation. |
+| [ ] | Ecosystem integrations: Reddit ingestion spike | Feed source quality, rate limits, moderation boundaries, and filtering rules before coding. |
+| [ ] | Ecosystem integrations: alternate commerce rails | Coinbase Commerce and related payment/billing implications. Keep separate from content/data partner work. |
+| [ ] | Catalog expansion: vitamins/supplements taxonomy | Structure, UX boundaries, and flagship compounds before data entry starts. |
+| [ ] | Catalog expansion: HRT/anabolics compliance review | Decide compliance/product boundaries before adding catalog rows or guidance. Depends on policy clarity, not just UI work. |
+| [ ] | Community systems: leaderboard + percentile model | Ranking logic, fairness rules, and anti-gaming assumptions before UI implementation. |
+| [ ] | Community systems: vendor ratings | Submission rules, moderation, and legal/compliance review before public launch. |
+| [ ] | Community systems: richer network identity layers | Expanded public identity, badges, or profile graph features once follow/feed surfaces are stable. |
+| [ ] | DevSecOps: dependency pinning + automated updates | Dependency policy, Renovate/Dependabot, and review workflow. |
+| [ ] | DevSecOps: CI scanning + SBOM generation | Add security scanning and release SBOMs after dependency policy is set. Depends on the pinning row. |
+| [ ] | DevSecOps: container/base-image hardening | Containerization and pinned base digests after the current Pages/Worker flow is stable. |
+| [ ] | DevSecOps: PITR decision + rollout checkpoint | Operational decision point once user volume justifies the spend. |
 
 ---
 

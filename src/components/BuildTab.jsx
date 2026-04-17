@@ -425,7 +425,6 @@ export function BuildTab({
         advisorDebounce.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounced advisor; rows/catalog/primaryCategory from render when fingerprint changes
   }, [advisorStackFingerprint]);
 
   useEffect(() => {

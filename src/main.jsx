@@ -21,8 +21,14 @@ function PublicStackViewWithAgeGate({ shareId }) {
   }, []);
   return (
     <>
-      {!ageVerified && <AgeGate onConfirm={onConfirm} onExit={onExit} />}
-      <PublicStackView shareId={shareId} />
+      {!ageVerified ? (
+        <>
+          <GlobalStyles />
+          <AgeGate onConfirm={onConfirm} onExit={onExit} />
+        </>
+      ) : (
+        <PublicStackView shareId={shareId} />
+      )}
     </>
   );
 }
@@ -45,8 +51,14 @@ function PublicMemberProfileWithAgeGate({ handle }) {
   }, []);
   return (
     <>
-      {!ageVerified && <AgeGate onConfirm={onConfirm} onExit={onExit} />}
-      <PublicMemberProfilePage handle={handle} onClose={onClose} includeGlobalStyles />
+      {!ageVerified ? (
+        <>
+          <GlobalStyles />
+          <AgeGate onConfirm={onConfirm} onExit={onExit} />
+        </>
+      ) : (
+        <PublicMemberProfilePage handle={handle} onClose={onClose} includeGlobalStyles />
+      )}
     </>
   );
 }

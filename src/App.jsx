@@ -2726,9 +2726,6 @@ export default function PepGuideIQ() {
     window.location.href = "https://www.google.com";
   }, []);
 
-  const ageGateOverlay =
-    !ageVerified ? <AgeGate onConfirm={confirmAgeVerified} onExit={exitUnderAge} /> : null;
-
   useEffect(() => {
     const onPop = () => setLegalRoute(getNormalizedPathname() === "/legal");
     window.addEventListener("popstate", onPop);
@@ -2736,6 +2733,10 @@ export default function PepGuideIQ() {
   }, []);
 
   useEffect(() => {
+    if (!ageVerified && !legalRoute) {
+      setAuthReady(!isSupabaseConfigured());
+      return;
+    }
     if (!isSupabaseConfigured()) {
       setAuthReady(true);
       return;
@@ -2756,14 +2757,22 @@ export default function PepGuideIQ() {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [ageVerified, legalRoute]);
 
   if (legalRoute) {
     return (
       <>
         <GlobalStyles />
-        {ageGateOverlay}
         <LegalPage />
+      </>
+    );
+  }
+
+  if (!ageVerified) {
+    return (
+      <>
+        <GlobalStyles />
+        <AgeGate onConfirm={confirmAgeVerified} onExit={exitUnderAge} />
       </>
     );
   }
@@ -2772,7 +2781,6 @@ export default function PepGuideIQ() {
     return (
       <>
         <GlobalStyles />
-        {ageGateOverlay}
         <div
           className="mono"
           style={{
@@ -2795,7 +2803,6 @@ export default function PepGuideIQ() {
     return (
       <>
         <GlobalStyles />
-        {ageGateOverlay}
         <AuthScreen onAuth={setUser} />
       </>
     );
@@ -2803,10 +2810,7 @@ export default function PepGuideIQ() {
 
   return (
     <ProfileProvider userId={user.id} plan={user.plan ?? "entry"}>
-      <>
-        {ageGateOverlay}
-        <PepGuideIQApp user={user} setUser={setUser} />
-      </>
+      <PepGuideIQApp user={user} setUser={setUser} />
     </ProfileProvider>
   );
 }

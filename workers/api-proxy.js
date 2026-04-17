@@ -1007,6 +1007,69 @@ function tierPlanFromStripeSubscription(subscr, env) {
   return normalizePlanTier(m, env);
 }
 
+function stripeSubscriptionStatusPriority(status) {
+  const normalized = typeof status === "string" ? status.trim().toLowerCase() : "";
+  if (normalized === "active") return 6;
+  if (normalized === "trialing") return 5;
+  if (normalized === "past_due") return 4;
+  if (normalized === "unpaid") return 3;
+  if (normalized === "incomplete") return 2;
+  if (normalized === "incomplete_expired") return 1;
+  if (normalized === "canceled") return 0;
+  return -1;
+}
+
+function stripeSubscriptionPeriodEnd(subscr) {
+  const value = typeof subscr?.current_period_end === "number" ? subscr.current_period_end : Number(subscr?.current_period_end);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function stripeSubscriptionCreatedAt(subscr) {
+  const value = typeof subscr?.created === "number" ? subscr.created : Number(subscr?.created);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function pickPrimaryStripeSubscription(subscriptions, allowedStatuses = null, fallbackToAny = true) {
+  const allowed = Array.isArray(allowedStatuses) ? new Set(allowedStatuses.map((s) => String(s).trim().toLowerCase())) : null;
+  const list = Array.isArray(subscriptions) ? subscriptions.filter((sub) => sub && typeof sub === "object") : [];
+  const eligible = allowed
+    ? list.filter((sub) => allowed.has(String(sub.status ?? "").trim().toLowerCase()))
+    : list;
+  const pool = eligible.length > 0 ? eligible : fallbackToAny ? list : [];
+  if (pool.length === 0) return null;
+  return pool
+    .slice()
+    .sort((a, b) => {
+      const statusDiff = stripeSubscriptionStatusPriority(b.status) - stripeSubscriptionStatusPriority(a.status);
+      if (statusDiff !== 0) return statusDiff;
+      const cancelDiff = Number(Boolean(a.cancel_at_period_end)) - Number(Boolean(b.cancel_at_period_end));
+      if (cancelDiff !== 0) return cancelDiff;
+      const periodDiff = stripeSubscriptionPeriodEnd(b) - stripeSubscriptionPeriodEnd(a);
+      if (periodDiff !== 0) return periodDiff;
+      return stripeSubscriptionCreatedAt(b) - stripeSubscriptionCreatedAt(a);
+    })[0];
+}
+
+function stripePortalAllowedOrigin(env) {
+  const origin = String(env.ALLOWED_ORIGIN ?? "").trim();
+  if (!origin || origin === "*") return "https://pepguideiq.com";
+  return origin.replace(/\/$/, "");
+}
+
+function normalizeStripePortalReturnUrl(rawReturnUrl, env) {
+  const allowedOrigin = stripePortalAllowedOrigin(env);
+  const fallback = `${allowedOrigin}/`;
+  if (typeof rawReturnUrl !== "string" || !rawReturnUrl.trim()) return fallback;
+  try {
+    const url = new URL(rawReturnUrl.trim(), fallback);
+    if (!/^https?:$/.test(url.protocol)) return fallback;
+    if (url.origin !== allowedOrigin) return fallback;
+    return url.toString();
+  } catch {
+    return fallback;
+  }
+}
+
 async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
   const res = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, {
     method: "PATCH",
@@ -1233,15 +1296,14 @@ async function handleStripeCreateSubscription(request, env, cors) {
   }
   const customerId = ensured.customer_id;
 
-  const qs = new URLSearchParams({ customer: customerId, limit: "5", status: "all" });
+  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
   qs.append("expand[]", "data.items.data.price");
   const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
     headers: { Authorization: `Bearer ${stripeKey}` },
   });
   const listJson = await listRes.json().catch(() => ({}));
   const subs = Array.isArray(listJson.data) ? listJson.data : [];
-  const activeLike = (s) => ["active", "trialing", "past_due", "unpaid"].includes(s?.status);
-  const existing = subs.find((s) => activeLike(s) && !s.cancel_at_period_end);
+  const existing = pickPrimaryStripeSubscription(subs, ["active", "trialing", "past_due", "unpaid"], false);
 
   const expandFields = {
     "metadata[plan]": plan,
@@ -1348,10 +1410,7 @@ async function handleStripePortalSession(request, env, cors) {
   } catch {
     body = {};
   }
-  const returnUrl =
-    typeof body?.return_url === "string" && body.return_url.trim()
-      ? body.return_url.trim()
-      : "https://pepguideiq.com/";
+  const returnUrl = normalizeStripePortalReturnUrl(body?.return_url, env);
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -1806,7 +1865,7 @@ async function handleStripeSubscription(request, env, cors) {
 
   const qs = new URLSearchParams({
     customer: customerId,
-    limit: "1",
+    limit: "20",
     status: "all",
   });
   qs.append("expand[]", "data.default_payment_method");
@@ -1823,7 +1882,7 @@ async function handleStripeSubscription(request, env, cors) {
   }
 
   const list = Array.isArray(sdata.data) ? sdata.data : [];
-  const subscr = list[0];
+  const subscr = pickPrimaryStripeSubscription(list);
   if (!subscr) {
     return emptyResponse();
   }
@@ -1890,7 +1949,7 @@ async function handleScheduleDowngrade(request, env, cors) {
     return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
   }
 
-  const qs = new URLSearchParams({ customer: customerId, limit: "1", status: "all" });
+  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
   qs.append("expand[]", "data.default_payment_method");
   const sr = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
     headers: { Authorization: `Bearer ${stripeKey}` },
@@ -1904,7 +1963,7 @@ async function handleScheduleDowngrade(request, env, cors) {
     );
   }
   const list = Array.isArray(sdata.data) ? sdata.data : [];
-  const subscr = list[0];
+  const subscr = pickPrimaryStripeSubscription(list, ["active", "trialing", "past_due"], false);
   if (!subscr || typeof subscr.current_period_end !== "number") {
     return jsonResponse({ error: "No active subscription to schedule against" }, 400, cors);
   }
