@@ -236,6 +236,18 @@ export function DoseLogFAB({ onSessionPicked }) {
     return () => document.removeEventListener("pointerdown", onDocPointerDown, true);
   }, [expanded]);
 
+  useEffect(() => {
+    const el = fabRef.current;
+    if (!el) return;
+    const preventScroll = (e) => {
+      if (dragPhaseRef.current !== "idle") {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("touchmove", preventScroll, { passive: false });
+    return () => el.removeEventListener("touchmove", preventScroll);
+  }, []);
+
   /** Snap/commit after a real drag (not used for tap). */
   const finishDragCommit = useCallback(
     (clientX, _clientY) => {
