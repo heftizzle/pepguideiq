@@ -157,28 +157,42 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   const [doseItems, setDoseItems] = useState(/** @type {object[]} */ ([]));
   const [stackLoading, setStackLoading] = useState(true);
   const [doseLoading, setDoseLoading] = useState(true);
+  const [stackError, setStackError] = useState(/** @type {string | null} */ (null));
+  const [doseError, setDoseError] = useState(/** @type {string | null} */ (null));
 
   const loadStackFeed = useCallback(async () => {
     if (!isSupabaseConfigured() || !userId) {
       setStackItems([]);
+      setStackError(null);
       setStackLoading(false);
       return;
     }
     setStackLoading(true);
-    const rows = await fetchNetworkFeed();
-    setStackItems(rows);
+    const { rows, error } = await fetchNetworkFeed();
+    if (error) {
+      setStackError(error.message || "Could not load shared stacks.");
+    } else {
+      setStackItems(rows);
+      setStackError(null);
+    }
     setStackLoading(false);
   }, [userId]);
 
   const loadDoseFeed = useCallback(async () => {
     if (!isSupabaseConfigured() || !userId) {
       setDoseItems([]);
+      setDoseError(null);
       setDoseLoading(false);
       return;
     }
     setDoseLoading(true);
-    const raw = await fetchPublicNetworkDoseFeed();
-    setDoseItems(normalizeDoseRpcRows(raw));
+    const { rows, error } = await fetchPublicNetworkDoseFeed();
+    if (error) {
+      setDoseError(error.message || "Could not load live dosing.");
+    } else {
+      setDoseItems(normalizeDoseRpcRows(rows));
+      setDoseError(null);
+    }
     setDoseLoading(false);
   }, [userId]);
 
@@ -279,10 +293,41 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
         LIVE DOSING
       </div>
+      {doseError ? (
+        <div
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "#f59e0b",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            background: "rgba(245, 158, 11, 0.08)",
+          }}
+        >
+          {doseItems.length > 0 ? `Could not refresh live dosing: ${doseError}` : `Live dosing is unavailable: ${doseError}`}
+        </div>
+      ) : null}
       {doseLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
           <DoseFeedSkeleton />
           <DoseFeedSkeleton />
+        </div>
+      ) : doseError && doseItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed rgba(245, 158, 11, 0.4)",
+            borderRadius: 12,
+            padding: "36px 20px",
+            textAlign: "center",
+            marginBottom: 28,
+            background: "#0e1520",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "#fcd34d", lineHeight: 1.55, maxWidth: 420, margin: "0 auto" }}>
+            Live dose activity could not be loaded right now. Try refresh in a moment.
+          </div>
         </div>
       ) : doseItems.length === 0 ? (
         <div
@@ -405,10 +450,40 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
         SHARED STACKS
       </div>
+      {stackError ? (
+        <div
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "#f59e0b",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            background: "rgba(245, 158, 11, 0.08)",
+          }}
+        >
+          {stackItems.length > 0 ? `Could not refresh shared stacks: ${stackError}` : `Shared stacks are unavailable: ${stackError}`}
+        </div>
+      ) : null}
       {stackLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <NetworkFeedSkeleton />
           <NetworkFeedSkeleton />
+        </div>
+      ) : stackError && stackItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed rgba(245, 158, 11, 0.4)",
+            borderRadius: 12,
+            padding: "56px 20px",
+            textAlign: "center",
+            background: "#0e1520",
+          }}
+        >
+          <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
+            Shared stacks could not be loaded right now. Try refresh in a moment.
+          </div>
         </div>
       ) : stackItems.length === 0 ? (
         <div

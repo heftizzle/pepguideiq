@@ -86,18 +86,24 @@ async function verifyTokenWithWorker(token) {
   return data.success === true;
 }
 
-function waitForTurnstile(callback, maxWait = 5000) {
+function waitForTurnstile(onReady, onTimeout, maxWait = 5000) {
   const start = Date.now();
   const interval = setInterval(() => {
     if (typeof window.turnstile !== "undefined") {
       clearInterval(interval);
-      callback();
+      onReady();
     } else if (Date.now() - start > maxWait) {
       clearInterval(interval);
-      // turnstile never loaded — leave turnstileReady false, allow login
+      onTimeout();
     }
   }, 100);
   return () => clearInterval(interval);
+}
+
+function turnstileBlockedMessage(unavailable) {
+  return unavailable
+    ? "Bot verification is unavailable right now. Please refresh or try again in a moment."
+    : "Bot verification is still loading. Please wait a moment.";
 }
 
 export function AuthScreen({ onAuth }) {
@@ -107,8 +113,9 @@ export function AuthScreen({ onAuth }) {
   const [busy, setBusy] = useState(false);
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
-  /** True only after Turnstile `render()` succeeds; skip enforcement when false (widget never mounted). */
+  /** True only after Turnstile `render()` succeeds. */
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [turnstileUnavailable, setTurnstileUnavailable] = useState(false);
   const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
   /** Set from dynamic `zxcvbn` (register password strength meter). */
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
@@ -167,6 +174,7 @@ export function AuthScreen({ onAuth }) {
       }
     }
     setTurnstileToken(null);
+    setTurnstileUnavailable(false);
   };
 
   const resetPlansTurnstile = () => {
@@ -179,6 +187,7 @@ export function AuthScreen({ onAuth }) {
       }
     }
     setTurnstileToken(null);
+    setTurnstileUnavailable(false);
   };
 
   useEffect(() => {
@@ -187,39 +196,56 @@ export function AuthScreen({ onAuth }) {
     let cancelled = false;
     mainWidgetIdRef.current = null;
     setTurnstileReady(false);
-    const stopPolling = waitForTurnstile(() => {
-      if (cancelled) return;
-      const el = document.getElementById("turnstile-widget");
-      if (!el || typeof window.turnstile === "undefined") return;
-      el.innerHTML = "";
-      let widgetId;
-      try {
-        widgetId = window.turnstile.render("#turnstile-widget", {
-          sitekey: TURNSTILE_SITE_KEY,
-          callback: (t) => setTurnstileToken(t),
-          "expired-callback": () => setTurnstileToken(null),
-          "error-callback": () => {
-            setTurnstileToken(null);
-            setTurnstileReady(false);
-          },
-          theme: "dark",
-        });
-      } catch {
-        return;
-      }
-      if (cancelled) {
-        if (window.turnstile?.remove) {
-          try {
-            window.turnstile.remove(widgetId);
-          } catch {
-            /* ignore */
-          }
+    setTurnstileUnavailable(false);
+    const stopPolling = waitForTurnstile(
+      () => {
+        if (cancelled) return;
+        const el = document.getElementById("turnstile-widget");
+        if (!el || typeof window.turnstile === "undefined") {
+          setTurnstileUnavailable(true);
+          return;
         }
-        return;
+        el.innerHTML = "";
+        let widgetId;
+        try {
+          widgetId = window.turnstile.render("#turnstile-widget", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (t) => {
+              setTurnstileToken(t);
+              setTurnstileUnavailable(false);
+            },
+            "expired-callback": () => setTurnstileToken(null),
+            "error-callback": () => {
+              setTurnstileToken(null);
+              setTurnstileReady(false);
+              setTurnstileUnavailable(true);
+            },
+            theme: "dark",
+          });
+        } catch {
+          setTurnstileUnavailable(true);
+          return;
+        }
+        if (cancelled) {
+          if (window.turnstile?.remove) {
+            try {
+              window.turnstile.remove(widgetId);
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+        mainWidgetIdRef.current = widgetId;
+        setTurnstileReady(true);
+      },
+      () => {
+        if (cancelled) return;
+        setTurnstileReady(false);
+        setTurnstileToken(null);
+        setTurnstileUnavailable(true);
       }
-      mainWidgetIdRef.current = widgetId;
-      setTurnstileReady(true);
-    });
+    );
     return () => {
       cancelled = true;
       stopPolling();
@@ -242,39 +268,56 @@ export function AuthScreen({ onAuth }) {
     let cancelled = false;
     plansWidgetIdRef.current = null;
     setTurnstileReady(false);
-    const stopPolling = waitForTurnstile(() => {
-      if (cancelled) return;
-      const el = document.getElementById("turnstile-widget-plans");
-      if (!el || typeof window.turnstile === "undefined") return;
-      el.innerHTML = "";
-      let widgetId;
-      try {
-        widgetId = window.turnstile.render("#turnstile-widget-plans", {
-          sitekey: TURNSTILE_SITE_KEY,
-          callback: (t) => setTurnstileToken(t),
-          "expired-callback": () => setTurnstileToken(null),
-          "error-callback": () => {
-            setTurnstileToken(null);
-            setTurnstileReady(false);
-          },
-          theme: "dark",
-        });
-      } catch {
-        return;
-      }
-      if (cancelled) {
-        if (window.turnstile?.remove) {
-          try {
-            window.turnstile.remove(widgetId);
-          } catch {
-            /* ignore */
-          }
+    setTurnstileUnavailable(false);
+    const stopPolling = waitForTurnstile(
+      () => {
+        if (cancelled) return;
+        const el = document.getElementById("turnstile-widget-plans");
+        if (!el || typeof window.turnstile === "undefined") {
+          setTurnstileUnavailable(true);
+          return;
         }
-        return;
+        el.innerHTML = "";
+        let widgetId;
+        try {
+          widgetId = window.turnstile.render("#turnstile-widget-plans", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (t) => {
+              setTurnstileToken(t);
+              setTurnstileUnavailable(false);
+            },
+            "expired-callback": () => setTurnstileToken(null),
+            "error-callback": () => {
+              setTurnstileToken(null);
+              setTurnstileReady(false);
+              setTurnstileUnavailable(true);
+            },
+            theme: "dark",
+          });
+        } catch {
+          setTurnstileUnavailable(true);
+          return;
+        }
+        if (cancelled) {
+          if (window.turnstile?.remove) {
+            try {
+              window.turnstile.remove(widgetId);
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+        plansWidgetIdRef.current = widgetId;
+        setTurnstileReady(true);
+      },
+      () => {
+        if (cancelled) return;
+        setTurnstileReady(false);
+        setTurnstileToken(null);
+        setTurnstileUnavailable(true);
       }
-      plansWidgetIdRef.current = widgetId;
-      setTurnstileReady(true);
-    });
+    );
     return () => {
       cancelled = true;
       stopPolling();
@@ -296,7 +339,11 @@ export function AuthScreen({ onAuth }) {
     setBusy(true);
     try {
       if (mode === "login") {
-        if (turnstileRequired && turnstileReady) {
+        if (turnstileRequired) {
+          if (!turnstileReady) {
+            setError(turnstileBlockedMessage(turnstileUnavailable));
+            return;
+          }
           if (!turnstileToken) {
             setError("Bot verification failed. Please try again.");
             return;
@@ -355,7 +402,11 @@ export function AuthScreen({ onAuth }) {
           setError("This password has appeared in a known data breach. Please choose a different one.");
           return;
         }
-        if (turnstileRequired && turnstileReady) {
+        if (turnstileRequired) {
+          if (!turnstileReady) {
+            setError(turnstileBlockedMessage(turnstileUnavailable));
+            return;
+          }
           if (!turnstileToken) {
             setError("Bot verification failed. Please try again.");
             return;
@@ -391,7 +442,11 @@ export function AuthScreen({ onAuth }) {
     setError("");
     setBusy(true);
     try {
-      if (turnstileRequired && turnstileReady) {
+      if (turnstileRequired) {
+        if (!turnstileReady) {
+          setError(turnstileBlockedMessage(turnstileUnavailable));
+          return;
+        }
         if (!turnstileToken) {
           setError("Bot verification failed. Please try again.");
           return;
@@ -431,8 +486,8 @@ export function AuthScreen({ onAuth }) {
 
   const authSubmitDisabled =
     busy ||
-    (turnstileRequired && turnstileReady && !turnstileToken && (mode === "login" || mode === "register"));
-  const plansSelectDisabled = busy || (turnstileRequired && turnstileReady && !turnstileToken);
+    (turnstileRequired && (mode === "login" || mode === "register") && (!turnstileReady || !turnstileToken));
+  const plansSelectDisabled = busy || (turnstileRequired && (!turnstileReady || !turnstileToken));
 
   if (!isSupabaseConfigured()) {
     return (
@@ -561,6 +616,14 @@ export function AuthScreen({ onAuth }) {
             id="turnstile-widget-plans"
             style={{ display: "flex", justifyContent: "center", marginBottom: 20, minHeight: 65 }}
           />
+        )}
+        {turnstileRequired && !turnstileReady && (
+          <div
+            className="mono"
+            style={{ fontSize: 12, color: turnstileUnavailable ? "#f59e0b" : "#b0bec5", marginBottom: 16, textAlign: "center" }}
+          >
+            {turnstileBlockedMessage(turnstileUnavailable)}
+          </div>
         )}
         {partnerDiscountActive && (
           <div
@@ -877,6 +940,11 @@ export function AuthScreen({ onAuth }) {
               id="turnstile-widget"
               style={{ display: "flex", justifyContent: "center", marginBottom: 16, minHeight: 65 }}
             />
+          )}
+          {turnstileRequired && !turnstileReady && (
+            <div className="mono" style={{ fontSize: 12, color: turnstileUnavailable ? "#f59e0b" : "#b0bec5", marginBottom: 14 }}>
+              {turnstileBlockedMessage(turnstileUnavailable)}
+            </div>
           )}
           {error && (
             <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>

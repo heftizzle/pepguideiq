@@ -236,16 +236,6 @@ export async function getCurrentUser() {
   if (profileErr && import.meta.env.DEV) {
     console.warn("[getCurrentUser] profiles:", profileErr.message);
   }
-  // Always log once per call so production DevTools can confirm fetch + key names (row may be null).
-  console.log("[getCurrentUser] profiles query (before normalization)", {
-    userId: u.id,
-    postgrestError: profileErr?.message ?? null,
-    rowPresent: profile != null,
-    rowKeys: profile && typeof profile === "object" ? Object.keys(profile) : [],
-    biological_sex_raw: profileFieldRaw(profile, "biological_sex", "biologicalSex"),
-    training_experience_raw: profileFieldRaw(profile, "training_experience", "trainingExperience"),
-    fullRow: profile,
-  });
   const stackPhotoKey =
     profile && typeof profile.stack_photo_r2_key === "string" ? profile.stack_photo_r2_key.trim() : null;
   const stackPhotoUrlLegacy =
@@ -730,42 +720,42 @@ export async function updateStack(userId, profileId, patch) {
 
 /**
  * Authenticated network feed: stacks with feed_visible and share_id (RPC get_network_feed).
- * @returns {Promise<object[]>}
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
  */
 export async function fetchNetworkFeed() {
-  if (!supabase) return [];
+  if (!supabase) return { rows: [], error: notConfiguredError() };
   try {
     const { data, error } = await supabase.rpc("get_network_feed", {});
-    if (error) return [];
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
+    if (error) return { rows: [], error };
+    return { rows: Array.isArray(data) ? data : [], error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load network feed.") };
   }
 }
 
 /**
  * Live dose posts (non-expired), enriched via RPC — max 50, newest first.
- * @returns {Promise<object[]>}
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
  */
 export async function fetchPublicNetworkDoseFeed() {
-  if (!supabase) return [];
+  if (!supabase) return { rows: [], error: notConfiguredError() };
   try {
     const { data, error } = await supabase.rpc("get_public_network_dose_feed", {});
-    if (error) return [];
-    if (data == null) return [];
-    if (Array.isArray(data)) return data;
+    if (error) return { rows: [], error };
+    if (data == null) return { rows: [], error: null };
+    if (Array.isArray(data)) return { rows: data, error: null };
     if (typeof data === "string") {
       try {
         const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
+        return { rows: Array.isArray(parsed) ? parsed : [], error: null };
       } catch {
-        return [];
+        return { rows: [], error: new Error("Could not parse dose feed response.") };
       }
     }
-    if (data != null && typeof data === "object") return [data];
-    return [];
-  } catch {
-    return [];
+    if (data != null && typeof data === "object") return { rows: [data], error: null };
+    return { rows: [], error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load dose feed.") };
   }
 }
 

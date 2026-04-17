@@ -5,6 +5,13 @@ import { useDemoTour, NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
 const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
 const HELP_MENU_MAX_W = 280;
+const hit44 = {
+  minWidth: 44,
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
 
 const HELP_MENU_ROW = {
   display: "flex",
