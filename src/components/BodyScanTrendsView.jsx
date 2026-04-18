@@ -82,6 +82,62 @@ function unitSuffix(metricId) {
   return " lb";
 }
 
+/** Unit suffix for absolute delta from first scan (not % change). */
+function deltaLineUnitSuffix(metricId) {
+  if (metricId === "inbody_score") return " pts";
+  if (metricId === "pbf_pct" || metricId.startsWith("seg_fat_")) return " %";
+  if (metricId === "ecw_tbw_ratio") return "";
+  if (metricId === "bmr_kcal") return " kcal";
+  if (metricId === "visceral_fat_level") return "";
+  if (metricId === "bmi") return "";
+  if (metricId.endsWith("_l") || metricId === "tbw_l" || metricId === "icw_l" || metricId === "ecw_l") return " L";
+  return " lb";
+}
+
+/** @param {string} metricId @param {number} delta */
+function formatSignedDeltaBody(metricId, delta) {
+  if (metricId === "ecw_tbw_ratio") {
+    const r = Math.round(delta * 1000) / 1000;
+    if (r > 0) return `+${r.toFixed(3)}`;
+    if (r < 0) return r.toFixed(3);
+    return "0";
+  }
+  const intish = new Set(["inbody_score", "visceral_fat_level", "bmr_kcal"]);
+  if (intish.has(metricId)) {
+    const r = Math.round(delta);
+    if (r > 0) return `+${r}`;
+    return String(r);
+  }
+  const r = Math.round(delta * 10) / 10;
+  const s = Number.isInteger(r) ? String(r) : r.toFixed(1);
+  if (r > 0) return `+${s}`;
+  return s;
+}
+
+/**
+ * @param {string} metricId
+ * @param {number | null} first
+ * @param {number | null} last
+ * @returns {string}
+ */
+function absoluteDeltaFromFirstLine(metricId, first, last) {
+  if (first == null || last == null || !Number.isFinite(first) || !Number.isFinite(last)) return "—";
+  const delta = last - first;
+  const suf = deltaLineUnitSuffix(metricId);
+  if (delta === 0) return `0${suf}`;
+  const arrow = delta > 0 ? "↑" : "↓";
+  return `${arrow} ${formatSignedDeltaBody(metricId, delta)}${suf}`;
+}
+
+/** @param {string} metricId @param {number | null} n */
+function formatLatestRaw(metricId, n) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  if (metricId === "inbody_score" || metricId === "visceral_fat_level" || metricId === "bmr_kcal") {
+    return `${Math.round(n)}${unitSuffix(metricId)}`;
+  }
+  return `${n.toFixed(1)}${unitSuffix(metricId)}`;
+}
+
 function loadChartScript() {
   if (typeof globalThis !== "undefined" && globalThis.Chart) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -114,39 +170,15 @@ function scanRangeContainsYmd(scansAsc, ymd) {
   return te >= t0 && te <= t1;
 }
 
-/**
- * @param {unknown} chart
- * @param {number[]} scanTsAsc
- * @param {number} eventTs
- */
-function xPixelForEventTs(chart, scanTsAsc, eventTs) {
-  const xScale = chart.scales?.x;
-  if (!xScale || !scanTsAsc.length) return null;
-  const n = scanTsAsc.length;
-  if (n === 1) {
-    const p = xScale.getPixelForTick?.(0);
-    return typeof p === "number" ? p : null;
+/** @param {string} ymd */
+function formatProtocolListDate(ymd) {
+  const t = Date.parse(`${ymd}T12:00:00`);
+  if (!Number.isFinite(t)) return ymd;
+  try {
+    return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(t);
+  } catch {
+    return ymd;
   }
-  if (eventTs <= scanTsAsc[0]) {
-    const p = xScale.getPixelForTick?.(0);
-    return typeof p === "number" ? p : null;
-  }
-  if (eventTs >= scanTsAsc[n - 1]) {
-    const p = xScale.getPixelForTick?.(n - 1);
-    return typeof p === "number" ? p : null;
-  }
-  for (let i = 0; i < n - 1; i++) {
-    const t0 = scanTsAsc[i];
-    const t1 = scanTsAsc[i + 1];
-    if (eventTs >= t0 && eventTs <= t1) {
-      const denom = t1 - t0 || 1;
-      const f = (eventTs - t0) / denom;
-      const x0 = xScale.getPixelForTick?.(i);
-      const x1 = xScale.getPixelForTick?.(i + 1);
-      if (typeof x0 === "number" && typeof x1 === "number") return x0 + f * (x1 - x0);
-    }
-  }
-  return null;
 }
 
 /** @param {unknown} iso */
@@ -170,58 +202,117 @@ function formatInterpretedRelativeLine(iso) {
   }
 }
 
-const protocolOverlayPlugin = {
-  id: "pepvInbodyProtocolOverlay",
-  /** @param {any} chart */
-  afterDraw(chart) {
-    const pack = chart.pepvProtocol;
-    const events = pack?.events;
-    const scanTsAsc = pack?.scanTsAsc;
-    if (!chart.ctx || !chart.chartArea || !events?.length || !scanTsAsc?.length) return;
-    const { top, bottom } = chart.chartArea;
-    const c = chart.ctx;
+/**
+ * @param {{ m: MetricDef, scansAsc: Record<string, unknown>[], chartReady: boolean }} props
+ */
+function MetricTrendCard({ m, scansAsc, chartReady }) {
+  const canvasRef = useRef(/** @type {HTMLCanvasElement | null} */ (null));
+  const chartRef = useRef(null);
 
-    /** @type {{ ev: { date: string, label: string }, x: number, stagger: number }[]} */
-    const placed = [];
-    for (const ev of events) {
-      const te = Date.parse(`${ev.date}T12:00:00Z`);
-      const x = xPixelForEventTs(chart, scanTsAsc, te);
-      if (x == null || !Number.isFinite(x)) continue;
-      placed.push({ ev, x, stagger: 0 });
-    }
-    placed.sort((a, b) => a.x - b.x);
-    for (let i = 0; i < placed.length; i++) {
-      if (i > 0 && placed[i].x - placed[i - 1].x <= 20) {
-        placed[i].stagger = (placed[i - 1].stagger + 1) % 3;
-      } else {
-        placed[i].stagger = 0;
-      }
-    }
+  const first = scansAsc[0];
+  const last = scansAsc[scansAsc.length - 1];
+  const t0 = Date.parse(String(first?.scan_date ?? ""));
+  const t1 = Date.parse(String(last?.scan_date ?? ""));
+  const days = Number.isFinite(t0) && Number.isFinite(t1) ? Math.max(1, Math.round(Math.abs(t1 - t0) / 86400000)) : null;
 
-    for (const p of placed) {
-      c.save();
-      c.setLineDash([4, 4]);
-      c.strokeStyle = "rgba(55,138,221,0.5)";
-      c.lineWidth = 1;
-      c.beginPath();
-      c.moveTo(p.x, top);
-      c.lineTo(p.x, bottom);
-      c.stroke();
-      c.restore();
-    }
+  const a = inbodyToNum(first?.[m.id] ?? null);
+  const b = inbodyToNum(last?.[m.id] ?? null);
+  const latestText = formatLatestRaw(m.id, b);
+  const deltaLine = absoluteDeltaFromFirstLine(m.id, a, b);
+  const total = a != null && b != null && Number.isFinite(a) && Number.isFinite(b) && days != null ? b - a : null;
+  const pace = total != null && days != null ? (total / days) * 30 : null;
+  const favorable = total != null && Number.isFinite(total) ? deltaFavorable(m.id, total) : null;
+  const deltaTone =
+    favorable === true ? "var(--color-text-success)" : favorable === false ? "var(--color-text-danger)" : "var(--color-text-muted)";
 
-    for (const p of placed) {
-      const labelY = bottom - 8 - p.stagger * 14;
-      c.save();
-      c.fillStyle = "rgba(55,138,221,0.95)";
-      c.font = "10px 'JetBrains Mono', monospace";
-      c.textAlign = "center";
-      c.textBaseline = "bottom";
-      c.fillText(String(p.ev.label).slice(0, 42), p.x, labelY);
-      c.restore();
-    }
-  },
-};
+  const sparkLabels = useMemo(
+    () =>
+      scansAsc.map((row) => {
+        const raw = row.scan_date ?? null;
+        return formatInbodyScanDateOnly(raw, "short") ?? String(raw ?? "");
+      }),
+    [scansAsc]
+  );
+
+  const sparkData = useMemo(() => scansAsc.map((row) => inbodyToNum(row[m.id] ?? null)), [scansAsc, m.id]);
+
+  useEffect(() => {
+    const Chart = typeof globalThis !== "undefined" ? globalThis.Chart : null;
+    const canvas = canvasRef.current;
+    if (!chartReady || !Chart || !canvas) return;
+
+    chartRef.current?.destroy?.();
+    chartRef.current = null;
+
+    if (!scansAsc.length) return;
+
+    chartRef.current = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: sparkLabels,
+        datasets: [
+          {
+            data: sparkData,
+            borderColor: m.color,
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            tension: 0.3,
+            spanGaps: true,
+            pointRadius: scansAsc.length <= 3 ? 3 : 0,
+            pointHoverRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: true, mode: "index", intersect: false },
+        },
+        scales: {
+          x: { display: false, grid: { display: false }, ticks: { display: false } },
+          y: { display: false, grid: { display: false }, ticks: { display: false } },
+        },
+      },
+    });
+
+    return () => {
+      chartRef.current?.destroy?.();
+      chartRef.current = null;
+    };
+  }, [chartReady, m.color, scansAsc.length, sparkData, sparkLabels]);
+
+  const paceText =
+    pace == null || !Number.isFinite(pace)
+      ? "—"
+      : `${pace > 0 ? "+" : ""}${pace.toFixed(1)}${unitSuffix(m.id)}/mo`;
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--color-border-default)",
+        borderRadius: 12,
+        padding: 12,
+        background: "var(--color-bg-card)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 11, color: "var(--color-text-muted)", letterSpacing: "0.02em" }}>{m.label}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "var(--color-text-primary)", lineHeight: 1.15 }}>
+        {latestText}
+      </div>
+      <div style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace", color: deltaTone }}>{deltaLine}</div>
+      <div style={{ height: 80, width: "100%", position: "relative" }}>
+        <canvas ref={canvasRef} aria-hidden />
+      </div>
+      <div style={{ fontSize: 11, color: "var(--color-text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>{paceText}</div>
+    </div>
+  );
+}
 
 /**
  * @param {{
@@ -267,25 +358,9 @@ export function BodyScanTrendsView({
     return typeof s === "string" && s.trim().length > 0;
   }, [anchorRow?.ai_interpretation]);
 
-  const labels = useMemo(
-    () =>
-      scansAsc.map((row) => {
-        const raw = row.scan_date ?? null;
-        return formatInbodyScanDateOnly(raw, "medium") ?? String(raw ?? "—");
-      }),
-    [scansAsc]
-  );
-
-  const scanTsAsc = useMemo(
-    () => scansAsc.map((row) => Date.parse(String(row.scan_date ?? ""))).map((t) => (Number.isFinite(t) ? t : NaN)),
-    [scansAsc]
-  );
-
   const [selected, setSelected] = useState(() => new Set(DEFAULT_METRICS));
   const [protocolEvents, setProtocolEvents] = useState(/** @type {{ date: string, label: string, type: string }[]} */ ([]));
   const [chartReady, setChartReady] = useState(false);
-  const canvasRef = useRef(/** @type {HTMLCanvasElement | null} */ (null));
-  const chartRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,110 +391,17 @@ export function BodyScanTrendsView({
     return protocolEvents.filter((e) => scanRangeContainsYmd(scansAsc, e.date));
   }, [protocolEvents, scansAsc]);
 
-  const metricSeries = useMemo(() => {
-    /** @type {Record<string, (number | null)[]>} */
-    const out = {};
-    for (const m of METRICS) {
-      const rawVals = scansAsc.map((row) => inbodyToNum(row[m.id] ?? null));
-      const first = rawVals.find((v) => v != null && Number.isFinite(v));
-      out[m.id] = rawVals.map((v) => {
-        if (v == null || !Number.isFinite(v) || first == null || !Number.isFinite(first) || first === 0) return null;
-        return ((v - first) / first) * 100;
-      });
-    }
-    return out;
-  }, [scansAsc]);
-
-  const buildChart = useCallback(() => {
-    const Chart = typeof globalThis !== "undefined" ? globalThis.Chart : null;
-    const canvas = canvasRef.current;
-    if (!Chart || !canvas || !chartReady || scansAsc.length < 2) return;
-
-    chartRef.current?.destroy?.();
-    chartRef.current = null;
-
-    const datasets = METRICS.filter((m) => selected.has(m.id)).map((m) => ({
-      label: m.label,
-      data: metricSeries[m.id] ?? [],
-      borderColor: m.color,
-      backgroundColor: "transparent",
-      borderWidth: 2,
-      tension: 0.3,
-      pointRadius: 5,
-      spanGaps: true,
-    }));
-
-    const cfg = {
-      type: "line",
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: { top: 40 } },
-        plugins: {
-          legend: { display: false },
-          tooltip: { mode: "index", intersect: false },
-        },
-        scales: {
-          x: { ticks: { maxRotation: 45, minRotation: 0 } },
-          y: {
-            title: { display: true, text: "% change from baseline" },
-            beginAtZero: false,
-            ticks: {
-              callback(/** @type {string | number} */ raw) {
-                const value = typeof raw === "number" ? raw : Number(raw);
-                if (!Number.isFinite(value)) return "";
-                const n = Math.round(value);
-                if (n === 0) return "0%";
-                return `${n > 0 ? "+" : ""}${n}%`;
-              },
-            },
-          },
-        },
-      },
-      plugins: [protocolOverlayPlugin],
-    };
-
-    const chart = new Chart(canvas, cfg);
-    chart.pepvProtocol = { events: eventsInRange, scanTsAsc: scanTsAsc.filter((t) => Number.isFinite(t)) };
-    chart.update();
-    chartRef.current = chart;
-  }, [chartReady, labels, metricSeries, scansAsc.length, selected, eventsInRange, scanTsAsc]);
-
-  useEffect(() => {
-    buildChart();
-    return () => {
-      chartRef.current?.destroy?.();
-      chartRef.current = null;
-    };
-  }, [buildChart]);
-
-  const legendRows = useMemo(() => {
-    return METRICS.filter((m) => selected.has(m.id)).map((m) => {
-      const last = scansAsc.length ? inbodyToNum(scansAsc[scansAsc.length - 1][m.id] ?? null) : null;
-      const disp = last == null ? "—" : m.id === "inbody_score" || m.id === "visceral_fat_level" || m.id === "bmr_kcal" ? String(Math.round(last)) : last.toFixed(1);
-      return { ...m, valueText: disp };
+  const protocolRowsDesc = useMemo(() => {
+    const copy = [...eventsInRange];
+    copy.sort((a, b) => {
+      const ta = Date.parse(`${a.date}T12:00:00`);
+      const tb = Date.parse(`${b.date}T12:00:00`);
+      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
     });
-  }, [selected, scansAsc]);
+    return copy;
+  }, [eventsInRange]);
 
-  const rateCards = useMemo(() => {
-    const first = scansAsc[0];
-    const last = scansAsc[scansAsc.length - 1];
-    const t0 = Date.parse(String(first?.scan_date ?? ""));
-    const t1 = Date.parse(String(last?.scan_date ?? ""));
-    const days = Number.isFinite(t0) && Number.isFinite(t1) ? Math.max(1, Math.round(Math.abs(t1 - t0) / 86400000)) : null;
-    return METRICS.filter((m) => selected.has(m.id)).map((m) => {
-      const a = inbodyToNum(first?.[m.id] ?? null);
-      const b = inbodyToNum(last?.[m.id] ?? null);
-      if (a == null || b == null || days == null) {
-        return { id: m.id, label: m.label, total: null, pace: null, favorable: null, suffix: unitSuffix(m.id) };
-      }
-      const total = b - a;
-      const pace = (total / days) * 30;
-      const favorable = deltaFavorable(m.id, total);
-      return { id: m.id, label: m.label, total, pace, favorable, suffix: unitSuffix(m.id) };
-    });
-  }, [selected, scansAsc]);
+  const selectedMetrics = useMemo(() => METRICS.filter((m) => selected.has(m.id)), [selected]);
 
   const [interpretText, setInterpretText] = useState("");
   const [interpretAt, setInterpretAt] = useState(/** @type {unknown} */ (null));
@@ -578,7 +560,7 @@ export function BodyScanTrendsView({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "'Outfit', sans-serif" }}>
       <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-        Each line shows % change from your first scan. Up = increasing, down = decreasing.
+        Each card shows the latest reading, the absolute change since your first scan, a sparkline of raw values over time, and an estimated per-month pace.
       </div>
 
       {Object.entries(grouped).map(([group, items]) => (
@@ -609,72 +591,38 @@ export function BodyScanTrendsView({
         </div>
       ))}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-        {legendRows.map((m) => (
-          <div
-            key={m.id}
-            className="mono"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 11,
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border-default)",
-              background: "var(--color-bg-card)",
-            }}
-          >
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: m.color, flexShrink: 0 }} aria-hidden />
-            <span style={{ color: "var(--color-text-secondary)" }}>{m.label}</span>
-            <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{m.valueText}</span>
-          </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 12,
+        }}
+      >
+        {selectedMetrics.map((m) => (
+          <MetricTrendCard key={m.id} m={m} scansAsc={scansAsc} chartReady={chartReady} />
         ))}
       </div>
 
-      <div style={{ position: "relative", height: 320, width: "100%" }}>
-        <canvas ref={canvasRef} aria-label="InBody trends chart" />
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          maxHeight: 200,
-          overflowY: "auto",
-          paddingRight: 4,
-        }}
-        aria-label="Rate of change per metric"
-      >
-        {rateCards.map((c) => {
-          const tone =
-            c.favorable === true ? "var(--color-text-success)" : c.favorable === false ? "var(--color-text-danger)" : "var(--color-text-muted)";
-          const arrow =
-            c.total == null || !Number.isFinite(c.total) || c.total === 0 ? "" : c.total > 0 ? "↑" : "↓";
-          return (
+      {protocolRowsDesc.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div className="mono" style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--color-text-secondary)" }}>
+            PROTOCOL (IN SCAN RANGE)
+          </div>
+          {protocolRowsDesc.map((ev, i) => (
             <div
-              key={c.id}
+              key={`${ev.date}-${ev.type}-${i}`}
               style={{
-                width: "100%",
-                border: "1px solid var(--color-border-default)",
-                borderRadius: 10,
-                padding: 12,
-                background: "var(--color-bg-card)",
+                fontSize: 13,
+                color: "var(--color-text-primary)",
+                lineHeight: 1.45,
+                fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6 }}>{c.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "var(--color-text-primary)" }}>
-                {c.total == null || !Number.isFinite(c.total) ? "—" : `${c.total > 0 ? "+" : ""}${c.total.toFixed(1)}${c.suffix}`}
-              </div>
-              <div style={{ fontSize: 11, marginTop: 6, color: tone, fontFamily: "'JetBrains Mono', monospace" }}>
-                {arrow}{" "}
-                {c.pace == null || !Number.isFinite(c.pace) ? "—" : `${c.pace > 0 ? "+" : ""}${c.pace.toFixed(1)}${c.suffix}/mo`}
-              </div>
+              {formatProtocolListDate(ev.date)} · {ev.label}
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : null}
 
       <div
         style={{
