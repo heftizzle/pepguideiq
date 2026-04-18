@@ -180,27 +180,44 @@ const protocolOverlayPlugin = {
     if (!chart.ctx || !chart.chartArea || !events?.length || !scanTsAsc?.length) return;
     const { top, bottom } = chart.chartArea;
     const c = chart.ctx;
+
+    /** @type {{ ev: { date: string, label: string }, x: number, stagger: number }[]} */
+    const placed = [];
     for (const ev of events) {
       const te = Date.parse(`${ev.date}T12:00:00Z`);
       const x = xPixelForEventTs(chart, scanTsAsc, te);
       if (x == null || !Number.isFinite(x)) continue;
+      placed.push({ ev, x, stagger: 0 });
+    }
+    placed.sort((a, b) => a.x - b.x);
+    for (let i = 0; i < placed.length; i++) {
+      if (i > 0 && placed[i].x - placed[i - 1].x <= 20) {
+        placed[i].stagger = (placed[i - 1].stagger + 1) % 3;
+      } else {
+        placed[i].stagger = 0;
+      }
+    }
+
+    for (const p of placed) {
       c.save();
       c.setLineDash([4, 4]);
       c.strokeStyle = "rgba(55,138,221,0.5)";
       c.lineWidth = 1;
       c.beginPath();
-      c.moveTo(x, top);
-      c.lineTo(x, bottom);
+      c.moveTo(p.x, top);
+      c.lineTo(p.x, bottom);
       c.stroke();
-      c.setLineDash([]);
+      c.restore();
+    }
+
+    for (const p of placed) {
+      const labelY = bottom - 8 - p.stagger * 14;
+      c.save();
       c.fillStyle = "rgba(55,138,221,0.95)";
       c.font = "10px 'JetBrains Mono', monospace";
-      c.save();
-      c.translate(x, top - 4);
-      c.rotate(-Math.PI / 6);
-      c.textAlign = "left";
-      c.fillText(String(ev.label).slice(0, 42), 0, 0);
-      c.restore();
+      c.textAlign = "center";
+      c.textBaseline = "bottom";
+      c.fillText(String(p.ev.label).slice(0, 42), p.x, labelY);
       c.restore();
     }
   },
@@ -307,7 +324,7 @@ export function BodyScanTrendsView({
       const first = rawVals.find((v) => v != null && Number.isFinite(v));
       out[m.id] = rawVals.map((v) => {
         if (v == null || !Number.isFinite(v) || first == null || !Number.isFinite(first) || first === 0) return null;
-        return (v / first) * 100;
+        return ((v - first) / first) * 100;
       });
     }
     return out;
@@ -338,6 +355,7 @@ export function BodyScanTrendsView({
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 40 } },
         plugins: {
           legend: { display: false },
           tooltip: { mode: "index", intersect: false },
@@ -345,8 +363,17 @@ export function BodyScanTrendsView({
         scales: {
           x: { ticks: { maxRotation: 45, minRotation: 0 } },
           y: {
-            title: { display: true, text: "Indexed (first scan in range = 100)" },
+            title: { display: true, text: "% change from baseline" },
             beginAtZero: false,
+            ticks: {
+              callback(/** @type {string | number} */ raw) {
+                const value = typeof raw === "number" ? raw : Number(raw);
+                if (!Number.isFinite(value)) return "";
+                const n = Math.round(value);
+                if (n === 0) return "0%";
+                return `${n > 0 ? "+" : ""}${n}%`;
+              },
+            },
           },
         },
       },
@@ -551,7 +578,7 @@ export function BodyScanTrendsView({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "'Outfit', sans-serif" }}>
       <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-        Indexed chart: each line is scaled to 100 at your earliest scan in this window so mixed units are comparable. Values in the legend are raw numbers from the latest scan.
+        Each line shows % change from your first scan. Up = increasing, down = decreasing.
       </div>
 
       {Object.entries(grouped).map(([group, items]) => (
