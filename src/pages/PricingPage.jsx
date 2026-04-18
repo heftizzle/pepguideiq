@@ -3,7 +3,7 @@ import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
 import { buildSignupHref, captureAffiliateRefFromLocation } from "../lib/affiliateRef.js";
 import { Logo } from "../components/Logo.jsx";
 
-const BG = "#0d0f14";
+const BG = "var(--color-bg-page)";
 const ACCENT = "var(--color-accent)";
 
 /** Marketing emojis (override catalog tier emojis on this page). */
@@ -35,7 +35,7 @@ function PricingPage() {
       style={{
         minHeight: "100vh",
         background: BG,
-        color: "#dde4ef",
+        color: "var(--color-text-primary)",
         padding: "24px 20px 48px",
         boxSizing: "border-box",
       }}
@@ -108,12 +108,12 @@ function PricingPage() {
       >
         {rows.map((row) => {
           const emoji = TIER_EMOJI[row.id] ?? row.emoji;
-          const borderColor = row.id === "entry" ? "#1e2a3a" : row.color;
+          const borderColor = row.id === "entry" ? "var(--color-border-tab)" : row.color;
           return (
             <article
               key={row.id}
               style={{
-                background: "#12151c",
+                background: "var(--color-bg-card)",
                 border: `1px solid ${borderColor}`,
                 borderRadius: 14,
                 padding: "22px 20px 20px",
@@ -167,7 +167,7 @@ function PricingPage() {
                   margin: "0 0 20px",
                   paddingLeft: 18,
                   fontSize: 12,
-                  color: "#b0bec5",
+                  color: "var(--color-text-secondary)",
                   lineHeight: 1.55,
                   textAlign: "left",
                 }}
@@ -191,8 +191,8 @@ function PricingPage() {
                   fontWeight: 700,
                   fontFamily: "'Outfit',sans-serif",
                   background: row.id === "entry" ? "transparent" : `${ACCENT}18`,
-                  border: `2px solid ${row.id === "entry" ? "#2d3d52" : ACCENT}`,
-                  color: row.id === "entry" ? "#b0bec5" : ACCENT,
+                  border: `2px solid ${row.id === "entry" ? "var(--color-upgrade-muted-border)" : ACCENT}`,
+                  color: row.id === "entry" ? "var(--color-text-secondary)" : ACCENT,
                 }}
               >
                 {tierCtaLabel(row.id)}

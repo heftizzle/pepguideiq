@@ -227,7 +227,7 @@ export function PublicMemberProfilePage({
           Loading…
         </div>
       ) : err ? (
-        <div className="mono" style={{ fontSize: 14, color: "#f59e0b", lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: 14, color: "var(--color-warning)", lineHeight: 1.5 }}>
           {err}
         </div>
       ) : profile ? (

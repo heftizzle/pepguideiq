@@ -229,7 +229,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                         width: 36,
                         height: 36,
                         borderRadius: "50%",
-                        background: "#14202e",
+                        background: "var(--color-surface-hover)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -301,7 +301,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                 disabled={adding}
               />
               {err && (
-                <div className="mono" style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginBottom: 8 }}>
                   {err}
                 </div>
               )}
@@ -363,7 +363,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               width: 34,
               height: 34,
               borderRadius: "50%",
-              background: "#14202e",
+              background: "var(--color-surface-hover)",
               border: activeProfileId ? "2px solid var(--color-accent-nav-border)" : "2px solid var(--color-border-emphasis)",
               display: "flex",
               alignItems: "center",
@@ -420,7 +420,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               lineHeight: 1.2,
               flexShrink: 0,
               border: "none",
-              borderLeft: "1px solid #243040",
+              borderLeft: "1px solid var(--color-border-emphasis)",
               background: "transparent",
               cursor: "pointer",
               padding: "8px 10px",

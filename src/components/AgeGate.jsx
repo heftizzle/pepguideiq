@@ -38,7 +38,7 @@ export function AgeGate({ onConfirm, onExit }) {
         position: "fixed",
         inset: 0,
         zIndex: 2147483000,
-        background: "#07090e",
+        background: "var(--color-bg-page)",
         "--color-text-primary": "#dde4ef",
         display: "flex",
         flexDirection: "column",
@@ -59,8 +59,8 @@ export function AgeGate({ onConfirm, onExit }) {
           alignItems: "stretch",
           textAlign: "left",
           borderRadius: 14,
-          border: "1px solid #1e2a38",
-          background: "#0b0f17",
+          border: "1px solid var(--color-border-tab)",
+          background: "var(--color-bg-sunken)",
           boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
           overflow: "hidden",
         }}
@@ -98,7 +98,7 @@ export function AgeGate({ onConfirm, onExit }) {
             className="mono"
             style={{
               fontSize: "clamp(12px, 3.2vw, 13px)",
-              color: "#b0bec5",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.55,
               marginBottom: 20,
               textAlign: "center",
@@ -183,7 +183,7 @@ export function AgeGate({ onConfirm, onExit }) {
               gap: 10,
               cursor: "pointer",
               fontSize: 13,
-              color: "#b0bec5",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.4,
               marginBottom: 20,
               fontFamily: "'Outfit', sans-serif",
@@ -209,8 +209,8 @@ export function AgeGate({ onConfirm, onExit }) {
               style={{
                 width: "100%",
                 background: canEnter ? "var(--color-accent)" : "#1e3d34",
-                border: `1px solid ${canEnter ? "var(--color-accent)" : "#243040"}`,
-                color: canEnter ? "#07090e" : "#4a6670",
+                border: `1px solid ${canEnter ? "var(--color-accent)" : "var(--color-border-emphasis)"}`,
+                color: canEnter ? "var(--color-bg-page)" : "#4a6670",
                 fontWeight: 700,
                 letterSpacing: "0.06em",
                 cursor: canEnter ? "pointer" : "not-allowed",
@@ -234,8 +234,8 @@ export function AgeGate({ onConfirm, onExit }) {
                 fontWeight: 500,
                 letterSpacing: "0.05em",
                 background: "transparent",
-                border: "1px solid #2a4055",
-                color: "#b0bec5",
+                border: "1px solid var(--color-upgrade-muted-border)",
+                color: "var(--color-text-secondary)",
                 transition: "border-color 0.2s, color 0.2s, background 0.2s",
               }}
             >

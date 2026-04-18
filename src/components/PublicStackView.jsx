@@ -62,7 +62,7 @@ export function PublicStackView({ shareId }) {
       <div
         style={{
           minHeight: "100vh",
-          background: "#07090e",
+          background: "var(--color-bg-page)",
           "--color-text-primary": "#dde4ef",
           color: "var(--color-text-primary)",
           fontFamily: "'Outfit', sans-serif",
@@ -74,12 +74,12 @@ export function PublicStackView({ shareId }) {
         <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
           <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ
         </div>
-        <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.12em", marginBottom: 28 }}>
+        <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.12em", marginBottom: 28 }}>
           SHARED STACK
         </div>
 
         {loading && (
-          <div className="mono" style={{ fontSize: 14, color: "#a0a0b0" }}>
+          <div className="mono" style={{ fontSize: 14, color: "var(--color-text-placeholder)" }}>
             Loading…
           </div>
         )}
@@ -103,7 +103,7 @@ export function PublicStackView({ shareId }) {
           <>
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 20px", lineHeight: 1.3 }}>My Stack</h1>
             {items.length === 0 ? (
-              <div className="mono" style={{ fontSize: 14, color: "#a0a0b0" }}>
+              <div className="mono" style={{ fontSize: 14, color: "var(--color-text-placeholder)" }}>
                 No compounds in this stack.
               </div>
             ) : (
@@ -120,20 +120,20 @@ export function PublicStackView({ shareId }) {
                       style={{
                         padding: 14,
                         borderRadius: 12,
-                        border: "1px solid #14202e",
-                        background: "#0b0f17",
+                        border: "1px solid var(--color-border-default)",
+                        background: "var(--color-bg-sunken)",
                       }}
                     >
                       <div className="brand" style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
                         {name}
                       </div>
                       {doseLine && (
-                        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>
+                        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                           {doseLine}
                         </div>
                       )}
                       {sessions.length > 0 && (
-                        <div className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
+                        <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                           Sessions: {sessions.join(", ")}
                         </div>
                       )}
@@ -162,7 +162,7 @@ export function PublicStackView({ shareId }) {
               View on pepguideIQ
             </a>
 
-            <p style={{ marginTop: 24, fontSize: 12, color: "#b0bec5", lineHeight: 1.5 }}>
+            <p style={{ marginTop: 24, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
               Research compounds only. Not medical advice. Consult a qualified professional.
             </p>
           </>

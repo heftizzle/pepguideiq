@@ -174,9 +174,9 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             minHeight: 44,
             flexShrink: 0,
             borderRadius: 10,
-            border: "1px solid #243040",
+            border: "1px solid var(--color-border-emphasis)",
             background: "var(--color-bg-hover)",
-            color: "#b0bec5",
+            color: "var(--color-text-secondary)",
             cursor: "pointer",
             fontSize: 20,
             lineHeight: 1,
@@ -201,15 +201,15 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             maxHeight: 280,
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
-            background: "#0e1520",
-            border: "1px solid #1a2840",
+            background: "var(--color-bg-card)",
+            border: "1px solid var(--color-border-pcard-side)",
             borderRadius: 10,
             boxShadow: "0 12px 40px rgba(0,0,0,0.55)",
             zIndex: 221,
           }}
         >
           {showEmpty ? (
-            <div className="mono" style={{ padding: "14px 16px", fontSize: 13, color: "#b0bec5" }}>
+            <div className="mono" style={{ padding: "14px 16px", fontSize: 13, color: "var(--color-text-secondary)" }}>
               No compounds found
             </div>
           ) : (
@@ -232,7 +232,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
                     textAlign: "left",
                     padding: "12px 16px",
                     border: "none",
-                    borderBottom: "1px solid #14202e",
+                    borderBottom: "1px solid var(--color-border-default)",
                     background: "transparent",
                     cursor: "pointer",
                     color: "var(--color-text-primary)",
@@ -242,7 +242,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
                     {nameHit ? highlightMatch(p.name, inputValue.trim()) : p.name}
                   </div>
                   {aliasHit ? (
-                    <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 4 }}>
+                    <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 4 }}>
                       {highlightMatch(String(aliasHit), inputValue.trim())}
                     </div>
                   ) : null}

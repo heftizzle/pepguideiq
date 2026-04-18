@@ -308,12 +308,12 @@ export function ProtocolTab({
           style={{
             padding: 20,
             borderRadius: 10,
-            border: "1px dashed #243040",
-            background: "#07090e",
+            border: "1px dashed var(--color-border-emphasis)",
+            background: "var(--color-bg-page)",
             cursor: "pointer",
           }}
         >
-          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
             Upgrade to Pro to run protocol logging with vials.
           </div>
         </div>
@@ -323,7 +323,7 @@ export function ProtocolTab({
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="mono" style={{ fontSize: 13, color: "#b0bec5", fontFamily: "'JetBrains Mono', monospace" }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
         Configure Supabase to use Protocol.
       </div>
     );
@@ -332,22 +332,22 @@ export function ProtocolTab({
   return (
     <>
     <div className="mono" style={{ maxWidth: 560, margin: "0 auto", paddingBottom: 100, fontFamily: "'JetBrains Mono', monospace" }}>
-      <div style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 24 }}>
+      <div style={{ fontSize: 13, color: "var(--color-text-placeholder)", marginBottom: 24 }}>
         {protocolHeaderLine()}
       </div>
 
       {emptyBecauseNoStack && (
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
           No stack saved — build your stack in Saved Stacks first.
         </div>
       )}
 
       {!emptyBecauseNoStack && rows === null && (
-        <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>Loading protocol…</div>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)" }}>Loading protocol…</div>
       )}
 
       {!emptyBecauseNoStack && rows !== null && rows.length === 0 && (
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
           No compounds in this session — edit Saved Stacks to assign morning / afternoon / evening / night.
         </div>
       )}
@@ -449,9 +449,9 @@ export function ProtocolTab({
 
 function ProtocolMissingVialRow({ name }) {
   return (
-    <div style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}>
+    <div style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}>
       <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600, marginBottom: 6 }}>{name}</div>
-      <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
         Injectable — no active vial today. Add or reconstitute a vial in Vial Tracker.
       </div>
     </div>
@@ -462,13 +462,13 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
   const timingWarning = getTimingWarning(row.peptideId, session);
   return (
     <div
-      style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}
+      style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}
       data-demo-target={demoLogDose ? DEMO_TARGET.protocol_log_dose : undefined}
       {...demoHighlightProps(demoLogDose)}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>{row.name}</div>
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           {row.routeKind === "oral" ? "Oral" : row.routeKind === "intranasal" ? "Intranasal" : "Topical"}
         </div>
       </div>
@@ -504,7 +504,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
             minWidth: 56,
             textAlign: "center",
             padding: "8px 0",
-            borderBottom: "1px solid #14202e",
+            borderBottom: "1px solid var(--color-border-default)",
           }}
         >
           {row.doseCount}
@@ -533,7 +533,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "var(--color-text-secondary)", borderColor: "var(--color-border-emphasis)" }
               : {}),
           }}
         >
@@ -568,7 +568,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
 
   return (
     <div
-      style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}
+      style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}
       data-demo-target={demoLogDose ? DEMO_TARGET.protocol_log_dose : undefined}
       {...demoHighlightProps(demoLogDose)}
     >
@@ -576,7 +576,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>
           {row.name}
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", maxWidth: 280 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "right", maxWidth: 280 }}>
           {vialTitle} · {formatConcWithUnit(vial?.concentration_mcg_ml, catalog)}
           {row.vials.length > 1 ? " (active vial — change in Vial Tracker)" : ""}
         </div>
@@ -613,7 +613,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
             minWidth: 56,
             textAlign: "center",
             padding: "8px 0",
-            borderBottom: "1px solid #14202e",
+            borderBottom: "1px solid var(--color-border-default)",
           }}
         >
           {row.units}
@@ -642,7 +642,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
             letterSpacing: ".04em",
             fontFamily: "'JetBrains Mono', monospace",
             ...(loggedToday
-              ? { opacity: 0.45, cursor: "not-allowed", color: "#b0bec5", borderColor: "#243040" }
+              ? { opacity: 0.45, cursor: "not-allowed", color: "var(--color-text-secondary)", borderColor: "var(--color-border-emphasis)" }
               : {}),
           }}
         >

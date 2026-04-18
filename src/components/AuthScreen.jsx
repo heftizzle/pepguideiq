@@ -26,8 +26,8 @@ function AuthPublicNav() {
         display: "flex",
         justifyContent: "flex-end",
         alignItems: "center",
-        borderBottom: "1px solid #14202e",
-        background: "#07090e",
+        borderBottom: "1px solid var(--color-border-default)",
+        background: "var(--color-bg-page)",
       }}
     >
       <a
@@ -49,7 +49,7 @@ function AuthPublicNav() {
 /** @param {{ children: import("react").ReactNode }} props */
 function AuthScaffold({ children }) {
   return (
-    <div style={{ minHeight: "100vh", background: "#07090e", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "var(--color-bg-page)", display: "flex", flexDirection: "column" }}>
       <AuthPublicNav />
       <div
         style={{
@@ -494,7 +494,7 @@ export function AuthScreen({ onAuth }) {
       <AuthScaffold>
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Logo style={{ marginBottom: 20 }} />
-          <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.6 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
             Copy <code style={{ color: "var(--color-accent)" }}>.env.example</code> to{" "}
             <code style={{ color: "var(--color-accent)" }}>.env.local</code> and set{" "}
             <code style={{ color: "var(--color-accent)" }}>VITE_SUPABASE_URL</code> and{" "}
@@ -512,11 +512,11 @@ export function AuthScreen({ onAuth }) {
         <div style={{ width: "100%", maxWidth: 380 }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <Logo />
-            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", letterSpacing: ".18em", marginTop: 4 }}>
               RESET PASSWORD
             </div>
           </div>
-          <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
+          <div style={{ background: "var(--color-bg-sunken)", border: "1px solid var(--color-border-default)", borderRadius: 10, padding: 24 }}>
             {forgotSubmitted ? (
               <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", lineHeight: 1.55, textAlign: "center" }}>
                 If that email is registered, a reset link is on the way.
@@ -574,7 +574,7 @@ export function AuthScreen({ onAuth }) {
               marginTop: 20,
               textAlign: "center",
               fontSize: 12,
-              color: "#b0bec5",
+              color: "var(--color-text-secondary)",
               lineHeight: 1.6,
             }}
           >
@@ -603,7 +603,7 @@ export function AuthScreen({ onAuth }) {
           className="mono"
           style={{
             fontSize: 13,
-            color: "#a0a0b0",
+            color: "var(--color-text-placeholder)",
             letterSpacing: ".2em",
             marginBottom: 28,
             textAlign: "center",
@@ -620,7 +620,7 @@ export function AuthScreen({ onAuth }) {
         {turnstileRequired && !turnstileReady && (
           <div
             className="mono"
-            style={{ fontSize: 12, color: turnstileUnavailable ? "#f59e0b" : "#b0bec5", marginBottom: 16, textAlign: "center" }}
+            style={{ fontSize: 12, color: turnstileUnavailable ? "var(--color-warning)" : "var(--color-text-secondary)", marginBottom: 16, textAlign: "center" }}
           >
             {turnstileBlockedMessage(turnstileUnavailable)}
           </div>
@@ -645,7 +645,7 @@ export function AuthScreen({ onAuth }) {
           <div
             style={{
               fontSize: 13,
-              color: "#ef4444",
+              color: "var(--color-danger)",
               marginBottom: 16,
               fontFamily: "'JetBrains Mono',monospace",
               maxWidth: 420,
@@ -670,8 +670,8 @@ export function AuthScreen({ onAuth }) {
             <div
               key={plan.id}
               style={{
-                background: "#0b0f17",
-                border: `1px solid ${plan.popular ? plan.color : "#14202e"}`,
+                background: "var(--color-bg-sunken)",
+                border: `1px solid ${plan.popular ? plan.color : "var(--color-border-default)"}`,
                 borderRadius: 10,
                 padding: 20,
                 position: "relative",
@@ -687,7 +687,7 @@ export function AuthScreen({ onAuth }) {
                     left: "50%",
                     transform: "translateX(-50%)",
                     background: plan.color,
-                    color: "#07090e",
+                    color: "var(--color-bg-page)",
                     fontSize: 13,
                     fontWeight: 700,
                     fontFamily: "'JetBrains Mono',monospace",
@@ -728,17 +728,17 @@ export function AuthScreen({ onAuth }) {
                     </span>
                     <span
                       className="brand"
-                      style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef", marginLeft: 10 }}
+                      style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text-primary)", marginLeft: 10 }}
                     >
                       {priceDisplay.main}
                     </span>
                   </>
                 ) : (
-                  <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "#dde4ef" }}>
+                  <span className="brand" style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text-primary)" }}>
                     {priceDisplay.main}
                   </span>
                 )}
-                <span style={{ fontSize: 13, color: "#b0bec5", marginLeft: 4 }}>
+                <span style={{ fontSize: 13, color: "var(--color-text-secondary)", marginLeft: 4 }}>
                   {plan.period === "forever" ? "forever" : priceDisplay.suffix || plan.period}
                 </span>
               </div>
@@ -746,7 +746,7 @@ export function AuthScreen({ onAuth }) {
                 {plan.features.map((f) => (
                   <div key={f} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
                     <span style={{ color: plan.color, fontSize: 13, marginTop: 2, flexShrink: 0 }}>✓</span>
-                    <span style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>{f}</span>
+                    <span style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{f}</span>
                   </div>
                 ))}
               </div>
@@ -773,7 +773,7 @@ export function AuthScreen({ onAuth }) {
           );
           })}
         </div>
-        <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0" }}>
+        <div style={{ marginTop: 16, fontSize: 13, color: "var(--color-text-placeholder)" }}>
           Subscriptions managed via App Store / Google Play on mobile.
         </div>
       </AuthScaffold>
@@ -813,12 +813,12 @@ export function AuthScreen({ onAuth }) {
       <div style={{ width: "100%", maxWidth: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <Logo />
-          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".18em", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", letterSpacing: ".18em", marginTop: 4 }}>
             {mode === "login" ? "SIGN IN TO YOUR ACCOUNT" : "CREATE YOUR ACCOUNT"}
           </div>
         </div>
 
-        <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
+        <div style={{ background: "var(--color-bg-sunken)", border: "1px solid var(--color-border-default)", borderRadius: 10, padding: 24 }}>
           {mode === "register" && (
             <div style={{ marginBottom: 14 }}>
               <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
@@ -887,7 +887,7 @@ export function AuthScreen({ onAuth }) {
                   border: "none",
                   borderRadius: 6,
                   background: "transparent",
-                  color: "#b0bec5",
+                  color: "var(--color-text-secondary)",
                   cursor: "pointer",
                   fontSize: 18,
                   lineHeight: 1,
@@ -905,7 +905,7 @@ export function AuthScreen({ onAuth }) {
                 margin: "0 0 14px 0",
                 paddingLeft: 18,
                 fontSize: 12,
-                color: "#ef4444",
+                color: "var(--color-danger)",
                 fontFamily: "'JetBrains Mono',monospace",
                 lineHeight: 1.5,
               }}
@@ -944,12 +944,12 @@ export function AuthScreen({ onAuth }) {
             />
           )}
           {turnstileRequired && !turnstileReady && (
-            <div className="mono" style={{ fontSize: 12, color: turnstileUnavailable ? "#f59e0b" : "#b0bec5", marginBottom: 14 }}>
+            <div className="mono" style={{ fontSize: 12, color: turnstileUnavailable ? "var(--color-warning)" : "var(--color-text-secondary)", marginBottom: 14 }}>
               {turnstileBlockedMessage(turnstileUnavailable)}
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 13, color: "#ef4444", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>
+            <div style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 14, fontFamily: "'JetBrains Mono',monospace" }}>
               {error}
             </div>
           )}
@@ -963,7 +963,7 @@ export function AuthScreen({ onAuth }) {
             {busy ? "…" : mode === "login" ? "Sign In" : "Continue"}
           </button>
 
-          <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "#a0a0b0" }}>
+          <div style={{ marginTop: 16, textAlign: "center", fontSize: 13, color: "var(--color-text-placeholder)" }}>
             {mode === "login" ? (
               <>
                 Don&apos;t have an account?{" "}
@@ -1017,7 +1017,7 @@ export function AuthScreen({ onAuth }) {
             marginTop: 20,
             textAlign: "center",
             fontSize: 12,
-            color: "#b0bec5",
+            color: "var(--color-text-secondary)",
             lineHeight: 1.6,
           }}
         >

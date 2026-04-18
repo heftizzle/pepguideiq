@@ -124,9 +124,9 @@ export function ProfileProvider({ userId, plan, children }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#b0bec5",
+          color: "var(--color-text-secondary)",
           fontSize: 13,
-          background: "#07090e",
+          background: "var(--color-bg-page)",
         }}
       >
         Loading profiles…
@@ -136,7 +136,7 @@ export function ProfileProvider({ userId, plan, children }) {
 
   if (memberProfiles.length === 0) {
     return (
-      <div className="mono" style={{ padding: 24, color: "#f59e0b", fontSize: 13, background: "#07090e" }}>
+      <div className="mono" style={{ padding: 24, color: "var(--color-warning)", fontSize: 13, background: "var(--color-bg-page)" }}>
         No member profiles found. Apply migration 013_member_profiles.sql (backfill) or sign in again.
       </div>
     );
@@ -144,7 +144,7 @@ export function ProfileProvider({ userId, plan, children }) {
 
   if (!activeProfileId) {
     return (
-      <div className="mono" style={{ padding: 24, color: "#f59e0b", fontSize: 13, background: "#07090e" }}>
+      <div className="mono" style={{ padding: 24, color: "var(--color-warning)", fontSize: 13, background: "var(--color-bg-page)" }}>
         Could not resolve an active profile. Check localStorage or pick a profile after refresh.
       </div>
     );

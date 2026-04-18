@@ -302,7 +302,7 @@ function PepguideStatsSectionHeading({ stats }) {
   const parts = pepguideIqScoreParts(stats);
   const tierStyle = {
     fontSize: 11,
-    color: "#6b8299",
+    color: "var(--color-text-muted)",
     letterSpacing: "0.12em",
     textTransform: "uppercase",
     fontFamily: "'JetBrains Mono', monospace",
@@ -809,7 +809,7 @@ function ProfilePrivatePhotoSlot({
         onChange={(e) => void onInputChange(e)}
       />
       {slotErr ? (
-        <div className="mono" style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
+        <div className="mono" style={{ fontSize: 10, color: "var(--color-warning)", marginTop: 4 }}>
           {slotErr}
         </div>
       ) : null}
@@ -1787,7 +1787,7 @@ export function ProfileTab({
       </div>
 
       {err && (
-        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 12 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12 }}>
           {err}
         </div>
       )}

@@ -15,12 +15,12 @@ const TAB_TOOLTIPS = [
 const GAP_PX = 10;
 
 const cardStyle = {
-  background: "#0e1520",
+  background: "var(--color-bg-card)",
   border: "1px solid var(--color-accent-subtle-40)",
   borderRadius: 8,
   padding: "6px 10px",
   fontSize: 11,
-  color: "#b0bec5",
+  color: "var(--color-text-secondary)",
   fontFamily: "'Outfit', sans-serif",
   whiteSpace: "normal",
   textAlign: "center",
@@ -122,7 +122,7 @@ export function NavTooltips({ tabButtonRefs }) {
             <svg width={14} height={8} viewBox="0 0 14 8" aria-hidden style={{ display: "block", marginTop: -1 }}>
               <path
                 d="M0 0 L14 0 L7 8 Z"
-                fill="#0e1520"
+                fill="var(--color-bg-card)"
                 stroke="var(--color-accent-subtle-40)"
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"

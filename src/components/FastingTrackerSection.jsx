@@ -15,8 +15,8 @@ import {
 } from "../lib/memberFasts.js";
 
 const CARD = {
-  background: "#0b0f17",
-  border: "1px solid #1e2a38",
+  background: "var(--color-bg-sunken)",
+  border: "1px solid var(--color-border-tab)",
   borderRadius: 12,
   padding: 16,
   marginBottom: 20,
@@ -187,7 +187,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
   if (!isSupabaseConfigured()) {
     return (
       <div style={CARD}>
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           Fasting tracker requires Supabase.
         </div>
       </div>
@@ -197,7 +197,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
   if (!activeProfileId) {
     return (
       <div style={CARD}>
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           Select a member profile to use the fasting tracker.
         </div>
       </div>
@@ -217,7 +217,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
       </div>
 
       {loading ? (
-        <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           Loading…
         </div>
       ) : active ? (
@@ -225,23 +225,23 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
           <div style={{ fontSize: 16, fontWeight: 600, color: "#f1f5f9", marginBottom: 6 }}>
             {fastTypeLabel(active.fast_type)}
           </div>
-          <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginBottom: 4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 4 }}>
             Elapsed:{" "}
             <span style={{ color: "var(--color-accent)" }}>
               {progress ? formatElapsedDuration(progress.elapsedMs) : "—"}
             </span>
           </div>
-          <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12 }}>
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 12 }}>
             Target: {formatTargetSummary(active.target_hours)}
             {progress?.overTarget ? (
-              <span style={{ color: "#f59e0b", marginLeft: 8 }}>(past target — still counting)</span>
+              <span style={{ color: "var(--color-warning)", marginLeft: 8 }}>(past target — still counting)</span>
             ) : null}
           </div>
           <div
             style={{
               height: 8,
               borderRadius: 999,
-              background: "#1e2a38",
+              background: "var(--color-border-tab)",
               overflow: "hidden",
               marginBottom: 14,
             }}
@@ -251,12 +251,12 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
                 height: "100%",
                 width: `${progress ? progress.progressPct : 0}%`,
                 borderRadius: 999,
-                background: progress?.overTarget ? "#f59e0b" : "var(--color-accent)",
+                background: progress?.overTarget ? "var(--color-warning)" : "var(--color-accent)",
                 transition: "width 0.4s ease",
               }}
             />
           </div>
-          <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 12 }}>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 12 }}>
             {progress ? `${progress.progressPct.toFixed(1)}% of target` : ""}
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
@@ -269,7 +269,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
               Show active fast on public profile
             </span>
           </label>
-          <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+          <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
             NOTES (OPTIONAL)
           </div>
           <textarea
@@ -287,12 +287,12 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
         </>
       ) : (
         <>
-          <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 14, lineHeight: 1.45 }}>
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 14, lineHeight: 1.45 }}>
             Start a fast, track elapsed time and progress toward your goal, and optionally share your active fast on
             your public profile.
           </div>
           <div style={{ marginBottom: 10 }}>
-            <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+            <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
               FAST TYPE
             </div>
             <select
@@ -309,7 +309,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
             </select>
           </div>
           <div style={{ marginBottom: 10 }}>
-            <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+            <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
               START TIME
             </div>
             <input
@@ -322,7 +322,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 120px", minWidth: 0 }}>
-              <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
                 TARGET
               </div>
               <input
@@ -336,7 +336,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
               />
             </div>
             <div style={{ flex: "0 0 110px" }}>
-              <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
                 UNIT
               </div>
               <select
@@ -351,7 +351,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
             </div>
           </div>
           <div style={{ marginBottom: 10 }}>
-            <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginBottom: 4 }}>
+            <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
               NOTES (OPTIONAL)
             </div>
             <textarea
@@ -375,8 +375,8 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
       )}
 
       {history.length > 0 ? (
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #1e2a38" }}>
-          <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 10, letterSpacing: "0.08em" }}>
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--color-border-tab)" }}>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 10, letterSpacing: "0.08em" }}>
             LAST {history.length} FAST{history.length === 1 ? "" : "S"}
           </div>
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -386,9 +386,9 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
                 className="mono"
                 style={{
                   fontSize: 12,
-                  color: "#b0bec5",
+                  color: "var(--color-text-secondary)",
                   padding: "8px 0",
-                  borderBottom: "1px solid #151d28",
+                  borderBottom: "1px solid var(--color-border-hairline)",
                   display: "flex",
                   justifyContent: "space-between",
                   gap: 12,
@@ -396,7 +396,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
                 }}
               >
                 <span style={{ color: "#cbd5e1" }}>{fastTypeLabel(row.fast_type)}</span>
-                <span style={{ color: "#b0bec5" }}>{formatCompletedFastDuration(row.started_at, row.ended_at)}</span>
+                <span style={{ color: "var(--color-text-secondary)" }}>{formatCompletedFastDuration(row.started_at, row.ended_at)}</span>
               </li>
             ))}
           </ul>

@@ -257,7 +257,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
         )}
       </button>
       {err && (
-        <div className="mono" style={{ fontSize: 9, color: "#f59e0b", textAlign: "center", lineHeight: 1.2 }}>
+        <div className="mono" style={{ fontSize: 9, color: "var(--color-warning)", textAlign: "center", lineHeight: 1.2 }}>
           {err}
         </div>
       )}
@@ -452,14 +452,14 @@ function urgencyFromLifeRemaining(remainingFrac) {
   }
   if (f > 0.25) {
     return {
-      barColor: "#f59e0b",
+      barColor: "var(--color-warning)",
       badgeBg: "rgba(245, 158, 11, 0.18)",
       badgeBorder: "rgba(245, 158, 11, 0.45)",
       badgeText: "#fcd34d",
     };
   }
   return {
-    barColor: "#ef4444",
+    barColor: "var(--color-danger)",
     badgeBg: "rgba(239, 68, 68, 0.18)",
     badgeBorder: "rgba(239, 68, 68, 0.45)",
     badgeText: "#fca5a5",
@@ -953,7 +953,7 @@ function DoseHistoryCalendar({
                   className="mono"
                   style={{
                     padding: "10px 0",
-                    borderTop: i > 0 ? "1px solid #0e1822" : "none",
+                    borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none",
                     fontSize: 13,
                     color: "var(--color-text-primary)",
                     lineHeight: 1.45,
@@ -1657,7 +1657,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
       </div>
 
       {!isSupabaseConfigured() && (
-        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 8 }}>Configure Supabase to sync vials</div>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 8 }}>Configure Supabase to sync vials</div>
       )}
 
       <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8, lineHeight: 1.45 }}>
@@ -1727,7 +1727,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             padding: 12,
             border: "1px dashed var(--color-accent-subtle-50)",
             borderRadius: 12,
-            background: "#0b0f17",
+            background: "var(--color-bg-sunken)",
             display: "flex",
             flexDirection: "column",
             gap: 12,
