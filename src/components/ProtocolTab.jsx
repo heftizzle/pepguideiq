@@ -20,7 +20,7 @@ import { isProtocolSessionId } from "../data/protocolSessions.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
-import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
+import { getConfirmationMessage, protocolSessionFromHour } from "../lib/protocolMessages.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import {
   localTodayYmd,
@@ -62,7 +62,7 @@ export function ProtocolTab({
   shiftSchedule = null,
   onDeepLinkConsumed,
   onLoggedNavigateLibrary: _onLoggedNavigateLibrary,
-  userPlan: _userPlan = "entry",
+  userPlan = "entry",
 }) {
   const session = useMemo(
     () => (isProtocolSessionId(initialSession) ? initialSession : inferProtocolSessionForNow(wakeTime, shiftSchedule)),
@@ -235,7 +235,8 @@ export function ProtocolTab({
     void refreshMemberProfiles();
     bumpReload();
     const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
-    const toastMessage = getDoseLogCelebrationMessage(cat, r.name);
+    const planKey = typeof userPlan === "string" ? userPlan.trim().toLowerCase() : "entry";
+    const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [peptideId], planKey);
     const doseLogId =
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {

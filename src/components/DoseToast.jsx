@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 export function DoseToast({ message, onDismiss }) {
   useEffect(() => {
     if (!message) return;
-    const t = window.setTimeout(() => onDismiss(), 4000);
+    const t = window.setTimeout(() => onDismiss(), 4500);
     return () => window.clearTimeout(t);
   }, [message, onDismiss]);
 

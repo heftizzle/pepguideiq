@@ -18,7 +18,7 @@ import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
 import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
-import { getDoseLogCelebrationMessage } from "../lib/doseLogCelebration.js";
+import { getConfirmationMessage, protocolSessionFromHour } from "../lib/protocolMessages.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import {
   localTodayYmd,
@@ -38,7 +38,16 @@ function clampUnits(u) {
  * Today's quick log on Stacks tab — same per-compound LOG DOSE pattern as Protocol (no vial management).
  * @param {{ userId: string, profileId: string, protocolRows: { peptideId: string, name: string }[], canUse: boolean, onUpgrade: () => void, userPlan?: string, wakeTime?: string | null, shiftSchedule?: string | null }} props
  */
-export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse, onUpgrade, wakeTime = null, shiftSchedule = null }) {
+export function StackProtocolQuickLog({
+  userId,
+  profileId,
+  protocolRows,
+  canUse,
+  onUpgrade,
+  userPlan = "entry",
+  wakeTime = null,
+  shiftSchedule = null,
+}) {
   const { refreshMemberProfiles } = useActiveProfile();
   const session = useMemo(() => inferProtocolSessionForNow(wakeTime, shiftSchedule), [wakeTime, shiftSchedule]);
 
@@ -202,7 +211,8 @@ export function StackProtocolQuickLog({ userId, profileId, protocolRows, canUse,
     void refreshMemberProfiles();
     bumpReload();
     const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
-    const toastMessage = getDoseLogCelebrationMessage(cat, r.name);
+    const planKey = typeof userPlan === "string" ? userPlan.trim().toLowerCase() : "entry";
+    const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [peptideId], planKey);
     const doseLogId =
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {

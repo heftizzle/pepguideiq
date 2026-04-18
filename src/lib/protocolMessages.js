@@ -41,6 +41,25 @@ export const MORNING_MESSAGES = [
   "Stack logged. Your ancestors would be confused but proud.",
   "Logged. No seed oils were harmed in this protocol.",
   "Stack logged. The wellness rabbit hole has no bottom.",
+  "You miss 100% of the shots you don't take. — Gretzky",
+  "Optimization, for lack of a better word, is good.",
+  "Discipline equals freedom. — Jocko",
+  "Frankly, my dear, I don't give a damn about your RDA. That's a government floor, not a ceiling.",
+  "Good. — Jocko",
+  "Show me the bloodwork!",
+  "Don't stop when you're tired. Stop when you're done. — Goggins",
+  "✓ Stack logged. Consistency is the protocol.",
+  "🧬 Stack logged. Stack receipted.",
+  "⚡ Stack logged. Let it work.",
+  "🐐 Stack logged. GOAT behavior.",
+  "🔬 Stack logged. Data is the protocol.",
+  "🥊 Stack logged. \"The fight is won or lost far away from witnesses.\" — Ali",
+  "🥊 Stack logged. \"I hated every minute of training, but I said don't quit.\" — Ali",
+  "🐐 Stack logged. \"Impossible is nothing.\" — Ali",
+  "⚡ Stack logged. \"Champions aren't made in gyms.\" — Ali",
+  "🏒 Stack logged. \"You miss 100% of the shots you don't take.\" — Gretzky",
+  "🐍 Stack logged. \"Rest at the end, not in the middle.\" — Kobe",
+  "🐍 Stack logged. \"The most important thing is to try and inspire people.\" — Kobe",
 ];
 
 export const AFTERNOON_MESSAGES = [
@@ -63,6 +82,25 @@ export const AFTERNOON_MESSAGES = [
   "Stack logged. Off-label doesn't even cover it.",
   "Your EOB will not reflect this purchase.",
   "Logged. The compounding pharmacy understands.",
+  "You are in danger of living a life so comfortable you die without realizing your potential. — Goggins",
+  "Say when.",
+  "Rest at the end, not in the middle. — Kobe",
+  "I'm as inflamed as hell and I AM going to take my protocol.",
+  "The most important thing is to inspire people. — Kobe",
+  "You can't handle the truth. Your doctor said your T is normal.",
+  "You have power over your mind, not outside events. — Marcus Aurelius",
+  "🔥 Stack logged. \"You are in danger of living a life so comfortable and soft that you will die without ever realizing your true potential.\" — Goggins",
+  "🔥 Stack logged. \"Don't stop when you're tired. Stop when you're done.\" — Goggins",
+  "⚡ Stack logged. \"Discipline equals freedom.\" — Jocko",
+  "⚡ Stack logged. \"Good.\" — Jocko",
+  "🏛️ Stack logged. \"We are what we repeatedly do.\" — Aristotle",
+  "🏛️ Stack logged. \"You have power over your mind, not outside events.\" — Marcus Aurelius",
+  "🏛️ Stack logged. \"Make the best use of what is in your power.\" — Epictetus",
+  "🔥 Stack logged. \"It never gets easier. You just get better.\" — Meadows",
+  "💪 Stack logged. \"Earn it every day.\" — Meadows",
+  "📈 Stack logged. \"Take care of your body. It's the only place you have to live.\" — Jim Rohn",
+  "📈 Stack logged. \"Small daily improvements over time lead to stunning results.\" — Jim Rohn",
+  "🏆 Stack logged. \"Winning is not a sometime thing. It is an all-the-time thing.\" — Lombardi",
 ];
 
 export const EVENING_MESSAGES = [
@@ -81,6 +119,25 @@ export const EVENING_MESSAGES = [
   "Logged. Crunchy sunset documented.",
   "Evening dose logged. Seed oils avoided. Probably.",
   "Stack complete. Your ancestors had evening routines too.",
+  "Make the best use of what is in your power. — Epictetus",
+  "Get busy optimizing, or get busy declining.",
+  "Winning is not a sometime thing. It is an all-the-time thing. — Lombardi",
+  "I'm your huckleberry.",
+  "Take care of your body. It's the only place you have to live. — Jim Rohn",
+  "We don't need no stinking prescriptions. Stack logged.",
+  "Earn it every day. — Meadows",
+  "🧬 Stack logged. Optimization, for lack of a better word, is good.",
+  "🔬 Stack logged. Frankly, my dear, I don't give a damn about your RDA. That's a government floor, not a ceiling.",
+  "⚡ Stack logged. Show me the bloodwork!",
+  "🐐 Stack logged. Say when.",
+  "🧬 Stack logged. I'm as inflamed as hell and I AM going to take my protocol.",
+  "💉 Stack logged. You can't handle the truth. Your doctor said your T is \"normal.\"",
+  "🔥 Stack logged. Get busy optimizing, or get busy declining.",
+  "🐐 Stack logged. I'm your huckleberry.",
+  "💉 Stack logged. We don't need no stinking prescriptions. Stack logged.",
+  "🧬 Stack logged. I'm gonna make his mitochondria an offer they can't refuse.",
+  "🔴 Stack logged. You took the red pill. Welcome to Wonderland.",
+  "🤖 Stack logged. TB-500 in the fridge, cold plunge running. I'll be back.",
 ];
 
 export const NIGHT_MESSAGES = [
@@ -109,7 +166,40 @@ export const NIGHT_MESSAGES = [
   "Not a vaccine. Goodnight.",
   "Logged. Sleep on your back. Ground yourself first.",
   "Recovery stack complete. Touch grass tomorrow.",
+  "The fight is won or lost far away from witnesses. — Ali",
+  "I'm gonna make his mitochondria an offer they can't refuse.",
+  "Impossible is nothing. — Ali",
+  "You took the red pill. Welcome to Wonderland.",
+  "Champions aren't made in gyms. — Ali",
+  "TB-500 in the fridge, cold plunge running. I'll be back.",
+  "💊 Stack logged. Big Pharma hates this one simple trick.",
+  "😂 Stack logged. FDA has left the chat.",
+  "🧬 Stack logged. WebMD does not endorse this message.",
+  "😅 Stack logged. Your doctor would like to speak with you.",
+  "💉 Stack logged. Your insurance doesn't cover this. Stack logged anyway.",
+  "🐐 Stack logged. Consulting your physician has been scheduled for never.",
+  "😂 Stack logged. CVS does not carry this. You're welcome.",
+  "💊 Stack logged. Tony Fauci has left the building.",
+  "🧬 Stack logged. The FDA is not watching. Probably.",
+  "😂 Stack logged. Pfizer stock just dipped.",
+  "💉 Stack logged. The compounding pharmacy understands.",
+  "🐐 Stack logged. Your naturopath is crying happy tears somewhere.",
 ];
+
+/**
+ * Local clock hour → session bucket for confirmation copy.
+ * Night 0–5, morning 6–11, afternoon 12–16, evening 17–20, night 21–23.
+ * @param {Date} [date]
+ * @returns {"morning" | "afternoon" | "evening" | "night"}
+ */
+export function protocolSessionFromHour(date = new Date()) {
+  const h = date.getHours();
+  if (h <= 5) return "night";
+  if (h <= 11) return "morning";
+  if (h <= 16) return "afternoon";
+  if (h <= 20) return "evening";
+  return "night";
+}
 
 export const COMPOUND_MESSAGES = {
   "retatrutide":              "GLP stack logged. Adipose tissue has been notified. It is not happy.",

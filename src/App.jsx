@@ -1807,6 +1807,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       protocolRows={protocolRows}
                       canUse={canVialTracker}
                       onUpgrade={openUpgradeModal}
+                      userPlan={planForStackLimits}
                       wakeTime={activeProfile?.wake_time ?? null}
                       shiftSchedule={activeProfile?.shift_schedule ?? null}
                     />
@@ -1983,7 +1984,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               shiftSchedule={activeProfile?.shift_schedule ?? null}
               onDeepLinkConsumed={() => {}}
               onLoggedNavigateLibrary={() => setActiveTab("library")}
-              userPlan={user?.plan ?? "entry"}
+              userPlan={planForStackLimits}
             />
           )}
 

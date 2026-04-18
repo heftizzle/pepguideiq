@@ -128,7 +128,7 @@ Everything goes through `src/lib/supabase.js` (57 exports) or explicit `fetch()`
 - **Member profile**: `memberAvatarUrl.js`, `memberFasts.js`, `memberProfileHandle.js`, `publicMemberProfile.js`, `openPublicProfile.js`, `socialProfileLinks.js`
 - **Stack sharing**: `stackShare.js`
 - **Social graph**: `follows.js`
-- **Dose display / celebration**: `doseLogCelebration.js`, `doseLogDisplay.js`, `doseNetworkFeed.js`
+- **Dose display / celebration**: `protocolMessages.js`, `doseLogDisplay.js`, `doseNetworkFeed.js`
 - **Upload**: `r2Upload.js`
 - **Builder**: `buildRowsFromMyStack.js`
 - **External links**: `finnrickUrl.js` (validates https finnrick.com only)
