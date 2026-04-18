@@ -1307,6 +1307,22 @@ export function ProfileTab({
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const progressPhotosHubSubLabel = useMemo(() => {
+    const ap = activeProfile;
+    if (!ap) return "Add photos";
+    const raw = [ap.progress_photo_front_at, ap.progress_photo_side_at, ap.progress_photo_back_at];
+    const times = raw
+      .map((x) => (typeof x === "string" && String(x).trim() ? Date.parse(String(x).trim()) : NaN))
+      .filter((n) => Number.isFinite(n));
+    if (!times.length) return "Add photos";
+    const latest = Math.max(...times);
+    try {
+      return `Last photo ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(latest)}`;
+    } catch {
+      return "Add photos";
+    }
+  }, [activeProfile, memberProfilesVersion]);
+
   const commitDisplayName = useCallback(async () => {
     if (!activeProfileId) return;
     const t = displayNameDraft.trim();
@@ -2140,23 +2156,34 @@ export function ProfileTab({
             </div>
           )}
         </button>
-        <div
+        <button
+          type="button"
+          onClick={() => void scrollToField("progress_photos")}
           style={{
+            textAlign: "left",
             padding: 14,
             borderRadius: 10,
             border: "1px solid var(--color-border-default)",
             background: "var(--color-bg-card)",
-            opacity: 0.5,
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
             minHeight: 120,
-            pointerEvents: "none",
+            color: "var(--color-text-primary)",
             fontFamily: "'Outfit', sans-serif",
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Progress Photos</div>
-          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-            Coming soon
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Progress Photos</div>
+            <span style={{ fontSize: 18, color: "var(--color-text-muted)" }} aria-hidden>
+              ›
+            </span>
           </div>
-        </div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            {progressPhotosHubSubLabel}
+          </div>
+        </button>
         <div
           style={{
             padding: 14,
@@ -2725,7 +2752,9 @@ export function ProfileTab({
         </div>
       </Card>
 
-      <div style={SECTION}>Progress photos</div>
+      <div ref={setFieldRef("progress_photos")} style={SECTION}>
+        Progress photos
+      </div>
       <Card style={{ paddingBottom: 12 }}>
         {canUseProgressPhotos && activeProfileId ? (
           <>

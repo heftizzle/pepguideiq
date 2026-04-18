@@ -381,6 +381,19 @@ export async function insertInbodyScanHistory(row) {
 }
 
 /**
+ * Deletes one `inbody_scan_history` row by id (RLS: own row; migration 057).
+ * @param {string} scanRowId
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function deleteInbodyScanHistoryRow(scanRowId) {
+  if (!supabase) return { error: notConfiguredError() };
+  const id = typeof scanRowId === "string" ? scanRowId.trim() : "";
+  if (!id) return { error: new Error("Missing scan id") };
+  const { error } = await supabase.from("inbody_scan_history").delete().eq("id", id);
+  return { error: error ?? null };
+}
+
+/**
  * @param {Record<string, unknown>} patch — profiles columns only
  */
 export async function updateUserProfile(patch) {

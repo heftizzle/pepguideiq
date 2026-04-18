@@ -15,10 +15,53 @@ import {
   uploadImageToR2,
   validateUploadFile,
 } from "../lib/r2Upload.js";
-import { insertInbodyScanHistory, fetchLatestInbodyScanHistory } from "../lib/supabase.js";
+import {
+  deleteInbodyScanHistoryRow,
+  fetchAllInbodyScanHistory,
+  insertInbodyScanHistory,
+} from "../lib/supabase.js";
 import { Modal } from "./Modal.jsx";
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** @param {Record<string, string>} fieldStrings */
+function parseIncomingScanDateMs(fieldStrings) {
+  const raw = String(fieldStrings.scan_date ?? "").trim();
+  if (!raw) return null;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : null;
+}
+
+/** @param {Record<string, unknown>} row */
+function rowScanDateMs(row) {
+  const v = row?.scan_date;
+  if (v == null) return null;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * @param {Record<string, unknown>[]} rows
+ * @param {number} incomingMs
+ */
+function findScanDateProximityConflicts(rows, incomingMs) {
+  const out = [];
+  for (const row of rows) {
+    const t = rowScanDateMs(row);
+    if (t == null) continue;
+    if (Math.abs(t - incomingMs) < ONE_WEEK_MS) out.push(row);
+  }
+  return out;
+}
+
+/** @param {number} ms */
+function formatScanDateForMessage(ms) {
+  try {
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(ms);
+  } catch {
+    return "that date";
+  }
+}
 
 /** @param {unknown} v */
 function valueToInputString(v) {
@@ -57,6 +100,7 @@ export function InBodyScanSection({
   const [fieldStrings, setFieldStrings] = useState(() => /** @type {Record<string, string>} */ ({}));
   const [confidence, setConfidence] = useState(() => /** @type {Record<string, unknown>} */ ({}));
   const [extractRawText, setExtractRawText] = useState(/** @type {string | null} */ (null));
+  const [duplicateDialog, setDuplicateDialog] = useState(/** @type {null | { conflicts: Record<string, unknown>[] }} */ (null));
 
   const resetReviewState = useCallback(() => {
     setShowReview(false);
@@ -64,6 +108,7 @@ export function InBodyScanSection({
     setFieldStrings({});
     setConfidence({});
     setExtractRawText(null);
+    setDuplicateDialog(null);
   }, []);
 
   const runExtract = useCallback(
@@ -71,19 +116,6 @@ export function InBodyScanSection({
       if (!userId || !profileId || !isApiWorkerConfigured()) {
         onErrorMessage?.("Configure VITE_API_WORKER_URL to use scan extraction.");
         return;
-      }
-      const weekCheck = await fetchLatestInbodyScanHistory(profileId);
-      if (weekCheck.error) {
-        onErrorMessage?.(weekCheck.error.message || "Could not verify scan cadence.");
-        return;
-      }
-      const lastIso = weekCheck.row && typeof weekCheck.row.created_at === "string" ? weekCheck.row.created_at : "";
-      if (lastIso) {
-        const t = Date.parse(lastIso);
-        if (Number.isFinite(t) && Date.now() - t < ONE_WEEK_MS) {
-          onErrorMessage?.("You can save one composition scan per week. Try again after your last scan is a week old.");
-          return;
-        }
       }
 
       const token = await getSessionAccessToken();
@@ -180,45 +212,34 @@ export function InBodyScanSection({
     setFieldStrings((prev) => ({ ...prev, [key]: s }));
   }, []);
 
-  const onAcceptCommit = useCallback(async () => {
+  const doUploadAndInsert = useCallback(async () => {
     if (!fileForCommit || !userId || !profileId) return;
-    setBusy(true);
-    onErrorMessage?.("");
-    try {
-      const up = await uploadImageToR2({
-        path: "/stack-photo",
-        file: fileForCommit,
-        fields: { kind: "inbody_scan_history", member_profile_id: profileId },
-      });
-      if (!up.ok) {
-        onErrorMessage?.(up.error);
-        setBusy(false);
-        return;
-      }
-      const rawJsonStored = buildRawJsonPayload(
-        Object.fromEntries(INBODY_SCAN_FIELD_DEFS.map((d) => [d.key, fieldStrings[d.key] ?? ""])),
-        confidence,
-        { rawText: extractRawText }
-      );
-      const insertRow = buildInbodyScanHistoryInsertRow(fieldStrings, up.key, userId, profileId, {
-        ...rawJsonStored,
-        r2WorkerUrlNote: "private read via GET /stack-photo?key=",
-      });
-      const { error } = await insertInbodyScanHistory(insertRow);
-      if (error) {
-        console.error("[InBodyScanSection] insert failed", error);
-        onErrorMessage?.(error.message || "Could not save scan record.");
-        setBusy(false);
-        return;
-      }
-      resetReviewState();
-      onSavedBriefly?.();
-    } catch (err) {
-      console.error("[InBodyScanSection] commit failed", err);
-      onErrorMessage?.("Save failed — try again.");
-    } finally {
-      setBusy(false);
+    const up = await uploadImageToR2({
+      path: "/stack-photo",
+      file: fileForCommit,
+      fields: { kind: "inbody_scan_history", member_profile_id: profileId },
+    });
+    if (!up.ok) {
+      onErrorMessage?.(up.error);
+      return;
     }
+    const rawJsonStored = buildRawJsonPayload(
+      Object.fromEntries(INBODY_SCAN_FIELD_DEFS.map((d) => [d.key, fieldStrings[d.key] ?? ""])),
+      confidence,
+      { rawText: extractRawText }
+    );
+    const insertRow = buildInbodyScanHistoryInsertRow(fieldStrings, up.key, userId, profileId, {
+      ...rawJsonStored,
+      r2WorkerUrlNote: "private read via GET /stack-photo?key=",
+    });
+    const { error } = await insertInbodyScanHistory(insertRow);
+    if (error) {
+      console.error("[InBodyScanSection] insert failed", error);
+      onErrorMessage?.(error.message || "Could not save scan record.");
+      return;
+    }
+    resetReviewState();
+    onSavedBriefly?.();
   }, [
     fileForCommit,
     userId,
@@ -230,6 +251,61 @@ export function InBodyScanSection({
     onSavedBriefly,
     resetReviewState,
   ]);
+
+  const onAcceptCommit = useCallback(async () => {
+    if (!fileForCommit || !userId || !profileId) return;
+    setBusy(true);
+    onErrorMessage?.("");
+    try {
+      const incomingMs = parseIncomingScanDateMs(fieldStrings);
+      if (incomingMs != null) {
+        const { rows, error } = await fetchAllInbodyScanHistory(profileId);
+        if (error) {
+          onErrorMessage?.(error.message || "Could not verify existing scans.");
+          return;
+        }
+        const conflicts = findScanDateProximityConflicts(rows, incomingMs);
+        if (conflicts.length > 0) {
+          setDuplicateDialog({ conflicts });
+          return;
+        }
+      }
+      await doUploadAndInsert();
+    } catch (err) {
+      console.error("[InBodyScanSection] commit failed", err);
+      onErrorMessage?.("Save failed — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [fileForCommit, userId, profileId, fieldStrings, onErrorMessage, doUploadAndInsert]);
+
+  const onDuplicateReplace = useCallback(async () => {
+    if (!duplicateDialog?.conflicts?.length || !fileForCommit || !userId || !profileId) return;
+    setBusy(true);
+    onErrorMessage?.("");
+    try {
+      for (const row of duplicateDialog.conflicts) {
+        const rid = row && typeof row.id === "string" ? row.id.trim() : "";
+        if (!rid) continue;
+        const { error } = await deleteInbodyScanHistoryRow(rid);
+        if (error) {
+          onErrorMessage?.(error.message || "Could not remove the existing scan.");
+          return;
+        }
+      }
+      setDuplicateDialog(null);
+      await doUploadAndInsert();
+    } catch (err) {
+      console.error("[InBodyScanSection] replace failed", err);
+      onErrorMessage?.("Save failed — try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [duplicateDialog, fileForCommit, userId, profileId, onErrorMessage, doUploadAndInsert]);
+
+  const onDuplicateCancel = useCallback(() => {
+    if (!busy) setDuplicateDialog(null);
+  }, [busy]);
 
   return (
     <>
@@ -260,7 +336,8 @@ export function InBodyScanSection({
               </p>
               <p style={{ marginBottom: 16, color: "var(--color-text-secondary)", fontSize: 13 }}>
                 By continuing you agree not to rely on extracted numbers for medical decisions and to use this feature
-                only for personal tracking. One saved scan per member profile per rolling week.
+                only for personal tracking. If you save a scan whose report date is within 7 days of an existing saved
+                scan, you will be asked before replacing that older record.
               </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                 <button type="button" className="btn-teal" onClick={dismissWaiver}>
@@ -340,6 +417,38 @@ export function InBodyScanSection({
             document.body
           )
         : null}
+      {duplicateDialog &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <Modal onClose={onDuplicateCancel} maxWidth={480} label="Scan date conflict">
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.55 }}>
+              <p style={{ marginBottom: 16 }}>
+                A scan from{" "}
+                <strong>
+                  {(() => {
+                    const r0 = duplicateDialog.conflicts[0];
+                    const ms = r0 ? rowScanDateMs(r0) : null;
+                    return ms != null ? formatScanDateForMessage(ms) : "—";
+                  })()}
+                </strong>{" "}
+                already exists. Replace it?
+              </p>
+              <p style={{ marginBottom: 16, color: "var(--color-text-secondary)", fontSize: 13 }}>
+                Replacing removes the older saved row for this profile, then saves this upload. Cancel returns you to
+                the review screen.
+              </p>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button type="button" className="btn-teal" disabled={busy} onClick={onDuplicateCancel}>
+                  Cancel
+                </button>
+                <button type="button" className="btn-teal" disabled={busy} onClick={() => void onDuplicateReplace()}>
+                  {busy ? "Working…" : "Replace"}
+                </button>
+              </div>
+            </div>
+          </Modal>,
+          document.body
+        )}
     </>
   );
 }

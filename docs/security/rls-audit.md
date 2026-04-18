@@ -138,6 +138,7 @@ These are not RLS policies on tables but affect what **anon** can read.
 
 ## Changes Applied
 
-- **`055_inbody_scan_history.sql`**: `public.inbody_scan_history` — RLS enabled; `authenticated` **SELECT** + **INSERT** only; policies require `auth.uid() = user_id` and a matching `member_profiles` row for `profile_id`. No UPDATE/DELETE for clients (append-only history).
+- **`055_inbody_scan_history.sql`**: `public.inbody_scan_history` — RLS enabled; `authenticated` **SELECT** + **INSERT**; policies require `auth.uid() = user_id` and a matching `member_profiles` row for `profile_id`.
+- **`057_inbody_scan_history_delete_scoped.sql`**: adds **DELETE** for the same ownership scope (replace-within–scan-date window in the client).
 
 Re-run this audit after any out-of-band Dashboard or SQL changes in production.
