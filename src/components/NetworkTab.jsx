@@ -322,7 +322,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             padding: "36px 20px",
             textAlign: "center",
             marginBottom: 28,
-            background: "#0e1520",
+            background: "var(--color-bg-elevated)",
           }}
         >
           <div style={{ fontSize: 13, color: "#fcd34d", lineHeight: 1.55, maxWidth: 420, margin: "0 auto" }}>
@@ -332,15 +332,15 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       ) : doseItems.length === 0 ? (
         <div
           style={{
-            border: "1px dashed #14202e",
+            border: "1px dashed var(--color-border-default)",
             borderRadius: 12,
             padding: "36px 20px",
             textAlign: "center",
             marginBottom: 28,
-            background: "#0e1520",
+            background: "var(--color-bg-elevated)",
           }}
         >
-          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>
+          <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>
             No recent dose posts yet. Log a dose from Protocol or Stacks and choose &quot;Post It&quot; to share here
             (posts expire after 72 hours).
           </div>
@@ -378,7 +378,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   boxShadow: expiresSoon ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
                   opacity: expiresSoon ? 0.88 : 1,
                   fontFamily: "'Outfit', sans-serif",
-                  color: "#dde4ef",
+                  color: "var(--color-text-primary)",
                 }}
               >
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
@@ -413,11 +413,11 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                       style={{
                         fontSize: 10,
                         letterSpacing: "0.06em",
-                        color: "#00d4aa",
-                        border: "1px solid rgba(0, 212, 170, 0.45)",
+                        color: "var(--color-accent)",
+                        border: "1px solid var(--color-bell-border-unread)",
                         borderRadius: 6,
                         padding: "2px 8px",
-                        background: "rgba(0, 212, 170, 0.1)",
+                        background: "var(--color-accent-dim)",
                       }}
                     >
                       ✓ VERIFIED
@@ -429,7 +429,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                     </span>
                   ) : null}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: "#00d4aa", marginBottom: 6, lineHeight: 1.35 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-accent)", marginBottom: 6, lineHeight: 1.35 }}>
                   {compoundName}
                   <span style={{ color: "#b0bec5", fontWeight: 500, fontSize: 14 }}>
                     {" "}
@@ -542,7 +542,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   flexDirection: "column",
                   gap: 10,
                   fontFamily: "'Outfit', sans-serif",
-                  color: "#dde4ef",
+                  color: "var(--color-text-primary)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -557,7 +557,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                         }}
                         style={{
                           fontSize: 14,
-                          color: "#00d4aa",
+                          color: "var(--color-accent)",
                           marginBottom: 6,
                           background: "none",
                           border: "none",
@@ -565,14 +565,14 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                           cursor: "pointer",
                           textAlign: "left",
                           textDecoration: "underline",
-                          textDecorationColor: "rgba(0, 212, 170, 0.35)",
+                          textDecorationColor: "var(--color-accent-subtle-50)",
                           textUnderlineOffset: 3,
                         }}
                       >
                         {formatHandleDisplay(handle)}
                       </button>
                     ) : (
-                      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", marginBottom: 0 }}>
+                      <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 0 }}>
                         {displayName}
                       </div>
                     )}
@@ -590,7 +590,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   </span>
                   <span className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
                     pepguideIQ{" "}
-                    <span style={{ color: "#00d4aa", fontWeight: 700 }}>{score}</span>
+                    <span style={{ color: "var(--color-accent)", fontWeight: 700 }}>{score}</span>
                   </span>
                   {updatedAt ? (
                     <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>

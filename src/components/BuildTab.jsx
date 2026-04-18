@@ -665,18 +665,18 @@ export function BuildTab({
   };
 
   const sectionCard = {
-    border: "1px solid #1e2a38",
+    border: "1px solid var(--color-border-default)",
     borderRadius: 12,
-    background: "rgba(14, 21, 32, 0.55)",
+    background: "var(--color-bg-elevated)",
     padding: 16,
   };
 
   const builder = (
     <div style={sectionCard}>
-      <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.1em", marginBottom: 12 }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: "0.1em", marginBottom: 12 }}>
         COMPOUND BUILDER
       </div>
-      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 6 }}>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
         STACK NAME
       </div>
       <input
@@ -687,7 +687,7 @@ export function BuildTab({
         onChange={(e) => setLocalName(e.target.value)}
         aria-label="Stack name"
       />
-      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 6 }}>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
         ADD COMPOUND
       </div>
       <div data-demo-target={DEMO_TARGET.build_catalog_search}>
@@ -729,7 +729,7 @@ export function BuildTab({
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div className="brand" style={{ fontWeight: 600, fontSize: 13, color: "#dde4ef" }}>
+                  <div className="brand" style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-primary)" }}>
                     {p.name}
                   </div>
                   <span className="pill pill--category">{cat0}</span>
@@ -751,7 +751,7 @@ export function BuildTab({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {rows.length === 0 ? (
-          <div className="mono" style={{ color: "#b0bec5", fontSize: 13, padding: "12px 0" }}>
+          <div className="mono" style={{ color: "var(--color-text-secondary)", fontSize: 13, padding: "12px 0" }}>
             Add compounds from search above
           </div>
         ) : (
@@ -764,10 +764,10 @@ export function BuildTab({
                 key={row.key}
                 className="build-tab-compound-meta"
                 style={{
-                  border: "1px solid #14202e",
+                  border: "1px solid var(--color-border-default)",
                   borderRadius: 10,
                   padding: 12,
-                  background: "rgba(7, 9, 14, 0.45)",
+                  background: "var(--color-bg-card)",
                   ...getCategoryCssVars(cat0),
                 }}
               >
@@ -811,7 +811,7 @@ export function BuildTab({
                   </div>
                 </div>
                 <div style={{ marginTop: 10 }}>
-                  <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 4 }}>
                     DOSE
                   </div>
                   <input
@@ -823,7 +823,7 @@ export function BuildTab({
                   />
                 </div>
                 <div style={{ marginTop: 10 }}>
-                  <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 4 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 4 }}>
                     FREQUENCY
                   </div>
                   <select
@@ -858,9 +858,9 @@ export function BuildTab({
         <div
           style={{
             marginTop: 16,
-            border: "1px solid rgba(0, 255, 200, 0.22)",
+            border: "1px solid var(--color-border-emphasis)",
             borderRadius: 12,
-            background: "rgba(7, 9, 14, 0.78)",
+            background: "var(--color-bg-elevated)",
             padding: 14,
           }}
         >
@@ -878,7 +878,7 @@ export function BuildTab({
               style={{
                 fontSize: 15,
                 fontWeight: 700,
-                color: "#00ffc8",
+                color: "var(--color-accent)",
                 letterSpacing: "0.04em",
               }}
             >
@@ -887,11 +887,11 @@ export function BuildTab({
               </span>
               AI Guide
             </div>
-            <span className="mono" style={{ fontSize: 10, color: "#b0bec5", letterSpacing: "0.12em" }}>
+            <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", letterSpacing: "0.12em" }}>
               BETA
             </span>
           </div>
-          <div style={{ height: 1, background: "rgba(0, 255, 200, 0.15)", marginBottom: 12 }} />
+          <div style={{ height: 1, background: "var(--color-accent-subtle-30)", marginBottom: 12 }} />
           {advisorLoading ? (
             <>
               <div className="pepv-advisor-skeleton" style={{ height: 40, marginBottom: 14 }} />
@@ -908,7 +908,7 @@ export function BuildTab({
             </p>
           ) : advisorData ? (
             <>
-              <p style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.55, margin: "0 0 14px" }}>
+              <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55, margin: "0 0 14px" }}>
                 {advisorData.insight}
               </p>
               {advisorData.recommendations.length > 0 ? (
@@ -917,7 +917,7 @@ export function BuildTab({
                     className="mono"
                     style={{
                       fontSize: 11,
-                      color: "#00ffc8",
+                      color: "var(--color-accent)",
                       marginBottom: 10,
                       letterSpacing: "0.1em",
                     }}
@@ -936,17 +936,17 @@ export function BuildTab({
                           className="build-tab-compound-meta"
                           style={{
                             position: "relative",
-                            border: "1px solid #14202e",
+                            border: "1px solid var(--color-border-default)",
                             borderRadius: 10,
                             padding: 12,
                             paddingTop: tierNorm ? 40 : 12,
-                            background: "rgba(7, 9, 14, 0.5)",
+                            background: "var(--color-bg-card)",
                             ...getCategoryCssVars(cat0),
                           }}
                         >
                           <AdvisorTierBadge tier={rec.tier} />
                           <div style={{ minWidth: 0, paddingRight: tierNorm ? 8 : 0 }}>
-                            <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "#dde4ef" }}>
+                            <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text-primary)" }}>
                               {p.name}
                             </div>
                             <span className="pill pill--category">{cat0}</span>
@@ -964,7 +964,7 @@ export function BuildTab({
                               <div
                                 style={{
                                   fontSize: 13,
-                                  color: "#b0bec5",
+                                  color: "var(--color-text-secondary)",
                                   lineHeight: 1.5,
                                   flex: "1 1 auto",
                                   minWidth: 0,
@@ -995,7 +995,7 @@ export function BuildTab({
                           position: "absolute",
                           inset: 0,
                           borderRadius: 10,
-                          background: "rgba(7, 9, 14, 0.42)",
+                          background: "var(--color-modal-scrim)",
                           backdropFilter: "blur(8px)",
                           WebkitBackdropFilter: "blur(8px)",
                           display: "flex",
@@ -1038,11 +1038,11 @@ export function BuildTab({
 
   const calculatorInner = (
     <>
-      <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: "0.08em", marginBottom: 12 }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: "0.08em", marginBottom: 12 }}>
         HOW MUCH DO I NEED?
       </div>
       <div style={{ marginBottom: 14 }}>
-        <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginBottom: 4 }}>
+        <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 4 }}>
           CYCLE LENGTH (WEEKS)
         </div>
         <input
@@ -1057,7 +1057,7 @@ export function BuildTab({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {rows.length === 0 ? (
-          <div className="mono" style={{ color: "#b0bec5", fontSize: 13 }}>Add compounds to calculate</div>
+          <div className="mono" style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Add compounds to calculate</div>
         ) : (
           cycleLines.map((L) => (
             <div
@@ -1067,7 +1067,7 @@ export function BuildTab({
                 borderRadius: 8,
                 padding: 10,
                 fontSize: 13,
-                color: "#cbd5e1",
+                color: "var(--color-text-secondary)",
                 lineHeight: 1.5,
               }}
             >
@@ -1076,7 +1076,7 @@ export function BuildTab({
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ display: "block" }}>
-                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>
                     Dose (builder)
                   </span>
                   <input
@@ -1087,11 +1087,11 @@ export function BuildTab({
                   />
                 </label>
                 <div>
-                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>Frequency</span>
+                  <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>Frequency</span>
                   <div style={{ marginTop: 4 }}>{L.freqLabel}</div>
                 </div>
                 <label style={{ display: "block" }}>
-                  <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
+                  <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>
                     Vial size (mg)
                   </span>
                   <input
@@ -1107,7 +1107,7 @@ export function BuildTab({
                     }
                   />
                 </label>
-                <div className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                   {L.totalMg != null ? (
                     <>
                       ~{Math.round(L.totalMg * 1000) / 1000}mg for cycle
@@ -1134,10 +1134,10 @@ export function BuildTab({
             paddingTop: 12,
             borderTop: "1px solid #1e2a38",
             fontSize: 13,
-            color: "#dde4ef",
+            color: "var(--color-text-primary)",
           }}
         >
-          <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 8 }}>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 8 }}>
             TOTALS
           </div>
           <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
@@ -1180,10 +1180,10 @@ export function BuildTab({
               marginBottom: historyOpen ? 10 : 0,
             }}
           >
-            <span className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: "0.08em" }}>
+            <span className="mono" style={{ fontSize: 11, color: "var(--color-accent)", letterSpacing: "0.08em" }}>
               📋 ORDER HISTORY ({shoppingHistory.length})
             </span>
-            <span className="mono" style={{ fontSize: 10, color: "#b0bec5" }}>
+            <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>
               {historyOpen ? "▲" : "▼"}
             </span>
           </button>
@@ -1231,17 +1231,17 @@ export function BuildTab({
                           marginBottom: 6,
                         }}
                       >
-                        <span className="mono" style={{ fontSize: 11, color: "#b0bec5" }}>
+                        <span className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
                           {date} · {entry.cycle_weeks}wk
                         </span>
-                        <span className="brand" style={{ fontSize: 11, color: "#b0bec5" }}>
+                        <span className="brand" style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
                           {entry.stack_name}
                         </span>
                       </div>
 
                       <ul style={{ margin: "0 0 8px 0", paddingLeft: 14, lineHeight: 1.6 }}>
                         {(entry.items ?? []).map((item, i) => (
-                          <li key={i} className="mono" style={{ fontSize: 11, color: "#b0bec5" }}>
+                          <li key={i} className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
                             {item.name} · {item.vials}× {item.vialSize}mg
                           </li>
                         ))}
@@ -1337,7 +1337,7 @@ export function BuildTab({
       <div className="brand" style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
         BUILD A STACK
       </div>
-      <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 18, maxWidth: 560, lineHeight: 1.45 }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 18, maxWidth: 560, lineHeight: 1.45 }}>
         Plan compounds, dosing, and frequency — then estimate vials for your cycle length.
       </div>
 
@@ -1366,9 +1366,9 @@ export function BuildTab({
                 cursor: "pointer",
                 fontSize: 13,
                 fontFamily: "'Outfit', sans-serif",
-                color: "#00d4aa",
+                color: "var(--color-accent)",
                 border: "1px solid #243040",
-                background: "rgba(0, 212, 170, 0.08)",
+                background: "var(--color-accent-subtle-10)",
                 padding: "12px 14px",
                 borderRadius: 10,
                 textAlign: "left",

@@ -4,7 +4,7 @@ import { buildSignupHref, captureAffiliateRefFromLocation } from "../lib/affilia
 import { Logo } from "../components/Logo.jsx";
 
 const BG = "#0d0f14";
-const ACCENT = "#00d4aa";
+const ACCENT = "var(--color-accent)";
 
 /** Marketing emojis (override catalog tier emojis on this page). */
 const TIER_EMOJI = {
@@ -119,7 +119,8 @@ function PricingPage() {
                 padding: "22px 20px 20px",
                 display: "flex",
                 flexDirection: "column",
-                boxShadow: row.id === "pro" ? `0 0 0 1px ${ACCENT}22, 0 12px 40px #0006` : "0 8px 32px #0005",
+                boxShadow:
+                  row.id === "pro" ? "0 0 0 1px var(--color-accent-subtle-22), 0 12px 40px #0006" : "0 8px 32px #0005",
               }}
             >
               <div

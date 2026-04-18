@@ -298,7 +298,7 @@ export function ProtocolTab({
   if (!canUse) {
     return (
       <div className="mono" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-        <div style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: ".12em", marginBottom: 12 }}>
           PROTOCOL
         </div>
         <div
@@ -456,7 +456,7 @@ export function ProtocolTab({
 function ProtocolMissingVialRow({ name }) {
   return (
     <div style={{ borderBottom: "1px solid #14202e", paddingBottom: 18 }}>
-      <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600, marginBottom: 6 }}>{name}</div>
+      <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600, marginBottom: 6 }}>{name}</div>
       <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
         Injectable — no active vial today. Add or reconstitute a vial in Vial Tracker.
       </div>
@@ -473,7 +473,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
       {...demoHighlightProps(demoLogDose)}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>{row.name}</div>
+        <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>{row.name}</div>
         <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
           {row.routeKind === "oral" ? "Oral" : row.routeKind === "intranasal" ? "Intranasal" : "Topical"}
         </div>
@@ -506,7 +506,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
         <div
           style={{
             fontSize: 16,
-            color: "#dde4ef",
+            color: "var(--color-text-primary)",
             minWidth: 56,
             textAlign: "center",
             padding: "8px 0",
@@ -524,7 +524,7 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
         >
           +
         </button>
-        <div style={{ fontSize: 13, color: "#00d4aa" }}>{row.unitLabel}</div>
+        <div style={{ fontSize: 13, color: "var(--color-accent)" }}>{row.unitLabel}</div>
         <button
           type="button"
           className="btn-teal"
@@ -579,7 +579,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
       {...demoHighlightProps(demoLogDose)}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 14, color: "#dde4ef", fontWeight: 600 }}>
+        <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>
           {row.name}
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", maxWidth: 280 }}>
@@ -615,7 +615,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         <div
           style={{
             fontSize: 16,
-            color: "#dde4ef",
+            color: "var(--color-text-primary)",
             minWidth: 56,
             textAlign: "center",
             padding: "8px 0",
@@ -633,7 +633,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
         >
           +
         </button>
-        <div style={{ fontSize: 13, color: "#00d4aa" }}>{dosePreview}</div>
+        <div style={{ fontSize: 13, color: "var(--color-accent)" }}>{dosePreview}</div>
         <button
           type="button"
           className="btn-teal"

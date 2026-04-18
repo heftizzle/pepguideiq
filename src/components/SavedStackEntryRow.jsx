@@ -73,7 +73,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
           <div>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 4, letterSpacing: ".12em" }}>SESSIONS</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {PROTOCOL_SESSION_IDS.map((sid) => {
                 const on = sessions.includes(sid);
@@ -93,9 +93,9 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                       border: warnSelected
                         ? "1px solid rgba(245, 158, 11, 0.55)"
                         : on
-                          ? "1px solid rgba(0,212,170,0.45)"
+                          ? "1px solid var(--color-bell-border-unread)"
                           : "1px solid #243040",
-                      background: on ? "rgba(0,212,170,0.1)" : "rgba(255,255,255,0.03)",
+                      background: on ? "var(--color-accent-dim)" : "var(--color-bg-hover)",
                       fontSize: 18,
                       lineHeight: 1,
                       cursor: "pointer",
@@ -153,7 +153,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             )}
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 4, letterSpacing: ".12em" }}>DOSE</div>
             <input
               className="form-input"
               style={{ fontSize: 13 }}
@@ -163,7 +163,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 4, letterSpacing: ".12em" }}>FREQUENCY</div>
             <input
               className="form-input"
               style={{ fontSize: 13 }}
@@ -174,7 +174,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
             />
           </div>
           <div>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 4, letterSpacing: ".12em" }}>NOTES</div>
             <textarea
               className="form-input"
               style={{ fontSize: 13, minHeight: 56, resize: "vertical" }}

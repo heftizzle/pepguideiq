@@ -371,9 +371,9 @@ function SelectPill({ children, active, onClick }) {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        border: `1px solid ${active ? "#00d4aa" : "#14202e"}`,
-        background: active ? "#00d4aa14" : "transparent",
-        color: active ? "#00d4aa" : "#b0bec5",
+        border: `1px solid ${active ? "var(--color-accent)" : "#14202e"}`,
+        background: active ? "var(--color-accent-subtle-14)" : "transparent",
+        color: active ? "var(--color-accent)" : "#b0bec5",
       }}
     >
       {children}
@@ -638,13 +638,13 @@ function DoseHistoryCalendar({
       alignItems: "center",
       justifyContent: "center",
       padding: 8,
-      color: "#2e4055",
-      background: "#06080c",
-      border: "1px solid #0e1822",
+      color: "var(--color-text-muted)",
+      background: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border-default)",
       fontSize: 12,
       boxSizing: "border-box",
       ...(has && selectedYmd === ymd
-        ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+        ? { outline: "2px solid var(--color-bell-border-unread)", outlineOffset: 1 }
         : {}),
     };
 
@@ -655,8 +655,8 @@ function DoseHistoryCalendar({
             width: 8,
             height: 8,
             borderRadius: "50%",
-            background: "#00d4aa",
-            boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+            background: "var(--color-accent)",
+            boxShadow: "0 0 0 1px var(--color-accent-subtle-50)",
             flexShrink: 0,
             marginTop: 4,
           }}
@@ -696,10 +696,9 @@ function DoseHistoryCalendar({
       );
     }
 
-    const isPast = t < todayMs && !isToday;
-    const baseBg = isToday ? "rgba(0, 212, 170, 0.14)" : "#07090e";
-    const numColor = isPast ? "#b0bec5" : "#b0bec5";
-    const borderColor = isToday ? "#00d4aa" : "#14202e";
+    const baseBg = isToday ? "var(--color-accent-nav-fill)" : "var(--color-bg-elevated)";
+    const numColor = "var(--color-text-primary)";
+    const borderColor = isToday ? "var(--color-accent)" : "var(--color-border-default)";
     const borderWidth = isToday ? 2 : 1;
 
     const contentCellStyle = {
@@ -720,7 +719,7 @@ function DoseHistoryCalendar({
       border: `${borderWidth}px solid ${borderColor}`,
       boxSizing: "border-box",
       ...(has && selectedYmd === ymd
-        ? { outline: "2px solid rgba(0, 212, 170, 0.45)", outlineOffset: 1 }
+        ? { outline: "2px solid var(--color-bell-border-unread)", outlineOffset: 1 }
         : {}),
     };
 
@@ -730,8 +729,8 @@ function DoseHistoryCalendar({
           width: 8,
           height: 8,
           borderRadius: "50%",
-          background: "#00d4aa",
-          boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.35)",
+          background: "var(--color-accent)",
+          boxShadow: "0 0 0 1px var(--color-accent-subtle-50)",
           flexShrink: 0,
         }}
       />
@@ -770,7 +769,7 @@ function DoseHistoryCalendar({
 
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", marginBottom: 8, letterSpacing: ".12em" }}>
+      <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 8, letterSpacing: ".12em" }}>
         DOSE HISTORY
       </div>
       <div
@@ -854,7 +853,7 @@ function DoseHistoryCalendar({
                 style={{
                   textAlign: "center",
                   fontSize: 12,
-                  color: "#b0bec5",
+                  color: "var(--color-text-secondary)",
                   padding: "4px 0",
                   letterSpacing: "0.06em",
                 }}
@@ -915,7 +914,7 @@ function DoseHistoryCalendar({
             maxWidth: 420,
           }}
         >
-          <div className="mono" style={{ fontSize: 12, color: "#00d4aa", marginBottom: 10, letterSpacing: "0.06em" }}>
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-accent)", marginBottom: 10, letterSpacing: "0.06em" }}>
             {(() => {
               const hd = new Date(`${selectedYmd}T12:00:00`);
               return Number.isNaN(hd.getTime())
@@ -944,11 +943,11 @@ function DoseHistoryCalendar({
                     padding: "10px 0",
                     borderTop: i > 0 ? "1px solid #0e1822" : "none",
                     fontSize: 13,
-                    color: "#dde4ef",
+                    color: "var(--color-text-primary)",
                     lineHeight: 1.45,
                   }}
                 >
-                  <div style={{ color: "#dde4ef", marginBottom: meta ? 4 : 0 }}>{name}</div>
+                  <div style={{ color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
                   <div style={{ fontSize: 12, color: "#b0bec5" }}>
                     {amount}
                     {meta ? ` · ${meta}` : ""}
@@ -1188,7 +1187,7 @@ function VialRow({
                   <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 6 }}>
                     Expires {formatMediumDate(vial.expires_at)}
                   </div>
-                  <div className="mono" style={{ fontSize: 13, color: "#dde4ef", marginBottom: 10 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: 10 }}>
                     {dr} day{dr === 1 ? "" : "s"} remaining
                   </div>
                   <div
@@ -1615,7 +1614,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         }}
         title="Upgrade to Pro to use Vial Tracker"
       >
-        <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
+        <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", letterSpacing: ".12em", marginBottom: 4 }}>
           VIAL TRACKER
         </div>
         <div className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
@@ -1627,7 +1626,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
 
   return (
     <div style={{ marginTop: 10 }}>
-      <div className="mono" style={{ fontSize: 14, color: "#00d4aa", letterSpacing: ".12em", marginBottom: 4 }}>
+      <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", letterSpacing: ".12em", marginBottom: 4 }}>
         {compoundName}
       </div>
 
@@ -1699,7 +1698,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
           style={{
             marginTop: 10,
             padding: 12,
-            border: "1px dashed #00d4aa55",
+            border: "1px dashed var(--color-accent-subtle-50)",
             borderRadius: 12,
             background: "#0b0f17",
             display: "flex",
@@ -1708,7 +1707,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             maxWidth: 400,
           }}
         >
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 0 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 0 }}>
             NEW VIAL
           </div>
 
@@ -1806,10 +1805,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                 padding: 12,
                 borderRadius: 12,
                 border: "1px solid #1e3a32",
-                background: "rgba(0, 212, 170, 0.06)",
+                background: "var(--color-accent-subtle-0e)",
               }}
             >
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.08em" }}>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}>
                 BLEND CALCULATOR
               </div>
               <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 12, lineHeight: 1.45 }}>
@@ -1856,7 +1855,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                       borderCollapse: "collapse",
                       fontFamily: "JetBrains Mono, monospace",
                       fontSize: 12,
-                      color: "#dde4ef",
+                      color: "var(--color-text-primary)",
                     }}
                   >
                     <thead>
@@ -1876,7 +1875,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                           <td style={{ textAlign: "right", padding: "6px 6px 6px 0" }}>{formatBlendMcgDraw(r.mcgPerDraw)}</td>
                         </tr>
                       ))}
-                      <tr style={{ fontWeight: 600, color: "#00d4aa" }}>
+                      <tr style={{ fontWeight: 600, color: "var(--color-accent)" }}>
                         <td style={{ padding: "8px 6px 0 0" }}>Total blend</td>
                         <td style={{ textAlign: "right", padding: "8px 6px 0" }}>{effectiveBlendTotalMg.toLocaleString()}</td>
                         <td style={{ textAlign: "right", padding: "8px 6px 0" }}>{formatBlendMgDraw(blendCalc.totalMgPerDraw)}</td>
@@ -1929,7 +1928,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                 background: "#07090e",
               }}
             >
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.08em" }}>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 8, letterSpacing: "0.08em" }}>
                 LIVE RESULTS
               </div>
               {effectiveBlendComponents ? (
@@ -1951,14 +1950,14 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
                       marginTop: 10,
                       padding: 10,
                       borderRadius: 12,
-                      background: "#00d4aa14",
-                      border: "1px solid #00d4aa",
+                      background: "var(--color-accent-subtle-14)",
+                      border: "1px solid var(--color-accent)",
                     }}
                   >
-                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 6, letterSpacing: "0.06em" }}>
+                    <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.06em" }}>
                       INSULIN SYRINGE
                     </div>
-                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", lineHeight: 1.45 }}>
+                    <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", lineHeight: 1.45 }}>
                       {addFormCalc.units.toFixed(1)} units on a 100-unit (1 mL) syringe
                     </div>
                   </div>

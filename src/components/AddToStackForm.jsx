@@ -17,7 +17,7 @@ export function AddToStackForm({ peptide, onCancel, onSave }) {
       <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginBottom: 18 }}>{peptide.name}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>DOSE</div>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>DOSE</div>
           <input
             className="form-input"
             value={dose}
@@ -26,7 +26,7 @@ export function AddToStackForm({ peptide, onCancel, onSave }) {
           />
         </div>
         <div>
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>FREQUENCY</div>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>FREQUENCY</div>
           <input
             className="form-input"
             value={frequency}
@@ -35,7 +35,7 @@ export function AddToStackForm({ peptide, onCancel, onSave }) {
           />
         </div>
         <div>
-          <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>NOTES</div>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>NOTES</div>
           <input className="form-input" value={notes} placeholder="Optional notes…" onChange={(e) => setNotes(e.target.value)} />
         </div>
       </div>

@@ -28,33 +28,33 @@ export function PublicProfileFastingBlock({ publicFast }) {
         marginBottom: 20,
         padding: 14,
         borderRadius: 12,
-        border: "1px solid #243040",
-        background: "rgba(0,212,170,0.06)",
+        border: "1px solid var(--color-border-default)",
+        background: "var(--color-accent-subtle-0e)",
       }}
     >
-      <div className="mono" style={{ fontSize: 10, color: "#00d4aa", marginBottom: 8, letterSpacing: "0.1em" }}>
+      <div className="mono" style={{ fontSize: 10, color: "var(--color-accent)", marginBottom: 8, letterSpacing: "0.1em" }}>
         ACTIVE FAST
       </div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9", marginBottom: 6 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 6 }}>
         {fastTypeLabel(publicFast.fast_type)}
       </div>
-      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginBottom: 8 }}>
-        Elapsed <span style={{ color: "#00d4aa" }}>{formatElapsedDuration(prog.elapsedMs)}</span>
-        <span style={{ color: "#b0bec5" }}> · </span>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>
+        Elapsed <span style={{ color: "var(--color-accent)" }}>{formatElapsedDuration(prog.elapsedMs)}</span>
+        <span style={{ color: "var(--color-text-secondary)" }}> · </span>
         Target {formatTargetSummary(publicFast.target_hours)}
       </div>
-      <div style={{ height: 6, borderRadius: 999, background: "#1e2a38", overflow: "hidden" }}>
+      <div style={{ height: 6, borderRadius: 999, background: "var(--color-bg-input)", overflow: "hidden" }}>
         <div
           style={{
             height: "100%",
             width: `${prog.progressPct}%`,
             borderRadius: 999,
-            background: prog.overTarget ? "#f59e0b" : "#00d4aa",
+            background: prog.overTarget ? "#f59e0b" : "var(--color-accent)",
             transition: "width 0.35s ease",
           }}
         />
       </div>
-      <div className="mono" style={{ fontSize: 10, color: "#b0bec5", marginTop: 6 }}>
+      <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginTop: 6 }}>
         {prog.progressPct.toFixed(1)}% of goal
         {prog.overTarget ? " · past target" : ""}
       </div>

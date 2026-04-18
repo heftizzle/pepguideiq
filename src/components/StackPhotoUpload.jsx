@@ -190,7 +190,7 @@ export function StackPhotoUpload({
       ? "Configure VITE_API_WORKER_URL to upload"
       : "";
 
-  const borderColor = dragOver ? "rgba(0,212,170,0.85)" : "rgba(0,212,170,0.42)";
+  const borderColor = dragOver ? "var(--color-accent)" : "var(--color-accent-subtle-50)";
 
   return (
     <div style={{ maxWidth: 200 }}>
@@ -198,7 +198,7 @@ export function StackPhotoUpload({
         className="mono"
         style={{
           fontSize: 13,
-          color: "#00d4aa",
+          color: "var(--color-accent)",
           marginBottom: 6,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -234,7 +234,7 @@ export function StackPhotoUpload({
           minHeight: 128,
           borderRadius: 10,
           border: `2px dashed ${borderColor}`,
-          background: "rgba(0,212,170,0.04)",
+          background: "var(--color-accent-subtle-0e)",
           cursor: gated || uploading ? "not-allowed" : "pointer",
           opacity: gated ? 0.52 : 1,
           overflow: "hidden",

@@ -101,7 +101,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 |---|---|---|
 | `pepv_age_verified_v2` | localStorage | `{t: timestamp, v: 1}` — age gate ack |
 | `pepv_age_verified` | localStorage | legacy boolean, fallback only |
-| `pepguide_ref` | localStorage | affiliate ref (EDON15 / TSource15) |
+| `pepguide_ref` | localStorage | affiliate ref (whitelisted codes; see `affiliateRef.js`) |
 | `pepv_last_tab` | sessionStorage | last active tab id |
 | `pepguideiq.active_profile_id.{userId}` | localStorage | active member_profile id per user |
 

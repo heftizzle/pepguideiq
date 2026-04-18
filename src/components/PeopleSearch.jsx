@@ -176,7 +176,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         flexDirection: "column",
         justifyContent: "flex-start",
         paddingTop: "max(0px, env(safe-area-inset-top, 0px))",
-        background: "#07090e",
+        background: "var(--color-bg-page)",
         /* Above .grid-bg header (z-70) so top-right close is clickable; GlobalStyles .guide-takeover-close is only z-55 */
         zIndex: 72,
         overflowY: "auto",
@@ -210,7 +210,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           className="mono"
           style={{
             fontSize: 13,
-            color: "#00d4aa",
+            color: "var(--color-accent)",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
             marginBottom: 16,
@@ -221,7 +221,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <span className="mono" style={{ fontSize: 15, color: "#b0bec5", flexShrink: 0 }}>
+          <span className="mono" style={{ fontSize: 15, color: "var(--color-text-secondary)", flexShrink: 0 }}>
             @
           </span>
           <input
@@ -246,15 +246,15 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           }}
         >
           {!accessToken ? (
-            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 12 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: 12 }}>
               Loading session…
             </div>
           ) : emptyQuery ? (
-            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 8 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: 8 }}>
               Search for people by handle or name
             </div>
           ) : showNoResults ? (
-            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", padding: 8 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: 8 }}>
               No users found for @{debounced.replace(/^@/, "").trim()}
             </div>
           ) : (
@@ -302,14 +302,14 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         borderRadius: "50%",
                         overflow: "hidden",
                         flexShrink: 0,
-                        background: "#0e1520",
-                        border: "1px solid #243040",
+                        background: "var(--color-bg-elevated)",
+                        border: "1px solid var(--color-border-default)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: 13,
                         fontWeight: 700,
-                        color: "#00d4aa",
+                        color: "var(--color-accent)",
                         fontFamily: "'Outfit', sans-serif",
                       }}
                     >
@@ -325,14 +325,14 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                         minWidth: 0,
                       }}
                     >
-                      <div className="brand" style={{ fontSize: 15, fontWeight: 600, color: "#00d4aa", lineHeight: 1.3 }}>
+                      <div className="brand" style={{ fontSize: 15, fontWeight: 600, color: "var(--color-accent)", lineHeight: 1.3 }}>
                         {handleLine || "—"}
                       </div>
                       {dispName ? (
-                        <div style={{ fontSize: 13, color: "#b0bec5", marginTop: 2 }}>{dispName}</div>
+                        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>{dispName}</div>
                       ) : null}
                       {snippet ? (
-                        <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginTop: 6, lineHeight: 1.45 }}>
+                        <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6, lineHeight: 1.45 }}>
                           {snippet}
                         </div>
                       ) : null}

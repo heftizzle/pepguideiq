@@ -181,7 +181,7 @@ function MetricRuler({
           y1={h}
           x2={tk.x}
           y2={tk.major ? 2 : h - 6}
-          stroke="#00d4aa"
+          stroke="var(--color-accent)"
           strokeOpacity={0.2}
           strokeWidth={1}
           style={{ pointerEvents: "none" }}
@@ -192,7 +192,7 @@ function MetricRuler({
         y1={0}
         x2={pos}
         y2={interactive ? thumbCy : h}
-        stroke="#00d4aa"
+        stroke="var(--color-accent)"
         strokeOpacity={1}
         strokeWidth={1.5}
         style={{ pointerEvents: "none" }}
@@ -202,7 +202,7 @@ function MetricRuler({
           cx={pos}
           cy={thumbCy}
           r={THUMB_R}
-          fill="#00d4aa"
+          fill="var(--color-accent)"
           stroke="#00b894"
           strokeWidth={1}
           style={{ pointerEvents: "none" }}
@@ -246,7 +246,7 @@ export function BodyMetricStepper({ value, min, max, step, displayText, onCommit
           style={{
             flex: 1,
             textAlign: "center",
-            color: "#00d4aa",
+            color: "var(--color-accent)",
             fontSize: 15,
             fontWeight: 600,
             userSelect: "none",

@@ -288,8 +288,8 @@ export function NotificationsBell({ userId, userGoals }) {
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          background: "#0b0f17",
-          border: "1px solid #243040",
+          background: "var(--color-bg-sunken)",
+          border: "1px solid var(--color-border-emphasis)",
           borderRadius: 10,
           boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
           zIndex: NOTIFICATIONS_DROPDOWN_Z_INDEX,
@@ -302,11 +302,11 @@ export function NotificationsBell({ userId, userGoals }) {
             justifyContent: "space-between",
             gap: 8,
             padding: "10px 12px",
-            borderBottom: "1px solid #1a2430",
+            borderBottom: "1px solid var(--color-border-strong)",
             flexShrink: 0,
           }}
         >
-          <span className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.12em" }}>
+          <span className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", letterSpacing: "0.12em" }}>
             NOTIFICATIONS
           </span>
           <button
@@ -316,7 +316,7 @@ export function NotificationsBell({ userId, userGoals }) {
             onClick={() => void onMarkAll()}
             style={{
               fontSize: 11,
-              color: unread === 0 ? "#4a5568" : "#00d4aa",
+              color: unread === 0 ? "var(--color-text-muted)" : "var(--color-accent)",
               background: "none",
               border: "none",
               cursor: unread === 0 ? "default" : "pointer",
@@ -329,7 +329,7 @@ export function NotificationsBell({ userId, userGoals }) {
         </div>
         <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
           {rows.length === 0 ? (
-            <div className="mono" style={{ padding: 20, fontSize: 13, color: "#b0bec5", textAlign: "center" }}>
+            <div className="mono" style={{ padding: 20, fontSize: 13, color: "var(--color-text-secondary)", textAlign: "center" }}>
               No notifications yet.
             </div>
           ) : (
@@ -352,13 +352,13 @@ export function NotificationsBell({ userId, userGoals }) {
                     textAlign: "left",
                     padding: "12px 14px",
                     border: "none",
-                    borderBottom: "1px solid #14202e",
-                    background: isRead ? "transparent" : "rgba(0, 212, 170, 0.06)",
+                    borderBottom: "1px solid var(--color-border-default)",
+                    background: isRead ? "transparent" : "var(--color-accent-subtle-0e)",
                     cursor: busy ? "wait" : "pointer",
                     display: "block",
                   }}
                 >
-                  <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45 }}>
+                  <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>
                     {actorCanon ? (
                       <span
                         role="link"
@@ -375,21 +375,21 @@ export function NotificationsBell({ userId, userGoals }) {
                         }}
                         style={{
                           fontWeight: 700,
-                          color: "#00d4aa",
+                          color: "var(--color-accent)",
                           cursor: busy ? "wait" : "pointer",
                           textDecoration: "underline",
-                          textDecorationColor: "rgba(0, 212, 170, 0.35)",
+                          textDecorationColor: "var(--color-accent-subtle-50)",
                           textUnderlineOffset: 3,
                         }}
                       >
                         {label}
                       </span>
                     ) : (
-                      <span style={{ fontWeight: 700, color: "#00d4aa" }}>{label}</span>
+                      <span style={{ fontWeight: 700, color: "var(--color-accent)" }}>{label}</span>
                     )}{" "}
-                    <span style={{ color: "#b0bec5" }}>{body}</span>
+                    <span style={{ color: "var(--color-text-secondary)" }}>{body}</span>
                   </div>
-                  <div className="mono" style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                  <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
                     {ago}
                   </div>
                 </button>
@@ -425,8 +425,8 @@ export function NotificationsBell({ userId, userGoals }) {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: "#00d4aa",
-              boxShadow: "0 0 0 2px #0b0f17",
+              background: "var(--color-accent)",
+              boxShadow: "0 0 0 2px var(--color-bg-sunken)",
             }}
           />
         ) : null}

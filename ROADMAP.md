@@ -22,7 +22,7 @@
 - [x] Resend SMTP — transactional emails from `noreply@pepguideiq.com`
 - [x] DMARC record live — `_dmarc.pepguideiq.com` TXT in Cloudflare; full SPF + DKIM + DMARC stack
 - [x] PgBouncer — confirmed not needed (Supabase JS client uses REST/PostgREST); connection pooling enabled at size 15
-- [x] Rewardful affiliate tracking — all 11 codes whitelisted in `src/lib/affiliateRef.js`, case-insensitive; snippet + referral ID capture wired; webhook handles Rewardful referral string vs UUID
+- [x] Rewardful affiliate tracking — all 12 codes whitelisted in `src/lib/affiliateRef.js`, case-insensitive; snippet + referral ID capture wired; webhook handles Rewardful referral string vs UUID
 - [x] Account deletion flow — Stripe subscription cancel → R2 cleanup → auth delete; verified end-to-end twice
 - [x] Signup trigger fixed — `handle_new_user` atomically creates `profiles` + `member_profiles` + `user_stacks` (migration 053)
 - [ ] Liability insurance for the LLC
@@ -154,7 +154,7 @@
 - [x] Demo tour (6-step core walkthrough, session-count gated)
 - [x] Age gate (`pepv_age_verified_v2` localStorage, v=1)
 - [x] ToS + Privacy Policy + Research Use Waiver at `/legal`
-- [x] Rewardful affiliate integration — 11-code whitelist, case-insensitive, referral ID capture, webhook UUID resolution
+- [x] Rewardful affiliate integration — 12-code whitelist, case-insensitive, referral ID capture, webhook UUID resolution
 - [x] Account deletion — Stripe cancel + R2 cleanup + auth delete + `window.location.replace` redirect
 - [x] Find People X button — z-index fix + `history.back()` fallback
 - [x] AI Guide X button — z-index fix, clean Library landing

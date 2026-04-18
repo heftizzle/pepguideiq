@@ -159,9 +159,9 @@ export function StackShareControls({
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            color: feedVisible ? "#00d4aa" : undefined,
-            border: feedVisible ? "1px solid rgba(0, 212, 170, 0.45)" : undefined,
-            background: feedVisible ? "rgba(0, 212, 170, 0.1)" : undefined,
+            color: feedVisible ? "var(--color-accent)" : undefined,
+            border: feedVisible ? "1px solid var(--color-bell-border-unread)" : undefined,
+            background: feedVisible ? "var(--color-accent-dim)" : undefined,
           }}
         >
           {feedBusy ? "…" : feedVisible ? "Shared to Network ✓" : "Post to Network"}
@@ -199,7 +199,7 @@ export function StackShareControls({
         >
           <div
             className="mono"
-            style={{ fontSize: 12, color: "#00d4aa", letterSpacing: "0.1em", marginBottom: 10 }}
+            style={{ fontSize: 12, color: "var(--color-accent)", letterSpacing: "0.1em", marginBottom: 10 }}
           >
             SHARE STACK
           </div>

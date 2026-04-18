@@ -16,8 +16,8 @@ function highlightMatch(text, query) {
       {text.slice(0, i)}
       <mark
         style={{
-          background: "rgba(0, 212, 170, 0.35)",
-          color: "#dde4ef",
+          background: "var(--color-accent-subtle-50)",
+          color: "var(--color-text-primary)",
           padding: "0 2px",
           borderRadius: 2,
         }}
@@ -175,7 +175,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             flexShrink: 0,
             borderRadius: 10,
             border: "1px solid #243040",
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--color-bg-hover)",
             color: "#b0bec5",
             cursor: "pointer",
             fontSize: 20,
@@ -235,7 +235,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
                     borderBottom: "1px solid #14202e",
                     background: "transparent",
                     cursor: "pointer",
-                    color: "#dde4ef",
+                    color: "var(--color-text-primary)",
                   }}
                 >
                   <div className="brand" style={{ fontSize: 14, fontWeight: 600 }}>

@@ -3,7 +3,7 @@ import { Logo } from "./Logo.jsx";
 import { setAgeVerifiedInStorage } from "../lib/ageVerification.js";
 
 const linkStyle = {
-  color: "#00d4aa",
+  color: "var(--color-accent)",
   textDecoration: "underline",
   textUnderlineOffset: 3,
 };
@@ -39,6 +39,7 @@ export function AgeGate({ onConfirm, onExit }) {
         inset: 0,
         zIndex: 2147483000,
         background: "#07090e",
+        "--color-text-primary": "#dde4ef",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -67,8 +68,8 @@ export function AgeGate({ onConfirm, onExit }) {
         <div
           style={{
             padding: "14px 20px 12px",
-            borderBottom: "1px solid rgba(0, 212, 170, 0.35)",
-            background: "linear-gradient(180deg, rgba(0, 212, 170, 0.14) 0%, rgba(0, 212, 170, 0.04) 100%)",
+            borderBottom: "1px solid var(--color-accent-subtle-50)",
+            background: "linear-gradient(180deg, var(--color-accent-nav-fill) 0%, var(--color-accent-subtle-0e) 100%)",
             textAlign: "center",
           }}
         >
@@ -81,7 +82,7 @@ export function AgeGate({ onConfirm, onExit }) {
             style={{
               fontSize: "clamp(16px, 4vw, 19px)",
               fontWeight: 700,
-              color: "#00d4aa",
+              color: "var(--color-accent)",
               lineHeight: 1.35,
               margin: 0,
               letterSpacing: "0.04em",
@@ -115,7 +116,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 gap: 12,
                 cursor: "pointer",
                 fontSize: 14,
-                color: "#dde4ef",
+                color: "var(--color-text-primary)",
                 lineHeight: 1.45,
                 fontFamily: "'Outfit', sans-serif",
               }}
@@ -125,7 +126,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 type="checkbox"
                 checked={ageChecked}
                 onChange={(e) => setAgeChecked(e.target.checked)}
-                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "#00d4aa" }}
+                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--color-accent)" }}
               />
               <span>I confirm I am 18 years of age or older.</span>
             </label>
@@ -136,7 +137,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 alignItems: "flex-start",
                 gap: 12,
                 fontSize: 14,
-                color: "#dde4ef",
+                color: "var(--color-text-primary)",
                 lineHeight: 1.45,
                 fontFamily: "'Outfit', sans-serif",
               }}
@@ -146,7 +147,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 type="checkbox"
                 checked={researchChecked}
                 onChange={(e) => setResearchChecked(e.target.checked)}
-                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "#00d4aa" }}
+                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--color-accent)" }}
               />
               <div>
                 <label htmlFor={idResearch} style={{ cursor: "pointer" }}>
@@ -193,7 +194,7 @@ export function AgeGate({ onConfirm, onExit }) {
               type="checkbox"
               checked={rememberChoice}
               onChange={(e) => setRememberChoice(e.target.checked)}
-              style={{ width: 16, height: 16, marginTop: 2, flexShrink: 0, accentColor: "#00d4aa" }}
+              style={{ width: 16, height: 16, marginTop: 2, flexShrink: 0, accentColor: "var(--color-accent)" }}
             />
             <span>Remember my choice on this device</span>
           </label>
@@ -207,8 +208,8 @@ export function AgeGate({ onConfirm, onExit }) {
               onClick={onAgree}
               style={{
                 width: "100%",
-                background: canEnter ? "#00d4aa" : "#1e3d34",
-                border: `1px solid ${canEnter ? "#00d4aa" : "#243040"}`,
+                background: canEnter ? "var(--color-accent)" : "#1e3d34",
+                border: `1px solid ${canEnter ? "var(--color-accent)" : "#243040"}`,
                 color: canEnter ? "#07090e" : "#4a6670",
                 fontWeight: 700,
                 letterSpacing: "0.06em",

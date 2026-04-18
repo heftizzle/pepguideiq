@@ -16,6 +16,7 @@ import {
   updateUserProfile,
 } from "../lib/supabase.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
+import { ThemeToggle } from "./ThemeToggle.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { getCountriesForProfileForm } from "../data/countries.js";
 import { formatLanguageOptionLabel, PROFILE_LANGUAGE_OPTIONS } from "../data/profileLanguages.js";
@@ -35,7 +36,7 @@ import { wakeTimeFromInputToApi, wakeTimeToInputValue } from "../lib/sessionSche
 
 const SECTION = {
   fontSize: 13,
-  color: "#00d4aa",
+  color: "var(--color-accent)",
   letterSpacing: "0.12em",
   marginBottom: 12,
   textTransform: "uppercase",
@@ -53,10 +54,22 @@ const SHIFT_SCHEDULE_OPTIONS = [
 function tierPillStyle(plan) {
   return {
     background:
-      plan === "goat" ? "#a855f720" : plan === "elite" ? "#f59e0b20" : plan === "pro" ? "#00d4aa20" : "#14202e",
-    color: plan === "goat" ? "#a855f7" : plan === "elite" ? "#f59e0b" : plan === "pro" ? "#00d4aa" : "#b0bec5",
+      plan === "goat"
+        ? "var(--tier-goat-dim)"
+        : plan === "elite"
+          ? "var(--tier-elite-dim)"
+          : plan === "pro"
+            ? "var(--tier-pro-dim)"
+            : "var(--tier-entry-dim)",
+    color: plan === "goat" ? "var(--tier-goat)" : plan === "elite" ? "var(--tier-elite)" : plan === "pro" ? "var(--tier-pro)" : "var(--tier-entry)",
     border: `1px solid ${
-      plan === "goat" ? "#a855f730" : plan === "elite" ? "#f59e0b30" : plan === "pro" ? "#00d4aa30" : "#14202e"
+      plan === "goat"
+        ? "var(--tier-goat-border)"
+        : plan === "elite"
+          ? "var(--tier-elite-border)"
+          : plan === "pro"
+            ? "var(--tier-pro-border)"
+            : "var(--tier-entry-border)"
     }`,
     fontSize: 13,
     padding: "4px 10px",
@@ -70,8 +83,8 @@ function Card({ children, style = {} }) {
   return (
     <div
       style={{
-        background: "#0e1520",
-        border: "1px solid #1e2a38",
+        background: "var(--color-bg-card)",
+        border: "1px solid var(--color-border-tab)",
         borderRadius: 12,
         padding: 16,
         marginBottom: 20,
@@ -610,7 +623,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
+      <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)" }}>
         Supabase is not configured.
       </div>
     );
@@ -624,9 +637,9 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     justifyContent: "center",
     padding: "0 12px",
     borderRadius: 12,
-    border: "1px solid rgba(0, 212, 170, 0.45)",
-    background: "rgba(0, 212, 170, 0.08)",
-    color: "#00d4aa",
+    border: "1px solid var(--color-bell-border-unread)",
+    background: "var(--color-guide-toggle-bg)",
+    color: "var(--color-accent)",
     cursor: "pointer",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: 18,
@@ -656,15 +669,17 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
           Settings
         </div>
+        <div style={{ flex: 1, minWidth: 0 }} />
+        <ThemeToggle />
       </div>
 
       {err && (
-        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 12 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12 }}>
           {err}
         </div>
       )}
       {msg && (
-        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 12 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 12 }}>
           {msg}
         </div>
       )}
@@ -685,9 +700,10 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 fontSize: 13,
                 padding: "6px 12px",
                 borderRadius: 12,
-                border: defaultSession === s.id ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                background: defaultSession === s.id ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
-                color: defaultSession === s.id ? "#00d4aa" : "#b0bec5",
+                border:
+                  defaultSession === s.id ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-emphasis)",
+                background: defaultSession === s.id ? "var(--color-accent-nav-fill)" : "var(--color-bg-hover)",
+                color: defaultSession === s.id ? "var(--color-accent)" : "var(--color-text-secondary)",
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
                 display: "inline-flex",
@@ -713,7 +729,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div>
-              <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Shift schedule</div>
+              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Shift schedule</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {SHIFT_SCHEDULE_OPTIONS.map((opt) => {
                   const on = scheduleShift === opt.id;
@@ -726,9 +742,9 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                       style={{
                         padding: "8px 10px",
                         borderRadius: 10,
-                        border: on ? "1px solid rgba(0,212,170,0.55)" : "1px solid #243040",
-                        background: on ? "rgba(0,212,170,0.14)" : "rgba(255,255,255,0.03)",
-                        color: on ? "#00d4aa" : "#b0bec5",
+                        border: on ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-emphasis)",
+                        background: on ? "var(--color-accent-nav-fill)" : "var(--color-bg-hover)",
+                        color: on ? "var(--color-accent)" : "var(--color-text-secondary)",
                         fontSize: 12,
                         cursor: scheduleBusy ? "default" : "pointer",
                         fontFamily: "'JetBrains Mono', monospace",
@@ -746,7 +762,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               data-demo-target={DEMO_TARGET.profile_wake}
               {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_wake)))}
             >
-              <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Wake time</div>
+              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Wake time</div>
               <input
                 className="form-input"
                 type="time"
@@ -755,11 +771,11 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 onChange={(e) => setWakeTimeInput(e.target.value)}
                 disabled={scheduleBusy}
               />
-              <div style={{ fontSize: 12, color: "#b0bec5", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
+              <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 8, lineHeight: 1.45, maxWidth: 420 }}>
                 Your wake time personalizes dose reminders and protocol guardrails to your schedule.
               </div>
               {scheduleSummary ? (
-                <div className="mono" style={{ fontSize: 12, color: "#8fa3b8", marginTop: 8 }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 8 }}>
                   Current: {scheduleSummary}
                 </div>
               ) : null}
@@ -776,7 +792,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
               Shift schedule and wake time are included with Elite and GOAT — personalize protocol timing for shift work.
             </div>
             <button type="button" className="btn-teal" style={{ fontSize: 13, alignSelf: "flex-start" }} onClick={onOpenUpgrade}>
@@ -797,14 +813,14 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             padding: "4px 0",
           }}
         >
-          <span style={{ fontSize: 13, color: "#dde4ef" }}>Push notifications</span>
+          <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>Push notifications</span>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               className="mono"
               style={{
                 fontSize: 11,
                 letterSpacing: "0.08em",
-                color: "#f59e0b",
+                color: "var(--color-warning)",
                 border: "1px solid rgba(245, 158, 11, 0.4)",
                 padding: "2px 8px",
                 borderRadius: 6,
@@ -819,8 +835,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 width: 48,
                 height: 26,
                 borderRadius: 13,
-                border: "1px solid #243040",
-                background: "#1a1f28",
+                border: "1px solid var(--color-border-emphasis)",
+                background: "var(--color-bg-elevated)",
                 opacity: 0.5,
                 cursor: "not-allowed",
               }}
@@ -834,7 +850,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>City</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>City</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -846,7 +862,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             />
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>State / region</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>State / region</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -858,7 +874,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             />
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Country (ISO alpha-2)</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Country (ISO alpha-2)</div>
             <input
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box", marginBottom: 8 }}
@@ -872,12 +888,12 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 maxHeight: 200,
                 overflowY: "auto",
                 borderRadius: 10,
-                border: "1px solid #243040",
-                background: "#07090e",
+                border: "1px solid var(--color-border-emphasis)",
+                background: "var(--color-bg-page)",
               }}
             >
               {filteredCountries.length === 0 ? (
-                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", padding: "10px 12px" }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", padding: "10px 12px" }}>
                   No matches
                 </div>
               ) : (
@@ -899,9 +915,9 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                         fontSize: 13,
                         padding: "8px 12px",
                         border: "none",
-                        borderBottom: "1px solid #1a2430",
-                        background: sel ? "rgba(0,212,170,0.1)" : "transparent",
-                        color: sel ? "#00d4aa" : "#dde4ef",
+                        borderBottom: "1px solid var(--color-border-strong)",
+                        background: sel ? "var(--color-accent-dim)" : "transparent",
+                        color: sel ? "var(--color-accent)" : "var(--color-text-primary)",
                         cursor: localeBusy ? "default" : "pointer",
                         fontFamily: "inherit",
                       }}
@@ -913,7 +929,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               )}
             </div>
             {localeCountryCode ? (
-              <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 6 }}>
+              <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 6 }}>
                 Selected: {localeCountryCode}
                 <button
                   type="button"
@@ -922,7 +938,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   style={{
                     marginLeft: 10,
                     fontSize: 12,
-                    color: "#b0bec5",
+                    color: "var(--color-text-secondary)",
                     background: "none",
                     border: "none",
                     cursor: localeBusy ? "default" : "pointer",
@@ -937,7 +953,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             ) : null}
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Language preference</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Language preference</div>
             <select
               className="form-input"
               style={{ fontSize: 13, width: "100%", maxWidth: 420, boxSizing: "border-box" }}
@@ -953,7 +969,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             </select>
           </div>
           {localeSummary ? (
-            <div className="mono" style={{ fontSize: 12, color: "#8fa3b8" }}>
+            <div className="mono" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
               Current: {localeSummary}
             </div>
           ) : null}
@@ -975,7 +991,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           marginBottom: 6,
           textAlign: "center",
           fontSize: 12,
-          color: "#b0bec5",
+          color: "var(--color-text-secondary)",
           lineHeight: 1.6,
         }}
       >
@@ -996,7 +1012,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Current plan</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Current plan</div>
             <span className="pill" style={tierPillStyle(user.plan)}>
               {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
             </span>
@@ -1012,7 +1028,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           </button>
         </div>
         {portalErr ? (
-          <div className="mono" style={{ fontSize: 12, color: "#f59e0b", marginTop: 10, lineHeight: 1.45 }}>
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 10, lineHeight: 1.45 }}>
             {portalErr}
           </div>
         ) : null}
@@ -1042,11 +1058,11 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   gap: 12,
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "1px solid #243040",
-                  background: "#07090e",
+                  border: "1px solid var(--color-border-emphasis)",
+                  background: "var(--color-bg-page)",
                 }}
               >
-                <span style={{ fontSize: 13, color: "#dde4ef" }}>{label}</span>
+                <span style={{ fontSize: 13, color: "var(--color-text-primary)" }}>{label}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
                     className="mono"
@@ -1054,8 +1070,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                       fontSize: 12,
                       padding: "2px 8px",
                       borderRadius: 6,
-                      color: on ? "#00d4aa" : "#b0bec5",
-                      border: `1px solid ${on ? "rgba(0,212,170,0.35)" : "#243040"}`,
+                      color: on ? "var(--color-accent)" : "var(--color-text-secondary)",
+                      border: `1px solid ${on ? "var(--color-accent-subtle-50)" : "var(--color-border-emphasis)"}`,
                     }}
                   >
                     {on ? "Connected" : "Disconnected"}
@@ -1074,7 +1090,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Profile display name</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Profile display name</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <input
                 className="form-input"
@@ -1099,7 +1115,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             data-demo-target={DEMO_TARGET.profile_handle}
             {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_handle)))}
           >
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Public handle</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Public handle</div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
               <div
                 style={{
@@ -1109,12 +1125,12 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   minWidth: 0,
                   maxWidth: 360,
                   borderRadius: 5,
-                  border: "1px solid #14202e",
-                  background: "#07090e",
+                  border: "1px solid var(--color-border-default)",
+                  background: "var(--color-bg-page)",
                   padding: "0 10px",
                 }}
               >
-                <span className="mono" style={{ fontSize: 13, color: "#b0bec5", flexShrink: 0, userSelect: "none" }}>
+                <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", flexShrink: 0, userSelect: "none" }}>
                   @
                 </span>
                 <input
@@ -1138,23 +1154,23 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 />
               </div>
               {handleAvailability === "checking" ? (
-                <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
+                <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                   …
                 </span>
               ) : null}
               {handleAvailability === "available" ? (
-                <span className="pepv-emoji" style={{ fontSize: 16, color: "#22c55e" }} aria-label="Available">
+                <span className="pepv-emoji" style={{ fontSize: 16, color: "var(--color-success)" }} aria-label="Available">
                   ✅
                 </span>
               ) : null}
               {handleAvailability === "taken" ? (
-                <span style={{ fontSize: 13, color: "#f87171" }}>✗ This handle is already taken</span>
+                <span style={{ fontSize: 13, color: "var(--color-danger)" }}>✗ This handle is already taken</span>
               ) : null}
               {handleAvailability === "short" ? (
-                <span style={{ fontSize: 13, color: "#fbbf24" }}>At least 3 characters</span>
+                <span style={{ fontSize: 13, color: "var(--color-warning)" }}>At least 3 characters</span>
               ) : null}
               {handleAvailability === "invalid" ? (
-                <span style={{ fontSize: 13, color: "#fbbf24" }}>
+                <span style={{ fontSize: 13, color: "var(--color-warning)" }}>
                   Letters, numbers, underscore, period, or hyphen (3–32); no ..; cannot start or end with .
                 </span>
               ) : null}
@@ -1168,17 +1184,17 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 {handleSaveBusy ? "…" : "Save handle"}
               </button>
             </div>
-            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", marginTop: 6 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>
               {handleInput.length}/32 · min 3 characters · shown as{" "}
               {handleNormalized.length >= 3 && isValidMemberHandleFormat(handleInput)
                 ? formatHandleDisplay(handleInput)
                 : "@handle"}
             </div>
             {handleSaveInlineErr ? (
-              <div style={{ fontSize: 13, color: "#f87171", marginTop: 8 }}>{handleSaveInlineErr}</div>
+              <div style={{ fontSize: 13, color: "var(--color-danger)", marginTop: 8 }}>{handleSaveInlineErr}</div>
             ) : null}
             {handleSaveSuccess ? (
-              <div style={{ fontSize: 13, color: "#22c55e", marginTop: 8 }}>Handle saved.</div>
+              <div style={{ fontSize: 13, color: "var(--color-success)", marginTop: 8 }}>Handle saved.</div>
             ) : null}
           </div>
 
@@ -1191,7 +1207,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 borderRadius: 10,
                 border: "1px solid rgba(249, 115, 22, 0.55)",
                 background: "rgba(249, 115, 22, 0.12)",
-                color: "#fb923c",
+                color: "var(--color-warning)",
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
                 alignSelf: "flex-start",
@@ -1208,7 +1224,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Change email</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Change email</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <input
                 className="form-input"
@@ -1224,12 +1240,12 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 13, color: "#b0bec5", marginBottom: 6 }}>Change password</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Change password</div>
             <button type="button" className="btn-teal" style={{ fontSize: 13 }} disabled={busy} onClick={() => void onSendPasswordReset()}>
               Send password reset email
             </button>
             {pwdResetSent && (
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginTop: 8 }}>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginTop: 8 }}>
                 If that email is registered, a reset link is on the way.
               </div>
             )}
@@ -1246,7 +1262,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             background: "rgba(15, 23, 42, 0.35)",
           }}
         >
-          <div className="mono" style={{ fontSize: 12, color: "#64748b", marginBottom: 10, letterSpacing: "0.06em" }}>
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 10, letterSpacing: "0.06em" }}>
             DEVELOPMENT — Demo tour
           </div>
           <button
@@ -1258,13 +1274,13 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           >
             {demoResetBusy ? "…" : "Reset demo session counter (→ 0)"}
           </button>
-          <div className="mono" style={{ fontSize: 11, color: "#475569", marginTop: 10, lineHeight: 1.5 }}>
-            Console: <code style={{ color: "#b0bec5" }}>await window.pepguideIQ?.resetDemoSessions()</code>
+          <div className="mono" style={{ fontSize: 11, color: "var(--tier-entry)", marginTop: 10, lineHeight: 1.5 }}>
+            Console: <code style={{ color: "var(--color-text-secondary)" }}>await window.pepguideIQ?.resetDemoSessions()</code>
           </div>
         </Card>
       )}
 
-      <div style={{ ...SECTION, color: "#f87171" }}>Danger Zone</div>
+      <div style={{ ...SECTION, color: "var(--color-danger)" }}>Danger Zone</div>
       <Card
         style={{
           border: "1px solid rgba(248, 113, 113, 0.5)",
@@ -1292,8 +1308,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
 
       {showDeleteProfile && (
         <Modal onClose={() => setShowDeleteProfile(false)} maxWidth={420} label="Delete profile">
-          <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, marginBottom: 20 }}>
-            Delete <strong style={{ color: "#dde4ef" }}>{activeProfile?.display_name ?? "this profile"}</strong>? This removes its
+          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
+            Delete <strong style={{ color: "var(--color-text-primary)" }}>{activeProfile?.display_name ?? "this profile"}</strong>? This removes its
             stack, vials, dose logs, and body metrics tied to this profile. Your account and other profiles stay intact.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -1329,14 +1345,14 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           maxWidth={420}
           label="Delete account"
         >
-          <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 12px", color: "#fde68a", lineHeight: 1.35 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 12px", color: "var(--tier-goat-border)", lineHeight: 1.35 }}>
             Sad to see you go, but love to watch ya leave. 🙂
           </h2>
-          <p style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.55, marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 16 }}>
             This permanently deletes your account, stack, vials, and dose history. There is no undo.
           </p>
           {deleteAccountErr ? (
-            <div className="mono" style={{ fontSize: 13, color: "#f87171", marginBottom: 16, lineHeight: 1.45 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 16, lineHeight: 1.45 }}>
               {deleteAccountErr}
             </div>
           ) : null}

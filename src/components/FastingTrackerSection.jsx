@@ -212,7 +212,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
 
   return (
     <div style={CARD}>
-      <div className="mono" style={{ fontSize: 11, color: "#00d4aa", marginBottom: 10, letterSpacing: "0.08em" }}>
+      <div className="mono" style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 10, letterSpacing: "0.08em" }}>
         FASTING TRACKER
       </div>
 
@@ -227,7 +227,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
           </div>
           <div className="mono" style={{ fontSize: 13, color: "#b0bec5", marginBottom: 4 }}>
             Elapsed:{" "}
-            <span style={{ color: "#00d4aa" }}>
+            <span style={{ color: "var(--color-accent)" }}>
               {progress ? formatElapsedDuration(progress.elapsedMs) : "—"}
             </span>
           </div>
@@ -251,7 +251,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
                 height: "100%",
                 width: `${progress ? progress.progressPct : 0}%`,
                 borderRadius: 999,
-                background: progress?.overTarget ? "#f59e0b" : "#00d4aa",
+                background: progress?.overTarget ? "#f59e0b" : "var(--color-accent)",
                 transition: "width 0.4s ease",
               }}
             />

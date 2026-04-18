@@ -29,6 +29,7 @@ import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
 import { LegalPage } from "./components/LegalPage.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
 import { ProfileProvider, useActiveProfile } from "./context/ProfileContext.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { DoseToastProvider } from "./context/DoseToastContext.jsx";
 import {
   DemoTourProvider,
@@ -62,21 +63,21 @@ import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
 
-const getCatColor = (cat) => CAT_COLORS[cat] || "#00d4aa";
+const getCatColor = (cat) => CAT_COLORS[cat] ?? "var(--color-accent)";
 
 /** Assistant message markdown (AI Guide); stable ref for react-markdown. */
 const AI_GUIDE_MARKDOWN_COMPONENTS = {
   h2: ({ children }) => (
-    <div className="brand" style={{ fontSize: 14, fontWeight: 700, color: "#00d4aa", marginBottom: 6, marginTop: 12 }}>
+    <div className="brand" style={{ fontSize: 14, fontWeight: 700, color: "var(--color-accent)", marginBottom: 6, marginTop: 12 }}>
       {children}
     </div>
   ),
   h3: ({ children }) => (
-    <div className="brand" style={{ fontSize: 13, fontWeight: 600, color: "#dde4ef", marginBottom: 4, marginTop: 10 }}>
+    <div className="brand" style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4, marginTop: 10 }}>
       {children}
     </div>
   ),
-  strong: ({ children }) => <span style={{ color: "#dde4ef", fontWeight: 600 }}>{children}</span>,
+  strong: ({ children }) => <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{children}</span>,
   hr: () => <hr style={{ border: "none", borderTop: "1px solid #1e2a38", margin: "10px 0" }} />,
   p: ({ children }) => <p style={{ marginBottom: 8, lineHeight: 1.6 }}>{children}</p>,
   li: ({ children }) => (
@@ -147,25 +148,25 @@ const LIBRARY_FILTER_PILL_BASE = {
   justifyContent: "center",
   padding: "6px 12px",
   borderRadius: 12,
-  border: "1px solid #1e2a38",
-  background: "rgba(255, 255, 255, 0.03)",
+  border: "1px solid var(--color-border-default)",
+  background: "var(--color-bg-hover)",
   boxShadow: "none",
   fontSize: 13,
   fontFamily: "'JetBrains Mono', monospace",
   fontWeight: 500,
   letterSpacing: "0.06em",
   lineHeight: 1.15,
-  color: "#ffffff",
+  color: "var(--color-text-secondary)",
   cursor: "pointer",
   whiteSpace: "nowrap",
   transition: "border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
 };
 
 const LIBRARY_FILTER_PILL_ACTIVE = {
-  border: "1px solid rgba(0, 212, 170, 0.55)",
-  background: "rgba(0, 212, 170, 0.14)",
-  boxShadow: "0 0 0 1px rgba(0, 212, 170, 0.12)",
-  color: "#00d4aa",
+  border: "1px solid var(--color-accent-nav-border)",
+  background: "var(--color-accent-nav-fill)",
+  boxShadow: "0 0 0 1px var(--color-accent-nav-ring)",
+  color: "var(--color-accent)",
 };
 
 /** Library category pills — two horizontal scroll rows (order is intentional). */
@@ -224,7 +225,7 @@ const LIBRARY_CAT_CHEV_BTN = {
   borderRadius: "50%",
   border: "none",
   background: "rgba(0,0,0,0.6)",
-  color: "#00d4aa",
+  color: "var(--color-accent)",
   fontSize: 16,
   lineHeight: 1,
   cursor: "pointer",
@@ -1330,7 +1331,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
         <div
           className="pepv-app-shell"
           style={{
-            color: "#dde4ef",
+            color: "var(--color-text-primary)",
             fontFamily: "'Outfit', sans-serif",
           }}
         >
@@ -1395,7 +1396,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             type="button"
                             className="pepv-header-action-btn"
                             onClick={() => openUpgradeModal()}
-                            style={{ color: "#00d4aa" }}
+                            style={{ color: "var(--color-accent)" }}
                           >
                             Upgrade
                           </button>
@@ -1444,7 +1445,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                                 borderRadius: "50%",
                                 background: "#14202e",
                                 border: "1px solid #243040",
-                                color: "#00d4aa",
+                                color: "var(--color-accent)",
                                 display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -1586,14 +1587,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
               >
                 {sortedPeptides.map((p, cardIdx) => {
                   const cat0 = primaryCategory(p);
-                  const cc = getCatColor(cat0);
                   const inStack = myStack.some((s) => s.id === p.id);
                   const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
                   return (
                     <div key={p.id} className="pcard" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
                         <div>
-                          <div className="brand" style={{ fontWeight:700,fontSize:14,color:"#dde4ef" }}>{p.name}</div>
+                          <div className="brand" style={{ fontWeight:700,fontSize:14,color:"var(--color-text-primary)" }}>{p.name}</div>
                           {p.variantOf && (
                             <div>
                               <div
@@ -1682,7 +1682,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                       )}
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                        <div className="mono" style={{ fontSize: 13,color:"#a0a0b0" }}><span style={{ color:cc+"80" }}>t½</span> {p.halfLife}</div>
+                        <div className="mono" style={{ fontSize: 13,color:"#a0a0b0" }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>t½</span> {p.halfLife}</div>
                         <button
                           type="button"
                           className={inStack?"btn-green":"btn-teal"}
@@ -1715,7 +1715,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             display: "block",
                             marginTop: 10,
                             fontSize: 12,
-                            color: "#00d4aa",
+                            color: "var(--color-accent)",
                             textDecoration: "none",
                             letterSpacing: "0.02em",
                             lineHeight: 1.35,
@@ -1784,7 +1784,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
                   <div style={{ marginBottom:4,display:"flex",flexWrap:"wrap",alignItems:"flex-end",gap:14 }}>
                     <div style={{ flex:"1 1 220px",minWidth:0 }}>
-                      <div className="mono" style={{ fontSize: 13,color:"#00d4aa",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
+                      <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",marginBottom:6,letterSpacing:".12em" }}>STACK NAME</div>
                       <SavedStackNameInput initialName={stackName} onCommit={setStackName} />
                     </div>
                     {user?.id && activeProfileId && (
@@ -1822,12 +1822,20 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       />
                     </div>
                   ))}
-                  <div style={{ marginTop:12,background:"#0b0f17",border:"1px solid #14202e",borderRadius:8,padding:14 }}>
-                    <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".15em",marginBottom:10 }}>SAVED STACK BREAKDOWN</div>
+                  <div style={{ marginTop:12,background:"var(--color-bg-sunken)",border:"1px solid var(--color-border-default)",borderRadius:8,padding:14 }}>
+                    <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".15em",marginBottom:10 }}>SAVED STACK BREAKDOWN</div>
                     <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>
                       {[...new Set(myStack.map((p) => primaryCategory(p)))].map((cat) => {
-                        const cc = getCatColor(cat); const n = myStack.filter((p) => primaryCategory(p) === cat).length;
-                        return <span key={cat} className="pill" style={{ background:cc+"15",color:cc,border:`1px solid ${cc}30`,fontSize: 13,padding:"4px 10px" }}>{cat}: {n}</span>;
+                        const n = myStack.filter((p) => primaryCategory(p) === cat).length;
+                        return (
+                          <span
+                            key={cat}
+                            className="pill pill--category"
+                            style={{ ...getCategoryCssVars(cat), fontSize: 13, padding: "4px 10px" }}
+                          >
+                            {cat}: {n}
+                          </span>
+                        );
                       })}
                     </div>
                     <button
@@ -1835,9 +1843,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       className="btn-teal"
                       style={{
                         fontSize: 13,
-                        color: "#00d4aa",
-                        background: "rgba(0,212,170,0.08)",
-                        border: "1px solid #00d4aa",
+                        color: "var(--color-accent)",
+                        background: "var(--color-accent-subtle-10)",
+                        border: "1px solid var(--color-accent)",
                       }}
                       onClick={() => {
                         const summary = myStack
@@ -2012,9 +2020,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     padding: "10px 14px",
                     fontSize: 12,
                     letterSpacing: "0.08em",
-                    color: "#b8b0b0",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid #2a2224",
+                    color: "var(--color-text-secondary)",
+                    background: "var(--color-bg-hover)",
+                    border: "1px solid var(--color-border-default)",
                     borderRadius: 10,
                     cursor: "pointer",
                   }}
@@ -2060,7 +2068,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 }}
                 className="guide-sidebar"
               >
-                <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
+                <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: ".15em", marginBottom: 6 }}>
                   GOALS <span style={{ color: "#a0a0b0" }}>(optional)</span>
                 </div>
                 {GOALS.map((g) => (
@@ -2075,7 +2083,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 ))}
                 {myStack.length > 0 && (
                   <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #0e1822" }}>
-                    <div className="mono" style={{ fontSize: 13, color: "#00d4aa", letterSpacing: ".15em", marginBottom: 6 }}>
+                    <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: ".15em", marginBottom: 6 }}>
                       SAVED STACK LOADED
                     </div>
                     {myStack.map((p) => (
@@ -2117,12 +2125,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       width: 7,
                       height: 7,
                       borderRadius: "50%",
-                      background: aiLoading ? "#f59e0b" : "#00d4aa",
+                      background: aiLoading ? "#f59e0b" : "var(--color-accent)",
                       flexShrink: 0,
                     }}
                   />
                   <div className="brand" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".06em" }}>
-                    <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ INTELLIGENCE
+                    <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ INTELLIGENCE
                   </div>
                   {goals.length > 0 && (
                     <span className="mono" style={{ fontSize: 13, color: "#a0a0b0" }}>
@@ -2185,7 +2193,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                         {myStack.length > 0 && (
                           <div style={{ padding: "0 10px 8px", borderTop: "1px solid #14202e" }}>
-                            <div className="mono" style={{ fontSize: 11, color: "#00d4aa", letterSpacing: ".12em", margin: "6px 0 4px" }}>
+                            <div className="mono" style={{ fontSize: 11, color: "var(--color-accent)", letterSpacing: ".12em", margin: "6px 0 4px" }}>
                               SAVED STACK
                             </div>
                             {myStack.map((p) => (
@@ -2202,7 +2210,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
                 <div
                   className="guide-takeover-msgs"
-                  style={{ flex: 1, overflowY: "auto", padding: 14, background: "#07090e", color: "#dde4ef" }}
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: 14,
+                    background: "#07090e",
+                    "--color-text-primary": "#dde4ef",
+                    color: "var(--color-text-primary)",
+                  }}
                 >
                   {aiMsgs.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
@@ -2235,12 +2250,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   {aiMsgs.map((msg, i) => (
                     <div key={i} className={`ai-msg ${msg.role === "user" ? "ai-user" : "ai-bot"}`}>
                       {msg.role === "assistant" && (
-                        <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".15em" }}>
-                          <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
+                        <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".15em" }}>
+                          <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ
                         </div>
                       )}
                       {msg.role === "user" ? (
-                        <div style={{ whiteSpace: "pre-wrap", color: "#dde4ef" }}>{msg.content}</div>
+                        <div style={{ whiteSpace: "pre-wrap", color: "var(--color-text-primary)" }}>{msg.content}</div>
                       ) : (
                         <div style={{ color: "#b0bec5" }}>
                           <ReactMarkdown components={AI_GUIDE_MARKDOWN_COMPONENTS}>{msg.content}</ReactMarkdown>
@@ -2260,7 +2275,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   ))}
                   {aiLoading && (
                     <div className="ai-msg ai-bot">
-                      <div className="mono pulse" style={{ fontSize: 13, color: "#00d4aa" }}>
+                      <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
                         Analyzing protocol data…
                       </div>
                     </div>
@@ -2310,7 +2325,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
         {selPeptide && (() => {
           const p = selPeptide;
           const pCat = primaryCategory(p);
-          const cc = getCatColor(pCat);
           const inStack = myStack.some((s)=>s.id===p.id);
           const baDetail = resolvePeptideBioavailability(p);
           return (
@@ -2320,7 +2334,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,...getCategoryCssVars(pCat) }}
               >
                 <div>
-                  <div className="brand" style={{ fontSize:20,fontWeight:800,color:"#dde4ef" }}>{p.name}</div>
+                  <div className="brand" style={{ fontSize:20,fontWeight:800,color:"var(--color-text-primary)" }}>{p.name}</div>
                   {p.variantOf && (
                     <div
                       className="mono"
@@ -2345,7 +2359,19 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <button type="button" style={{ background:"none",border:"none",color:"#b0bec5",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
-              <div style={{ borderLeft:`3px solid ${cc}`,paddingLeft:12,marginBottom:14,fontSize: 13,color:"#a0a0b0",lineHeight:1.6 }}>{p.mechanism}</div>
+              <div
+                style={{
+                  ...getCategoryCssVars(pCat),
+                  borderLeft: "3px solid var(--cc)",
+                  paddingLeft: 12,
+                  marginBottom: 14,
+                  fontSize: 13,
+                  color: "#a0a0b0",
+                  lineHeight: 1.6,
+                }}
+              >
+                {p.mechanism}
+              </div>
               {baDetail && (
                 <div
                   className="mono"
@@ -2377,8 +2403,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
               <div style={{ marginTop:12 }}>
-                <div className="mono" style={{ fontSize: 13,color:"#00d4aa",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"#00d4aa0e",color:"#00d4aa70",border:"1px solid #00d4aa18" }}>{b}</span>)}</div>
+                <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
               </div>
               <div style={{ marginTop:10 }}>
                 <div className="mono" style={{ fontSize: 13,color:"#f59e0b",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
@@ -2467,8 +2493,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
             left: 0,
             right: 0,
             zIndex: 40,
-            background: "#07090e",
-            borderTop: "1px solid #0e1822",
+            background: "var(--color-bg-page)",
+            borderTop: "1px solid var(--color-border-hairline)",
             padding: "8px 10px calc(8px + env(safe-area-inset-bottom, 0px))",
           }}
         >
@@ -2504,9 +2530,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 borderRadius: 12,
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
-                border: libraryNavActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-                background: libraryNavActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                boxShadow: libraryNavActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                border: libraryNavActive ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-tab)",
+                background: libraryNavActive ? "var(--color-accent-nav-fill)" : "var(--color-nav-tab-inactive-bg)",
+                boxShadow: libraryNavActive ? "0 0 0 1px var(--color-accent-nav-ring)" : "none",
               }}
             >
               <span
@@ -2515,7 +2541,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 10,
                   lineHeight: 1,
                   letterSpacing: "0.03em",
-                  color: libraryNavActive ? "#00d4aa" : "#b0bec5",
+                  color: libraryNavActive ? "var(--color-accent)" : "var(--color-text-secondary)",
                   fontWeight: 500,
                 }}
                 aria-hidden
@@ -2534,7 +2560,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 13,
                   lineHeight: 1.15,
                   letterSpacing: "0.06em",
-                  color: libraryNavActive ? "#00d4aa" : "#b0bec5",
+                  color: libraryNavActive ? "var(--color-accent)" : "var(--color-text-secondary)",
                   fontWeight: 500,
                   textAlign: "center",
                 }}
@@ -2607,9 +2633,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   borderRadius: 12,
                   cursor: "pointer",
                   fontFamily: "'JetBrains Mono', monospace",
-                  border: item.isActive ? "1px solid rgba(0, 212, 170, 0.55)" : "1px solid #1e2a38",
-                  background: item.isActive ? "rgba(0, 212, 170, 0.14)" : "rgba(255, 255, 255, 0.03)",
-                  boxShadow: item.isActive ? "0 0 0 1px rgba(0, 212, 170, 0.12)" : "none",
+                  border: item.isActive ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-tab)",
+                  background: item.isActive ? "var(--color-accent-nav-fill)" : "var(--color-nav-tab-inactive-bg)",
+                  boxShadow: item.isActive ? "0 0 0 1px var(--color-accent-nav-ring)" : "none",
                 }}
               >
                 {item.labelTop ? (
@@ -2622,7 +2648,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       fontWeight: 500,
                       margin: 0,
                       padding: 0,
-                      color: item.isActive ? "#00d4aa" : "#b0bec5",
+                      color: item.isActive ? "var(--color-accent)" : "var(--color-text-secondary)",
                     }}
                     aria-hidden
                   >
@@ -2641,7 +2667,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     fontSize: 13,
                     lineHeight: 1.15,
                     letterSpacing: "0.06em",
-                    color: item.isActive ? "#00d4aa" : "#b0bec5",
+                    color: item.isActive ? "var(--color-accent)" : "var(--color-text-secondary)",
                     fontWeight: 500,
                     textAlign: "center",
                   }}
@@ -2663,7 +2689,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
 
         {showHandlePrompt && (
           <Modal onClose={dismissHandlePrompt} maxWidth={440} label="Set your public handle">
-            <div style={{ color: "#dde4ef", fontSize: 15, lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{ color: "var(--color-text-primary)", fontSize: 15, lineHeight: 1.5, marginBottom: 16 }}>
               Choose a unique public handle (shown as <span className="mono">@username</span>). It helps identify your profile
               across the app.
             </div>
@@ -2686,9 +2712,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   fontSize: 14,
                   cursor: "pointer",
                   flex: "1 1 140px",
-                  border: "1px solid #243040",
-                  background: "rgba(255,255,255,0.04)",
-                  color: "#b0bec5",
+                  border: "1px solid var(--color-border-emphasis)",
+                  background: "var(--color-bg-hover)",
+                  color: "var(--color-text-secondary)",
                 }}
                 onClick={dismissHandlePrompt}
               >
@@ -2759,34 +2785,26 @@ export default function PepGuideIQ() {
     };
   }, [ageVerified, legalRoute]);
 
-  if (legalRoute) {
-    return (
+  const tree =
+    legalRoute ? (
       <>
         <GlobalStyles />
         <LegalPage />
       </>
-    );
-  }
-
-  if (!ageVerified) {
-    return (
+    ) : !ageVerified ? (
       <>
         <GlobalStyles />
         <AgeGate onConfirm={confirmAgeVerified} onExit={exitUnderAge} />
       </>
-    );
-  }
-
-  if (!authReady) {
-    return (
+    ) : !authReady ? (
       <>
         <GlobalStyles />
         <div
           className="mono"
           style={{
             minHeight: "100vh",
-            background: "#07090e",
-            color: "#a0a0b0",
+            background: "var(--color-bg-page)",
+            color: "var(--color-text-placeholder)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -2796,21 +2814,16 @@ export default function PepGuideIQ() {
           Loading session…
         </div>
       </>
-    );
-  }
-
-  if (!user) {
-    return (
+    ) : !user ? (
       <>
         <GlobalStyles />
         <AuthScreen onAuth={setUser} />
       </>
+    ) : (
+      <ProfileProvider userId={user.id} plan={user.plan ?? "entry"}>
+        <PepGuideIQApp user={user} setUser={setUser} />
+      </ProfileProvider>
     );
-  }
 
-  return (
-    <ProfileProvider userId={user.id} plan={user.plan ?? "entry"}>
-      <PepGuideIQApp user={user} setUser={setUser} />
-    </ProfileProvider>
-  );
+  return <ThemeProvider user={user}>{tree}</ThemeProvider>;
 }

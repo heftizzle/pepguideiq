@@ -65,7 +65,7 @@ Subdirectory briefs: `src/CLAUDE.md`, `workers/CLAUDE.md`, `supabase/CLAUDE.md`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.
 - **Stripe Elements is live.** Primary checkout is embedded Elements via `UpgradePlanModal.jsx` → Worker `POST /stripe/create-subscription` → PaymentIntent `client_secret`. Payment Links are the fallback / alternative path.
-- **Only `EDON15` and `TSource15` are recognized affiliate codes.** Other codes in the Rewardful dashboard (Primo15, Pete15, etc.) are silently dropped by `normalizeAffiliateRef()`. Whitelist more before marketing them.
+- **Affiliate codes (12 whitelisted).** `?ref=` values are normalized case-insensitively by `normalizeAffiliateRef()` in `src/lib/affiliateRef.js`; unknown Rewardful codes are dropped. Canonical codes: Primo15, Pete15, Tsource15, EDON15, ironresolve15, Palmer15, Ryba15, Fire15, Lake15, OTMen15, Elite15, Vitality15 (Dr. Tracy / Live In Vitality, Riverview, FL).
 - **Plan (tier) is server-authoritative.** The `profiles.plan` column has a trigger that rejects direct updates. Only `update_user_plan(uuid, text)` via the service-role Worker can change it.
 - **Session IDs are `morning`, `afternoon`, `evening`, `night` — exactly 4.** See `src/data/protocolSessions.js`.
 - **Tab IDs are `library`, `guide`, `stackBuilder`, `stack`, `network`, `vialTracker`, `protocol`, `profile` — exactly 8.** See `PEPV_VALID_TABS` in `src/App.jsx`.

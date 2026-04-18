@@ -24,7 +24,7 @@ const HELP_MENU_ROW = {
   border: "none",
   borderRadius: 10,
   background: "transparent",
-  color: "#dde4ef",
+  color: "var(--color-text-primary)",
   cursor: "pointer",
   fontFamily: "'Outfit', sans-serif",
   fontSize: 14,
@@ -134,7 +134,7 @@ export function DemoTourHelpButton() {
           onClick={() => setHelpMenuOpen(false)}
           style={HELP_MENU_ROW}
         >
-          <span aria-hidden style={{ color: "rgba(0, 212, 170, 0.72)", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>
+          <span aria-hidden style={{ color: "var(--color-accent-subtle-50)", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>
             ✉
           </span>
           <span>Support</span>
@@ -214,9 +214,9 @@ export function DemoTourBar() {
               minHeight: 44,
               padding: "10px 14px",
               borderRadius: 12,
-              border: "1px solid #1e2a38",
-              background: "rgba(0, 212, 170, 0.08)",
-              color: "#00d4aa",
+              border: "1px solid var(--color-border-default)",
+              background: "var(--color-accent-subtle-10)",
+              color: "var(--color-accent)",
               cursor: "pointer",
               fontFamily: "'Outfit', sans-serif",
               fontSize: 14,
@@ -261,7 +261,7 @@ export function DemoTourBar() {
           margin: "0 auto",
           pointerEvents: "auto",
           borderRadius: 14,
-          border: "1px solid rgba(0, 212, 170, 0.28)",
+          border: "1px solid var(--color-accent-subtle-40)",
           background: "rgba(7, 9, 14, 0.96)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.35)",
           padding: "12px 12px 10px",
@@ -279,7 +279,7 @@ export function DemoTourBar() {
                     fontFamily: "'Outfit', sans-serif",
                     fontSize: 15,
                     fontWeight: 600,
-                    color: "#dde4ef",
+                    color: "var(--color-text-primary)",
                     lineHeight: 1.35,
                     marginBottom: 6,
                   }}
@@ -297,10 +297,10 @@ export function DemoTourBar() {
                 >
                   Tap Next to follow along, or × to explore on your own
                 </div>
-                <div style={{ fontSize: 14, color: "#dde4ef", lineHeight: 1.45 }}>{label}</div>
+                <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{label}</div>
               </div>
             ) : (
-              <div style={{ fontSize: 14, color: "#dde4ef", lineHeight: 1.45 }}>{label}</div>
+              <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{label}</div>
             )}
           </div>
           <button

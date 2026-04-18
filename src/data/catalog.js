@@ -254,7 +254,7 @@ export const GOALS = [
 
 export const CAT_COLORS = {
   "Anabolics / HRT": "#d97757",
-  "GLP / Metabolic": "#00d4aa",
+  "GLP / Metabolic": "var(--color-accent)",
   "GH Peptides": "#3b82f6",
   Sleep: "#8b5cf6",
   Nootropic: "#a855f7",
@@ -289,8 +289,10 @@ export function hexToRgbCsv(hex) {
 
 /** Custom properties for `.pcard` / category row + `.pill--category`. */
 export function getCategoryCssVars(cat) {
-  const cc = CAT_COLORS[cat] || "#00d4aa";
-  return { "--cc": cc, "--cc-rgb": hexToRgbCsv(cc) };
+  const cc = CAT_COLORS[cat] ?? "var(--color-accent)";
+  const base = { "--cc": cc };
+  if (String(cc).trim().startsWith("var(")) return base;
+  return { ...base, "--cc-rgb": hexToRgbCsv(cc) };
 }
 
 const PLAN_CONFIG = [
@@ -309,7 +311,7 @@ const PLAN_CONFIG = [
   {
     id: "pro",
     period: "/mo",
-    color: "#00d4aa",
+    color: "var(--color-accent)",
     popular: true,
     features: [
       `${TIERS.pro.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,

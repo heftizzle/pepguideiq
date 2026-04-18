@@ -65,7 +65,7 @@ function BrandIcon({ name, gradientId }) {
       return (
         <svg {...common}>
           <path
-            fill="#f1f5f9"
+            fill="var(--color-text-primary)"
             d="M18.22 3h3.22l-7.04 8.04L22.5 21h-6.44l-5.04-6.6L5.1 21H1.86l7.53-8.6L1.5 3h6.6l4.56 6.05L18.22 3zm-1.13 16.2h1.79L7.94 4.73H6.04l11.05 14.47z"
           />
         </svg>

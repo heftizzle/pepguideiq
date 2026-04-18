@@ -5,7 +5,7 @@ export function Logo({ size = 19, style = {} }) {
         style={{
           width: 32,
           height: 32,
-          background: "linear-gradient(135deg,#00d4aa,#0891b2)",
+          background: "linear-gradient(135deg,var(--color-accent),var(--color-accent-hover))",
           borderRadius: 7,
           display: "flex",
           alignItems: "center",
@@ -18,11 +18,11 @@ export function Logo({ size = 19, style = {} }) {
       </div>
       <div>
         <div className="brand" style={{ fontSize: size, fontWeight: 800, letterSpacing: ".05em", lineHeight: 1.1 }}>
-          <span style={{ color: "#00d4aa" }}>Pep</span>
-          <span style={{ color: "#dde4ef" }}>Guide</span>
-          <span style={{ color: "#00d4aa", fontSize: size * 0.7 }}>IQ</span>
+          <span style={{ color: "var(--color-accent)" }}>Pep</span>
+          <span style={{ color: "var(--color-text-primary)" }}>Guide</span>
+          <span style={{ color: "var(--color-accent)", fontSize: size * 0.7 }}>IQ</span>
         </div>
-        <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", letterSpacing: ".18em" }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", letterSpacing: ".18em" }}>
           RESEARCH INTELLIGENCE
         </div>
       </div>

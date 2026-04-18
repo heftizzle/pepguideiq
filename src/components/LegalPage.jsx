@@ -4,6 +4,8 @@ const WRAP = {
   minHeight: "100vh",
   background: "#07090e",
   color: "#cbd5e1",
+  /* Dark static page: keep headings readable when global [data-theme] is light */
+  "--color-text-primary": "#dde4ef",
 };
 
 const INNER = {
@@ -32,7 +34,7 @@ const STICKY_NAV = {
 };
 
 const NAV_LINK = {
-  color: "#00d4aa",
+  color: "var(--color-accent)",
   textDecoration: "none",
   fontWeight: 500,
 };
@@ -41,7 +43,7 @@ const NAV_MUTED = { color: "#b0bec5" };
 
 const SECTION_HDR = {
   fontFamily: "'JetBrains Mono', monospace",
-  color: "#00d4aa",
+  color: "var(--color-accent)",
   fontSize: 15,
   letterSpacing: "0.06em",
   marginTop: 40,
@@ -100,7 +102,7 @@ export function LegalPage() {
           <p style={BODY}>Effective Date: May 1, 2026</p>
           <p style={BODY}>pepguideIQ LLC · Riverview, Florida</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>What We Collect</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>What We Collect</strong>
           </p>
           <p style={BODY}>Account information: email address, display name, public handle</p>
           <p style={BODY}>Protocol data: compounds logged, vial records, dose history, stacks, body metrics, progress photos</p>
@@ -108,14 +110,14 @@ export function LegalPage() {
           <p style={BODY}>Payment data: processed by our payment processor — we never see or store card numbers</p>
           <p style={BODY}>Technical data: browser type, IP address for security and performance purposes</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>What We Don&apos;t Do</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>What We Don&apos;t Do</strong>
           </p>
           <p style={BODY}>We do not sell your data. Ever.</p>
           <p style={BODY}>We do not serve ads. pepguideIQ products are ad-free.</p>
           <p style={BODY}>We do not share your data with third parties except as required to operate the service</p>
           <p style={BODY}>We do not use your protocol data for marketing or profiling</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>HIPAA Notice</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>HIPAA Notice</strong>
           </p>
           <p style={BODY}>
             pepguideIQ is not a covered entity under the Health Insurance Portability and Accountability Act (HIPAA). pepguideIQ is a
@@ -123,14 +125,14 @@ export function LegalPage() {
             Do not enter clinical, diagnostic, or treatment information you believe to be HIPAA-protected.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Third Party Services</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Third Party Services</strong>
           </p>
           <p style={BODY}>
             pepguideIQ uses third party service providers for database hosting, content delivery, and payment processing. These providers
             are contractually bound to protect your data and may not use it for their own purposes.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Your Rights</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Your Rights</strong>
           </p>
           <p style={BODY}>Access: You can review your data in your Profile tab at any time</p>
           <p style={BODY}>
@@ -140,24 +142,24 @@ export function LegalPage() {
           <p style={BODY}>Correction: You can update your profile, metrics, and handle at any time</p>
           <p style={BODY}>Portability: Protocol data export available in Profile settings (Pro+)</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Data Retention</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Data Retention</strong>
           </p>
           <p style={BODY}>
             Active account data is retained while your account exists. Deleted accounts are purged within 30 days. Anonymized aggregate usage
             statistics may be retained indefinitely.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Children</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Children</strong>
           </p>
           <p style={BODY}>pepguideIQ is not intended for users under 18. We do not knowingly collect data from minors.</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Changes</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Changes</strong>
           </p>
           <p style={BODY}>
             We will notify users of material changes via email to your registered address at least 14 days before changes take effect.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Contact</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Contact</strong>
           </p>
           <p style={BODY}>hello@pepguideiq.com</p>
         </section>
@@ -166,11 +168,11 @@ export function LegalPage() {
           <h1 style={SECTION_HDR}>TERMS OF SERVICE — pepguideIQ</h1>
           <p style={BODY}>Effective Date: May 1, 2026</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>1. Acceptance</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>1. Acceptance</strong>
           </p>
           <p style={BODY}>By creating an account or using pepguideIQ, you agree to these Terms. If you do not agree, do not use the service.</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>2. What pepguideIQ Is</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>2. What pepguideIQ Is</strong>
           </p>
           <p style={BODY}>
             pepguideIQ is an educational software platform for tracking, organizing, and researching peptide compounds. It provides
@@ -183,7 +185,7 @@ export function LegalPage() {
           <p style={BODY}>A vendor or retailer of any compounds</p>
           <p style={BODY}>A HIPAA covered entity</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>3. Research Use Only — No Medical Advice</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>3. Research Use Only — No Medical Advice</strong>
           </p>
           <p style={BODY}>
             ALL content on pepguideIQ — including compound data, dosing information, reconstitution calculators, AI Guide responses, and
@@ -195,7 +197,7 @@ export function LegalPage() {
             accessed through this platform.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>4. User Responsibilities</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>4. User Responsibilities</strong>
           </p>
           <p style={BODY}>You represent and warrant that:</p>
           <p style={BODY}>You are at least 18 years of age</p>
@@ -207,7 +209,7 @@ export function LegalPage() {
           <p style={BODY}>You assume full and sole responsibility for any decisions made based on information accessed through pepguideIQ</p>
           <p style={BODY}>You will not use pepguideIQ to facilitate the sale, distribution, or illegal procurement of any regulated substance</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>5. Accuracy of Information</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>5. Accuracy of Information</strong>
           </p>
           <p style={BODY}>
             pepguideIQ makes reasonable efforts to maintain accurate compound information but makes no warranties regarding completeness,
@@ -215,14 +217,14 @@ export function LegalPage() {
             and may not apply to your specific situation.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>6. AI Guide</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>6. AI Guide</strong>
           </p>
           <p style={BODY}>
             The pepguideIQ AI Guide is powered by large language model technology. AI outputs may be inaccurate, incomplete, or outdated. AI
             responses are not a substitute for professional medical advice. Do not make health decisions based solely on AI Guide output.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>7. Network Tab and User Content</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>7. Network Tab and User Content</strong>
           </p>
           <p style={BODY}>
             By posting to the pepguideIQ Network tab, you grant pepguideIQ a non-exclusive, royalty-free license to display your shared
@@ -230,7 +232,7 @@ export function LegalPage() {
             applicable law.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>8. Subscriptions and Billing</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>8. Subscriptions and Billing</strong>
           </p>
           <p style={BODY}>
             Subscription fees are billed through our payment processor. You may cancel at any time from your account settings. Cancellation
@@ -238,14 +240,14 @@ export function LegalPage() {
             by law.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>9. Termination</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>9. Termination</strong>
           </p>
           <p style={BODY}>
             We reserve the right to suspend or terminate accounts that violate these Terms, engage in fraudulent activity, or misuse the
             platform.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>10. Limitation of Liability</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>10. Limitation of Liability</strong>
           </p>
           <p style={BODY}>
             TO THE MAXIMUM EXTENT PERMITTED BY LAW, PEPGUIDEIQ LLC SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL,
@@ -253,11 +255,11 @@ export function LegalPage() {
             IN THE 12 MONTHS PRECEDING THE CLAIM.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>11. Governing Law</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>11. Governing Law</strong>
           </p>
           <p style={BODY}>These Terms are governed by the laws of the State of Florida, without regard to conflict of law principles.</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>Contact</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>Contact</strong>
           </p>
           <p style={BODY}>hello@pepguideiq.com</p>
         </section>
@@ -267,7 +269,7 @@ export function LegalPage() {
           <p style={BODY}>Effective Date: May 1, 2026</p>
           <p style={BODY}>By accessing pepguideIQ, you acknowledge and agree to the following:</p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>1. Research Reference Only</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>1. Research Reference Only</strong>
           </p>
           <p style={BODY}>
             All compound information, dosing guidance, reconstitution data, protocol examples, and AI-generated content within pepguideIQ is
@@ -275,14 +277,14 @@ export function LegalPage() {
             facilitate the administration of any compound to any human or animal.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>2. Not a Medical Platform</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>2. Not a Medical Platform</strong>
           </p>
           <p style={BODY}>
             pepguideIQ is not a healthcare provider, medical device, or HIPAA covered entity. Information on this platform does not constitute
             medical advice, diagnosis, or treatment. Nothing here creates a patient-provider relationship of any kind.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>3. Regulatory Status</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>3. Regulatory Status</strong>
           </p>
           <p style={BODY}>
             Many compounds referenced in pepguideIQ — including but not limited to BPC-157, TB-500, GHK-Cu, Retatrutide, and related peptides
@@ -291,14 +293,14 @@ export function LegalPage() {
             location.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>4. No Endorsement</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>4. No Endorsement</strong>
           </p>
           <p style={BODY}>
             pepguideIQ does not endorse, recommend, or encourage the use of any compound. The presence of a compound in the pepguideIQ
             catalog does not constitute an endorsement of its safety, efficacy, or legality.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>5. No Vendor Affiliation</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>5. No Vendor Affiliation</strong>
           </p>
           <p style={BODY}>
             pepguideIQ is not affiliated with, sponsored by, or compensated by any peptide vendor, compounding pharmacy, or supplement
@@ -306,7 +308,7 @@ export function LegalPage() {
             educational materials are for informational context only.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>6. Assumption of Risk</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>6. Assumption of Risk</strong>
           </p>
           <p style={BODY}>
             You expressly acknowledge that any decisions you make regarding the acquisition, handling, or use of any compound are made
@@ -314,7 +316,7 @@ export function LegalPage() {
             outcomes, legal consequences, or health effects arising from information accessed through this platform.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "#dde4ef" }}>7. Consult a Professional</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>7. Consult a Professional</strong>
           </p>
           <p style={BODY}>
             Always consult a licensed physician, pharmacist, or qualified healthcare provider before making any decisions related to compounds

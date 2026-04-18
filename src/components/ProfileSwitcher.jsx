@@ -109,11 +109,11 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
             width: "min(280px, calc(100vw - 28px))",
             maxHeight: "min(320px, 45vh)",
             overflowY: "auto",
-            background: "#0b0f17",
-            border: "1px solid #1e2a38",
+            background: "var(--color-bg-elevated)",
+            border: "1px solid var(--color-border-default)",
             borderRadius: 14,
             padding: 10,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
+            boxShadow: "var(--color-shadow-45) 0px 12px 40px",
           }}
         >
           <div
@@ -123,7 +123,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               gap: 8,
               marginBottom: 10,
               paddingBottom: 10,
-              borderBottom: "1px solid #1a2430",
+              borderBottom: "1px solid var(--color-border-emphasis)",
             }}
           >
             <button
@@ -145,9 +145,9 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                 textAlign: "left",
                 padding: "10px 12px",
                 borderRadius: 10,
-                border: "1px solid #243040",
-                background: "rgba(0, 212, 170, 0.08)",
-                color: "#00d4aa",
+                border: "1px solid var(--color-border-emphasis)",
+                background: "var(--color-accent-subtle-10)",
+                color: "var(--color-accent)",
                 cursor: normalizeHandleInput(activeProfile?.handle ?? "") ? "pointer" : "not-allowed",
                 fontFamily: "'Outfit', sans-serif",
                 fontSize: 14,
@@ -169,9 +169,9 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                   textAlign: "left",
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "1px solid #243040",
-                  background: "rgba(255,255,255,0.03)",
-                  color: "#cbd5e1",
+                  border: "1px solid var(--color-border-default)",
+                  background: "var(--color-bg-hover)",
+                  color: "var(--color-text-secondary)",
                   cursor: "pointer",
                   fontFamily: "'Outfit', sans-serif",
                   fontSize: 13,
@@ -181,7 +181,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               </button>
             ) : null}
           </div>
-          <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 8 }}>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", letterSpacing: "0.1em", marginBottom: 8 }}>
             PROFILES
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -197,8 +197,8 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                     gap: 8,
                     padding: "10px 12px",
                     borderRadius: 12,
-                    border: active ? "2px solid rgba(0, 212, 170, 0.65)" : "1px solid #243040",
-                    background: active ? "rgba(0, 212, 170, 0.1)" : "rgba(255,255,255,0.03)",
+                    border: active ? "2px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-emphasis)",
+                    background: active ? "var(--color-accent-dim)" : "var(--color-bg-hover)",
                   }}
                 >
                   <button
@@ -218,7 +218,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                       border: "none",
                       borderRadius: 0,
                       background: "transparent",
-                      color: "#dde4ef",
+                      color: "var(--color-text-primary)",
                       cursor: "pointer",
                       fontFamily: "'Outfit', sans-serif",
                       fontSize: 14,
@@ -234,7 +234,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                         alignItems: "center",
                         justifyContent: "center",
                         fontWeight: 700,
-                        color: "#00d4aa",
+                        color: "var(--color-accent)",
                         flexShrink: 0,
                       }}
                     >
@@ -266,7 +266,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
                       }}
                       style={{
                         fontSize: 11,
-                        color: "#00d4aa",
+                        color: "var(--color-accent)",
                         opacity: 0.9,
                         flexShrink: 0,
                         background: "transparent",
@@ -288,8 +288,8 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
             })}
           </div>
           {canAddProfile && (
-            <form onSubmit={(e) => void submitAdd(e)} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #1a2632" }}>
-              <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.08em", marginBottom: 6 }}>
+            <form onSubmit={(e) => void submitAdd(e)} style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--color-border-emphasis)" }}>
+              <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", letterSpacing: "0.08em", marginBottom: 6 }}>
                 ADD PROFILE
               </div>
               <input
@@ -327,10 +327,10 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
           alignItems: "center",
           gap: 0,
           borderRadius: 999,
-          border: "1px solid #1e2a38",
-          background: "rgba(10, 14, 22, 0.92)",
+          border: "1px solid var(--color-border-default)",
+          background: "var(--color-bg-elevated)",
           backdropFilter: "blur(8px)",
-          color: "#dde4ef",
+          color: "var(--color-text-primary)",
           boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
           fontFamily: "'Outfit', sans-serif",
           fontSize: 13,
@@ -364,12 +364,12 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
               height: 34,
               borderRadius: "50%",
               background: "#14202e",
-              border: activeProfileId ? "2px solid rgba(0, 212, 170, 0.5)" : "2px solid #243040",
+              border: activeProfileId ? "2px solid var(--color-accent-nav-border)" : "2px solid var(--color-border-emphasis)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 700,
-              color: "#00d4aa",
+              color: "var(--color-accent)",
               flexShrink: 0,
               overflow: "hidden",
             }}
@@ -415,7 +415,7 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
             }}
             style={{
               fontSize: 11,
-              color: "#00d4aa",
+              color: "var(--color-accent)",
               opacity: 0.9,
               lineHeight: 1.2,
               flexShrink: 0,

@@ -63,7 +63,8 @@ export function PublicStackView({ shareId }) {
         style={{
           minHeight: "100vh",
           background: "#07090e",
-          color: "#dde4ef",
+          "--color-text-primary": "#dde4ef",
+          color: "var(--color-text-primary)",
           fontFamily: "'Outfit', sans-serif",
           padding: "32px 20px 48px",
           maxWidth: 560,
@@ -71,7 +72,7 @@ export function PublicStackView({ shareId }) {
         }}
       >
         <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
-          <span style={{ color: "#00d4aa" }}>Pep</span>GuideIQ
+          <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ
         </div>
         <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.12em", marginBottom: 28 }}>
           SHARED STACK
@@ -149,9 +150,9 @@ export function PublicStackView({ shareId }) {
                 marginTop: 28,
                 padding: "12px 20px",
                 borderRadius: 12,
-                background: "rgba(0, 212, 170, 0.14)",
-                border: "1px solid rgba(0, 212, 170, 0.45)",
-                color: "#00d4aa",
+                background: "var(--color-accent-nav-fill)",
+                border: "1px solid var(--color-bell-border-unread)",
+                color: "var(--color-accent)",
                 fontWeight: 600,
                 fontSize: 14,
                 textDecoration: "none",

@@ -35,7 +35,7 @@ function AuthPublicNav() {
         style={{
           fontSize: 14,
           fontWeight: 600,
-          color: "#00d4aa",
+          color: "var(--color-accent)",
           textDecoration: "none",
           fontFamily: "'Outfit',sans-serif",
         }}
@@ -495,11 +495,11 @@ export function AuthScreen({ onAuth }) {
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Logo style={{ marginBottom: 20 }} />
           <div className="mono" style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.6 }}>
-            Copy <code style={{ color: "#00d4aa" }}>.env.example</code> to{" "}
-            <code style={{ color: "#00d4aa" }}>.env.local</code> and set{" "}
-            <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_URL</code> and{" "}
-            <code style={{ color: "#00d4aa" }}>VITE_SUPABASE_ANON_KEY</code>, then restart{" "}
-            <code style={{ color: "#00d4aa" }}>npm run dev</code>.
+            Copy <code style={{ color: "var(--color-accent)" }}>.env.example</code> to{" "}
+            <code style={{ color: "var(--color-accent)" }}>.env.local</code> and set{" "}
+            <code style={{ color: "var(--color-accent)" }}>VITE_SUPABASE_URL</code> and{" "}
+            <code style={{ color: "var(--color-accent)" }}>VITE_SUPABASE_ANON_KEY</code>, then restart{" "}
+            <code style={{ color: "var(--color-accent)" }}>npm run dev</code>.
           </div>
         </div>
       </AuthScaffold>
@@ -518,13 +518,13 @@ export function AuthScreen({ onAuth }) {
           </div>
           <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
             {forgotSubmitted ? (
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", lineHeight: 1.55, textAlign: "center" }}>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", lineHeight: 1.55, textAlign: "center" }}>
                 If that email is registered, a reset link is on the way.
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: 20 }}>
-                  <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+                  <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
                     EMAIL
                   </div>
                   <input
@@ -554,7 +554,7 @@ export function AuthScreen({ onAuth }) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#00d4aa",
+                  color: "var(--color-accent)",
                   cursor: "pointer",
                   fontSize: 13,
                   fontFamily: "'Outfit',sans-serif",
@@ -630,7 +630,7 @@ export function AuthScreen({ onAuth }) {
             className="mono"
             style={{
               fontSize: 12,
-              color: "#00d4aa",
+              color: "var(--color-accent)",
               marginBottom: 16,
               textAlign: "center",
               maxWidth: 420,
@@ -756,7 +756,9 @@ export function AuthScreen({ onAuth }) {
                 style={{
                   borderColor: plan.color,
                   color: plan.color,
-                  background: plan.color + "12",
+                  background: String(plan.color).trim().startsWith("var(")
+                    ? "var(--color-accent-dim)"
+                    : `${plan.color}12`,
                   width: "100%",
                   padding: "8px 0",
                   fontSize: 13,
@@ -819,7 +821,7 @@ export function AuthScreen({ onAuth }) {
         <div style={{ background: "#0b0f17", border: "1px solid #14202e", borderRadius: 10, padding: 24 }}>
           {mode === "register" && (
             <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
                 NAME
               </div>
               <input
@@ -832,7 +834,7 @@ export function AuthScreen({ onAuth }) {
             </div>
           )}
           <div style={{ marginBottom: 14 }}>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
               EMAIL
             </div>
             <input
@@ -846,7 +848,7 @@ export function AuthScreen({ onAuth }) {
             />
           </div>
           <div style={{ marginBottom: mode === "register" ? 8 : 20 }}>
-            <div className="mono" style={{ fontSize: 13, color: "#00d4aa", marginBottom: 5, letterSpacing: ".12em" }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
             <div style={{ position: "relative", width: "100%" }}>
@@ -920,7 +922,7 @@ export function AuthScreen({ onAuth }) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#00d4aa",
+                  color: "var(--color-accent)",
                   cursor: "pointer",
                   fontSize: 13,
                   fontFamily: "'Outfit',sans-serif",
@@ -970,7 +972,7 @@ export function AuthScreen({ onAuth }) {
                   style={{
                     background: "none",
                     border: "none",
-                    color: "#00d4aa",
+                    color: "var(--color-accent)",
                     cursor: "pointer",
                     fontSize: 13,
                     fontFamily: "'Outfit',sans-serif",
@@ -992,7 +994,7 @@ export function AuthScreen({ onAuth }) {
                   style={{
                     background: "none",
                     border: "none",
-                    color: "#00d4aa",
+                    color: "var(--color-accent)",
                     cursor: "pointer",
                     fontSize: 13,
                     fontFamily: "'Outfit',sans-serif",

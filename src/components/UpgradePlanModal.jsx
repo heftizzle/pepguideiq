@@ -91,10 +91,10 @@ function UpgradePaymentInner({ planLabel, onBack, onCompleted, setPayError }) {
 
   return (
     <form onSubmit={(ev) => void handleSubmit(ev)} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div className="brand" style={{ fontSize: 16, fontWeight: 700, color: "#e8eef6" }}>
+      <div className="brand" style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)" }}>
         Complete checkout — {planLabel}
       </div>
-      <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
         Encrypted card details. PepGuideIQ never stores your full card number on our servers.
       </div>
       <PaymentElement />
@@ -170,7 +170,7 @@ const mutedDowngradeBtn = {
   fontSize: 13,
   borderRadius: 10,
   border: "1px solid #4a6080",
-  color: "#b0bec5",
+  color: "var(--color-text-secondary)",
   background: "transparent",
   cursor: "pointer",
 };
@@ -315,32 +315,32 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
       return (
         <div
           style={{
-            border: "1px solid #14202e",
+            border: "1px solid var(--color-border-default)",
             borderRadius: 10,
             padding: 12,
-            background: "#0b0f17",
+            background: "var(--color-bg-elevated)",
           }}
         >
-          <div className="brand" style={{ fontSize: 13, fontWeight: 700, color: "#dde4ef", marginBottom: 10 }}>
+          <div className="brand" style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 10 }}>
             {isEntryTarget ? "⚠️  Moving to Entry (Free)" : "⏳  Confirm downgrade"}
           </div>
-          <div style={{ fontSize: 13, color: "#b0bec5", lineHeight: 1.55, marginBottom: 14 }}>
+          <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 14 }}>
             {isEntryTarget ? (
               <>
-                You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
-                <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>.
+                You&apos;ll keep <strong style={{ color: "var(--color-text-primary)" }}>{formatPlan(stripeTier)}</strong> access until{" "}
+                <strong style={{ color: "var(--color-text-primary)" }}>{periodEndDate}</strong>.
                 <br />
-                On <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>, billing stops and your plan moves to Entry.
+                On <strong style={{ color: "var(--color-text-primary)" }}>{periodEndDate}</strong>, billing stops and your plan moves to Entry.
                 <br />
                 You can resubscribe anytime.
               </>
             ) : (
               <>
-                You&apos;ll keep <strong style={{ color: "#dde4ef" }}>{formatPlan(stripeTier)}</strong> access until{" "}
-                <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>.
+                You&apos;ll keep <strong style={{ color: "var(--color-text-primary)" }}>{formatPlan(stripeTier)}</strong> access until{" "}
+                <strong style={{ color: "var(--color-text-primary)" }}>{periodEndDate}</strong>.
                 <br />
-                On <strong style={{ color: "#dde4ef" }}>{periodEndDate}</strong>, your plan moves to{" "}
-                <strong style={{ color: "#dde4ef" }}>{formatPlan(rowId)}</strong>.
+                On <strong style={{ color: "var(--color-text-primary)" }}>{periodEndDate}</strong>, your plan moves to{" "}
+                <strong style={{ color: "var(--color-text-primary)" }}>{formatPlan(rowId)}</strong>.
                 <br />
                 No action needed — this happens automatically.
               </>
@@ -465,7 +465,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
       listStyle: "none",
       fontSize: 13,
       lineHeight: 1.6,
-      color: "#cdd8e8",
+      color: "var(--color-text-secondary)",
     };
 
     const checkRow = (line) => (
@@ -545,14 +545,14 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
               {price}
             </span>
             {suffix ? (
-              <span style={{ fontSize: 12, color: "#b0bec5", fontWeight: 500 }}>{suffix}</span>
+              <span style={{ fontSize: 12, color: "var(--color-text-secondary)", fontWeight: 500 }}>{suffix}</span>
             ) : null}
           </div>
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#e8eef6", lineHeight: 1.45 }}>{row.headline}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{row.headline}</div>
 
-        <div style={{ fontSize: 13, color: "#a8b8d0", lineHeight: 1.55 }}>{row.subline}</div>
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{row.subline}</div>
 
         <ul style={featureListStyle}>{row.limitBullets.map(checkRow)}</ul>
 
@@ -608,13 +608,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, gap: 12 }}>
           <div>
             <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Secure checkout</div>
-            <div className="mono" style={{ fontSize: 12, color: "#b0bec5", marginTop: 4 }}>
+            <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 4 }}>
               {formatPlan(paymentStep.planId)} — powered by Stripe
             </div>
           </div>
           <button
             type="button"
-            style={{ background: "none", border: "none", color: "#b0bec5", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+            style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
             onClick={() => {
               setPaymentStep(null);
               setPaySubmitError(null);
@@ -650,13 +650,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
         <div>
           <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Choose your plan</div>
-          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
             Compare tiers — upgrade anytime. Cancel anytime.
           </div>
         </div>
         <button
           type="button"
-          style={{ background: "none", border: "none", color: "#b0bec5", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
+          style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
           onClick={onClose}
           aria-label="Close"
         >
@@ -673,7 +673,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
             borderRadius: 10,
             border: "1px solid #4a6080",
             fontSize: 13,
-            color: "#cbd5e1",
+            color: "var(--color-text-secondary)",
             lineHeight: 1.5,
           }}
         >
@@ -693,14 +693,14 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
             marginBottom: 18,
             padding: "16px 18px",
             borderRadius: 12,
-            border: "1px solid rgba(0, 212, 170, 0.38)",
-            background: "linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(6, 182, 212, 0.06) 100%)",
+            border: "1px solid var(--color-demo-outline)",
+            background: "linear-gradient(135deg, var(--color-accent-subtle-10) 0%, var(--color-accent-subtle-0e) 100%)",
           }}
         >
-          <div className="brand" style={{ fontSize: 17, fontWeight: 700, color: "#e8eef6", marginBottom: 8, lineHeight: 1.3 }}>
+          <div className="brand" style={{ fontSize: 17, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 8, lineHeight: 1.3 }}>
             {gateCopy.title}
           </div>
-          <div style={{ fontSize: 14, color: "#b0bec5", lineHeight: 1.55, marginBottom: gateCheckoutTier && gateCheckoutTier !== "entry" ? 14 : 0, maxWidth: 640 }}>
+          <div style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: gateCheckoutTier && gateCheckoutTier !== "entry" ? 14 : 0, maxWidth: 640 }}>
             {gateCopy.body}
           </div>
           {gateCheckoutTier && gateCheckoutTier !== "entry" ? (
@@ -731,7 +731,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         ))}
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 13, color: "#a0a0b0", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
+      <div style={{ marginTop: 16, fontSize: 13, color: "var(--color-text-secondary)", fontFamily: "'JetBrains Mono',monospace", textAlign: "center" }}>
         Subscriptions billed monthly. Cancel anytime.
       </div>
 

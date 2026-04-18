@@ -16,7 +16,7 @@ const GAP_PX = 10;
 
 const cardStyle = {
   background: "#0e1520",
-  border: "1px solid #00d4aa40",
+  border: "1px solid var(--color-accent-subtle-40)",
   borderRadius: 8,
   padding: "6px 10px",
   fontSize: 11,
@@ -123,7 +123,7 @@ export function NavTooltips({ tabButtonRefs }) {
               <path
                 d="M0 0 L14 0 L7 8 Z"
                 fill="#0e1520"
-                stroke="#00d4aa40"
+                stroke="var(--color-accent-subtle-40)"
                 strokeWidth={1}
                 vectorEffect="non-scaling-stroke"
               />
