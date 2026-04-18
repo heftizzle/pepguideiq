@@ -1,6 +1,9 @@
 import { scaleBlendComponentsToVial, blendConcentrationsMgPerMl, blendRecipeTotalMg } from "./peptideMath.js";
 import { mcgToUnits, unitsToMcg } from "./vialDoseMath.js";
 
+/** HGH 191AA (`doseUnit: 'IU'`): display IU as mcg÷1000 and IU/mL as (mcg/mL)÷1000 (1:1 with stored mcg). */
+export const HGH_IU_PER_MG = 1;
+
 /** @param {unknown} components */
 export function isBlendCatalogComponents(components) {
   return Array.isArray(components) && components.length >= 2;
@@ -39,13 +42,18 @@ export function blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, c
 }
 
 /**
- * Under 1,000 mcg → mcg; at 1,000+ → mg.
+ * Under 1,000 mcg → mcg; at 1,000+ → mg. Optional `catalogEntry` with `doseUnit: 'IU'` (HGH 191AA) → IU from mcg.
  * @param {number} mcg
+ * @param {{ doseUnit?: string } | null | undefined} [catalogEntry]
  * @returns {string | null}
  */
-export function formatDoseAmountFromMcg(mcg) {
+export function formatDoseAmountFromMcg(mcg, catalogEntry) {
   const x = Number(mcg);
   if (!Number.isFinite(x) || x <= 0) return null;
+  if (catalogEntry?.doseUnit === "IU") {
+    const iu = (x / 1000) * HGH_IU_PER_MG;
+    return `${+iu.toFixed(2)} IU`;
+  }
   if (x < 1000) {
     const t = Math.round(x * 10) / 10;
     return `${t.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 })} mcg`;
@@ -60,13 +68,29 @@ export function formatDoseAmountFromMcg(mcg) {
 }
 
 /**
+ * @param {number} concMcgMl
+ * @param {{ doseUnit?: string } | null | undefined} [catalogEntry]
+ * @returns {string}
+ */
+export function formatConcWithUnit(concMcgMl, catalogEntry) {
+  if (!Number.isFinite(Number(concMcgMl)) || Number(concMcgMl) <= 0) return "—";
+  if (catalogEntry?.doseUnit === "IU") {
+    const iuPerMl = (Number(concMcgMl) / 1000) * HGH_IU_PER_MG;
+    return `${+iuPerMl.toFixed(2)} IU/mL`;
+  }
+  const n = Number(concMcgMl);
+  return n >= 1000 ? `${+(n / 1000).toFixed(3)} mg/mL` : `${n} mcg/mL`;
+}
+
+/**
  * Live Protocol / quick-log line: single = "N units = …", blend = "N units — A: … · B: …".
  * @param {number} units
  * @param {Record<string, unknown> | null | undefined} vial
  * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
  * @param {number} [catalogBacRefMl=2]
+ * @param {{ doseUnit?: string } | null | undefined} [catalogEntry]
  */
-export function formatProtocolInjectableDosePreview(units, vial, catalogBlendComponents, catalogBacRefMl = 2) {
+export function formatProtocolInjectableDosePreview(units, vial, catalogBlendComponents, catalogBacRefMl = 2, catalogEntry) {
   const u = Number(units);
   if (!Number.isFinite(u) || u <= 0 || !vial) return "—";
   const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, catalogBacRefMl);
@@ -80,7 +104,7 @@ export function formatProtocolInjectableDosePreview(units, vial, catalogBlendCom
     if (parts.length) return `${u} units — ${parts.join(" · ")}`;
   }
   const total = unitsToMcg(u, vial.concentration_mcg_ml);
-  const lbl = formatDoseAmountFromMcg(total);
+  const lbl = formatDoseAmountFromMcg(total, catalogEntry);
   if (!lbl) return "—";
   return `${u} units = ${lbl}`;
 }
@@ -91,25 +115,20 @@ export function formatProtocolInjectableDosePreview(units, vial, catalogBlendCom
  * @param {Record<string, unknown> | null | undefined} vial
  * @param {{ name: string, mg?: number, mgPerMl?: number | null }[] | null | undefined} catalogBlendComponents
  * @param {number} [catalogBacRefMl=2]
+ * @param {{ doseUnit?: string } | null | undefined} [catalogEntry]
  */
-export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendComponents, catalogBacRefMl = 2) {
+export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendComponents, catalogBacRefMl = 2, catalogEntry) {
   const mcg = Number(doseMcg);
   if (!Number.isFinite(mcg) || mcg <= 0) return "—";
   const conc = Number(vial?.concentration_mcg_ml);
   if (!vial || !Number.isFinite(conc) || conc <= 0) {
-    if (mcg >= 1000) {
-      const mg = mcg / 1000;
-      const t =
-        mg % 1 === 0 ? mg.toLocaleString() : mg.toLocaleString(undefined, { maximumFractionDigits: 3 });
-      return `${t} mg`;
-    }
-    return `${mcg.toLocaleString()} mcg`;
+    const lbl = formatDoseAmountFromMcg(mcg, catalogEntry);
+    return lbl ?? "—";
   }
   const units = mcgToUnits(mcg, conc);
   if (units == null) {
-    return mcg >= 1000
-      ? `${(mcg / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} mg`
-      : `${mcg.toLocaleString()} mcg`;
+    const lbl = formatDoseAmountFromMcg(mcg, catalogEntry);
+    return lbl ?? "—";
   }
   const ing = blendIngredientConcMcgMlFromVial(vial, catalogBlendComponents, catalogBacRefMl);
   if (ing && ing.length >= 2) {
@@ -121,6 +140,6 @@ export function formatInjectableDoseHistoryAmount(doseMcg, vial, catalogBlendCom
     }
     if (parts.length) return `${units} units · ${parts.join(" · ")}`;
   }
-  const lbl = formatDoseAmountFromMcg(mcg);
+  const lbl = formatDoseAmountFromMcg(mcg, catalogEntry);
   return lbl ? `${units} units · ${lbl}` : "—";
 }

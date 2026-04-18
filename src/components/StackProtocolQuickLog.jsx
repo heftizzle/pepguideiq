@@ -3,7 +3,7 @@ import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
-import { formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
+import { formatConcWithUnit, formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
 import { resolveCatalogBlendBacRefMl } from "../lib/peptideMath.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import {
@@ -27,12 +27,6 @@ import {
 
 function protocolHeaderLine() {
   return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
-}
-
-function formatConcLine(n) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "—";
-  return `${x.toLocaleString(undefined, { maximumFractionDigits: 0 })} mcg/mL`;
 }
 
 function clampUnits(u) {
@@ -570,7 +564,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
         <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text-primary)" }}>{line.name}</div>
         <div className="mono" style={{ fontSize: 13, color: "#b0bec5", textAlign: "right", maxWidth: 260 }}>
-          {vialTitle} · {formatConcLine(vial?.concentration_mcg_ml)}
+          {vialTitle} · {formatConcWithUnit(vial?.concentration_mcg_ml, catalog)}
           {line.vials.length > 1 ? " (active vial — Vial Tracker)" : ""}
         </div>
       </div>

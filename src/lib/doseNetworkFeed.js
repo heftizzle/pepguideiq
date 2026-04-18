@@ -24,7 +24,7 @@ export function buildDoseNetworkPreviewLine(row, payload, catalogPeptide) {
     const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
     const blend = catalogPeptide && Array.isArray(catalogPeptide.components) ? catalogPeptide.components : null;
     const bacRef = resolveCatalogBlendBacRefMl(catalogPeptide);
-    const dosePart = formatProtocolInjectableDosePreview(row.units, vial, blend, bacRef);
+    const dosePart = formatProtocolInjectableDosePreview(row.units, vial, blend, bacRef, catalogPeptide);
     return `${row.name} · ${dosePart}`;
   }
   if (payload.kind === "nonInjectable" && row.kind === "nonInjectable") {
