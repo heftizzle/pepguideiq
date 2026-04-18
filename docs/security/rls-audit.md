@@ -138,4 +138,6 @@ These are not RLS policies on tables but affect what **anon** can read.
 
 ## Changes Applied
 
-**None.** No table in this repository’s migrations has RLS disabled, so **Part 3** (enable RLS + default-deny for anon on user tables) did not require a new migration. Re-run this audit after any out-of-band Dashboard or SQL changes in production.
+- **`055_inbody_scan_history.sql`**: `public.inbody_scan_history` — RLS enabled; `authenticated` **SELECT** + **INSERT** only; policies require `auth.uid() = user_id` and a matching `member_profiles` row for `profile_id`. No UPDATE/DELETE for clients (append-only history).
+
+Re-run this audit after any out-of-band Dashboard or SQL changes in production.

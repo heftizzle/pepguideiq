@@ -331,6 +331,56 @@ export async function upsertBodyMetrics(userId, profileId, patch) {
 }
 
 /**
+ * Latest saved InBody-style scan (cadence + profile previews).
+ * @param {string} profileId — member_profiles.id
+ * @returns {Promise<{ row: Record<string, unknown> | null, error: Error | null }>}
+ */
+export async function fetchLatestInbodyScanHistory(profileId) {
+  if (!supabase) return { row: null, error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { row: null, error: new Error("Missing profile") };
+  const { data, error } = await supabase
+    .from("inbody_scan_history")
+    .select(
+      "id, created_at, scan_date, weight_lbs, smm_lbs, pbf_pct, inbody_score, lean_mass_lbs, bmr_kcal, fat_mass_lbs"
+    )
+    .eq("profile_id", pid)
+    .order("scan_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return { row: data ?? null, error: error ?? null };
+}
+
+/**
+ * All InBody scan rows for a profile (newest `scan_date` first, then `created_at`).
+ * @param {string} profileId
+ * @returns {Promise<{ rows: Record<string, unknown>[], error: Error | null }>}
+ */
+export async function fetchAllInbodyScanHistory(profileId) {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { rows: [], error: new Error("Missing profile") };
+  const { data, error } = await supabase
+    .from("inbody_scan_history")
+    .select("*")
+    .eq("profile_id", pid)
+    .order("scan_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  return { rows: Array.isArray(data) ? data : [], error: error ?? null };
+}
+
+/**
+ * @param {Record<string, unknown>} row — `public.inbody_scan_history` insert payload
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function insertInbodyScanHistory(row) {
+  if (!supabase) return { error: notConfiguredError() };
+  const { error } = await supabase.from("inbody_scan_history").insert(row);
+  return { error: error ?? null };
+}
+
+/**
  * @param {Record<string, unknown>} patch — profiles columns only
  */
 export async function updateUserProfile(patch) {
@@ -1166,6 +1216,43 @@ export async function insertNetworkFeedDosePost(row, feedVisible) {
   const { data, error } = await supabase
     .from("network_feed")
     .insert({ ...row, public_visible })
+    .select("id")
+    .maybeSingle();
+  const id = data && typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;
+  return { data: id ? { id } : null, error: error ?? null };
+}
+
+/**
+ * InBody progress share on `network_feed` (post_type inbody_progress). Requires migration 056.
+ * @param {{
+ *   userId: string,
+ *   profileId: string,
+ *   contentJson: Record<string, unknown>,
+ *   publicVisible: boolean,
+ * }} args
+ * @returns {Promise<{ data: { id: string } | null; error: Error | null }>}
+ */
+export async function insertInbodyProgressNetworkPost({ userId, profileId, contentJson, publicVisible }) {
+  if (!supabase) return { data: null, error: notConfiguredError() };
+  const uid = typeof userId === "string" ? userId.trim() : "";
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!uid || !pid) return { data: null, error: new Error("Missing user or profile") };
+  const { data, error } = await supabase
+    .from("network_feed")
+    .insert({
+      user_id: uid,
+      post_type: "inbody_progress",
+      profile_id: pid,
+      content_json: contentJson,
+      public_visible: Boolean(publicVisible),
+      dose_log_id: null,
+      compound_id: null,
+      dose_amount: null,
+      dose_unit: null,
+      route: null,
+      session_label: null,
+      stack_id: null,
+    })
     .select("id")
     .maybeSingle();
   const id = data && typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;

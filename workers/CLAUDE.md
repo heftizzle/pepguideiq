@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700.
 
-## Routes (exactly 25)
+## Routes (exactly 26)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -33,8 +33,11 @@ Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` c
 - `DELETE /member-follows` — unfollow (same body shape).
 - `GET /member-follows/following?profile_id=`
 
+### Body composition (InBody / DEXA)
+- `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Guide daily KV quota.
+
 ### R2 images
-- `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`.
+- `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated).
 - `POST /upload-stack-photo` — alias of the above, kept for compatibility.
 - `GET /stack-photo?key=…` — authenticated private read. User can only read keys prefixed with their own user id.
 - `GET /avatars/{key}` — **public** R2 read (no auth, no rate limit). Never rate-limit these — cascades to broken `<img>` tags.

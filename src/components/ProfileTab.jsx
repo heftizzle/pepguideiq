@@ -2,12 +2,13 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { SettingsTab } from "./SettingsTab.jsx";
 import { BodyMetricStepper } from "./BodyMetricStepper.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { formatPlan, getTier } from "../lib/tiers.js";
+import { formatPlan } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
 import {
   archiveProgressPhotoSetViaWorker,
   checkMemberProfileHandleAvailable,
   fetchBodyMetrics,
+  fetchLatestInbodyScanHistory,
   fetchUserProfileStats,
   getCurrentUser,
   getSessionAccessToken,
@@ -33,6 +34,9 @@ import {
   storedSocialHandleString,
 } from "../lib/socialProfileLinks.js";
 import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
+import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
+import { BodyScanView } from "./BodyScanView.jsx";
+import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
 import { ProfileCtx } from "../context/ProfileContext.jsx";
 import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -849,8 +853,6 @@ export function ProfileTab({
   const demo = useDemoTourOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
-  const canUploadBodyScan = Boolean(getTier(user?.plan ?? "entry").inbody_dexa_upload);
-
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
   const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
@@ -878,6 +880,8 @@ export function ProfileTab({
   const [err, setErr] = useState(null);
   const [msg, setMsg] = useState(null);
   const [bodyMetricsRow, setBodyMetricsRow] = useState(null);
+  const [healthSubview, setHealthSubview] = useState(/** @type {null | "bodyScan"} */ (null));
+  const [latestInbodyRow, setLatestInbodyRow] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [handleDraft, setHandleDraft] = useState("@");
   const [handleHint, setHandleHint] = useState("");
@@ -885,7 +889,6 @@ export function ProfileTab({
   const [socialDrafts, setSocialDrafts] = useState(() =>
     Object.fromEntries(SOCIAL_EDIT_FIELDS.map(({ key }) => [key, ""]))
   );
-  const [scanBusy, setScanBusy] = useState(false);
   /** Local copies of `profiles` fields so App.jsx auth refresh cannot wipe pill/input UI mid-session. */
   const [bioSex, setBioSex] = useState(() => user?.biological_sex ?? null);
   const [trainingExp, setTrainingExp] = useState(() => user?.training_experience ?? null);
@@ -895,7 +898,6 @@ export function ProfileTab({
   const [dobYear, setDobYear] = useState(initDob.y);
   const lastCommittedDobRef = useRef(/** @type {string | null} */ (user?.date_of_birth ?? null));
 
-  const scanFileRef = useRef(null);
   const fieldAnchorRefs = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
   /** While > 0, skip syncing these fields from global `user` (avoids stale auth payload overwriting locals). */
   const profilesSaveInFlightRef = useRef(0);
@@ -1132,6 +1134,20 @@ export function ProfileTab({
       ignore = true;
     };
   }, [user.id, activeProfileId]);
+
+  useEffect(() => {
+    if (!activeProfileId || !isSupabaseConfigured()) {
+      setLatestInbodyRow(null);
+      return;
+    }
+    let ignore = false;
+    void fetchLatestInbodyScanHistory(activeProfileId).then(({ row }) => {
+      if (!ignore) setLatestInbodyRow(row ?? null);
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [activeProfileId, healthSubview, memberProfilesVersion]);
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -1394,45 +1410,6 @@ export function ProfileTab({
       }
     },
     [user?.id, trainingExp, setUser, showSavedBriefly, applyFreshUserToLocalProfileFields]
-  );
-
-  const onBodyScanPick = useCallback(
-    async (e) => {
-      const file = e.target.files?.[0];
-      e.target.value = "";
-      if (!file) return;
-      if (!canUploadBodyScan) {
-        onOpenUpgrade();
-        return;
-      }
-      if (!workerOk) {
-        setErr("Configure VITE_API_WORKER_URL to upload.");
-        return;
-      }
-      if (!activeProfileId) {
-        setErr("No active profile");
-        return;
-      }
-      if (!R2_UPLOAD_ALLOWED_TYPES.has(file.type) || file.size > R2_UPLOAD_MAX_BYTES) {
-        setErr("JPEG/PNG/WebP/GIF, max 10MB");
-        return;
-      }
-      setScanBusy(true);
-      setErr(null);
-      const result = await uploadImageToR2({
-        path: "/stack-photo",
-        file,
-        fields: { kind: "body_scan", member_profile_id: activeProfileId },
-      });
-      setScanBusy(false);
-      if (!result.ok) {
-        setErr(result.error);
-        return;
-      }
-      await refreshMemberProfiles();
-      showSavedBriefly();
-    },
-    [activeProfileId, canUploadBodyScan, onOpenUpgrade, workerOk, refreshMemberProfiles, showSavedBriefly]
   );
 
   useEffect(() => {
@@ -1753,6 +1730,39 @@ export function ProfileTab({
   const heightDisplayStrImperial = fmtFeetInches(heightInchesSlider);
   const heightDisplayStrMetric = `${(heightInchesSlider * 2.54).toFixed(1)} cm`;
   const bodyFatDisplayStr = `${bodyFatSlider.toFixed(1)}%`;
+
+  if (healthSubview === "bodyScan" && user?.id && activeProfileId) {
+    const handleShown =
+      typeof activeProfile?.display_handle === "string" && activeProfile.display_handle.trim()
+        ? activeProfile.display_handle.trim()
+        : String(activeProfile?.handle ?? "").trim();
+    return (
+      <div className="pepv-profile-tab" style={{ maxWidth: 640, margin: "0 auto" }}>
+        {err && (
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12 }}>
+            {err}
+          </div>
+        )}
+        {savedFlash ? (
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 10, letterSpacing: "0.04em" }}>
+            Saved ✓
+          </div>
+        ) : null}
+        <BodyScanView
+          profileId={activeProfileId}
+          userId={user.id}
+          tier={user.plan ?? "entry"}
+          handle={handleShown}
+          onBack={() => setHealthSubview(null)}
+          onOpenUpgrade={onOpenUpgrade}
+          onErrorMessage={(m) => setErr(typeof m === "string" ? m : "")}
+          onSavedBriefly={showSavedBriefly}
+          workerOk={workerOk}
+          activeStack={savedStackPeptides}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -2077,6 +2087,132 @@ export function ProfileTab({
         demoHighlightProps={demoHighlightProps}
         demoHighlighted={Boolean(demo?.isHighlighted(DEMO_TARGET.profile_score))}
       />
+
+      <div style={SECTION}>Measurement hub</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+        <button
+          type="button"
+          onClick={() => {
+            if (user?.id && activeProfileId) setHealthSubview("bodyScan");
+          }}
+          disabled={!user?.id || !activeProfileId}
+          style={{
+            textAlign: "left",
+            padding: 14,
+            borderRadius: 10,
+            border: "1px solid var(--color-border-default)",
+            background: "var(--color-bg-card)",
+            cursor: user?.id && activeProfileId ? "pointer" : "not-allowed",
+            opacity: user?.id && activeProfileId ? 1 : 0.55,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            minHeight: 120,
+            color: "var(--color-text-primary)",
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Body Scan</div>
+            <span style={{ fontSize: 18, color: "var(--color-text-muted)" }} aria-hidden>
+              ›
+            </span>
+          </div>
+          {latestInbodyRow?.id ? (
+            <>
+              <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                {formatInbodyScanDateOnly(latestInbodyRow.scan_date ?? null, "medium") ?? "—"}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <InbodyScoreRing size={44} score={inbodyToNum(latestInbodyRow.inbody_score ?? null)} />
+                <div style={{ display: "flex", flex: 1, gap: 6, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--color-text-secondary)" }}>
+                  <span>W {latestInbodyRow.weight_lbs != null ? `${Number(latestInbodyRow.weight_lbs).toFixed(0)}` : "—"}</span>
+                  <span>·</span>
+                  <span>SMM {latestInbodyRow.smm_lbs != null ? `${Number(latestInbodyRow.smm_lbs).toFixed(0)}` : "—"}</span>
+                  <span>·</span>
+                  <span>BF {latestInbodyRow.pbf_pct != null ? `${Number(latestInbodyRow.pbf_pct).toFixed(0)}%` : "—"}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+              No scans yet
+            </div>
+          )}
+        </button>
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 10,
+            border: "1px solid var(--color-border-default)",
+            background: "var(--color-bg-card)",
+            opacity: 0.5,
+            minHeight: 120,
+            pointerEvents: "none",
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Progress Photos</div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            Coming soon
+          </div>
+        </div>
+        <div
+          style={{
+            padding: 14,
+            borderRadius: 10,
+            border: "1px solid var(--color-border-default)",
+            background: "var(--color-bg-card)",
+            opacity: 0.5,
+            minHeight: 120,
+            pointerEvents: "none",
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Lab Biomarkers</div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            Coming soon
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void scrollToField("weight")}
+          style={{
+            textAlign: "left",
+            padding: 14,
+            borderRadius: 10,
+            border: "1px solid var(--color-border-default)",
+            background: "var(--color-bg-card)",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            minHeight: 120,
+            color: "var(--color-text-primary)",
+            fontFamily: "'Outfit', sans-serif",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Body Metrics</div>
+            <span style={{ fontSize: 18, color: "var(--color-text-muted)" }} aria-hidden>
+              ›
+            </span>
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            {bodyMetricsRow?.updated_at && typeof bodyMetricsRow.updated_at === "string"
+              ? (() => {
+                  const t = Date.parse(bodyMetricsRow.updated_at);
+                  if (!Number.isFinite(t)) return "Weight, height & body fat %";
+                  try {
+                    return `Updated ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(t)}`;
+                  } catch {
+                    return "Weight, height & body fat %";
+                  }
+                })()
+              : "Weight, height & body fat %"}
+          </div>
+        </button>
+      </div>
 
       <div style={SECTION}>Body metrics</div>
       <Card>
@@ -2586,38 +2722,6 @@ export function ProfileTab({
           </div>
           </div>
 
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--color-border-emphasis)" }}>
-            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}>
-              BODY COMPOSITION SCAN
-            </div>
-            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.45, marginBottom: 10 }}>
-              InBody, DEXA, or any body comp scan
-              <br />
-              — auto-populates metrics (Pro+)
-            </div>
-            <input
-              ref={scanFileRef}
-              type="file"
-              accept={R2_UPLOAD_ACCEPT_ATTR}
-              hidden
-              onChange={(e) => void onBodyScanPick(e)}
-            />
-            <button
-              type="button"
-              className="btn-teal"
-              style={{ fontSize: 13, opacity: scanBusy ? 0.75 : 1 }}
-              disabled={scanBusy || !activeProfileId}
-              onClick={() => {
-                if (!canUploadBodyScan) {
-                  onOpenUpgrade();
-                  return;
-                }
-                scanFileRef.current?.click();
-              }}
-            >
-              {scanBusy ? "Uploading…" : activeProfile?.body_scan_r2_key ? "Replace scan" : "Upload scan"}
-            </button>
-          </div>
         </div>
       </Card>
 

@@ -93,6 +93,176 @@ function compoundDisplayName(compoundId) {
   return (p && typeof p.name === "string" && p.name.trim()) || (typeof compoundId === "string" && compoundId.trim()) || "—";
 }
 
+const INBODY_METRIC_LABEL = {
+  weight_lbs: "Weight",
+  smm_lbs: "SMM",
+  pbf_pct: "BF%",
+  inbody_score: "Score",
+  lean_mass_lbs: "Lean",
+  bmr_kcal: "BMR",
+};
+
+/**
+ * @param {{ row: Record<string, unknown> }} p
+ */
+function InbodyNetworkProgressCard({ row }) {
+  const cj = row.content_json;
+  const o = cj != null && typeof cj === "object" ? /** @type {Record<string, unknown>} */ (cj) : {};
+  const days = typeof o.daysBetween === "number" && Number.isFinite(o.daysBetween) ? o.daysBetween : null;
+  const deltas = o.deltas != null && typeof o.deltas === "object" ? /** @type {Record<string, unknown>} */ (o.deltas) : {};
+  const selected = Array.isArray(o.selectedMetrics) ? o.selectedMetrics.map(String) : [];
+  const stackSnap = Array.isArray(o.stackSnapshot) ? o.stackSnapshot : [];
+  const handle = typeof row.handle === "string" ? row.handle.trim() : "";
+  const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";
+  const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+  const verified =
+    row.verified_credential != null &&
+    String(row.verified_credential).trim() !== "";
+  const createdAt = typeof row.created_at === "string" ? row.created_at : "";
+  const expiresAt = typeof row.expires_at === "string" ? row.expires_at : "";
+  const expiresSoon = isExpiresWithinHours(expiresAt, 6);
+  const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
+
+  const formatDeltaVal = (k) => {
+    const v = deltas[k];
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n)) return "—";
+    const abs = Math.abs(n);
+    const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+    if (k === "pbf_pct" || k === "inbody_score") return `${sign}${abs.toFixed(1)}${k === "pbf_pct" ? "%" : ""}`;
+    if (k === "bmr_kcal") return `${sign}${Math.round(abs)}`;
+    return `${sign}${abs.toFixed(1)}`;
+  };
+
+  return (
+    <div
+      className="pcard"
+      role="article"
+      style={{
+        cursor: "default",
+        transform: "none",
+        boxShadow: expiresSoon ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
+        opacity: expiresSoon ? 0.88 : 1,
+        fontFamily: "'Outfit', sans-serif",
+        color: "var(--color-text-primary)",
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+        {handle ? (
+          <button
+            type="button"
+            onClick={() => openPublicMemberProfile(handle)}
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "left",
+              textDecoration: "underline",
+              textDecorationColor: "rgba(248, 250, 252, 0.25)",
+              textUnderlineOffset: 3,
+            }}
+          >
+            {handleShown}
+          </button>
+        ) : (
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{handleShown}</span>
+        )}
+        {verified ? (
+          <span
+            title="Verified"
+            className="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.06em",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-bell-border-unread)",
+              borderRadius: 6,
+              padding: "2px 8px",
+              background: "var(--color-accent-dim)",
+            }}
+          >
+            ✓ VERIFIED
+          </span>
+        ) : null}
+        <span className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+          InBody progress{days != null ? ` · ${days} days` : ""}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+        {(selected.length ? selected : Object.keys(deltas))
+          .filter((k) => k in INBODY_METRIC_LABEL)
+          .slice(0, 6)
+          .map((k) => (
+          <div
+            key={k}
+            style={{
+              border: "1px solid var(--color-border-default)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              minWidth: 72,
+              textAlign: "center",
+            }}
+          >
+            <div className="mono" style={{ fontSize: 9, color: "var(--color-text-muted)", marginBottom: 4 }}>
+              {INBODY_METRIC_LABEL[k] ?? k}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-accent)" }}>{formatDeltaVal(k)}</div>
+          </div>
+        ))}
+      </div>
+      {stackSnap.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {stackSnap.map((s, i) => {
+            const name = s && typeof s === "object" && typeof /** @type {{name?:string}} */ (s).name === "string" ? /** @type {{name?:string}} */ (s).name : "";
+            if (!name.trim()) return null;
+            return (
+              <span
+                key={`${name}-${i}`}
+                className="mono"
+                style={{
+                  fontSize: 10,
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  border: "1px solid var(--color-border-emphasis)",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                {name.trim()}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 6 }}>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.08em",
+            color: "var(--color-accent)",
+            border: "1px solid var(--color-accent-nav-border)",
+            borderRadius: 6,
+            padding: "2px 8px",
+            background: "var(--color-accent-nav-fill)",
+          }}
+        >
+          Receipted · InBody 570
+        </span>
+        {createdAt ? (
+          <span className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            {formatTimeAgo(createdAt)}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /**
  * @param {string | null | undefined} expiresIso
  */
@@ -353,6 +523,11 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
           {doseItems.map((row, idx) => {
+            const postType = typeof row.post_type === "string" ? row.post_type.trim().toLowerCase() : "dose";
+            if (postType === "inbody_progress") {
+              const id = typeof row.id === "string" ? row.id : `inbody-${idx}`;
+              return <InbodyNetworkProgressCard key={id} row={row} />;
+            }
             const id = typeof row.id === "string" ? row.id : `dose-${idx}`;
             const handle = typeof row.handle === "string" ? row.handle.trim() : "";
             const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";

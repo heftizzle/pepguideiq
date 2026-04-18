@@ -1,5 +1,5 @@
 ---
-description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 25 routes. Model routing, rate limits, security invariants.
+description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 26 routes. Model routing, rate limits, security invariants.
 globs: workers/**/*
 alwaysApply: false
 ---
@@ -8,7 +8,7 @@ alwaysApply: false
 
 Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700. **There is no framework** (no Hono, no itty-router) — raw `fetch` event handlers.
 
-## Routes (exactly 25 — do not invent)
+## Routes (exactly 26 — do not invent)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`.

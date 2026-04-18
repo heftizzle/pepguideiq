@@ -87,6 +87,211 @@ function imageMagicMatchesClaimedMime(buf, mime) {
   return false;
 }
 
+/**
+ * @param {ArrayBuffer} buffer
+ * @returns {string}
+ */
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunk = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const sub = bytes.subarray(i, i + chunk);
+    binary += String.fromCharCode.apply(null, /** @type {any} */ (sub));
+  }
+  return btoa(binary);
+}
+
+const INBODY_EXTRACT_FIELD_KEYS = [
+  "scan_date",
+  "weight_lbs",
+  "lean_mass_lbs",
+  "smm_lbs",
+  "pbf_pct",
+  "fat_mass_lbs",
+  "inbody_score",
+  "bmi",
+  "bmr_kcal",
+  "visceral_fat_level",
+  "tbw_l",
+  "icw_l",
+  "ecw_l",
+  "ecw_tbw_ratio",
+  "seg_lean_r_arm_lbs",
+  "seg_lean_l_arm_lbs",
+  "seg_lean_trunk_lbs",
+  "seg_lean_r_leg_lbs",
+  "seg_lean_l_leg_lbs",
+  "seg_fat_r_arm_pct",
+  "seg_fat_l_arm_pct",
+  "seg_fat_trunk_pct",
+  "seg_fat_r_leg_pct",
+  "seg_fat_l_leg_pct",
+];
+
+/**
+ * POST /inbody-scan/extract — multipart `file` (JPEG/PNG/WebP/GIF). Pro+ only. Claude Haiku vision → JSON values + confidence.
+ * @param {Request} request
+ * @param {Record<string, string | undefined>} env
+ * @param {Record<string, string>} cors
+ */
+async function handleInbodyScanExtract(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "Pro plan or higher required" }, 403, cors);
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return jsonResponse({ error: "Invalid multipart body" }, 400, cors);
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+    return jsonResponse({ error: 'Expected multipart field "file"' }, 400, cors);
+  }
+  const size = typeof file.size === "number" ? file.size : 0;
+  if (size <= 0) return jsonResponse({ error: "File is empty" }, 400, cors);
+  if (size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
+  }
+  const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
+  if (!STACK_PHOTO_TYPES.has(mime)) {
+    return jsonResponse({ error: "Unsupported file type — use JPEG, PNG, WebP, or GIF" }, 415, cors);
+  }
+
+  let bytes;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return jsonResponse({ error: "Could not read file" }, 400, cors);
+  }
+  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return jsonResponse({ error: "Vision extraction is not configured" }, 503, cors);
+  }
+
+  const systemText = `You read InBody, InBody770, or similar body composition report printouts and screenshots.
+Rules:
+- Extract ONLY numbers and dates that are clearly printed on the report. Never guess or estimate.
+- If a value is missing, illegible, or you are not confident it matches the field, use null for that value.
+- Return ONLY valid JSON (no markdown fences, no commentary).
+- Shape must be exactly: {"values":{...},"confidence":{...}}
+- "values" must include every key listed below. Use JSON null for unknown values (not the string "null").
+- "confidence" uses the same keys as in "values" where the value is non-null: use "high" only when the label and number are unmistakable; "medium" when reasonably clear; omit the key or use null when the value is null or confidence is low.
+- scan_date: ISO 8601 date/time string in UTC if the report shows a date/time; otherwise null.
+- All other keys are numbers (lbs, %, L, ratio, kcal, score, level as printed).
+
+Keys for "values" and "confidence" (same set):
+scan_date, weight_lbs, lean_mass_lbs, smm_lbs, pbf_pct, fat_mass_lbs, inbody_score, bmi, bmr_kcal, visceral_fat_level, tbw_l, icw_l, ecw_l, ecw_tbw_ratio, seg_lean_r_arm_lbs, seg_lean_l_arm_lbs, seg_lean_trunk_lbs, seg_lean_r_leg_lbs, seg_lean_l_leg_lbs, seg_fat_r_arm_pct, seg_fat_l_arm_pct, seg_fat_trunk_pct, seg_fat_r_leg_pct, seg_fat_l_leg_pct`;
+
+  const userBlock = "Read this scan image and return the JSON object as specified.";
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: MODEL_ENTRY_PRO,
+        max_tokens: 4096,
+        system: systemText,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mime,
+                  data: arrayBufferToBase64(bytes),
+                },
+              },
+              { type: "text", text: userBlock },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (e) {
+    log(env, "error", "inbody_extract_fetch_failed", { message: String(e) });
+    return jsonResponse({ error: "Vision request failed" }, 502, cors);
+  }
+
+  if (!anthropicRes.ok) {
+    const t = await anthropicRes.text().catch(() => "");
+    log(env, "warn", "inbody_extract_anthropic_status", { status: anthropicRes.status, body: String(t).slice(0, 400) });
+    return jsonResponse({ error: "Vision extraction temporarily unavailable" }, 502, cors);
+  }
+
+  let anthropicData;
+  try {
+    anthropicData = await anthropicRes.json();
+  } catch (jsonErr) {
+    log(env, "error", "inbody_extract_anthropic_json", { message: String(jsonErr) });
+    return jsonResponse({ error: "Invalid response from vision service" }, 502, cors);
+  }
+
+  const rawText = anthropicData.content?.[0]?.text ?? "";
+  const cleaned = rawText.replace(/```json|```/gi, "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    log(env, "warn", "inbody_extract_parse_failed", { preview: cleaned.slice(0, 200) });
+    return jsonResponse({ error: "Could not parse extraction result" }, 422, cors);
+  }
+
+  const valuesIn = parsed && typeof parsed.values === "object" && parsed.values ? parsed.values : parsed;
+  const confIn = parsed && typeof parsed.confidence === "object" && parsed.confidence ? parsed.confidence : {};
+
+  /** @type {Record<string, unknown>} */
+  const values = {};
+  /** @type {Record<string, unknown>} */
+  const confidence = {};
+
+  for (const key of INBODY_EXTRACT_FIELD_KEYS) {
+    if (key === "scan_date") {
+      const v = valuesIn[key];
+      if (typeof v === "string" && v.trim()) {
+        const d = Date.parse(v.trim());
+        values[key] = Number.isFinite(d) ? new Date(d).toISOString() : null;
+      } else {
+        values[key] = null;
+      }
+    } else {
+      const n = Number(valuesIn[key]);
+      values[key] = Number.isFinite(n) ? n : null;
+    }
+    const c = confIn[key];
+    const cs = typeof c === "string" ? c.trim().toLowerCase() : "";
+    confidence[key] = cs === "high" || cs === "medium" ? cs : null;
+  }
+
+  return jsonResponse({ values, confidence, rawText: cleaned }, 200, cors);
+}
+
 /** Content-Type from stored R2 object's filename extension (fallback when metadata is missing). */
 function contentTypeFromKey(key) {
   const m = String(key ?? "").toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -3455,21 +3660,25 @@ async function handlePostStackPhoto(request, env, cors) {
   const memberProfileId =
     typeof memberProfileIdRaw === "string" ? memberProfileIdRaw.trim() : "";
 
-  if (kind === "body_scan") {
+  if (kind === "body_scan" || kind === "inbody_scan_history") {
     const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
     if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
       return jsonResponse({ error: "Pro plan or higher required for InBody / DEXA scan upload" }, 403, cors);
     }
   }
 
-  const memberScopedKinds = new Set(["body_scan", "progress_front", "progress_side", "progress_back"]);
-  if (
-    !["stack_shot_1", "stack_shot_2", "vial", "avatar", ...memberScopedKinds].includes(kind)
-  ) {
+  const memberScopedKinds = new Set([
+    "body_scan",
+    "inbody_scan_history",
+    "progress_front",
+    "progress_side",
+    "progress_back",
+  ]);
+  if (!["stack_shot_1", "stack_shot_2", "vial", "avatar", ...memberScopedKinds].includes(kind)) {
     return jsonResponse(
       {
         error:
-          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, progress_front, progress_side, or progress_back",
+          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, inbody_scan_history, progress_front, progress_side, or progress_back",
       },
       400,
       cors
@@ -3527,7 +3736,10 @@ async function handlePostStackPhoto(request, env, cors) {
   const isoNow = new Date().toISOString();
   if (kind === "stack_shot_1") key = `${userId}/stack-shot-1.jpg`;
   else if (kind === "stack_shot_2") key = `${userId}/stack-shot-2.jpg`;
-  else if (kind === "body_scan") key = `${userId}/member-profiles/${memberProfileId}/body-scan.jpg`;
+  else if (kind === "inbody_scan_history") {
+    const safeIso = isoNow.replace(/[:.]/g, "-");
+    key = `${userId}/scans/${safeIso}.jpg`;
+  } else if (kind === "body_scan") key = `${userId}/member-profiles/${memberProfileId}/body-scan.jpg`;
   else if (kind === "progress_front") key = `${userId}/member-profiles/${memberProfileId}/progress-front.jpg`;
   else if (kind === "progress_side") key = `${userId}/member-profiles/${memberProfileId}/progress-side.jpg`;
   else if (kind === "progress_back") key = `${userId}/member-profiles/${memberProfileId}/progress-back.jpg`;
@@ -3614,6 +3826,9 @@ async function handlePostStackPhoto(request, env, cors) {
       patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { avatar_r2_key: key });
       url = publicMemberAvatarUrl(request, key);
     }
+  } else if (kind === "inbody_scan_history") {
+    patched = true;
+    url = privateStackPhotoUrl(request, key);
   } else if (kind === "body_scan") {
     const scanPatch = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, memberProfileId, {
       body_scan_r2_key: key,
@@ -4032,6 +4247,15 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/member-profiles" && request.method === "POST") {
       return handleCreateMemberProfile(request, env, cors);
+    }
+
+    if (url.pathname === "/inbody-scan/extract") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: cors });
+      }
+      if (request.method === "POST") {
+        return handleInbodyScanExtract(request, env, cors);
+      }
     }
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {
