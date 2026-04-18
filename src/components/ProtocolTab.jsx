@@ -10,6 +10,7 @@ import {
   insertDoseLog,
   insertNetworkFeedDosePost,
   listLatestDosedAtByPeptideOnLocalDay,
+  updateNetworkFeedPostPublicVisible,
 } from "../lib/supabase.js";
 import { lockMapFromLatestDosedAtIso } from "../lib/protocolLogCooldown.js";
 import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
@@ -76,7 +77,7 @@ export function ProtocolTab({
   const [cooldownTick, setCooldownTick] = useState(0);
   const [guardrail, setGuardrail] = useState(null);
   const [networkPrompt, setNetworkPrompt] = useState(
-    /** @type {null | { insertRow: Record<string, unknown>; feedVisible: boolean; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
+    /** @type {null | { networkFeedId: string; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
   );
   const [networkPostBusy, setNetworkPostBusy] = useState(false);
   const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
@@ -242,7 +243,7 @@ export function ProtocolTab({
       return;
     }
     const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
-    const { stackRowId, feedVisible } = await getUserStackRowId(userId, profileId);
+    const { stackRowId } = await getUserStackRowId(userId, profileId);
     const insertRow = buildNetworkFeedInsertRow({
       userId,
       doseLogId,
@@ -251,12 +252,24 @@ export function ProtocolTab({
       session,
       stackRowId: stackRowId ?? null,
       catalogPeptide: cat,
-      feedVisible,
+      feedVisible: false,
     });
+    const { data: nf, error: nfErr } = await insertNetworkFeedDosePost(insertRow, false);
+    if (nfErr || !nf?.id) {
+      if (nfErr) console.error("[ProtocolTab] network_feed insert failed", nfErr);
+      else console.error("[ProtocolTab] network_feed insert returned no id", nf);
+      showDoseToast(toastMessage);
+      return;
+    }
+    const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
+    if (!networkFeedId) {
+      console.error("[ProtocolTab] network_feed insert id empty", nf);
+      showDoseToast(toastMessage);
+      return;
+    }
     setNetworkPostError(null);
     setNetworkPrompt({
-      insertRow,
-      feedVisible,
+      networkFeedId,
       compoundName: r.name,
       previewLine,
       toastMessage,
@@ -272,12 +285,14 @@ export function ProtocolTab({
   }, [networkPrompt, showDoseToast]);
 
   const confirmNetworkPost = useCallback(async () => {
-    if (!networkPrompt?.insertRow) return;
+    const id = networkPrompt?.networkFeedId?.trim();
+    if (!id) return;
     setNetworkPostBusy(true);
     setNetworkPostError(null);
-    const { error } = await insertNetworkFeedDosePost(networkPrompt.insertRow, networkPrompt.feedVisible);
+    const { error } = await updateNetworkFeedPostPublicVisible(id, true);
     setNetworkPostBusy(false);
     if (error) {
+      console.error("[ProtocolTab] network_feed public_visible update failed", error);
       setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
       return;
     }

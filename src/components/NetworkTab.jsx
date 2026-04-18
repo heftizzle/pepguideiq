@@ -68,12 +68,13 @@ function formatSessionLabel(session) {
 /**
  * @param {unknown} amount
  * @param {unknown} unit
+ * @param {{ doseUnit?: string } | null | undefined} [catalogEntry] — e.g. HGH 191AA (`doseUnit: 'IU'`) from `PEPTIDES`
  */
-function formatDoseLine(amount, unit) {
+function formatDoseLine(amount, unit, catalogEntry) {
   const u = typeof unit === "string" ? unit.trim().toLowerCase() : "";
   const n = Number(amount);
   if (u === "mcg" && Number.isFinite(n) && n > 0) {
-    return formatDoseAmountFromMcg(n) ?? `${n} mcg`;
+    return formatDoseAmountFromMcg(n, catalogEntry) ?? `${n} mcg`;
   }
   if (Number.isFinite(n) && u) return `${n} ${unit}`.trim();
   if (Number.isFinite(n)) return String(n);
@@ -81,11 +82,15 @@ function formatDoseLine(amount, unit) {
   return "—";
 }
 
-function compoundDisplayName(compoundId) {
+function catalogEntryByCompoundId(compoundId) {
   const id = typeof compoundId === "string" ? compoundId.trim() : "";
-  if (!id) return "—";
-  const p = PEPTIDES.find((x) => x && x.id === id);
-  return (p && typeof p.name === "string" && p.name.trim()) || id;
+  if (!id) return undefined;
+  return PEPTIDES.find((x) => x && x.id === id);
+}
+
+function compoundDisplayName(compoundId) {
+  const p = catalogEntryByCompoundId(compoundId);
+  return (p && typeof p.name === "string" && p.name.trim()) || (typeof compoundId === "string" && compoundId.trim()) || "—";
 }
 
 /**
@@ -356,8 +361,9 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
               row.verified_credential != null &&
               String(row.verified_credential).trim() !== "";
             const compoundId = typeof row.compound_id === "string" ? row.compound_id.trim() : "";
+            const catalogEntry = catalogEntryByCompoundId(compoundId);
             const compoundName = compoundDisplayName(compoundId);
-            const doseLine = formatDoseLine(row.dose_amount, row.dose_unit);
+            const doseLine = formatDoseLine(row.dose_amount, row.dose_unit, catalogEntry);
             const routeLabel = formatRouteLabel(row.route);
             const sessionPretty = formatSessionLabel(row.session_label);
             const stackLabel = typeof row.stack_label === "string" && row.stack_label.trim() ? row.stack_label.trim() : null;
@@ -389,7 +395,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                       style={{
                         fontSize: 15,
                         fontWeight: 600,
-                        color: "#f8fafc",
+                        color: "var(--color-text-secondary)",
                         background: "none",
                         border: "none",
                         padding: 0,
@@ -404,7 +410,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                       {handleShown}
                     </button>
                   ) : (
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "#f8fafc" }}>{handleShown}</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{handleShown}</span>
                   )}
                   {verified ? (
                     <span
@@ -577,7 +583,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                       </div>
                     )}
                     {handle ? (
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "#f1f5f9" }}>{displayName}</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{displayName}</div>
                     ) : null}
                   </div>
                   <span className="pepv-emoji" style={{ fontSize: 22, flexShrink: 0 }} title={tier} aria-hidden>

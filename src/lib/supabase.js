@@ -1155,15 +1155,37 @@ export async function getUserStackRowId(userId, profileId) {
 
 /**
  * Inserts a network_feed row (migration 033). `expires_at` defaults server-side (+72h).
- * `public_visible` should match `user_stacks.feed_visible` (see buildNetworkFeedInsertRow + feedVisible).
  * @param {Record<string, unknown>} row
- * @param {boolean} [feedVisible] — used when row.public_visible is missing (same as user_stacks.feed_visible)
+ * @param {boolean} [feedVisible] — fallback when `row.public_visible` is not a boolean
+ * @returns {Promise<{ data: { id: string } | null; error: Error | null }>}
  */
 export async function insertNetworkFeedDosePost(row, feedVisible) {
-  if (!supabase) return { error: notConfiguredError() };
+  if (!supabase) return { data: null, error: notConfiguredError() };
   const public_visible =
     typeof row.public_visible === "boolean" ? row.public_visible : (feedVisible ?? false);
-  const { error } = await supabase.from("network_feed").insert({ ...row, public_visible });
+  const { data, error } = await supabase
+    .from("network_feed")
+    .insert({ ...row, public_visible })
+    .select("id")
+    .maybeSingle();
+  const id = data && typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;
+  return { data: id ? { id } : null, error: error ?? null };
+}
+
+/**
+ * Sets `public_visible` on an existing dose post (e.g. after user taps "Post It"). Migration 054 RLS + GRANT.
+ * @param {string} networkFeedId — `network_feed.id`, not `dose_logs.id`
+ * @param {boolean} [publicVisible]
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function updateNetworkFeedPostPublicVisible(networkFeedId, publicVisible = true) {
+  if (!supabase) return { error: notConfiguredError() };
+  const id = typeof networkFeedId === "string" ? networkFeedId.trim() : "";
+  if (!id) return { error: new Error("Missing network feed id.") };
+  const { error } = await supabase
+    .from("network_feed")
+    .update({ public_visible: Boolean(publicVisible) })
+    .eq("id", id);
   return { error: error ?? null };
 }
 

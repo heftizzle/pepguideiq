@@ -4,6 +4,7 @@ import { resolveCatalogBlendBacRefMl } from "./peptideMath.js";
 
 /**
  * One-line preview: compound name + dose (matches protocol / quick-log UI).
+ * Injectable path uses `formatProtocolInjectableDosePreview` with `catalogPeptide` (IU compounds like HGH 191AA).
  * @param {{
  *   kind: "injectable",
  *   name: string,
@@ -44,6 +45,8 @@ export function buildDoseNetworkRouteLabel(catalogPeptide, payloadKind) {
 }
 
 /**
+ * Builds `network_feed` insert fields. `feedVisible` sets initial `public_visible` (Protocol / Stack quick log
+ * insert private first, then `updateNetworkFeedPostPublicVisible` when the user taps "Post It").
  * @param {{
  *   userId: string,
  *   doseLogId: string,

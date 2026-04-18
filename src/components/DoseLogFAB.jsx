@@ -437,9 +437,8 @@ export function DoseLogFAB({ onSessionPicked }) {
                 minHeight: 44,
                 padding: "8px 14px",
                 borderRadius: 12,
-                border: "1px solid var(--color-bell-border-unread)",
-                background: "rgba(7, 9, 14, 0.96)",
-                "--color-text-primary": "#dde4ef",
+                border: "1px solid var(--color-border-default)",
+                background: "var(--color-bg-card)",
                 color: "var(--color-text-primary)",
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: 13,
@@ -450,7 +449,7 @@ export function DoseLogFAB({ onSessionPicked }) {
                 alignItems: "center",
                 gap: 8,
                 whiteSpace: "nowrap",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.45)",
+                boxShadow: "0 4px 20px var(--color-shadow-45)",
                 animation: `pepvFabPillIn 0.22s ease ${i * 50}ms both`,
               }}
             >
