@@ -102,8 +102,8 @@ export function DemoTourHelpButton() {
           zIndex: 50,
           padding: 8,
           borderRadius: 12,
-          border: "1px solid #1e2a38",
-          background: "#0b0f17",
+          border: "1px solid var(--color-border-tab)",
+          background: "var(--color-bg-sunken)",
           boxShadow: "0 12px 40px rgba(0,0,0,0.55)",
         }}
       >
@@ -269,7 +269,7 @@ export function DemoTourBar() {
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-            <div className="mono" style={{ fontSize: 11, color: "#b0bec5", letterSpacing: "0.08em", marginBottom: 4 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", letterSpacing: "0.08em", marginBottom: 4 }}>
               PEPGUIDE IQ · {flowKey ? `${stepIndex + 1} / ${total}` : "Tips"}
             </div>
             {sessionCount === 1 ? (
@@ -290,7 +290,7 @@ export function DemoTourBar() {
                   style={{
                     fontFamily: "'Outfit', sans-serif",
                     fontSize: 12,
-                    color: "#b0bec5",
+                    color: "var(--color-text-secondary)",
                     lineHeight: 1.4,
                     marginBottom: 8,
                   }}
@@ -312,9 +312,9 @@ export function DemoTourBar() {
               ...hit44,
               padding: 0,
               borderRadius: 10,
-              border: "1px solid #243040",
+              border: "1px solid var(--color-border-emphasis)",
               background: "rgba(255,255,255,0.04)",
-              color: "#b0bec5",
+              color: "var(--color-text-secondary)",
               cursor: "pointer",
               fontSize: 20,
               lineHeight: 1,

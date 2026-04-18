@@ -723,7 +723,7 @@ export function BuildTab({
                   gap: 10,
                   padding: "8px 10px",
                   borderRadius: 8,
-                  border: "1px solid #14202e",
+                  border: "1px solid var(--color-border-default)",
                   background: "rgba(7, 9, 14, 0.6)",
                   ...getCategoryCssVars(cat0),
                 }}
@@ -1063,7 +1063,7 @@ export function BuildTab({
             <div
               key={L.key}
               style={{
-                border: "1px solid #14202e",
+                border: "1px solid var(--color-border-default)",
                 borderRadius: 8,
                 padding: 10,
                 fontSize: 13,
@@ -1132,7 +1132,7 @@ export function BuildTab({
           style={{
             marginTop: 14,
             paddingTop: 12,
-            borderTop: "1px solid #1e2a38",
+            borderTop: "1px solid var(--color-border-tab)",
             fontSize: 13,
             color: "var(--color-text-primary)",
           }}
@@ -1164,7 +1164,7 @@ export function BuildTab({
 
       {/* ── ORDER HISTORY ────────────────────────────────── */}
       {(shoppingHistory.length > 0 || historyLoading) && (
-        <div style={{ marginTop: 14, borderTop: "1px solid #1e2a38", paddingTop: 12 }}>
+        <div style={{ marginTop: 14, borderTop: "1px solid var(--color-border-tab)", paddingTop: 12 }}>
           <button
             type="button"
             onClick={() => setHistoryOpen((o) => !o)}
@@ -1218,7 +1218,7 @@ export function BuildTab({
                       key={entry.id}
                       style={{
                         background: "rgba(255,255,255,0.02)",
-                        border: "1px solid #1e2a38",
+                        border: "1px solid var(--color-border-tab)",
                         borderRadius: 8,
                         padding: "10px 12px",
                       }}
@@ -1367,7 +1367,7 @@ export function BuildTab({
                 fontSize: 13,
                 fontFamily: "'Outfit', sans-serif",
                 color: "var(--color-accent)",
-                border: "1px solid #243040",
+                border: "1px solid var(--color-border-emphasis)",
                 background: "var(--color-accent-subtle-10)",
                 padding: "12px 14px",
                 borderRadius: 10,

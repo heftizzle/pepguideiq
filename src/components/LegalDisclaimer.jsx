@@ -8,9 +8,9 @@ export function LegalDisclaimer() {
       style={{
         marginTop: 24,
         padding: "14px 16px",
-        borderTop: "1px solid #14202e",
+        borderTop: "1px solid var(--color-border-default)",
         fontSize: 13,
-        color: "#b0bec5",
+        color: "var(--color-text-secondary)",
         lineHeight: 1.55,
         maxWidth: 1200,
         marginLeft: "auto",
@@ -25,7 +25,7 @@ export function LegalDisclaimer() {
           marginTop: 10,
           textAlign: "center",
           fontSize: 12,
-          color: "#b0bec5",
+          color: "var(--color-text-secondary)",
           lineHeight: 1.6,
           fontFamily: "'Outfit', sans-serif",
         }}

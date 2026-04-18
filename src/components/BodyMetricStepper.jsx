@@ -173,7 +173,7 @@ function MetricRuler({
           : undefined
       }
     >
-      <line x1={0} y1={h - 1} x2={w} y2={h - 1} stroke="#14202e" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      <line x1={0} y1={h - 1} x2={w} y2={h - 1} stroke="var(--color-border-default)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
       {ticks.map((tk, i) => (
         <line
           key={i}

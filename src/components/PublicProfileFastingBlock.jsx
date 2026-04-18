@@ -49,7 +49,7 @@ export function PublicProfileFastingBlock({ publicFast }) {
             height: "100%",
             width: `${prog.progressPct}%`,
             borderRadius: 999,
-            background: prog.overTarget ? "#f59e0b" : "var(--color-accent)",
+            background: prog.overTarget ? "var(--color-warning)" : "var(--color-accent)",
             transition: "width 0.35s ease",
           }}
         />

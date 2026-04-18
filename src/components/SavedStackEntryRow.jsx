@@ -67,7 +67,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 6 }}>
           <div>
             <div className="brand" style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-            <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", marginTop: 2 }}>{catLabel} · added {item.addedDate}</div>
           </div>
           <button type="button" className="btn-red" onClick={() => onRemove(rowKey)}>✕</button>
         </div>
@@ -94,7 +94,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                         ? "1px solid rgba(245, 158, 11, 0.55)"
                         : on
                           ? "1px solid var(--color-bell-border-unread)"
-                          : "1px solid #243040",
+                          : "1px solid var(--color-border-emphasis)",
                       background: on ? "var(--color-accent-dim)" : "var(--color-bg-hover)",
                       fontSize: 18,
                       lineHeight: 1,

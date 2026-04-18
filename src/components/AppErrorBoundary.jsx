@@ -37,14 +37,14 @@ export class AppErrorBoundary extends Component {
             minHeight: "100vh",
             boxSizing: "border-box",
             padding: 24,
-            background: "#07090e",
-            color: "#b0bec5",
+            background: "var(--color-bg-page)",
+            color: "var(--color-text-secondary)",
             fontSize: 13,
             lineHeight: 1.55,
             fontFamily: "'JetBrains Mono', monospace",
           }}
         >
-          <div style={{ color: "#f59e0b", marginBottom: 12, letterSpacing: "0.06em" }}>Something went wrong</div>
+          <div style={{ color: "var(--color-warning)", marginBottom: 12, letterSpacing: "0.06em" }}>Something went wrong</div>
           {msg ? (
             <div
               style={{
@@ -62,7 +62,7 @@ export class AppErrorBoundary extends Component {
             <div
               style={{
                 fontSize: 11,
-                color: "#b0bec5",
+                color: "var(--color-text-secondary)",
                 marginBottom: 16,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",

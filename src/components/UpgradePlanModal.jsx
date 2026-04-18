@@ -347,7 +347,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
             )}
           </div>
           {downgradeError && (
-            <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginBottom: 10 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 10 }}>
               {downgradeError}
             </div>
           )}
@@ -575,7 +575,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
   if (paymentStep && elementsOptions && !stripePromise) {
     return (
       <Modal onClose={onClose} maxWidth={480} label="Checkout" variant="sheet">
-        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", lineHeight: 1.5, marginBottom: 16 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", lineHeight: 1.5, marginBottom: 16 }}>
           Stripe could not load (check VITE_STRIPE_PUBLISHABLE_KEY).
         </div>
         <button type="button" className="btn-teal" style={{ fontSize: 13 }} onClick={() => setPaymentStep(null)}>
@@ -626,7 +626,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
           </button>
         </div>
         {paySubmitError ? (
-          <div className="mono" style={{ color: "#f59e0b", marginBottom: 14, fontSize: 13, lineHeight: 1.45 }}>
+          <div className="mono" style={{ color: "var(--color-warning)", marginBottom: 14, fontSize: 13, lineHeight: 1.45 }}>
             {paySubmitError}
           </div>
         ) : null}
@@ -682,7 +682,7 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
       ) : null}
 
       {upgradeSubmitError ? (
-        <div className="mono" style={{ marginBottom: 14, fontSize: 13, color: "#f59e0b", lineHeight: 1.45 }}>
+        <div className="mono" style={{ marginBottom: 14, fontSize: 13, color: "var(--color-warning)", lineHeight: 1.45 }}>
           {upgradeSubmitError}
         </div>
       ) : null}

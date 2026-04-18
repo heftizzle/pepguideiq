@@ -147,8 +147,8 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
           aspectRatio: "3 / 4",
           maxHeight: 220,
           borderRadius: 12,
-          border: showImage ? "1px solid #1e2a38" : "2px dashed #243040",
-          background: "#07090e",
+          border: showImage ? "1px solid var(--color-border-tab)" : "2px dashed var(--color-border-emphasis)",
+          background: "var(--color-bg-page)",
           cursor: uploading ? "wait" : "pointer",
           padding: 0,
           overflow: "hidden",
@@ -160,7 +160,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
         {showImage ? (
           <img src={imgUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         ) : r2Key ? (
-          <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
+          <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
             Loading…
           </span>
         ) : (
@@ -168,7 +168,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
             <span style={{ fontSize: 32, lineHeight: 1, opacity: 0.8 }} aria-hidden>
               📷
             </span>
-            <span className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.08em" }}>
+            <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.08em" }}>
               STACK SHOT
             </span>
           </div>
@@ -188,12 +188,12 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
         STACK SHOT
       </div>
       {err && (
-        <div className="mono" style={{ fontSize: 11, color: "#f59e0b", textAlign: "center" }}>
+        <div className="mono" style={{ fontSize: 11, color: "var(--color-warning)", textAlign: "center" }}>
           {err}
         </div>
       )}
       {uploading && (
-        <div className="mono" style={{ fontSize: 11, color: "#a0a0b0" }}>
+        <div className="mono" style={{ fontSize: 11, color: "var(--color-text-placeholder)" }}>
           Uploading…
         </div>
       )}

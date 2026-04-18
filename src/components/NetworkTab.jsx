@@ -112,9 +112,9 @@ function NetworkFeedSkeleton() {
       }}
       aria-hidden
     >
-      <div style={{ height: 14, background: "#1a2430", borderRadius: 6, width: "38%", marginBottom: 14 }} />
-      <div style={{ height: 16, background: "#1a2430", borderRadius: 6, width: "72%", marginBottom: 10 }} />
-      <div style={{ height: 12, background: "#1a2430", borderRadius: 6, width: "50%" }} />
+      <div style={{ height: 14, background: "var(--color-surface-hover)", borderRadius: 6, width: "38%", marginBottom: 14 }} />
+      <div style={{ height: 16, background: "var(--color-surface-hover)", borderRadius: 6, width: "72%", marginBottom: 10 }} />
+      <div style={{ height: 12, background: "var(--color-surface-hover)", borderRadius: 6, width: "50%" }} />
     </div>
   );
 }
@@ -132,9 +132,9 @@ function DoseFeedSkeleton() {
       }}
       aria-hidden
     >
-      <div style={{ height: 12, background: "#1a2430", borderRadius: 6, width: "44%", marginBottom: 12 }} />
-      <div style={{ height: 18, background: "#1a2430", borderRadius: 6, width: "88%", marginBottom: 8 }} />
-      <div style={{ height: 12, background: "#1a2430", borderRadius: 6, width: "55%" }} />
+      <div style={{ height: 12, background: "var(--color-surface-hover)", borderRadius: 6, width: "44%", marginBottom: 12 }} />
+      <div style={{ height: 18, background: "var(--color-surface-hover)", borderRadius: 6, width: "88%", marginBottom: 8 }} />
+      <div style={{ height: 12, background: "var(--color-surface-hover)", borderRadius: 6, width: "55%" }} />
     </div>
   );
 }
@@ -243,7 +243,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   if (!userId) {
     return (
       <div style={{ padding: "48px 0", textAlign: "center" }}>
-        <div className="mono" style={{ color: "#b0bec5", fontSize: 14 }}>
+        <div className="mono" style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
           Sign in to browse the Network feed.
         </div>
       </div>
@@ -253,7 +253,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   if (!isSupabaseConfigured()) {
     return (
       <div style={{ padding: "48px 0", textAlign: "center" }}>
-        <div className="mono" style={{ color: "#b0bec5", fontSize: 14 }}>
+        <div className="mono" style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
           Configure Supabase to use Network.
         </div>
       </div>
@@ -275,7 +275,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
           <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
             NETWORK
           </div>
-          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", marginTop: 4, maxWidth: 560 }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", marginTop: 4, maxWidth: 560 }}>
             Live dose activity from the community and public stacks shared for discovery.
           </div>
         </div>
@@ -290,7 +290,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
         </button>
       </div>
 
-      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.1em", marginBottom: 10 }}>
         LIVE DOSING
       </div>
       {doseError ? (
@@ -298,7 +298,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
           className="mono"
           style={{
             fontSize: 12,
-            color: "#f59e0b",
+            color: "var(--color-warning)",
             border: "1px solid rgba(245, 158, 11, 0.3)",
             borderRadius: 10,
             padding: "10px 12px",
@@ -424,19 +424,19 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                     </span>
                   ) : null}
                   {expiresSoon ? (
-                    <span className="mono" style={{ fontSize: 10, color: "#b0bec5", marginLeft: "auto" }}>
+                    <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginLeft: "auto" }}>
                       Expires soon
                     </span>
                   ) : null}
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-accent)", marginBottom: 6, lineHeight: 1.35 }}>
                   {compoundName}
-                  <span style={{ color: "#b0bec5", fontWeight: 500, fontSize: 14 }}>
+                  <span style={{ color: "var(--color-text-secondary)", fontWeight: 500, fontSize: 14 }}>
                     {" "}
                     · {doseLine} · {routeLabel}
                   </span>
                 </div>
-                <div className="mono" style={{ fontSize: 12, color: "#b0bec5", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
                   {sessionPretty ? <span>Session: {sessionPretty}</span> : null}
                   {stackLabel ? <span>Stack: {stackLabel}</span> : null}
                   {createdAt ? <span>{formatTimeAgo(createdAt)}</span> : null}
@@ -447,7 +447,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
         </div>
       )}
 
-      <div className="mono" style={{ fontSize: 12, color: "#b0bec5", letterSpacing: "0.1em", marginBottom: 10 }}>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.1em", marginBottom: 10 }}>
         SHARED STACKS
       </div>
       {stackError ? (
@@ -455,7 +455,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
           className="mono"
           style={{
             fontSize: 12,
-            color: "#f59e0b",
+            color: "var(--color-warning)",
             border: "1px solid rgba(245, 158, 11, 0.3)",
             borderRadius: 10,
             padding: "10px 12px",
@@ -478,7 +478,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             borderRadius: 12,
             padding: "56px 20px",
             textAlign: "center",
-            background: "#0e1520",
+            background: "var(--color-bg-card)",
           }}
         >
           <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
@@ -488,7 +488,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       ) : stackItems.length === 0 ? (
         <div
           style={{
-            border: "1px dashed #14202e",
+            border: "1px dashed var(--color-border-default)",
             borderRadius: 12,
             padding: "56px 20px",
             textAlign: "center",
@@ -497,7 +497,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
           <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.35 }} aria-hidden>
             {NETWORK_TAB_EMOJI}
           </div>
-          <div style={{ fontSize: 14, color: "#b0bec5", lineHeight: 1.55, maxWidth: 360, margin: "0 auto" }}>
+          <div style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55, maxWidth: 360, margin: "0 auto" }}>
             No stacks shared yet. Be the first — share your stack from the Stacks tab.
           </div>
         </div>
@@ -585,15 +585,15 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   </span>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "center" }}>
-                  <span className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+                  <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
                     {compoundLabel}
                   </span>
-                  <span className="mono" style={{ fontSize: 13, color: "#b0bec5" }}>
+                  <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
                     pepguideIQ{" "}
                     <span style={{ color: "var(--color-accent)", fontWeight: 700 }}>{score}</span>
                   </span>
                   {updatedAt ? (
-                    <span className="mono" style={{ fontSize: 12, color: "#b0bec5" }}>
+                    <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                       {formatTimeAgo(updatedAt)}
                     </span>
                   ) : null}

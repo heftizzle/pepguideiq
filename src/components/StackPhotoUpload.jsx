@@ -255,7 +255,7 @@ export function StackPhotoUpload({
               justifyContent: "center",
               background: "rgba(7,9,14,0.75)",
               fontSize: 13,
-              color: "#b0bec5",
+              color: "var(--color-text-secondary)",
               zIndex: 2,
             }}
           >
@@ -293,13 +293,13 @@ export function StackPhotoUpload({
             </button>
           </>
         ) : (
-          <div className="mono" style={{ fontSize: 13, color: "#a0a0b0", padding: "12px 14px", textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", padding: "12px 14px", textAlign: "center" }}>
             Upload your stack photo
           </div>
         )}
       </div>
       {err && (
-        <div className="mono" style={{ fontSize: 13, color: "#f59e0b", marginTop: 6, lineHeight: 1.4 }}>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginTop: 6, lineHeight: 1.4 }}>
           {err}
         </div>
       )}

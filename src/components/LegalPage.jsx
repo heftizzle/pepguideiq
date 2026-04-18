@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 const WRAP = {
   minHeight: "100vh",
-  background: "#07090e",
+  background: "var(--color-bg-page)",
   color: "#cbd5e1",
   /* Dark static page: keep headings readable when global [data-theme] is light */
   "--color-text-primary": "#dde4ef",
@@ -27,7 +27,7 @@ const STICKY_NAV = {
   padding: "12px 16px",
   margin: "0 -20px 28px",
   background: "rgba(7, 9, 14, 0.92)",
-  borderBottom: "1px solid #1e2a38",
+  borderBottom: "1px solid var(--color-border-tab)",
   backdropFilter: "blur(8px)",
   fontSize: 13,
   fontFamily: "'Outfit', sans-serif",
@@ -39,7 +39,7 @@ const NAV_LINK = {
   fontWeight: 500,
 };
 
-const NAV_MUTED = { color: "#b0bec5" };
+const NAV_MUTED = { color: "var(--color-text-secondary)" };
 
 const SECTION_HDR = {
   fontFamily: "'JetBrains Mono', monospace",

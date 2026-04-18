@@ -191,8 +191,8 @@ export function StackShareControls({
             marginTop: 12,
             padding: 14,
             borderRadius: 12,
-            border: "1px solid #1e2a38",
-            background: "#0b0f17",
+            border: "1px solid var(--color-border-tab)",
+            background: "var(--color-bg-sunken)",
             maxWidth: 400,
             boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
           }}
@@ -204,7 +204,7 @@ export function StackShareControls({
             SHARE STACK
           </div>
           {busy && (
-            <div className="mono" style={{ fontSize: 12, color: "#a0a0b0", marginBottom: 8 }}>
+            <div className="mono" style={{ fontSize: 12, color: "var(--color-text-placeholder)", marginBottom: 8 }}>
               Preparing link…
             </div>
           )}
@@ -213,14 +213,14 @@ export function StackShareControls({
               className="mono"
               style={{
                 fontSize: 12,
-                color: "#b0bec5",
+                color: "var(--color-text-secondary)",
                 wordBreak: "break-all",
                 lineHeight: 1.45,
                 marginBottom: 12,
                 padding: "8px 10px",
                 borderRadius: 10,
-                background: "#07090e",
-                border: "1px solid #14202e",
+                background: "var(--color-bg-page)",
+                border: "1px solid var(--color-border-default)",
               }}
               title={fullUrl}
             >
@@ -228,7 +228,7 @@ export function StackShareControls({
             </div>
           )}
           {err && (
-            <div className="mono" style={{ fontSize: 12, color: "#f59e0b", marginBottom: 10 }}>
+            <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginBottom: 10 }}>
               {err}
             </div>
           )}
