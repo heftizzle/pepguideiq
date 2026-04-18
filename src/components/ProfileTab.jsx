@@ -826,7 +826,7 @@ function ProfilePrivatePhotoSlot({
   );
 }
 
-/** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, canUseProgressPhotos?: boolean, savedStackPeptides?: { id: string, name: string }[] }} props */
+/** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, canUseProgressPhotos?: boolean, savedStackPeptides?: { id: string, name: string, stackDose?: string, stackFrequency?: string }[], onGuideDeepAnalysisToGuide?: (prompt: string) => void }} props */
 export function ProfileTab({
   user,
   setUser,
@@ -834,6 +834,7 @@ export function ProfileTab({
   onSignOut,
   canUseProgressPhotos = false,
   savedStackPeptides = [],
+  onGuideDeepAnalysisToGuide,
 }) {
   const fmtFeetInches = (inches) => {
     const ft = Math.floor(inches / 12);
@@ -1775,6 +1776,7 @@ export function ProfileTab({
           onSavedBriefly={showSavedBriefly}
           workerOk={workerOk}
           activeStack={savedStackPeptides}
+          onGuideDeepAnalysis={onGuideDeepAnalysisToGuide}
         />
       </div>
     );

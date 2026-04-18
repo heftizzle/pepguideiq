@@ -292,6 +292,231 @@ scan_date, weight_lbs, lean_mass_lbs, smm_lbs, pbf_pct, fat_mass_lbs, inbody_sco
   return jsonResponse({ values, confidence, rawText: cleaned }, 200, cors);
 }
 
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} scanId
+ * @param {string} userId
+ */
+async function supabaseFetchInbodyInterpretRow(supabaseUrl, serviceKey, scanId, userId) {
+  const url = `${supabaseUrl}/rest/v1/inbody_scan_history?id=eq.${encodeURIComponent(scanId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,ai_interpretation,ai_interpreted_at`;
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  });
+  if (!res.ok) return { row: null };
+  const data = await res.json().catch(() => []);
+  const row = Array.isArray(data) && data[0] ? data[0] : null;
+  return { row };
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} scanId
+ * @param {string} userId
+ * @param {Record<string, unknown>} patch
+ */
+async function supabasePatchInbodyScanHistory(supabaseUrl, serviceKey, scanId, userId, patch) {
+  const url = `${supabaseUrl}/rest/v1/inbody_scan_history?id=eq.${encodeURIComponent(scanId)}&user_id=eq.${encodeURIComponent(userId)}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(patch),
+  });
+  return res.ok;
+}
+
+/**
+ * POST /inbody-scan/interpret — Pro+ only. Sonnet stream; caches per `scanId` on `inbody_scan_history`. Does not use AI Guide KV quota.
+ * Body: `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`.
+ * Cached hit: JSON `{ cached: true, interpretation, ai_interpreted_at }` (no stream).
+ * @param {Request} request
+ * @param {Record<string, string | undefined>} env
+ * @param {Record<string, string>} cors
+ */
+async function handleInbodyScanInterpret(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "Pro plan or higher required" }, 403, cors);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+  const scanId = typeof body.scanId === "string" ? body.scanId.trim() : "";
+  if (!scanId) {
+    return jsonResponse({ error: 'Missing "scanId"' }, 400, cors);
+  }
+  const reinterpret = body.reinterpret === true;
+  const scans = Array.isArray(body.scans) ? body.scans.slice(0, 5) : [];
+  const protocolEvents = Array.isArray(body.protocolEvents) ? body.protocolEvents : [];
+  const activeStack = Array.isArray(body.activeStack) ? body.activeStack : [];
+
+  const { row: anchorRow } = await supabaseFetchInbodyInterpretRow(supabaseUrl, serviceKey, scanId, userId);
+  if (!anchorRow) {
+    return jsonResponse({ error: "Scan not found" }, 404, cors);
+  }
+
+  if (reinterpret) {
+    const okClear = await supabasePatchInbodyScanHistory(supabaseUrl, serviceKey, scanId, userId, {
+      ai_interpretation: null,
+      ai_interpreted_at: null,
+    });
+    if (!okClear) {
+      log(env, "warn", "inbody_interpret_cache_clear_failed", { scanId });
+    }
+  } else {
+    const cachedRaw = anchorRow.ai_interpretation;
+    const cachedText = typeof cachedRaw === "string" ? cachedRaw.trim() : "";
+    if (cachedText) {
+      return jsonResponse(
+        {
+          cached: true,
+          interpretation: cachedRaw,
+          ai_interpreted_at: anchorRow.ai_interpreted_at ?? null,
+        },
+        200,
+        cors
+      );
+    }
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return jsonResponse({ error: "Interpretation is not configured" }, 503, cors);
+  }
+
+  const systemText = `You summarize InBody scan trends for an informed adult user.
+Rules:
+- Respond in 3–5 short sentences, factual and specific; reference actual numbers and scan dates from the JSON.
+- When protocol events align in time with scan changes, note the correlation cautiously (association, not proof).
+- Flag metrics trending in an unfavorable direction (e.g., rising body fat %, falling muscle, rising ECW/TBW) when the data supports it.
+- Do not give medical diagnoses, treatment instructions, or personalized dosing/medical recommendations. No "you should" medical advice.`;
+
+  const userPayload = JSON.stringify(
+    {
+      scans,
+      protocolEvents,
+      activeStack,
+    },
+    null,
+    0
+  );
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: MODEL_ELITE_GOAT,
+        max_tokens: 1024,
+        stream: true,
+        system: systemText,
+        messages: [{ role: "user", content: userPayload }],
+      }),
+    });
+  } catch (e) {
+    log(env, "error", "inbody_interpret_fetch_failed", { message: String(e) });
+    return jsonResponse({ error: "Upstream request failed" }, 502, cors);
+  }
+
+  if (!anthropicRes.ok || !anthropicRes.body) {
+    const t = await anthropicRes.text().catch(() => "");
+    log(env, "warn", "inbody_interpret_anthropic_status", { status: anthropicRes.status, body: String(t).slice(0, 400) });
+    return jsonResponse({ error: "Interpretation temporarily unavailable" }, 502, cors);
+  }
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+
+  (async () => {
+    const reader = anthropicRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let outputTokens = 0;
+    let fullText = "";
+    let streamOk = true;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const jsonStr = trimmed.replace(/^data:\s*/, "");
+          if (!jsonStr || jsonStr === "[DONE]") continue;
+          let ev;
+          try {
+            ev = JSON.parse(jsonStr);
+          } catch {
+            continue;
+          }
+          if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && typeof ev.delta.text === "string") {
+            fullText += ev.delta.text;
+            await writer.write(encoder.encode(`data: ${JSON.stringify({ text: ev.delta.text })}\n\n`));
+          }
+          if (ev.type === "message_delta" && ev.usage && typeof ev.usage.output_tokens === "number") {
+            outputTokens = ev.usage.output_tokens;
+          }
+        }
+      }
+    } catch (e) {
+      streamOk = false;
+      await writer.write(encoder.encode(`data: ${JSON.stringify({ error: String(e) })}\n\n`));
+    }
+    if (streamOk) {
+      const atIso = new Date().toISOString();
+      const patched = await supabasePatchInbodyScanHistory(supabaseUrl, serviceKey, scanId, userId, {
+        ai_interpretation: fullText,
+        ai_interpreted_at: atIso,
+      });
+      if (!patched) {
+        log(env, "warn", "inbody_interpret_persist_failed", { scanId });
+      }
+    }
+    logUsage(env, userId, profilePlan, MODEL_ELITE_GOAT, outputTokens);
+    await writer.write(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
+    await writer.close();
+  })();
+
+  return new Response(readable, {
+    status: 200,
+    headers: {
+      ...cors,
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
+}
+
 /** Content-Type from stored R2 object's filename extension (fallback when metadata is missing). */
 function contentTypeFromKey(key) {
   const m = String(key ?? "").toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -4255,6 +4480,15 @@ async function handleRequest(request, env) {
       }
       if (request.method === "POST") {
         return handleInbodyScanExtract(request, env, cors);
+      }
+    }
+
+    if (url.pathname === "/inbody-scan/interpret") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: cors });
+      }
+      if (request.method === "POST") {
+        return handleInbodyScanInterpret(request, env, cors);
       }
     }
 

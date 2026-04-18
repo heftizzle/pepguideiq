@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700.
 
-## Routes (exactly 26)
+## Routes (exactly 27)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -35,6 +35,7 @@ Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` c
 
 ### Body composition (InBody / DEXA)
 - `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Guide daily KV quota.
+- `POST /inbody-scan/interpret` — JSON body `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`. **Pro+** only. If `inbody_scan_history.ai_interpretation` is already set for `scanId` (and `reinterpret` is not true), returns JSON `{ cached: true, interpretation, ai_interpreted_at }` with no Anthropic call. Otherwise streams Sonnet (`MODEL_ELITE_GOAT`) as `text/event-stream`, then persists to `ai_interpretation` / `ai_interpreted_at` on that row. Does **not** use AI Guide daily KV quota.
 
 ### R2 images
 - `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated).

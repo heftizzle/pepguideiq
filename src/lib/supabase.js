@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { PEPTIDES } from "../data/catalog.js";
 import { getStoredAffiliateRef, normalizeAffiliateRef } from "./affiliateRef.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./config.js";
 import { generateShareId8 } from "./stackShare.js";
@@ -391,6 +392,114 @@ export async function deleteInbodyScanHistoryRow(scanRowId) {
   if (!id) return { error: new Error("Missing scan id") };
   const { error } = await supabase.from("inbody_scan_history").delete().eq("id", id);
   return { error: error ?? null };
+}
+
+/** @type {Map<string, string> | null} */
+let _peptideNameByIdCache = null;
+function peptideDisplayNameFromCatalog(peptideId) {
+  if (!_peptideNameByIdCache) {
+    _peptideNameByIdCache = new Map(PEPTIDES.map((p) => [p.id, typeof p.name === "string" ? p.name : p.id]));
+  }
+  const id = typeof peptideId === "string" ? peptideId.trim() : "";
+  if (!id) return "Unknown";
+  return _peptideNameByIdCache.get(id) ?? id;
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @returns {{ n: number, unit: string } | null}
+ */
+function doseLogComparableMagnitude(row) {
+  const mcg = row.dose_mcg;
+  if (mcg != null && Number.isFinite(Number(mcg))) {
+    const n = Number(mcg);
+    if (n > 0) return { n, unit: "mcg" };
+  }
+  const c = row.dose_count;
+  if (c != null && Number.isFinite(Number(c))) {
+    const n = Number(c);
+    const unit = typeof row.dose_unit === "string" && row.dose_unit.trim() ? row.dose_unit.trim() : "units";
+    return { n, unit };
+  }
+  return null;
+}
+
+/**
+ * Earliest dose per compound plus titration rows when dose changes by more than 15% (same unit).
+ * @param {string} userId
+ * @param {string} profileId
+ * @returns {Promise<{ events: Array<{ date: string, label: string, type: 'start' | 'titration' }>, error: Error | null }>}
+ */
+export async function fetchProtocolEventsForTrends(userId, profileId) {
+  if (!supabase || !userId || !profileId) return { events: [], error: notConfiguredError() };
+  const { data, error } = await supabase
+    .from("dose_logs")
+    .select("peptide_id, dosed_at, dose_mcg, dose_count, dose_unit")
+    .eq("user_id", userId)
+    .eq("profile_id", profileId)
+    .order("dosed_at", { ascending: true });
+  if (error) return { events: [], error: error ?? null };
+
+  /** @type {Map<string, Record<string, unknown>[]>} */
+  const byPeptide = new Map();
+  for (const row of data ?? []) {
+    const pid = typeof row.peptide_id === "string" ? row.peptide_id.trim() : "";
+    if (!pid) continue;
+    const list = byPeptide.get(pid) ?? [];
+    list.push(row);
+    byPeptide.set(pid, list);
+  }
+
+  /** @type {Array<{ date: string, label: string, type: 'start' | 'titration', sortKey: number }>} */
+  const acc = [];
+
+  for (const [peptideId, rows] of byPeptide) {
+    rows.sort((a, b) => {
+      const ta = Date.parse(String(a.dosed_at ?? ""));
+      const tb = Date.parse(String(b.dosed_at ?? ""));
+      return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
+    });
+    const name = peptideDisplayNameFromCatalog(peptideId);
+    const first = rows[0];
+    const d0 = first && typeof first.dosed_at === "string" ? first.dosed_at.slice(0, 10) : "";
+    if (d0 && first) {
+      acc.push({
+        date: d0,
+        label: `Started ${name}`,
+        type: "start",
+        sortKey: Date.parse(String(first.dosed_at)) || 0,
+      });
+    }
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const cur = rows[i];
+      const a = doseLogComparableMagnitude(prev);
+      const b = doseLogComparableMagnitude(cur);
+      if (!a || !b || a.unit !== b.unit) continue;
+      if (a.n <= 0 || b.n <= 0) continue;
+      const rel = Math.abs(b.n - a.n) / a.n;
+      if (rel > 0.15) {
+        const d = typeof cur.dosed_at === "string" ? cur.dosed_at.slice(0, 10) : "";
+        if (!d) continue;
+        const fmt = (x) => {
+          const n = Number(x);
+          if (!Number.isFinite(n)) return "";
+          if (Number.isInteger(n)) return String(n);
+          return n.toFixed(1).replace(/\.0$/, "");
+        };
+        acc.push({
+          date: d,
+          label: `${name} ${fmt(a.n)}${a.unit} → ${fmt(b.n)}${b.unit}`,
+          type: "titration",
+          sortKey: Date.parse(String(cur.dosed_at)) || 0,
+        });
+      }
+    }
+  }
+
+  acc.sort((x, y) => x.sortKey - y.sortKey);
+  const events = acc.map(({ date, label, type }) => ({ date, label, type }));
+  return { events, error: null };
 }
 
 /**

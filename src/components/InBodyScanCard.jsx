@@ -1,3 +1,5 @@
+import { formatInbodyDecimal1, formatInbodyIntegerScan } from "../lib/inbodyScanDisplay.js";
+
 const EM = "\u2014";
 const SCORE_RING_C = 188.5;
 
@@ -19,22 +21,25 @@ function formatScanDate(raw) {
   }
 }
 
-/** @param {number | null} n @param {number} [digits] */
-function fmtNum(n, digits = 1) {
-  if (n == null) return EM;
-  return n.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+/** @param {number | null} score */
+function scoreDescriptor(score) {
+  if (score == null) return { word: null, color: null };
+  if (score < 60) return { word: "Fair", color: "var(--color-text-secondary)" };
+  if (score < 70) return { word: "Average", color: "var(--color-text-warning)" };
+  if (score < 80) return { word: "Good", color: "var(--color-text-success)" };
+  if (score < 90) return { word: "Very Good", color: "var(--color-text-success)" };
+  return { word: "Excellent", color: "var(--color-text-success)" };
 }
 
-/** @param {number | null} n */
-function fmtInt(n) {
-  if (n == null) return EM;
-  return Math.round(n).toLocaleString(undefined);
-}
+const WEIGHT_BAR = { max: 300, lo: 0.47, hi: 0.6 };
+const SMM_BAR = { max: 130, lo: 0.55, hi: 0.66 };
+const FAT_BAR = { max: 80, lo: 0.19, hi: 0.32 };
+const SEG_LEAN_MARKER = 0.62;
 
 /**
- * @param {{ label: string, value: number | null, max: number, lo: number, hi: number, fill: string }} p
+ * @param {{ label: string, value: number | null, max: number, lo: number, hi: number, fill: string, rangeLine?: string | null }} p
  */
-function MuscleFatBar({ label, value, max, lo, hi, fill }) {
+function MuscleFatBar({ label, value, max, lo, hi, fill, rangeLine }) {
   const v = value ?? null;
   const pct = v == null ? null : Math.min(100, Math.max(0, (v / max) * 100));
   const nzLeft = lo * 100;
@@ -50,10 +55,20 @@ function MuscleFatBar({ label, value, max, lo, hi, fill }) {
           gap: 8,
         }}
       >
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--color-text-muted)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        <span
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            color: "var(--color-text-muted)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
           {label}
         </span>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--color-text-secondary)" }}>{v == null ? EM : fmtNum(v, 1)}</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--color-text-secondary)" }}>
+          {v == null ? EM : formatInbodyDecimal1(v)}
+        </span>
       </div>
       <div
         style={{
@@ -104,6 +119,11 @@ function MuscleFatBar({ label, value, max, lo, hi, fill }) {
           />
         )}
       </div>
+      {rangeLine ? (
+        <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginTop: 4, lineHeight: 1.35 }}>
+          {rangeLine}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -144,7 +164,7 @@ function SegmentalLeanRow({ label, value, max }) {
         />
       </div>
       <div style={{ width: 52, flexShrink: 0, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--color-text-secondary)" }}>
-        {v == null ? EM : `${fmtNum(v, 1)} lb`}
+        {v == null ? EM : `${formatInbodyDecimal1(v)} lb`}
       </div>
     </div>
   );
@@ -173,9 +193,9 @@ function MiniMetricCard({ label, children, sub, valueColor }) {
 /**
  * Full visualization for one `inbody_scan_history` row (upload/parse/save flow unchanged).
  *
- * @param {{ scan: Record<string, unknown>, handle?: string | null }} props
+ * @param {{ scan: Record<string, unknown>, handle?: string | null, prevScan?: Record<string, unknown> | null }} props
  */
-export function InBodyScanCard({ scan, handle = null }) {
+export function InBodyScanCard({ scan, handle = null, prevScan = null }) {
   const row = scan ?? {};
   const h = typeof handle === "string" && handle.trim() ? handle.trim() : EM;
 
@@ -208,6 +228,7 @@ export function InBodyScanCard({ scan, handle = null }) {
 
   const scoreClamped = inbody_score == null ? null : Math.min(100, Math.max(0, inbody_score));
   const scoreDash = scoreClamped == null ? 0 : (scoreClamped / 100) * SCORE_RING_C;
+  const scoreWord = scoreDescriptor(inbody_score);
 
   const waterPairOk = icw_l != null && ecw_l != null;
   const icwN = waterPairOk && icw_l != null ? icw_l : 0;
@@ -241,6 +262,115 @@ export function InBodyScanCard({ scan, handle = null }) {
 
   const highLeanSmm = smm_lbs != null && smm_lbs > 95;
 
+  const wUpper = WEIGHT_BAR.hi * WEIGHT_BAR.max;
+  const wLo = WEIGHT_BAR.lo * WEIGHT_BAR.max;
+  let wStatus = "within";
+  if (weight_lbs != null) {
+    if (weight_lbs > wUpper) wStatus = "above";
+    else if (weight_lbs < wLo) wStatus = "below";
+  }
+  const smmUpper = SMM_BAR.hi * SMM_BAR.max;
+  const smmLower = SMM_BAR.lo * SMM_BAR.max;
+  let mStatus = "within";
+  if (smm_lbs != null) {
+    if (smm_lbs > smmUpper) mStatus = "above";
+    else if (smm_lbs < smmLower) mStatus = "below";
+  }
+  const fatUpper = FAT_BAR.hi * FAT_BAR.max;
+  let fStatus = "within";
+  if (fat_mass_lbs != null && fat_mass_lbs > fatUpper) fStatus = "elevated";
+
+  const muscleAbove = mStatus === "above";
+  const muscleBelow = mStatus === "below";
+  const fatElevated = fStatus === "elevated";
+
+  let mfBadgeText = "On track";
+  let mfBadgeColor = "var(--color-text-success)";
+  let mfBadgeBorder = "var(--color-accent-nav-border)";
+  if (muscleBelow) {
+    mfBadgeText = "Build opportunity";
+    mfBadgeColor = "var(--color-warning)";
+    mfBadgeBorder = "rgba(234,179,8,0.45)";
+  } else if (muscleAbove && fatElevated) {
+    mfBadgeText = "High muscle · elevated fat";
+    mfBadgeColor = "var(--color-warning)";
+    mfBadgeBorder = "rgba(234,179,8,0.45)";
+  } else if (muscleAbove && !fatElevated) {
+    mfBadgeText = "Above average";
+    mfBadgeColor = "var(--color-text-success)";
+    mfBadgeBorder = "var(--color-accent-nav-border)";
+  }
+
+  const weightRangeLine =
+    weight_lbs == null
+      ? null
+      : `Normal ≤ ${formatInbodyDecimal1(wUpper)} lbs · ${wStatus === "above" ? "above" : wStatus === "below" ? "below" : "within"}`;
+  const muscleRangeLine =
+    smm_lbs == null
+      ? null
+      : `Normal ${formatInbodyDecimal1(smmLower)}–${formatInbodyDecimal1(smmUpper)} lbs · ${
+          mStatus === "above" ? "above ✓" : mStatus === "below" ? "below" : "within"
+        }`;
+  const fatRangeLine =
+    fat_mass_lbs == null
+      ? null
+      : `Normal ≤ ${formatInbodyDecimal1(fatUpper)} lbs · ${fStatus === "elevated" ? "elevated" : "within"}`;
+
+  const smmNormUpper = smmUpper;
+  const smmNormLower = smmLower;
+  let s1 = "";
+  if (smm_lbs != null && smmNormUpper > 0) {
+    if (smm_lbs > smmNormUpper) {
+      const pct = (((smm_lbs - smmNormUpper) / smmNormUpper) * 100).toFixed(1);
+      s1 = `Muscle is ${pct}% above the normal range for your height.`;
+    } else if (smm_lbs < smmNormLower) {
+      const pct = (((smmNormLower - smm_lbs) / smmNormLower) * 100).toFixed(1);
+      s1 = `Muscle is ${pct}% below normal — primary build opportunity.`;
+    } else {
+      s1 = "Muscle is within the normal range.";
+    }
+  }
+
+  let s2 = "Body composition is trending in the right direction.";
+  if (pbf_pct != null && pbf_pct > 25) {
+    s2 = "Body fat reduction is the primary goal for this phase.";
+  } else if (ecw_tbw_ratio != null && ecw_tbw_ratio >= 0.39) {
+    s2 = `ECW/TBW of ${formatInbodyDecimal1(ecw_tbw_ratio)} is approaching the edema threshold — monitor hydration.`;
+  }
+
+  const segRows = [
+    { label: "R Arm", v: seg_lean_r_arm_lbs, max: 12 },
+    { label: "L Arm", v: seg_lean_l_arm_lbs, max: 12 },
+    { label: "Trunk", v: seg_lean_trunk_lbs, max: 110 },
+    { label: "R Leg", v: seg_lean_r_leg_lbs, max: 35 },
+    { label: "L Leg", v: seg_lean_l_leg_lbs, max: 35 },
+  ];
+  const markerVals = segRows.map(({ v, max }) => (v == null ? null : SEG_LEAN_MARKER * max));
+  const allAboveMarker = segRows.every(({ v, max }, i) => v != null && v > (markerVals[i] ?? 0));
+  const anyWellBelow = segRows.some(({ v, max }, i) => {
+    const mk = SEG_LEAN_MARKER * max;
+    return v != null && v < mk * 0.9;
+  });
+  let segBadgeText = null;
+  let segBadgeTone = "success";
+  if (allAboveMarker) {
+    segBadgeText = "Balanced";
+    segBadgeTone = "success";
+  } else if (anyWellBelow) {
+    segBadgeText = "Imbalance detected";
+    segBadgeTone = "warning";
+  }
+
+  const prevBmr = prevScan ? toNum(prevScan.bmr_kcal ?? null) : null;
+  let bmrSub = "kcal/day";
+  if (smm_lbs != null && smm_lbs > 95) bmrSub += " · elevated by muscle mass";
+  if (bmr_kcal != null && prevBmr != null && bmr_kcal > prevBmr) bmrSub += " · building";
+
+  const waterEcwLine =
+    ecw_tbw_ratio != null && ecw_tbw_ratio < 0.39
+      ? `ECW/TBW of ${formatInbodyDecimal1(ecw_tbw_ratio)} is within normal range — no edema signal.`
+      : null;
+
   return (
     <div
       style={{
@@ -257,57 +387,72 @@ export function InBodyScanCard({ scan, handle = null }) {
           <div style={{ marginTop: 6, fontSize: 14, color: "var(--color-text-primary)", fontWeight: 500 }}>{scan_date ?? EM}</div>
           <div style={{ marginTop: 4, fontSize: 13, color: "var(--color-text-secondary)" }}>{h}</div>
         </div>
-        <div style={{ position: "relative", width: 72, height: 72, flexShrink: 0 }}>
-          <svg width={72} height={72} viewBox="0 0 72 72" aria-hidden>
-            <circle cx={36} cy={36} r={30} fill="none" stroke="#B5D4F4" strokeWidth={6} strokeLinecap="round" strokeDasharray={`${SCORE_RING_C} ${SCORE_RING_C}`} transform="rotate(-90 36 36)" />
-            <circle
-              cx={36}
-              cy={36}
-              r={30}
-              fill="none"
-              stroke="#378ADD"
-              strokeWidth={6}
-              strokeLinecap="round"
-              strokeDasharray={`${scoreDash} ${SCORE_RING_C}`}
-              transform="rotate(-90 36 36)"
-            />
-          </svg>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-              fontSize: inbody_score != null && inbody_score >= 100 ? 13 : 15,
-              fontWeight: 700,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            {inbody_score == null ? EM : fmtInt(inbody_score)}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0, gap: 4 }}>
+          <div style={{ position: "relative", width: 72, height: 72 }}>
+            <svg width={72} height={72} viewBox="0 0 72 72" aria-hidden>
+              <circle cx={36} cy={36} r={30} fill="none" stroke="#B5D4F4" strokeWidth={6} strokeLinecap="round" strokeDasharray={`${SCORE_RING_C} ${SCORE_RING_C}`} transform="rotate(-90 36 36)" />
+              <circle
+                cx={36}
+                cy={36}
+                r={30}
+                fill="none"
+                stroke="#378ADD"
+                strokeWidth={6}
+                strokeLinecap="round"
+                strokeDasharray={`${scoreDash} ${SCORE_RING_C}`}
+                transform="rotate(-90 36 36)"
+              />
+            </svg>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                fontSize: inbody_score != null && inbody_score >= 100 ? 13 : 15,
+                fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              {formatInbodyIntegerScan(inbody_score)}
+            </div>
           </div>
+          {scoreWord.word ? (
+            <div style={{ fontSize: 12, fontWeight: 600, color: scoreWord.color ?? "var(--color-text-secondary)", letterSpacing: "0.04em" }}>{scoreWord.word}</div>
+          ) : null}
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 14px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>Weight</div>
-          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-primary)" }}>{weight_lbs == null ? EM : `${fmtNum(weight_lbs, 1)} lb`}</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-primary)" }}>
+            {weight_lbs == null ? EM : `${formatInbodyDecimal1(weight_lbs)} lb`}
+          </div>
         </div>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 14px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>SMM</div>
-          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-success)" }}>{smm_lbs == null ? EM : `${fmtNum(smm_lbs, 1)} lb`}</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-success)" }}>
+            {smm_lbs == null ? EM : `${formatInbodyDecimal1(smm_lbs)} lb`}
+          </div>
         </div>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 14px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>Body Fat</div>
-          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-danger)" }}>{pbf_pct == null ? EM : `${fmtNum(pbf_pct, 1)}%`}</div>
-          <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-danger)" }}>{fat_mass_lbs == null ? EM : `${fmtNum(fat_mass_lbs, 1)} lb fat`}</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-danger)" }}>
+            {pbf_pct == null ? EM : `${formatInbodyDecimal1(pbf_pct)}%`}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-danger)" }}>
+            {fat_mass_lbs == null ? EM : `${formatInbodyDecimal1(fat_mass_lbs)} lb fat`}
+          </div>
         </div>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 14px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>Lean Mass</div>
-          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-primary)" }}>{lean_mass_lbs == null ? EM : `${fmtNum(lean_mass_lbs, 1)} lb`}</div>
+          <div style={{ marginTop: 6, fontSize: 20, fontWeight: 600, color: "var(--color-text-primary)" }}>
+            {lean_mass_lbs == null ? EM : `${formatInbodyDecimal1(lean_mass_lbs)} lb`}
+          </div>
         </div>
       </div>
 
@@ -319,16 +464,77 @@ export function InBodyScanCard({ scan, handle = null }) {
           marginBottom: 18,
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: 10 }}>Muscle–fat analysis</div>
-        <MuscleFatBar label="Weight" value={weight_lbs} max={300} lo={0.47} hi={0.6} fill="#888780" />
-        <MuscleFatBar label="Muscle" value={smm_lbs} max={130} lo={0.55} hi={0.66} fill="#1D9E75" />
-        <MuscleFatBar label="Body Fat" value={fat_mass_lbs} max={80} lo={0.19} hi={0.32} fill="#E24B4A" />
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-secondary)" }}>Muscle–fat analysis</div>
+          <span
+            className="mono"
+            style={{
+              fontSize: 9,
+              letterSpacing: "0.08em",
+              color: mfBadgeColor,
+              border: `1px solid ${mfBadgeBorder}`,
+              borderRadius: 4,
+              padding: "2px 6px",
+              flexShrink: 0,
+              maxWidth: "52%",
+              textAlign: "right",
+              lineHeight: 1.25,
+            }}
+          >
+            {mfBadgeText}
+          </span>
+        </div>
+        <MuscleFatBar
+          label="Weight"
+          value={weight_lbs}
+          max={WEIGHT_BAR.max}
+          lo={WEIGHT_BAR.lo}
+          hi={WEIGHT_BAR.hi}
+          fill="#888780"
+          rangeLine={weightRangeLine}
+        />
+        <MuscleFatBar label="Muscle" value={smm_lbs} max={SMM_BAR.max} lo={SMM_BAR.lo} hi={SMM_BAR.hi} fill="#1D9E75" rangeLine={muscleRangeLine} />
+        <MuscleFatBar label="Body Fat" value={fat_mass_lbs} max={FAT_BAR.max} lo={FAT_BAR.lo} hi={FAT_BAR.hi} fill="#E24B4A" rangeLine={fatRangeLine} />
+        {s1 ? (
+          <div
+            style={{
+              marginTop: 10,
+              marginBottom: 8,
+              padding: "10px 12px",
+              borderLeft: "2px solid var(--color-border-success)",
+              background: "var(--color-background-primary)",
+              fontSize: 12,
+              color: "var(--color-text-secondary)",
+              lineHeight: 1.45,
+            }}
+          >
+            {`${s1} ${s2}`}
+          </div>
+        ) : null}
         <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic", marginTop: 2 }}>Shaded zone = normal range.</div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", gap: 14, marginBottom: 18 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-secondary)", marginBottom: 10 }}>Segmental lean</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-secondary)" }}>Segmental lean</div>
+            {segBadgeText ? (
+              <span
+                className="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "0.08em",
+                  color: segBadgeTone === "warning" ? "var(--color-warning)" : "var(--color-text-success)",
+                  border: `1px solid ${segBadgeTone === "warning" ? "rgba(234,179,8,0.45)" : "var(--color-accent-nav-border)"}`,
+                  borderRadius: 4,
+                  padding: "2px 6px",
+                  flexShrink: 0,
+                }}
+              >
+                {segBadgeText}
+              </span>
+            ) : null}
+          </div>
           <SegmentalLeanRow label="R Arm" value={seg_lean_r_arm_lbs} max={12} />
           <SegmentalLeanRow label="L Arm" value={seg_lean_l_arm_lbs} max={12} />
           <SegmentalLeanRow label="Trunk" value={seg_lean_trunk_lbs} max={110} />
@@ -348,13 +554,18 @@ export function InBodyScanCard({ scan, handle = null }) {
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-            <MiniMetricCard label="TBW (L)">{tbwDisplay == null ? EM : fmtNum(tbwDisplay, 2)}</MiniMetricCard>
-            <MiniMetricCard label="ICW (L)">{icw_l == null ? EM : fmtNum(icw_l, 2)}</MiniMetricCard>
-            <MiniMetricCard label="ECW (L)">{ecw_l == null ? EM : fmtNum(ecw_l, 2)}</MiniMetricCard>
+            <MiniMetricCard label="TBW (L)">{tbwDisplay == null ? EM : formatInbodyDecimal1(tbwDisplay)}</MiniMetricCard>
+            <MiniMetricCard label="ICW (L)">{icw_l == null ? EM : formatInbodyDecimal1(icw_l)}</MiniMetricCard>
+            <MiniMetricCard label="ECW (L)">{ecw_l == null ? EM : formatInbodyDecimal1(ecw_l)}</MiniMetricCard>
             <MiniMetricCard label="ECW/TBW" valueColor={ecwTbwColor}>
-              {ecw_tbw_ratio == null ? EM : fmtNum(ecw_tbw_ratio, 3)}
+              {ecw_tbw_ratio == null ? EM : formatInbodyDecimal1(ecw_tbw_ratio)}
             </MiniMetricCard>
           </div>
+          {waterEcwLine ? (
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 10, lineHeight: 1.4 }}>
+              {waterEcwLine}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -378,7 +589,9 @@ export function InBodyScanCard({ scan, handle = null }) {
             }}
           >
             <div style={{ fontSize: 10, color: "var(--color-text-muted)", marginBottom: 4 }}>{k}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: segFatColor(v) }}>{v == null ? EM : `${fmtNum(v, 1)}%`}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: segFatColor(v) }}>
+              {v == null ? EM : `${formatInbodyDecimal1(v)}%`}
+            </div>
           </div>
         ))}
       </div>
@@ -387,19 +600,19 @@ export function InBodyScanCard({ scan, handle = null }) {
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 10px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>BMR</div>
           <div style={{ marginTop: 6, fontSize: 17, fontWeight: 600, color: "var(--color-text-primary)", fontFamily: "'JetBrains Mono', monospace" }}>
-            {bmr_kcal == null ? EM : fmtInt(bmr_kcal)}
+            {formatInbodyIntegerScan(bmr_kcal)}
           </div>
-          <div style={{ marginTop: 4, fontSize: 11, color: "var(--color-text-muted)" }}>kcal/day</div>
+          <div style={{ marginTop: 4, fontSize: 11, color: "var(--color-text-muted)" }}>{bmrSub}</div>
         </div>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 10px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", lineHeight: 1.3 }}>Visceral Fat Level</div>
           <div style={{ marginTop: 6, fontSize: 17, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: visceral_fat_level == null ? "var(--color-text-muted)" : visceralColor }}>
-            {visceral_fat_level == null ? EM : fmtInt(visceral_fat_level)}
+            {formatInbodyIntegerScan(visceral_fat_level)}
           </div>
         </div>
         <div style={{ border: "1px solid var(--color-border-default)", borderRadius: 8, padding: "12px 10px" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)" }}>BMI</div>
-          <div style={{ marginTop: 6, fontSize: 17, fontWeight: 600, color: "var(--color-text-primary)", fontFamily: "'JetBrains Mono', monospace" }}>{bmi == null ? EM : fmtNum(bmi, 1)}</div>
+          <div style={{ marginTop: 6, fontSize: 17, fontWeight: 600, color: "var(--color-text-primary)", fontFamily: "'JetBrains Mono', monospace" }}>{bmi == null ? EM : formatInbodyDecimal1(bmi)}</div>
           {highLeanSmm ? <div style={{ marginTop: 4, fontSize: 11, color: "var(--color-text-muted)" }}>high lean mass adj.</div> : null}
         </div>
       </div>

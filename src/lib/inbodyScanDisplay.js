@@ -56,3 +56,25 @@ export function inbodyScoreProgressDash(score, circ = INBODY_SCORE_RING_C) {
   const c = Math.min(100, Math.max(0, score));
   return (c / 100) * circ;
 }
+
+/**
+ * One decimal place for display (lbs, %, L, ratio, segmental values, etc.).
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function formatInbodyDecimal1(raw) {
+  const n = inbodyToNum(raw);
+  if (n == null) return INBODY_EM;
+  return n.toFixed(1);
+}
+
+/**
+ * Whole-number display for score, visceral level, BMR.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function formatInbodyIntegerScan(raw) {
+  const n = inbodyToNum(raw);
+  if (n == null) return INBODY_EM;
+  return String(Math.round(n));
+}

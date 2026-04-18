@@ -1995,7 +1995,17 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 onOpenUpgrade={openUpgradeModal}
                 onSignOut={handleSignOut}
                 canUseProgressPhotos={canVialTracker}
-                savedStackPeptides={myStack.map((p) => ({ id: p.id, name: p.name }))}
+                savedStackPeptides={myStack.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  stackDose: typeof p.stackDose === "string" ? p.stackDose : "",
+                  stackFrequency: typeof p.stackFrequency === "string" ? p.stackFrequency : "",
+                }))}
+                onGuideDeepAnalysisToGuide={(prompt) => {
+                  const t = typeof prompt === "string" ? prompt : "";
+                  setActiveTab("guide");
+                  if (t) setAiInput(t);
+                }}
               />
               <div
                 style={{

@@ -7,6 +7,7 @@ import { InBodyScanSection } from "./InBodyScanSection.jsx";
 import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
 import { Modal } from "./Modal.jsx";
 import { BodyScanShareComposer } from "./BodyScanShareComposer.jsx";
+import { BodyScanTrendsView } from "./BodyScanTrendsView.jsx";
 
 const EM = INBODY_EM;
 
@@ -72,7 +73,9 @@ function StatDelta({ label, cur, prev, baseline, lowerIsGood, higherIsGood, suff
  *   onErrorMessage?: (msg: string) => void,
  *   onSavedBriefly?: () => void,
  *   workerOk: boolean,
- *   activeStack?: { id: string, name: string }[],
+ *   activeStack?: { id: string, name: string, stackDose?: string, stackFrequency?: string }[],
+ *   onGuideDeepAnalysis?: (prompt: string) => void,
+ *   onInterpretationPersisted?: () => void | Promise<void>,
  * }} props
  */
 export function BodyScanView({
@@ -86,6 +89,8 @@ export function BodyScanView({
   onSavedBriefly,
   workerOk,
   activeStack = [],
+  onGuideDeepAnalysis,
+  onInterpretationPersisted,
 }) {
   const planKey = typeof tier === "string" ? tier.trim().toLowerCase() : "entry";
   const isProPlus = (TIER_RANK[planKey] ?? 0) >= TIER_RANK.pro;
@@ -96,6 +101,7 @@ export function BodyScanView({
   const [showUpload, setShowUpload] = useState(false);
   const [detailScan, setDetailScan] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [sharePair, setSharePair] = useState(/** @type {{ current: Record<string, unknown>, previous: Record<string, unknown> } | null} */ (null));
+  const [bodyTab, setBodyTab] = useState(/** @type {"scans" | "trends"} */ ("scans"));
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -106,9 +112,15 @@ export function BodyScanView({
     setLoading(false);
   }, [profileId]);
 
+  const persistInterpretation = onInterpretationPersisted ?? reload;
+
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (bodyTab === "trends" && rows.length < 2) setBodyTab("scans");
+  }, [bodyTab, rows.length]);
 
   const countLabel = useMemo(() => {
     const n = rows.length;
@@ -153,6 +165,48 @@ export function BodyScanView({
         </button>
       </div>
 
+      {!loading && rows.length > 0 ? (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => setBodyTab("scans")}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: bodyTab === "scans" ? "2px solid var(--color-accent)" : "1px solid var(--color-border-default)",
+              background: bodyTab === "scans" ? "var(--color-bg-elevated)" : "var(--color-bg-card)",
+              color: "var(--color-text-primary)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Scans
+          </button>
+          <button
+            type="button"
+            title={rows.length < 2 ? "Upload a second scan to unlock trends." : undefined}
+            disabled={rows.length < 2}
+            onClick={() => rows.length >= 2 && setBodyTab("trends")}
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: bodyTab === "trends" ? "2px solid var(--color-accent)" : "1px solid var(--color-border-default)",
+              background: bodyTab === "trends" ? "var(--color-bg-elevated)" : "var(--color-bg-card)",
+              color: rows.length < 2 ? "var(--color-text-muted)" : "var(--color-text-primary)",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: rows.length < 2 ? "not-allowed" : "pointer",
+              opacity: rows.length < 2 ? 0.55 : 1,
+            }}
+          >
+            Trends
+          </button>
+        </div>
+      ) : null}
+
       {loadErr ? (
         <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginBottom: 12 }}>
           {loadErr}
@@ -176,6 +230,19 @@ export function BodyScanView({
             Upload scan
           </button>
         </div>
+      ) : bodyTab === "trends" ? (
+        <BodyScanTrendsView
+          key={profileId}
+          scans={rows}
+          profileId={profileId}
+          userId={userId}
+          tier={planKey}
+          activeStack={activeStack}
+          workerOk={workerOk}
+          onOpenUpgrade={onOpenUpgrade}
+          onGuideDeepAnalysis={onGuideDeepAnalysis}
+          onInterpretationPersisted={persistInterpretation}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {rows.map((row, idx) => {
@@ -279,7 +346,14 @@ export function BodyScanView({
 
       {detailScan ? (
         <Modal onClose={() => setDetailScan(null)} label="InBody scan" maxWidth={720}>
-          <InBodyScanCard scan={detailScan} handle={handle} />
+          <InBodyScanCard
+            scan={detailScan}
+            handle={handle}
+            prevScan={(() => {
+              const i = rows.findIndex((r) => String(r.id ?? "") === String(detailScan.id ?? ""));
+              return i >= 0 && i < rows.length - 1 ? rows[i + 1] : null;
+            })()}
+          />
         </Modal>
       ) : null}
 
