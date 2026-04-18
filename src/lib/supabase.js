@@ -424,8 +424,16 @@ function doseLogComparableMagnitude(row) {
   return null;
 }
 
+/** Display name truncated to 8 chars for InBody trends protocol markers. */
+function protocolCompoundShort(displayName) {
+  const s = typeof displayName === "string" ? displayName.trim() : String(displayName ?? "").trim();
+  if (!s) return "";
+  return s.length <= 8 ? s : s.slice(0, 8);
+}
+
 /**
- * Earliest dose per compound plus titration rows when dose changes by more than 15% (same unit).
+ * Earliest dose per compound (short label) plus at most one titration per compound — the largest
+ * relative dose swing (>15%, same unit). Used by BodyScanTrendsView protocol overlay.
  * @param {string} userId
  * @param {string} profileId
  * @returns {Promise<{ events: Array<{ date: string, label: string, type: 'start' | 'titration' }>, error: Error | null }>}
@@ -460,16 +468,19 @@ export async function fetchProtocolEventsForTrends(userId, profileId) {
       return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
     });
     const name = peptideDisplayNameFromCatalog(peptideId);
+    const short = protocolCompoundShort(name);
     const first = rows[0];
     const d0 = first && typeof first.dosed_at === "string" ? first.dosed_at.slice(0, 10) : "";
     if (d0 && first) {
       acc.push({
         date: d0,
-        label: `Started ${name}`,
+        label: `+ ${short}`,
         type: "start",
         sortKey: Date.parse(String(first.dosed_at)) || 0,
       });
     }
+    /** @type {{ date: string, sortKey: number, pctRel: number, short: string, up: boolean, down: boolean }[]} */
+    const titCandidates = [];
     for (let i = 1; i < rows.length; i++) {
       const prev = rows[i - 1];
       const cur = rows[i];
@@ -481,19 +492,30 @@ export async function fetchProtocolEventsForTrends(userId, profileId) {
       if (rel > 0.15) {
         const d = typeof cur.dosed_at === "string" ? cur.dosed_at.slice(0, 10) : "";
         if (!d) continue;
-        const fmt = (x) => {
-          const n = Number(x);
-          if (!Number.isFinite(n)) return "";
-          if (Number.isInteger(n)) return String(n);
-          return n.toFixed(1).replace(/\.0$/, "");
-        };
-        acc.push({
+        const sk = Date.parse(String(cur.dosed_at)) || 0;
+        titCandidates.push({
           date: d,
-          label: `${name} ${fmt(a.n)}${a.unit} → ${fmt(b.n)}${b.unit}`,
-          type: "titration",
-          sortKey: Date.parse(String(cur.dosed_at)) || 0,
+          sortKey: sk,
+          pctRel: rel,
+          short,
+          up: b.n > a.n,
+          down: b.n < a.n,
         });
       }
+    }
+    if (titCandidates.length > 0) {
+      const best = titCandidates.reduce((winner, cur) => {
+        if (cur.pctRel > winner.pctRel) return cur;
+        if (cur.pctRel === winner.pctRel && cur.sortKey > winner.sortKey) return cur;
+        return winner;
+      });
+      const arrow = best.up ? " ↑" : best.down ? " ↓" : "";
+      acc.push({
+        date: best.date,
+        label: `${best.short}${arrow}`,
+        type: "titration",
+        sortKey: best.sortKey,
+      });
     }
   }
 
