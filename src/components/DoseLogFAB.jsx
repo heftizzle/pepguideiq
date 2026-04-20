@@ -20,8 +20,46 @@ const TOUR_GAP_PX = 8;
 const HEADER_TOP_SAFE = 60;
 /** Bottom nav height — FAB must sit fully above this band. */
 const NAV_BAR_HEIGHT = 80;
+/** Extra gap above the nav + home-indicator band when clamping `top` (notches / safe area). */
+const FAB_BOTTOM_GAP = 16;
 
 const STORAGE_KEY = "pepv.doseFab.pos";
+
+/** @type {number | null} */
+let safeAreaInsetBottomCache = null;
+let safeAreaInsetBottomListenerAttached = false;
+
+function invalidateSafeAreaInsetBottomCache() {
+  safeAreaInsetBottomCache = null;
+}
+
+/**
+ * Resolves `env(safe-area-inset-bottom)` to px (iOS needs `viewport-fit=cover`).
+ * Uses a one-frame hidden probe; cached until `orientationchange`.
+ */
+function getSafeAreaInsetBottom() {
+  if (typeof window === "undefined" || typeof document === "undefined") return 0;
+  if (safeAreaInsetBottomCache != null) return safeAreaInsetBottomCache;
+  if (!document.body) return 0;
+
+  const probe = document.createElement("div");
+  probe.setAttribute("aria-hidden", "true");
+  probe.setAttribute("data-pepv-safe-area-probe", "");
+  probe.style.cssText =
+    "position:fixed;left:0;bottom:0;width:0;height:0;margin:0;border:0;padding:0;" +
+    "overflow:hidden;visibility:hidden;pointer-events:none;z-index:-1;" +
+    "padding-bottom:env(safe-area-inset-bottom, 0px);";
+  document.body.appendChild(probe);
+  const parsed = parseFloat(getComputedStyle(probe).paddingBottom);
+  document.body.removeChild(probe);
+  safeAreaInsetBottomCache = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+
+  if (!safeAreaInsetBottomListenerAttached) {
+    safeAreaInsetBottomListenerAttached = true;
+    window.addEventListener("orientationchange", invalidateSafeAreaInsetBottomCache);
+  }
+  return safeAreaInsetBottomCache;
+}
 
 /** @param {number} [w] */
 function clampOffsetX(raw, w = typeof window !== "undefined" ? window.innerWidth : 0) {
@@ -36,8 +74,12 @@ function clampOffsetX(raw, w = typeof window !== "undefined" ? window.innerWidth
 function clampFabTop(raw, h = typeof window !== "undefined" ? window.innerHeight : 0) {
   if (!h) return raw;
   const minTop = HEADER_TOP_SAFE;
-  const maxTop = h - NAV_BAR_HEIGHT - FAB_HEIGHT;
-  if (maxTop < minTop) return Math.max(0, (h - FAB_HEIGHT) / 2);
+  const safeBottom = typeof window !== "undefined" ? getSafeAreaInsetBottom() : 0;
+  const maxTop = h - NAV_BAR_HEIGHT - FAB_HEIGHT - safeBottom - FAB_BOTTOM_GAP;
+  if (maxTop < minTop) {
+    const mid = (h - FAB_HEIGHT - safeBottom - FAB_BOTTOM_GAP) / 2;
+    return Math.max(0, mid);
+  }
   return Math.min(maxTop, Math.max(minTop, raw));
 }
 
