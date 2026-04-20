@@ -166,46 +166,54 @@ export async function authSignUp(email, password, meta = {}, turnstileToken) {
   const userData = { name, plan };
   if (affiliateRef) userData.affiliate_ref = affiliateRef;
 
+  const turnstileWidgetUnavailable =
+    meta &&
+    typeof meta === "object" &&
+    /** @type {{ __pepv_turnstileUnavailable?: boolean }} */ (meta).__pepv_turnstileUnavailable === true;
+
   const useWorkerSignup = isApiWorkerConfigured() && browserTurnstileSiteKeyConfigured();
   if (useWorkerSignup) {
     const tok = typeof turnstileToken === "string" ? turnstileToken.trim() : "";
-    if (!tok) {
+    if (!tok && !turnstileWidgetUnavailable) {
       return {
         user: null,
         error: new Error("Please complete bot verification before signing up."),
       };
     }
-    const res = await fetch(`${API_WORKER_URL}/auth/signup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, turnstileToken: tok, userData }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const errMsg = body && typeof body.error === "string" ? body.error : "";
-      const passThrough = new Set([
-        "Bot verification required",
-        "Bot verification failed",
-        "Too many signup attempts. Try again later.",
-        "Auth service not configured",
-        "Missing email or password",
-        "Invalid JSON",
-      ]);
-      if (passThrough.has(errMsg)) {
-        return { user: null, error: new Error(errMsg || "Unable to create account. Try again or sign in.") };
+    if (tok) {
+      const res = await fetch(`${API_WORKER_URL}/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, turnstileToken: tok, userData }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const errMsg = body && typeof body.error === "string" ? body.error : "";
+        const passThrough = new Set([
+          "Bot verification required",
+          "Bot verification failed",
+          "Too many signup attempts. Try again later.",
+          "Auth service not configured",
+          "Missing email or password",
+          "Invalid JSON",
+        ]);
+        if (passThrough.has(errMsg)) {
+          return { user: null, error: new Error(errMsg || "Unable to create account. Try again or sign in.") };
+        }
+        return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
       }
-      return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
-    }
-    const access_token = body?.access_token;
-    const refresh_token = body?.refresh_token;
-    const user = body?.user ?? null;
-    if (typeof access_token === "string" && typeof refresh_token === "string" && access_token && refresh_token) {
-      const { error: sesErr } = await supabase.auth.setSession({ access_token, refresh_token });
-      if (sesErr && import.meta.env.DEV) {
-        console.warn("[authSignUp] setSession after Worker signup", sesErr);
+      const access_token = body?.access_token;
+      const refresh_token = body?.refresh_token;
+      const user = body?.user ?? null;
+      if (typeof access_token === "string" && typeof refresh_token === "string" && access_token && refresh_token) {
+        const { error: sesErr } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (sesErr && import.meta.env.DEV) {
+          console.warn("[authSignUp] setSession after Worker signup", sesErr);
+        }
       }
+      return { user, error: null };
     }
-    return { user, error: null };
+    /* Turnstile widget unavailable: same graceful fallback as login — direct Supabase signup. */
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -287,10 +295,13 @@ export async function signIn(email, password) {
 /**
  * Register; stores `name` and `plan` in user_metadata.
  * @param {string | null | undefined} turnstileToken
+ * @param {{ turnstileWidgetUnavailable?: boolean }} [opts] — when true with no token, skip Worker Turnstile signup (widget failed to load).
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
-export async function signUp(name, email, password, plan = "entry", turnstileToken) {
-  return authSignUp(email, password, { name, plan }, turnstileToken);
+export async function signUp(name, email, password, plan = "entry", turnstileToken, opts = {}) {
+  const meta = { name, plan };
+  if (opts.turnstileWidgetUnavailable) meta.__pepv_turnstileUnavailable = true;
+  return authSignUp(email, password, meta, turnstileToken);
 }
 
 export async function signOut() {

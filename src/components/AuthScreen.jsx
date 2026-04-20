@@ -535,7 +535,8 @@ export function AuthScreen({ onAuth }) {
 
   const selectPlan = async (planId) => {
     setError("");
-    if (workerTurnstileEnforced() && !turnstileToken) {
+    const plansRequireTurnstileToken = workerTurnstileEnforced() && !turnstileUnavailable;
+    if (plansRequireTurnstileToken && !turnstileToken) {
       setError("Please complete bot verification before signing up.");
       return;
     }
@@ -549,7 +550,8 @@ export function AuthScreen({ onAuth }) {
         form.email.trim(),
         form.password,
         planId,
-        turnstileToken
+        turnstileToken,
+        workerTurnstileEnforced() && turnstileUnavailable ? { turnstileWidgetUnavailable: true } : {}
       );
       if (err) {
         setError(err.message || "Sign up failed.");
@@ -585,7 +587,10 @@ export function AuthScreen({ onAuth }) {
     !passwordFilled ||
     (mode === "register" && !registerNameFilled);
   const plansSelectDisabled =
-    busy || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
+    busy ||
+    (workerTurnstileEnforced() &&
+      !turnstileUnavailable &&
+      (!turnstileReady || !turnstileToken));
   const forgotSubmitDisabled =
     busy || !emailFilled || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
 
