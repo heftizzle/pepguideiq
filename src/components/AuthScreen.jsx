@@ -75,6 +75,11 @@ const ZXCVBN_STRENGTH_LABELS = ["Weak", "Weak", "Fair", "Strong", "Very Strong"]
 const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
 const turnstileRequired = Boolean(TURNSTILE_SITE_KEY);
 
+/** Server enforces Turnstile on signup/reset only when both Worker URL and site key are set. */
+function workerTurnstileEnforced() {
+  return isApiWorkerConfigured() && turnstileRequired;
+}
+
 /** Fire-and-forget POST to Worker for logging/analytics; does not gate auth. */
 function logTurnstileTokenToWorker(token) {
   if (!token || !isApiWorkerConfigured()) return;
@@ -105,6 +110,18 @@ function turnstileBlockedMessage(unavailable) {
     : "Optional verification is still loading — you can sign in when email and password are ready.";
 }
 
+function turnstileSignupGateMessage(unavailable) {
+  return unavailable
+    ? "Bot verification unavailable — refresh the page or try again shortly before completing signup."
+    : "Complete the verification challenge above before selecting a plan.";
+}
+
+function turnstileForgotGateMessage(unavailable) {
+  return unavailable
+    ? "Bot verification unavailable — try again in a few minutes."
+    : "Complete the verification challenge below before sending a reset link.";
+}
+
 export function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -124,6 +141,7 @@ export function AuthScreen({ onAuth }) {
   const [partnerDiscountActive, setPartnerDiscountActive] = useState(false);
   const mainWidgetIdRef = useRef(null);
   const plansWidgetIdRef = useRef(null);
+  const forgotWidgetIdRef = useRef(null);
 
   useEffect(() => {
     captureAffiliateRefFromLocation();
@@ -178,6 +196,19 @@ export function AuthScreen({ onAuth }) {
 
   const resetPlansTurnstile = () => {
     const id = plansWidgetIdRef.current;
+    if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
+      try {
+        window.turnstile.reset(id);
+      } catch {
+        /* ignore */
+      }
+    }
+    setTurnstileToken(null);
+    setTurnstileUnavailable(false);
+  };
+
+  const resetForgotTurnstile = () => {
+    const id = forgotWidgetIdRef.current;
     if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
       try {
         window.turnstile.reset(id);
@@ -264,7 +295,7 @@ export function AuthScreen({ onAuth }) {
 
   useEffect(() => {
     if (mode !== "plans") return;
-    if (!turnstileRequired) return;
+    if (!workerTurnstileEnforced()) return;
     let cancelled = false;
     plansWidgetIdRef.current = null;
     setTurnstileReady(false);
@@ -325,6 +356,79 @@ export function AuthScreen({ onAuth }) {
       setTurnstileReady(false);
       const id = plansWidgetIdRef.current;
       plansWidgetIdRef.current = null;
+      if (id != null && window.turnstile?.remove) {
+        try {
+          window.turnstile.remove(id);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "forgot") return;
+    if (!workerTurnstileEnforced()) return;
+    let cancelled = false;
+    forgotWidgetIdRef.current = null;
+    setTurnstileReady(false);
+    setTurnstileUnavailable(false);
+    const stopPolling = waitForTurnstile(
+      () => {
+        if (cancelled) return;
+        const el = document.getElementById("turnstile-widget-forgot");
+        if (!el || typeof window.turnstile === "undefined") {
+          setTurnstileUnavailable(true);
+          return;
+        }
+        el.innerHTML = "";
+        let widgetId;
+        try {
+          widgetId = window.turnstile.render("#turnstile-widget-forgot", {
+            sitekey: TURNSTILE_SITE_KEY,
+            callback: (t) => {
+              setTurnstileToken(t);
+              setTurnstileUnavailable(false);
+            },
+            "expired-callback": () => setTurnstileToken(null),
+            "error-callback": () => setTurnstileToken(null),
+            "timeout-callback": () => setTurnstileToken(null),
+            retry: "auto",
+            "retry-interval": 8000,
+            "refresh-expired": "auto",
+            appearance: "always",
+            theme: "auto",
+          });
+        } catch {
+          setTurnstileUnavailable(true);
+          return;
+        }
+        if (cancelled) {
+          if (window.turnstile?.remove) {
+            try {
+              window.turnstile.remove(widgetId);
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+        forgotWidgetIdRef.current = widgetId;
+        setTurnstileReady(true);
+      },
+      () => {
+        if (cancelled) return;
+        setTurnstileReady(false);
+        setTurnstileToken(null);
+        setTurnstileUnavailable(true);
+      }
+    );
+    return () => {
+      cancelled = true;
+      stopPolling();
+      setTurnstileReady(false);
+      const id = forgotWidgetIdRef.current;
+      forgotWidgetIdRef.current = null;
       if (id != null && window.turnstile?.remove) {
         try {
           window.turnstile.remove(id);
@@ -406,10 +510,24 @@ export function AuthScreen({ onAuth }) {
   const submitForgot = async () => {
     if (!form.email?.trim()) return;
     setError("");
+    if (workerTurnstileEnforced() && !turnstileToken) {
+      setError("Please complete bot verification before requesting a reset.");
+      return;
+    }
     setBusy(true);
     try {
-      await authResetPassword(form.email.trim());
+      const { error: err } = await authResetPassword(
+        form.email.trim(),
+        undefined,
+        turnstileToken
+      );
+      if (err) {
+        setError(err.message || "Unable to process request. Try again later.");
+        resetForgotTurnstile();
+        return;
+      }
       setForgotSubmitted(true);
+      resetForgotTurnstile();
     } finally {
       setBusy(false);
     }
@@ -417,12 +535,22 @@ export function AuthScreen({ onAuth }) {
 
   const selectPlan = async (planId) => {
     setError("");
+    if (workerTurnstileEnforced() && !turnstileToken) {
+      setError("Please complete bot verification before signing up.");
+      return;
+    }
     setBusy(true);
     try {
       if (turnstileToken) {
         logTurnstileTokenToWorker(turnstileToken);
       }
-      const { error: err } = await signUp(form.name.trim(), form.email.trim(), form.password, planId);
+      const { error: err } = await signUp(
+        form.name.trim(),
+        form.email.trim(),
+        form.password,
+        planId,
+        turnstileToken
+      );
       if (err) {
         setError(err.message || "Sign up failed.");
         resetPlansTurnstile();
@@ -456,7 +584,10 @@ export function AuthScreen({ onAuth }) {
     !emailFilled ||
     !passwordFilled ||
     (mode === "register" && !registerNameFilled);
-  const plansSelectDisabled = busy;
+  const plansSelectDisabled =
+    busy || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
+  const forgotSubmitDisabled =
+    busy || !emailFilled || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
 
   if (!isSupabaseConfigured()) {
     return (
@@ -503,15 +634,46 @@ export function AuthScreen({ onAuth }) {
                     value={form.email}
                     placeholder="you@email.com"
                     onChange={set("email")}
-                    onKeyDown={(e) => e.key === "Enter" && submitForgot()}
+                    onKeyDown={(e) => e.key === "Enter" && !forgotSubmitDisabled && void submitForgot()}
                   />
                 </div>
+                {workerTurnstileEnforced() && (
+                  <div
+                    id="turnstile-widget-forgot"
+                    style={{ display: "flex", justifyContent: "center", marginBottom: 16, minHeight: 65 }}
+                  />
+                )}
+                {workerTurnstileEnforced() && !turnstileReady && (
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: 12,
+                      color: turnstileUnavailable ? "var(--color-warning)" : "var(--color-text-secondary)",
+                      marginBottom: 14,
+                      textAlign: "center",
+                    }}
+                  >
+                    {turnstileForgotGateMessage(turnstileUnavailable)}
+                  </div>
+                )}
+                {error && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--color-danger)",
+                      marginBottom: 14,
+                      fontFamily: "'JetBrains Mono',monospace",
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
                 <button
                   type="button"
                   className="btn-teal"
-                  style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: busy ? 0.6 : 1 }}
+                  style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: forgotSubmitDisabled ? 0.5 : 1 }}
                   onClick={() => void submitForgot()}
-                  disabled={busy}
+                  disabled={forgotSubmitDisabled}
                 >
                   {busy ? "…" : "Send reset link"}
                 </button>
@@ -580,18 +742,18 @@ export function AuthScreen({ onAuth }) {
         >
           SELECT YOUR PLAN
         </div>
-        {turnstileRequired && (
+        {workerTurnstileEnforced() && (
           <div
             id="turnstile-widget-plans"
             style={{ display: "flex", justifyContent: "center", marginBottom: 20, minHeight: 65 }}
           />
         )}
-        {turnstileRequired && !turnstileReady && (
+        {workerTurnstileEnforced() && !turnstileReady && (
           <div
             className="mono"
             style={{ fontSize: 12, color: turnstileUnavailable ? "var(--color-warning)" : "var(--color-text-secondary)", marginBottom: 16, textAlign: "center" }}
           >
-            {turnstileBlockedMessage(turnstileUnavailable)}
+            {turnstileSignupGateMessage(turnstileUnavailable)}
           </div>
         )}
         {partnerDiscountActive && (

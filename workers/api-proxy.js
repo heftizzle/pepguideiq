@@ -576,6 +576,10 @@ const SECURITY_HEADERS = {
 const RATE_LIMITS = {
   auth: { windowMs: 60_000, max: 10 },
   api: { windowMs: 60_000, max: 60 },
+  /** POST /auth/signup — 3/hour per IP (Turnstile-gated). */
+  signup: { windowMs: 3_600_000, max: 3 },
+  /** POST /auth/password-reset — 5/hour per IP (Turnstile-gated). */
+  password_reset: { windowMs: 3_600_000, max: 5 },
   /** Authed image uploads (POST/PUT): 20/min per IP. */
   r2_write: { windowMs: 60_000, max: 20 },
   /** Authenticated private image reads (GET /stack-photo): 500/min per IP. Public /avatars/ is unrate-limited. */
@@ -621,7 +625,7 @@ async function verifyTurnstile(token, env) {
  * Sliding-window IP rate limit using RATE_LIMIT_KV.
  * @param {Record<string, unknown>} env
  * @param {string} ip
- * @param {"auth" | "api" | "r2_read" | "r2_write"} type
+ * @param {"auth" | "api" | "r2_read" | "r2_write" | "signup" | "password_reset"} type
  * @returns {Promise<{ limited: boolean, retryAfter?: number, serviceUnavailable?: boolean }>}
  */
 async function checkIpRateLimit(env, ip, type) {
@@ -4656,6 +4660,11 @@ async function handleRequest(request, env) {
       pathname.startsWith("/avatars/") &&
       (method === "GET" || method === "HEAD" || method === "OPTIONS");
 
+    /** Turnstile + dedicated KV limits inside handlers — avoid stacking generic /auth IP limits (no CORS on outer 429). */
+    const skipAuthWorkerTurnstileRoutes =
+      (pathname === "/auth/signup" && method === "POST") ||
+      (pathname === "/auth/password-reset" && method === "POST");
+
     /** Authed image uploads (multipart): POST /stack-photo, POST /upload-stack-photo, POST/PUT /avatars. */
     const isR2Write =
       (pathname === "/stack-photo" && method === "POST") ||
@@ -4666,7 +4675,7 @@ async function handleRequest(request, env) {
     /** Authed private reads: GET /stack-photo. Higher limit for <img> rendering bursts. */
     const isR2Read = pathname === "/stack-photo" && (method === "GET" || method === "HEAD");
 
-    if (!skipRateLimitPublicAvatar) {
+    if (!skipRateLimitPublicAvatar && !skipAuthWorkerTurnstileRoutes) {
       let rlType;
       if (isR2Write) {
         rlType = "r2_write";
@@ -4713,6 +4722,101 @@ async function handleRequest(request, env) {
 
     if (!cors) {
       return new Response("Forbidden", { status: 403 });
+    }
+
+    if (url.pathname === "/auth/signup" && request.method === "POST") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ error: "Invalid JSON" }, 400, cors);
+      }
+      const { email, password, turnstileToken, userData } = body;
+      if (!email || !password) {
+        return jsonResponse({ error: "Missing email or password" }, 400, cors);
+      }
+      if (!turnstileToken) {
+        return jsonResponse({ error: "Bot verification required" }, 400, cors);
+      }
+      const { success } = await verifyTurnstile(turnstileToken, env);
+      if (!success) {
+        return jsonResponse({ error: "Bot verification failed" }, 403, cors);
+      }
+      const ipRlSignup = await checkIpRateLimit(env, ip, "signup");
+      if (ipRlSignup.limited) {
+        return jsonResponse(
+          { error: "Too many signup attempts. Try again later." },
+          429,
+          { ...cors, "Retry-After": String(ipRlSignup.retryAfter || 3600) }
+        );
+      }
+      const supabaseUrl = env.SUPABASE_URL;
+      const anonKey = env.SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) {
+        return jsonResponse({ error: "Auth service not configured" }, 503, cors);
+      }
+      const res = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          data: userData && typeof userData === "object" && !Array.isArray(userData) ? userData : {},
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return jsonResponse(data, res.status, cors);
+    }
+
+    if (url.pathname === "/auth/password-reset" && request.method === "POST") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ error: "Invalid JSON" }, 400, cors);
+      }
+      const { email, turnstileToken, redirectTo } = body;
+      if (!email) {
+        return jsonResponse({ error: "Missing email" }, 400, cors);
+      }
+      if (!turnstileToken) {
+        return jsonResponse({ error: "Bot verification required" }, 400, cors);
+      }
+      const { success } = await verifyTurnstile(turnstileToken, env);
+      if (!success) {
+        return jsonResponse({ error: "Bot verification failed" }, 403, cors);
+      }
+      const ipRlReset = await checkIpRateLimit(env, ip, "password_reset");
+      if (ipRlReset.limited) {
+        return jsonResponse(
+          { error: "Too many reset attempts. Try again later." },
+          429,
+          { ...cors, "Retry-After": String(ipRlReset.retryAfter || 3600) }
+        );
+      }
+      const supabaseUrl = env.SUPABASE_URL;
+      const anonKey = env.SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !anonKey) {
+        return jsonResponse({ error: "Auth service not configured" }, 503, cors);
+      }
+      const res = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          email,
+          ...(redirectTo && typeof redirectTo === "string" ? { redirect_to: redirectTo } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      return jsonResponse(data, res.status, cors);
     }
 
     if (url.pathname === "/turnstile/verify" && request.method === "POST") {

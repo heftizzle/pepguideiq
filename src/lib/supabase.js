@@ -129,6 +129,10 @@ export async function checkPwnedPassword(password) {
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
+function browserTurnstileSiteKeyConfigured() {
+  return Boolean(String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim());
+}
+
 /**
  * @returns {{ user: import('@supabase/supabase-js').User | null, session: import('@supabase/supabase-js').Session | null, error: Error | null }}
  */
@@ -144,10 +148,11 @@ export async function authSignIn(email, password) {
 
 /**
  * @param {{ name?: string, plan?: string, affiliate_ref?: string }} [meta]
+ * @param {string | null | undefined} turnstileToken
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
-// enumeration-safe: always returns generic message regardless of supabase error
-export async function authSignUp(email, password, meta = {}) {
+// enumeration-safe: upstream failures map to a generic message (except Worker bot / rate-limit copy).
+export async function authSignUp(email, password, meta = {}, turnstileToken) {
   if (!supabase) return { user: null, error: notConfiguredError() };
   const policy = validatePassword(password);
   if (!policy.valid) {
@@ -160,6 +165,49 @@ export async function authSignUp(email, password, meta = {}) {
   /** @type {Record<string, string>} */
   const userData = { name, plan };
   if (affiliateRef) userData.affiliate_ref = affiliateRef;
+
+  const useWorkerSignup = isApiWorkerConfigured() && browserTurnstileSiteKeyConfigured();
+  if (useWorkerSignup) {
+    const tok = typeof turnstileToken === "string" ? turnstileToken.trim() : "";
+    if (!tok) {
+      return {
+        user: null,
+        error: new Error("Please complete bot verification before signing up."),
+      };
+    }
+    const res = await fetch(`${API_WORKER_URL}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, turnstileToken: tok, userData }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const errMsg = body && typeof body.error === "string" ? body.error : "";
+      const passThrough = new Set([
+        "Bot verification required",
+        "Bot verification failed",
+        "Too many signup attempts. Try again later.",
+        "Auth service not configured",
+        "Missing email or password",
+        "Invalid JSON",
+      ]);
+      if (passThrough.has(errMsg)) {
+        return { user: null, error: new Error(errMsg || "Unable to create account. Try again or sign in.") };
+      }
+      return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
+    }
+    const access_token = body?.access_token;
+    const refresh_token = body?.refresh_token;
+    const user = body?.user ?? null;
+    if (typeof access_token === "string" && typeof refresh_token === "string" && access_token && refresh_token) {
+      const { error: sesErr } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (sesErr && import.meta.env.DEV) {
+        console.warn("[authSignUp] setSession after Worker signup", sesErr);
+      }
+    }
+    return { user, error: null };
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -173,14 +221,54 @@ export async function authSignUp(email, password, meta = {}) {
 
 /**
  * @param {string} [redirectTo]
+ * @param {string | null | undefined} turnstileToken — required when Worker + Turnstile are configured (public forgot-password).
  * @returns {{ error: Error | null }} `error` is only set when Supabase is not configured.
  */
-// enumeration-safe: always returns generic message regardless of supabase error
-export async function authResetPassword(email, redirectTo) {
+// enumeration-safe: does not reveal whether the email exists (Supabase path swallows; Worker path uses generic copy for upstream errors).
+export async function authResetPassword(email, redirectTo, turnstileToken) {
   if (!supabase) return { error: notConfiguredError() };
+  const resolvedRedirect =
+    redirectTo ?? (typeof window !== "undefined" ? `${window.location.origin}/` : undefined);
+
+  const useWorkerReset = isApiWorkerConfigured() && browserTurnstileSiteKeyConfigured();
+  if (useWorkerReset) {
+    const tok = typeof turnstileToken === "string" ? turnstileToken.trim() : "";
+    if (!tok) {
+      return {
+        error: new Error("Please complete bot verification before requesting a reset."),
+      };
+    }
+    const res = await fetch(`${API_WORKER_URL}/auth/password-reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        turnstileToken: tok,
+        ...(resolvedRedirect ? { redirectTo: resolvedRedirect } : {}),
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const errMsg = body && typeof body.error === "string" ? body.error : "";
+      const passThrough = new Set([
+        "Bot verification required",
+        "Bot verification failed",
+        "Too many reset attempts. Try again later.",
+        "Auth service not configured",
+        "Missing email",
+        "Invalid JSON",
+      ]);
+      if (passThrough.has(errMsg)) {
+        return { error: new Error(errMsg || "Unable to process request. Try again later.") };
+      }
+      return { error: new Error("Unable to process request. Try again later.") };
+    }
+    return { error: null };
+  }
+
   try {
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectTo ?? (typeof window !== "undefined" ? `${window.location.origin}/` : undefined),
+      redirectTo: resolvedRedirect,
     });
   } catch {
     /* swallow — caller treats as success for enumeration safety */
@@ -198,10 +286,11 @@ export async function signIn(email, password) {
 
 /**
  * Register; stores `name` and `plan` in user_metadata.
+ * @param {string | null | undefined} turnstileToken
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */
-export async function signUp(name, email, password, plan = "entry") {
-  return authSignUp(email, password, { name, plan });
+export async function signUp(name, email, password, plan = "entry", turnstileToken) {
+  return authSignUp(email, password, { name, plan }, turnstileToken);
 }
 
 export async function signOut() {
@@ -864,8 +953,17 @@ export async function deleteMemberProfileViaWorker(profileId) {
   return { error: null };
 }
 
+/** Logged-in settings path — no Turnstile widget; stays on direct Supabase (session already exists). */
 export async function sendPasswordResetEmail(email, redirectTo) {
-  return authResetPassword(email, redirectTo);
+  if (!supabase) return { error: notConfiguredError() };
+  try {
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo ?? (typeof window !== "undefined" ? `${window.location.origin}/` : undefined),
+    });
+  } catch {
+    /* swallow — enumeration safety */
+  }
+  return { error: null };
 }
 
 export async function updateAuthEmail(newEmail) {

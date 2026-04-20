@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700.
 
-## Routes (exactly 27)
+## Routes (exactly 29)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -16,7 +16,9 @@ Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` c
 - `POST /stripe/create-portal-session` — returns `{url}` for the Stripe-hosted billing portal.
 
 ### Auth-adjacent
-- `POST /turnstile/verify` — verifies a Turnstile token (used by AuthScreen).
+- `POST /auth/signup` — Turnstile + IP rate limit, then proxies to Supabase `POST /auth/v1/signup` with anon key. Body: `{ email, password, turnstileToken, userData }`.
+- `POST /auth/password-reset` — Turnstile + IP rate limit, then proxies to Supabase `POST /auth/v1/recover`. Body: `{ email, turnstileToken, redirectTo? }`.
+- `POST /turnstile/verify` — verifies a Turnstile token (used by AuthScreen; login logging only).
 - `POST /account/delete` — service-role delete of user + cascading data.
 
 ### Member profiles
@@ -72,7 +74,7 @@ Taken from `DAILY_QUERY_LIMIT` constant, mapped to tiers: Entry 2, Pro 4, Elite 
 
 ## IP rate limits
 
-`checkIpRateLimit(env, ip, type)` with 4 types: `r2_write`, `r2_read`, `auth`, `api`. Public avatar reads (`GET /avatars/{key}`, `HEAD /avatars/{key}`, `OPTIONS /avatars/{key}`) bypass rate limiting entirely. Fails-closed in production if KV is missing.
+`checkIpRateLimit(env, ip, type)` with types: `r2_write`, `r2_read`, `auth`, `api`, `signup` (3/hour per IP), `password_reset` (5/hour per IP). `POST /auth/signup` and `POST /auth/password-reset` skip the outer `/auth` bucket and use only these dedicated limits (so 429 responses include CORS). Public avatar reads (`GET /avatars/{key}`, `HEAD /avatars/{key}`, `OPTIONS /avatars/{key}`) bypass rate limiting entirely. Fails-closed in production if KV is missing.
 
 ## Bindings (`wrangler.worker.toml`)
 
@@ -91,6 +93,7 @@ bucket_name = "stack-photos"
 
 - `ANTHROPIC_API_KEY` — required
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — required
+- `SUPABASE_ANON_KEY` — same value as `VITE_SUPABASE_ANON_KEY`; required for `POST /auth/signup` and `POST /auth/password-reset` (Turnstile-gated auth proxy)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — required for billing
 - `TURNSTILE_SECRET_KEY` — required when the app sets `VITE_TURNSTILE_SITE_KEY`
 

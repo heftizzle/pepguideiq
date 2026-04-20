@@ -2,6 +2,7 @@
 # 1. Set secrets (all required before deploy):
 #    npx wrangler secret put ANTHROPIC_API_KEY --config wrangler.worker.toml
 #    npx wrangler secret put SUPABASE_URL --config wrangler.worker.toml
+#    npx wrangler secret put SUPABASE_ANON_KEY --config wrangler.worker.toml  (same as VITE_SUPABASE_ANON_KEY — used by POST /auth/signup + /auth/password-reset)
 #    npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --config wrangler.worker.toml
 #
 # 2. Stripe (when using billing):
