@@ -38,6 +38,31 @@ function notConfiguredError() {
   return new Error("Supabase is not configured (set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).");
 }
 
+function browserIanaTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+/**
+ * Ensures PATCH payloads include a browser-detected IANA zone unless the caller set `timezone` explicitly.
+ * @param {Record<string, unknown>} body
+ */
+function withWorkerMemberProfileTimezone(body) {
+  const b = body && typeof body === "object" && !Array.isArray(body) ? { ...body } : {};
+  const raw = Object.prototype.hasOwnProperty.call(b, "timezone") ? b.timezone : undefined;
+  const has =
+    raw !== null &&
+    raw !== undefined &&
+    (typeof raw !== "string" || String(raw).trim() !== "");
+  if (!has) {
+    b.timezone = browserIanaTimeZone();
+  }
+  return b;
+}
+
 // ─── Password policy ───────────────────────────────────────────────────────
 
 const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/;
@@ -610,7 +635,7 @@ export async function listMemberProfiles(userId) {
   const { data, error } = await supabase
     .from("member_profiles")
     .select(
-      "id, user_id, display_name, avatar_url, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, instagram_handle, tiktok_handle, facebook_handle, snapchat_handle, linkedin_handle, x_handle, youtube_handle, rumble_handle, experience_level, goals, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
+      "id, user_id, display_name, avatar_r2_key, timezone, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, instagram_handle, tiktok_handle, facebook_handle, snapchat_handle, linkedin_handle, x_handle, youtube_handle, rumble_handle, experience_level, goals, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
@@ -651,7 +676,7 @@ export async function fetchMemberProfiles(userId) {
 /**
  * Patch one row in `member_profiles` (RLS: own rows only).
  * @param {string} profileId — member_profiles.id
- * @param {Record<string, unknown>} patch — e.g. { display_name }, { avatar_url }
+ * @param {Record<string, unknown>} patch — e.g. { display_name }, { avatar_r2_key }
  */
 export async function updateMemberProfile(profileId, patch) {
   if (!supabase) return { error: notConfiguredError() };
@@ -702,7 +727,10 @@ export async function createMemberProfileViaWorker(displayName) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ display_name: String(displayName ?? "").trim() }),
+    body: JSON.stringify({
+      display_name: String(displayName ?? "").trim(),
+      timezone: browserIanaTimeZone(),
+    }),
   });
   if (res.status === 403) {
     return { profile: null, error: new Error("Upgrade your plan to add more profiles") };
@@ -737,13 +765,16 @@ export async function patchMemberProfileViaWorker(profileId, body) {
   if (!token) return { error: new Error("Not signed in") };
   const id = typeof profileId === "string" ? profileId.trim() : "";
   if (!id) return { error: new Error("Missing profile") };
+  const rawBody = body && typeof body === "object" ? body : {};
+  const payload =
+    rawBody && rawBody.archive_progress_photo_set === true ? rawBody : withWorkerMemberProfileTimezone(rawBody);
   const res = await fetch(`${API_WORKER_URL}/member-profiles/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body && typeof body === "object" ? body : {}),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     let msg = "Could not update profile";

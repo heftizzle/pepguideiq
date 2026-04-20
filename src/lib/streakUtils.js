@@ -12,8 +12,8 @@ function addDaysToYmd(ymd, delta) {
 }
 
 /**
- * Streak = consecutive local calendar days with ≥1 dose, ending today or yesterday
- * (so logging late at night / timezone edges don't zero the streak).
+ * Legacy client-only fallback: consecutive **local** calendar days with ≥1 dose (not the DB active streak).
+ * Prefer `member_profiles.current_streak` from the server when present.
  * @param {string[]} dosedAtIsos — `dosed_at` values from dose_logs
  */
 export function calculateStreak(dosedAtIsos) {
@@ -68,7 +68,7 @@ export function getStreakMessage(streak) {
     1000: "1000 days. We don't have words. The peptides do. They said thank you.",
   };
   return {
-    streakLine: `🔥 Day ${streak} streak`,
+    streakLine: `🔥 ${streak}-day active streak`,
     milestoneLine: milestones[streak] ?? null,
   };
 }

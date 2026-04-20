@@ -1,36 +1,32 @@
 import { useEffect, useState } from "react";
 import { API_WORKER_URL } from "../lib/config.js";
-import { resolveMemberAvatarDisplayUrl } from "../lib/memberAvatarUrl.js";
+import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { getSessionAccessToken } from "../lib/supabase.js";
 
 function isHttpUrl(s) {
   return /^https?:\/\//i.test(String(s || "").trim());
 }
 
-function withCacheVersion(url, imageNonce) {
-  const n = typeof imageNonce === "number" ? imageNonce : 0;
-  if (!n) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}v=${n}`;
-}
-
 /**
- * Resolves `member_profiles.avatar_url` for display: https URLs (or Worker `/avatars/{key}`) as <img src>;
- * legacy key-only values use resolveMemberAvatarDisplayUrl, or authenticated GET /stack-photo when no public base.
+ * Resolves member avatar for `<img src>`: prefers `avatar_r2_key` (public `/avatars/{key}`).
+ * Bare key-only legacy values without a public base use authenticated GET /stack-photo.
  * @param {string | undefined} userId
- * @param {string | undefined} avatarUrl
- * @param {number} imageNonce — bump after upload to avoid stale cache
+ * @param {string | undefined} avatarR2Key — canonical `member_profiles.avatar_r2_key`
+ * @param {string | undefined} legacyAvatarUrl — full URL or legacy key string (pre-migration rows)
  * @param {boolean} workerOk
  * @returns {string | null}
  */
-export function useMemberAvatarSrc(userId, avatarUrl, imageNonce, workerOk) {
+export function useMemberAvatarSrc(userId, avatarR2Key, legacyAvatarUrl, workerOk) {
   const [blobUrl, setBlobUrl] = useState(null);
-  const raw = typeof avatarUrl === "string" ? avatarUrl.trim() : "";
-  const resolved = resolveMemberAvatarDisplayUrl(raw);
+  const k = typeof avatarR2Key === "string" ? avatarR2Key.trim() : "";
+  const legacy = typeof legacyAvatarUrl === "string" ? legacyAvatarUrl.trim() : "";
+  const primary = k || legacy;
+  const resolvedFromKey = k ? resolveMemberAvatarDisplayUrlFromKey(k) : "";
+  const resolved = k ? resolvedFromKey : resolveMemberAvatarDisplayUrl(legacy);
 
   useEffect(() => {
     setBlobUrl(null);
-    if (!raw || !userId) return;
+    if (!primary || !userId) return;
     if (isHttpUrl(resolved)) return;
     if (!workerOk || !API_WORKER_URL) return;
     const prefix = `${userId}/`;
@@ -41,11 +37,10 @@ export function useMemberAvatarSrc(userId, avatarUrl, imageNonce, workerOk) {
     (async () => {
       const token = await getSessionAccessToken();
       if (!token || cancelled) return;
-      const t = typeof imageNonce === "number" ? imageNonce : 0;
-      const res = await fetch(
-        `${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(resolved)}&t=${Date.now() + t}`,
-        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
-      );
+      const res = await fetch(`${API_WORKER_URL}/stack-photo?key=${encodeURIComponent(resolved)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
       if (!res.ok || cancelled) return;
       const blob = await res.blob();
       if (cancelled) return;
@@ -56,9 +51,9 @@ export function useMemberAvatarSrc(userId, avatarUrl, imageNonce, workerOk) {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [userId, raw, resolved, imageNonce, workerOk]);
+  }, [userId, primary, resolved, workerOk]);
 
-  if (!raw) return null;
-  if (isHttpUrl(resolved)) return withCacheVersion(resolved, imageNonce);
+  if (!primary) return null;
+  if (isHttpUrl(resolved)) return resolved;
   return blobUrl;
 }

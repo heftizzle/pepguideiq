@@ -542,12 +542,14 @@ function PepGuideIQApp({ user, setUser }) {
   }, [activeTab, guideExiting, beginCloseGuide]);
 
   const workerOkHeader = isApiWorkerConfigured();
-  const rawHeaderMemberAvatar =
+  const rawHeaderMemberAvatarKey =
+    activeProfile && typeof activeProfile.avatar_r2_key === "string" ? activeProfile.avatar_r2_key.trim() : "";
+  const rawHeaderMemberAvatarLegacy =
     activeProfile && typeof activeProfile.avatar_url === "string" ? activeProfile.avatar_url.trim() : "";
   const resolvedHeaderMemberAvatar = useMemberAvatarSrc(
     user?.id,
-    rawHeaderMemberAvatar,
-    memberProfilesVersion,
+    rawHeaderMemberAvatarKey,
+    rawHeaderMemberAvatarLegacy,
     workerOkHeader
   );
 

@@ -39,8 +39,8 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
     "";
   const floatingAvatarSrc = useMemberAvatarSrc(
     avatarUserId,
+    activeProfile?.avatar_r2_key,
     activeProfile?.avatar_url,
-    memberProfilesVersion,
     workerOk
   );
   const [open, setOpen] = useState(false);

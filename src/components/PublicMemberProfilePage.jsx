@@ -8,6 +8,7 @@ import { formatMemberProfileLocation, formatShiftScheduleLabel } from "../lib/me
 import { publicProfileGoalLabel } from "../data/publicProfileGoalLabels.js";
 import { followMemberProfile, getMyFollowing, unfollowMemberProfile } from "../lib/follows.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
+import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
 
@@ -180,7 +181,9 @@ export function PublicMemberProfilePage({
   const goalIds = parseGoalIds(profile?.goals);
   const handleLine = profile ? formatHandleDisplay(profile.handle, profile.display_handle) : "";
   const dispName = typeof profile?.display_name === "string" ? profile.display_name.trim() : "";
-  const av = typeof profile?.avatar_url === "string" ? profile.avatar_url.trim() : "";
+  const avKey = typeof profile?.avatar_r2_key === "string" ? profile.avatar_r2_key.trim() : "";
+  const avLegacy = typeof profile?.avatar_url === "string" ? profile.avatar_url.trim() : "";
+  const av = avKey ? resolveMemberAvatarDisplayUrlFromKey(avKey) : resolveMemberAvatarDisplayUrl(avLegacy);
   const plan = typeof profile?.plan === "string" ? profile.plan.trim().toLowerCase() : "entry";
   const locationLine = formatMemberProfileLocation(profile);
   const followerCount = Number.isFinite(Number(profile?.follower_count)) ? Number(profile.follower_count) : 0;

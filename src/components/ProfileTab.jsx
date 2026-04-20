@@ -872,7 +872,6 @@ export function ProfileTab({
   const [bodyFatMetricsLocked, setBodyFatMetricsLocked] = useState(true);
   const [stats, setStats] = useState(null);
   const [clientStreakFallback, setClientStreakFallback] = useState(0);
-  const [avatarImageNonce, setAvatarImageNonce] = useState(0);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCrop, setAvatarCrop] = useState(/** @type {{ url: string, revoke: () => void } | null} */ (null));
   const [archiveProgressBusy, setArchiveProgressBusy] = useState(false);
@@ -1071,8 +1070,8 @@ export function ProfileTab({
 
   const memberAvatarSrc = useMemberAvatarSrc(
     user.id,
+    activeProfile?.avatar_r2_key,
     activeProfile?.avatar_url,
-    avatarImageNonce + memberProfilesVersion,
     workerOk
   );
 
@@ -1249,7 +1248,10 @@ export function ProfileTab({
     return [
       {
         id: "avatar",
-        done: Boolean(activeProfile?.avatar_url && String(activeProfile.avatar_url).trim()),
+        done: Boolean(
+          (activeProfile?.avatar_r2_key && String(activeProfile.avatar_r2_key).trim()) ||
+            (activeProfile?.avatar_url && String(activeProfile.avatar_url).trim())
+        ),
         label: "Photo",
       },
       {
@@ -1446,7 +1448,7 @@ export function ProfileTab({
     setBodyFatMetricsLocked(true);
   }, [activeProfileId]);
 
-  /** Prefer `member_profiles.current_streak` (DB trigger on dose_logs); client calc only if column missing (older API). */
+  /** Prefer `member_profiles.current_streak` (DB active-streak triggers); client calc only if column missing (older API). */
   useEffect(() => {
     if (activeProfile != null && typeof activeProfile.current_streak === "number") {
       return;
@@ -1697,7 +1699,6 @@ export function ProfileTab({
     }
     cancelAvatarCrop();
     await refreshMemberProfiles();
-    setAvatarImageNonce((n) => n + 1);
     setAvatarBusy(false);
     showSavedBriefly();
   };
@@ -2089,10 +2090,13 @@ export function ProfileTab({
               <span className="pill" style={tierPillStyle(user.plan)}>
                 {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
               </span>
-              <span style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.4 }}>
+              <span
+                style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.4 }}
+                title="Consecutive days with any dose, post, metric, fast, scan, or stack edit — in your local time."
+              >
                 {streakCount <= 0
-                  ? "Beginner — log your first dose to start your streak"
-                  : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} streak`}
+                  ? "Beginner — log activity to start your active streak"
+                  : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} active streak`}
               </span>
             </div>
           </div>

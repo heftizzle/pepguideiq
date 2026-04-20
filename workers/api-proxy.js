@@ -1953,6 +1953,12 @@ function memberProfilePatchFailureMessage(result, patch) {
           status: 400,
         };
       }
+      if (Object.prototype.hasOwnProperty.call(patch, "timezone")) {
+        return {
+          msg: "timezone must be a valid IANA time zone name (e.g. America/New_York).",
+          status: 400,
+        };
+      }
     }
   }
   if (Array.isArray(result.parsed) && result.parsed.length === 0) {
@@ -2104,6 +2110,8 @@ async function handleCreateMemberProfile(request, env, cors) {
   if (!displayName) {
     return jsonResponse({ error: "display_name is required" }, 400, cors);
   }
+  const tzRaw = typeof body.timezone === "string" ? body.timezone.trim() : "";
+  const timezone = isValidIanaTimeZone(tzRaw) ? tzRaw : "UTC";
 
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -2144,6 +2152,7 @@ async function handleCreateMemberProfile(request, env, cors) {
       is_default: false,
       language: "en",
       shift_schedule: "days",
+      timezone,
     }),
   });
   const mpRows = await insMp.json().catch(() => []);
@@ -2613,9 +2622,10 @@ async function handleGetStackPhoto(request, env, cors) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** R2 keys allowed for public GET /avatars/{key} (member profile or legacy account avatar JPEG). */
+/** R2 keys allowed for public GET /avatars/{key} (member profile or account avatar JPEG, optional content-hash suffix). */
 const AVATAR_R2_KEY_RE = new RegExp(
-  `^${UUID_RE.source.slice(1, -1)}/(?:member-profiles/${UUID_RE.source.slice(1, -1)}/avatar\\.jpg|avatar\\.jpg)$`
+  `^${UUID_RE.source.slice(1, -1)}/(?:member-profiles/${UUID_RE.source.slice(1, -1)}/avatar(?:-[0-9a-f]{6,12})?\\.jpg|avatar(?:-[0-9a-f]{6,12})?\\.jpg)$`,
+  "i"
 );
 
 /**
@@ -2692,6 +2702,227 @@ const MEMBER_HANDLE_RE = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-
 const MEMBER_HANDLE_SLUG_RE = /^[a-z0-9][a-z0-9_.-]*[a-z0-9]$/;
 
 const MEMBER_EXPERIENCE_LEVELS = new Set(["beginner", "intermediate", "advanced", "elite"]);
+
+/** @param {string} tz */
+function isValidIanaTimeZone(tz) {
+  const t = String(tz ?? "").trim();
+  if (!t) return false;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: t });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const TZ_US_BY_STATE = {
+  FL: "America/New_York",
+  NY: "America/New_York",
+  PA: "America/New_York",
+  GA: "America/New_York",
+  OH: "America/New_York",
+  NC: "America/New_York",
+  SC: "America/New_York",
+  VA: "America/New_York",
+  MI: "America/Detroit",
+  IL: "America/Chicago",
+  TX: "America/Chicago",
+  AR: "America/Chicago",
+  TN: "America/Chicago",
+  LA: "America/Chicago",
+  AL: "America/Chicago",
+  MO: "America/Chicago",
+  MN: "America/Chicago",
+  WI: "America/Chicago",
+  CO: "America/Denver",
+  NM: "America/Denver",
+  UT: "America/Denver",
+  MT: "America/Denver",
+  AZ: "America/Phoenix",
+  CA: "America/Los_Angeles",
+  WA: "America/Los_Angeles",
+  OR: "America/Los_Angeles",
+  NV: "America/Los_Angeles",
+  AK: "America/Anchorage",
+  HI: "Pacific/Honolulu",
+  _default: "America/New_York",
+};
+
+const TZ_BY_COUNTRY = {
+  US: "America/New_York",
+  CA: "America/Toronto",
+  GB: "Europe/London",
+  BR: "America/Sao_Paulo",
+  MX: "America/Mexico_City",
+  JP: "Asia/Tokyo",
+  _default: "UTC",
+};
+
+/**
+ * @param {{ city?: unknown, state?: unknown, country?: unknown }} row
+ * @returns {string | null}
+ */
+function deriveMemberTimezoneFallback(row) {
+  const country = typeof row.country === "string" ? row.country.trim().toUpperCase() : "";
+  let state = typeof row.state === "string" ? row.state.trim().toUpperCase() : "";
+  if (!/^[A-Z]{2}$/.test(state)) {
+    const city = typeof row.city === "string" ? row.city.trim() : "";
+    const m = city.match(/,\s*([A-Za-z]{2})\s*$/);
+    if (m) state = m[1].toUpperCase();
+  }
+  if (country === "US" && state && TZ_US_BY_STATE[state]) {
+    return TZ_US_BY_STATE[state];
+  }
+  if (country === "US") {
+    return TZ_US_BY_STATE._default;
+  }
+  if (country && TZ_BY_COUNTRY[country]) {
+    return TZ_BY_COUNTRY[country];
+  }
+  return TZ_BY_COUNTRY._default;
+}
+
+/** @param {ArrayBuffer} bytes */
+async function contentHashSuffix(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hex.slice(0, 6);
+}
+
+/**
+ * @param {{ list: (opts: { prefix?: string, cursor?: string }) => Promise<{ objects?: { key: string }[], truncated?: boolean, cursor?: string }> }} bucket
+ * @param {string} prefix
+ * @returns {Promise<string[]>}
+ */
+async function listR2KeysWithPrefix(bucket, prefix) {
+  const keys = [];
+  let cursor;
+  let truncated = true;
+  while (truncated) {
+    const listed = await bucket.list({ prefix, cursor });
+    const objs = listed.objects ?? [];
+    for (const o of objs) {
+      if (o && typeof o.key === "string" && o.key) keys.push(o.key);
+    }
+    truncated = Boolean(listed.truncated);
+    cursor = listed.truncated ? listed.cursor : undefined;
+  }
+  return keys;
+}
+
+/**
+ * @param {{ list: Function, delete: (k: string) => Promise<unknown> }} bucket
+ * @param {string} userId
+ * @param {string} memberProfileId
+ * @param {string} keepKey
+ */
+async function deleteOtherMemberAvatarKeys(bucket, userId, memberProfileId, keepKey) {
+  const prefix = `${userId}/member-profiles/${memberProfileId}/`;
+  const keys = await listR2KeysWithPrefix(bucket, prefix);
+  const fileRe = /^avatar(?:-[0-9a-f]{6,12})?\.jpg$/i;
+  for (const k of keys) {
+    if (k === keepKey) continue;
+    const base = k.split("/").pop() ?? "";
+    if (fileRe.test(base)) await bucket.delete(k).catch(() => {});
+  }
+}
+
+/**
+ * @param {{ list: Function, delete: (k: string) => Promise<unknown> }} bucket
+ * @param {string} userId
+ * @param {string} keepKey
+ */
+async function deleteOtherAccountAvatarKeys(bucket, userId, keepKey) {
+  const prefix = `${userId}/`;
+  const keys = await listR2KeysWithPrefix(bucket, prefix);
+  const re = new RegExp(`^${userId}/avatar(?:-[0-9a-f]{6,12})?\\.jpg$`, "i");
+  for (const k of keys) {
+    if (k === keepKey) continue;
+    if (re.test(k)) await bucket.delete(k).catch(() => {});
+  }
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @param {string} vialId
+ * @param {string} profileId
+ * @returns {Promise<string | null>}
+ */
+async function fetchUserVialPhotoKey(supabaseUrl, serviceKey, userId, vialId, profileId) {
+  let qs = `${supabaseUrl}/rest/v1/user_vials?id=eq.${encodeURIComponent(vialId)}&user_id=eq.${encodeURIComponent(userId)}&select=vial_photo_r2_key`;
+  if (profileId) qs += `&profile_id=eq.${encodeURIComponent(profileId)}`;
+  const res = await fetch(qs, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  });
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const k = row && typeof row.vial_photo_r2_key === "string" ? row.vial_photo_r2_key.trim() : "";
+  return k || null;
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @param {string} memberProfileId
+ * @param {string} column — body_scan_r2_key | progress_photo_front_r2_key | progress_photo_side_r2_key | progress_photo_back_r2_key
+ * @returns {Promise<string | null>}
+ */
+async function fetchMemberProfileR2Column(supabaseUrl, serviceKey, userId, memberProfileId, column) {
+  const safeCol = column.replace(/[^a-z_]/g, "");
+  if (!safeCol) return null;
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}&select=${safeCol}`,
+    {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const v = row && typeof row[safeCol] === "string" ? row[safeCol].trim() : "";
+  return v || null;
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @returns {Promise<string | null>}
+ */
+async function fetchAccountAvatarR2Key(supabaseUrl, serviceKey, userId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=avatar_r2_key`,
+    {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const k = row && typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
+  return k || null;
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} userId
+ * @param {string} memberProfileId
+ * @returns {Promise<string | null>}
+ */
+async function fetchMemberProfileAvatarR2Key(supabaseUrl, serviceKey, userId, memberProfileId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(memberProfileId)}&user_id=eq.${encodeURIComponent(userId)}&select=avatar_r2_key`,
+    {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    }
+  );
+  const rows = await res.json().catch(() => []);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const k = row && typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
+  return k || null;
+}
 
 /** Trim and strip all leading `@` (preserve casing for display_handle / validation). */
 function stripHandleAtForApi(v) {
@@ -2773,7 +3004,7 @@ function normalizeWakeTimeForPatch(s) {
 async function fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, attemptLabel) {
   const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
     userId
-  )}&select=id,user_id,display_name,avatar_url,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,instagram_handle,tiktok_handle,facebook_handle,snapchat_handle,linkedin_handle,x_handle,youtube_handle,rumble_handle,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
+  )}&select=id,user_id,display_name,avatar_r2_key,timezone,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,instagram_handle,tiktok_handle,facebook_handle,snapchat_handle,linkedin_handle,x_handle,youtube_handle,rumble_handle,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
   try {
     const res = await fetch(sel, {
       headers: {
@@ -2935,7 +3166,7 @@ async function handleSearchMemberProfiles(request, env, cors) {
   if (safe.length >= 3 && MEMBER_HANDLE_SLUG_RE.test(safe)) {
     const exactUrl = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
       userId
-    )}&handle=eq.${encodeURIComponent(safe)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+    )}&handle=eq.${encodeURIComponent(safe)}&select=id,handle,display_handle,display_name,avatar_r2_key,bio,user_id&limit=20`;
     const er = await fetch(exactUrl, { headers });
     const exactRows = await er.json().catch(() => []);
     if (er.ok && Array.isArray(exactRows) && exactRows.length > 0) {
@@ -2947,7 +3178,7 @@ async function handleSearchMemberProfiles(request, env, cors) {
     const orClause = `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
     const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
       userId
-    )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_url,bio,user_id&limit=20`;
+    )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_r2_key,bio,user_id&limit=20`;
 
     const res = await fetch(sel, { headers });
     rows = await res.json().catch(() => []);
@@ -3140,7 +3371,7 @@ async function handleGetMemberProfilePublic(request, env, cors) {
     handle: row.handle,
     display_handle: row.display_handle,
     display_name: row.display_name,
-    avatar_url: row.avatar_url,
+    avatar_r2_key: row.avatar_r2_key,
     bio: row.bio,
     instagram_handle: row.instagram_handle,
     tiktok_handle: row.tiktok_handle,
@@ -3661,6 +3892,25 @@ function parseMemberProfilePatchBody(body) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, "timezone")) {
+    hasKey = true;
+    const v = body.timezone;
+    if (v === null) {
+      patch.timezone = "UTC";
+    } else if (typeof v === "string") {
+      const t = v.trim();
+      if (t === "") {
+        patch.timezone = "UTC";
+      } else if (!isValidIanaTimeZone(t)) {
+        return { error: "timezone must be a valid IANA time zone name" };
+      } else {
+        patch.timezone = t;
+      }
+    } else {
+      return { error: "timezone must be a string or null" };
+    }
+  }
+
   if (!hasKey) {
     return { error: "No supported fields to update" };
   }
@@ -3770,6 +4020,36 @@ async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
     const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, parsed.patch.handle, profileId);
     if (taken) {
       return jsonResponse({ error: "This handle is already taken" }, 409, cors);
+    }
+  }
+  if (
+    parsed.patch &&
+    !Object.prototype.hasOwnProperty.call(parsed.patch, "timezone") &&
+    (Object.prototype.hasOwnProperty.call(parsed.patch, "city") ||
+      Object.prototype.hasOwnProperty.call(parsed.patch, "state") ||
+      Object.prototype.hasOwnProperty.call(parsed.patch, "country"))
+  ) {
+    const lr = await fetch(
+      `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profileId)}&user_id=eq.${encodeURIComponent(
+        userId
+      )}&select=city,state,country`,
+      {
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+        },
+      }
+    );
+    const curRows = await lr.json().catch(() => []);
+    const cur = Array.isArray(curRows) ? curRows[0] : null;
+    const merged = {
+      city: Object.prototype.hasOwnProperty.call(parsed.patch, "city") ? parsed.patch.city : cur?.city,
+      state: Object.prototype.hasOwnProperty.call(parsed.patch, "state") ? parsed.patch.state : cur?.state,
+      country: Object.prototype.hasOwnProperty.call(parsed.patch, "country") ? parsed.patch.country : cur?.country,
+    };
+    const derived = deriveMemberTimezoneFallback(merged);
+    if (derived && isValidIanaTimeZone(derived)) {
+      parsed.patch.timezone = derived;
     }
   }
   const patchResult = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, profileId, parsed.patch);
@@ -3955,19 +4235,35 @@ async function handlePostStackPhoto(request, env, cors) {
     );
   }
 
+  let bytes;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return jsonResponse({ error: "Could not read file" }, 400, cors);
+  }
+  if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
+  }
+
+  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
+  }
+
+  const sha = await contentHashSuffix(bytes);
+
   let key;
-  /** When set, avatar upload updates `member_profiles.avatar_url` (R2 key) instead of account `profiles.avatar_r2_key`. */
+  /** When set, avatar upload updates `member_profiles.avatar_r2_key` instead of account `profiles.avatar_r2_key`. */
   let avatarMemberProfileId = null;
   const isoNow = new Date().toISOString();
   if (kind === "stack_shot_1") key = `${userId}/stack-shot-1.jpg`;
   else if (kind === "stack_shot_2") key = `${userId}/stack-shot-2.jpg`;
   else if (kind === "inbody_scan_history") {
     const safeIso = isoNow.replace(/[:.]/g, "-");
-    key = `${userId}/scans/${safeIso}.jpg`;
-  } else if (kind === "body_scan") key = `${userId}/member-profiles/${memberProfileId}/body-scan.jpg`;
-  else if (kind === "progress_front") key = `${userId}/member-profiles/${memberProfileId}/progress-front.jpg`;
-  else if (kind === "progress_side") key = `${userId}/member-profiles/${memberProfileId}/progress-side.jpg`;
-  else if (kind === "progress_back") key = `${userId}/member-profiles/${memberProfileId}/progress-back.jpg`;
+    key = `${userId}/scans/${safeIso}-${sha}.jpg`;
+  } else if (kind === "body_scan") key = `${userId}/member-profiles/${memberProfileId}/body-scan-${sha}.jpg`;
+  else if (kind === "progress_front") key = `${userId}/member-profiles/${memberProfileId}/progress-front-${sha}.jpg`;
+  else if (kind === "progress_side") key = `${userId}/member-profiles/${memberProfileId}/progress-side-${sha}.jpg`;
+  else if (kind === "progress_back") key = `${userId}/member-profiles/${memberProfileId}/progress-back-${sha}.jpg`;
   else if (kind === "avatar") {
     if (memberProfileId && UUID_RE.test(memberProfileId)) {
       const mr = await fetch(
@@ -3984,24 +4280,44 @@ async function handlePostStackPhoto(request, env, cors) {
         return jsonResponse({ error: "Member profile not found" }, 404, cors);
       }
       avatarMemberProfileId = memberProfileId;
-      key = `${userId}/member-profiles/${memberProfileId}/avatar.jpg`;
+      key = `${userId}/member-profiles/${memberProfileId}/avatar-${sha}.jpg`;
     } else {
-      key = `${userId}/avatar.jpg`;
+      key = `${userId}/avatar-${sha}.jpg`;
     }
-  } else key = `${userId}/vials/${vialId}.jpg`;
+  } else key = `${userId}/vials/${vialId}-${sha}.jpg`;
 
-  let bytes;
-  try {
-    bytes = await file.arrayBuffer();
-  } catch {
-    return jsonResponse({ error: "Could not read file" }, 400, cors);
-  }
-  if (bytes.byteLength > STACK_PHOTO_MAX_BYTES) {
-    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
-  }
-
-  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
-    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
+  /** @type {string | null} */
+  let priorR2KeyToDelete = null;
+  if (kind === "avatar" && !avatarMemberProfileId) {
+    priorR2KeyToDelete = await fetchAccountAvatarR2Key(supabaseUrl, serviceKey, userId);
+  } else if (kind === "vial") {
+    priorR2KeyToDelete = await fetchUserVialPhotoKey(supabaseUrl, serviceKey, userId, vialId, profileId);
+  } else if (kind === "body_scan") {
+    priorR2KeyToDelete = await fetchMemberProfileR2Column(supabaseUrl, serviceKey, userId, memberProfileId, "body_scan_r2_key");
+  } else if (kind === "progress_front") {
+    priorR2KeyToDelete = await fetchMemberProfileR2Column(
+      supabaseUrl,
+      serviceKey,
+      userId,
+      memberProfileId,
+      "progress_photo_front_r2_key"
+    );
+  } else if (kind === "progress_side") {
+    priorR2KeyToDelete = await fetchMemberProfileR2Column(
+      supabaseUrl,
+      serviceKey,
+      userId,
+      memberProfileId,
+      "progress_photo_side_r2_key"
+    );
+  } else if (kind === "progress_back") {
+    priorR2KeyToDelete = await fetchMemberProfileR2Column(
+      supabaseUrl,
+      serviceKey,
+      userId,
+      memberProfileId,
+      "progress_photo_back_r2_key"
+    );
   }
 
   if (kind === "vial") {
@@ -4044,7 +4360,7 @@ async function handlePostStackPhoto(request, env, cors) {
     if (avatarMemberProfileId) {
       url = publicMemberAvatarUrl(request, key);
       const avatarPatch = await supabasePatchMemberProfile(supabaseUrl, serviceKey, userId, avatarMemberProfileId, {
-        avatar_url: url,
+        avatar_r2_key: key,
       });
       patched = avatarPatch.ok;
     } else {
@@ -4090,6 +4406,17 @@ async function handlePostStackPhoto(request, env, cors) {
 
   if (!patched) {
     return jsonResponse({ error: "Failed to update database" }, 502, cors);
+  }
+
+  if (kind === "avatar" && avatarMemberProfileId) {
+    await deleteOtherMemberAvatarKeys(bucket, userId, avatarMemberProfileId, key);
+  } else if (kind === "avatar" && !avatarMemberProfileId) {
+    await deleteOtherAccountAvatarKeys(bucket, userId, key);
+    if (priorR2KeyToDelete && priorR2KeyToDelete !== key) {
+      await bucket.delete(priorR2KeyToDelete).catch(() => {});
+    }
+  } else if (priorR2KeyToDelete && priorR2KeyToDelete !== key) {
+    await bucket.delete(priorR2KeyToDelete).catch(() => {});
   }
 
   const isPublic = kind === "avatar";

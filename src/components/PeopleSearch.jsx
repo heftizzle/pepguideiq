@@ -7,6 +7,7 @@ import {
   searchMemberProfiles,
   unfollowMemberProfile,
 } from "../lib/follows.js";
+import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 
 /** Match App.jsx fixed bottom nav band so overlay leaves it visible and tappable. */
 const PEOPLE_SEARCH_NAV_RESERVE_PX = "calc(80px + env(safe-area-inset-bottom, 0px))";
@@ -266,7 +267,9 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                 const handleLine = formatHandleDisplay(p.handle ?? "", p.display_handle ?? "");
                 const dispName = typeof p.display_name === "string" ? p.display_name.trim() : "";
                 const snippet = bioSnippet(p.bio);
-                const av = typeof p.avatar_url === "string" && p.avatar_url.trim() ? p.avatar_url.trim() : "";
+                const avK = typeof p.avatar_r2_key === "string" && p.avatar_r2_key.trim() ? p.avatar_r2_key.trim() : "";
+                const avLegacy = typeof p.avatar_url === "string" && p.avatar_url.trim() ? p.avatar_url.trim() : "";
+                const av = avK ? resolveMemberAvatarDisplayUrlFromKey(avK) : resolveMemberAvatarDisplayUrl(avLegacy);
 
                 const canOpenProfile = typeof p.handle === "string" && Boolean(normalizeHandleInput(p.handle));
 
