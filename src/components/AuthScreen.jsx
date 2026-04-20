@@ -75,18 +75,17 @@ const ZXCVBN_STRENGTH_LABELS = ["Weak", "Weak", "Fair", "Strong", "Very Strong"]
 const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
 const turnstileRequired = Boolean(TURNSTILE_SITE_KEY);
 
-async function verifyTokenWithWorker(token) {
-  if (!token || !isApiWorkerConfigured()) return false;
-  const res = await fetch(`${API_WORKER_URL}/turnstile/verify`, {
+/** Fire-and-forget POST to Worker for logging/analytics; does not gate auth. */
+function logTurnstileTokenToWorker(token) {
+  if (!token || !isApiWorkerConfigured()) return;
+  void fetch(`${API_WORKER_URL}/turnstile/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token }),
-  });
-  const data = await res.json().catch(() => ({}));
-  return data.success === true;
+  }).catch(() => {});
 }
 
-function waitForTurnstile(onReady, onTimeout, maxWait = 5000) {
+function waitForTurnstile(onReady, onTimeout, maxWait = 15000) {
   const start = Date.now();
   const interval = setInterval(() => {
     if (typeof window.turnstile !== "undefined") {
@@ -102,8 +101,8 @@ function waitForTurnstile(onReady, onTimeout, maxWait = 5000) {
 
 function turnstileBlockedMessage(unavailable) {
   return unavailable
-    ? "Bot verification is unavailable right now. Please refresh or try again in a moment."
-    : "Bot verification is still loading. Please wait a moment.";
+    ? "Bot verification unavailable — proceeding with rate-limited sign-in."
+    : "Optional verification is still loading — you can sign in when email and password are ready.";
 }
 
 export function AuthScreen({ onAuth }) {
@@ -215,12 +214,13 @@ export function AuthScreen({ onAuth }) {
               setTurnstileUnavailable(false);
             },
             "expired-callback": () => setTurnstileToken(null),
-            "error-callback": () => {
-              setTurnstileToken(null);
-              setTurnstileReady(false);
-              setTurnstileUnavailable(true);
-            },
-            theme: "dark",
+            "error-callback": () => setTurnstileToken(null),
+            "timeout-callback": () => setTurnstileToken(null),
+            retry: "auto",
+            "retry-interval": 8000,
+            "refresh-expired": "auto",
+            appearance: "always",
+            theme: "auto",
           });
         } catch {
           setTurnstileUnavailable(true);
@@ -287,12 +287,13 @@ export function AuthScreen({ onAuth }) {
               setTurnstileUnavailable(false);
             },
             "expired-callback": () => setTurnstileToken(null),
-            "error-callback": () => {
-              setTurnstileToken(null);
-              setTurnstileReady(false);
-              setTurnstileUnavailable(true);
-            },
-            theme: "dark",
+            "error-callback": () => setTurnstileToken(null),
+            "timeout-callback": () => setTurnstileToken(null),
+            retry: "auto",
+            "retry-interval": 8000,
+            "refresh-expired": "auto",
+            appearance: "always",
+            theme: "auto",
           });
         } catch {
           setTurnstileUnavailable(true);
@@ -339,21 +340,10 @@ export function AuthScreen({ onAuth }) {
     setBusy(true);
     try {
       if (mode === "login") {
-        if (turnstileRequired) {
-          if (!turnstileReady) {
-            setError(turnstileBlockedMessage(turnstileUnavailable));
-            return;
-          }
-          if (!turnstileToken) {
-            setError("Bot verification failed. Please try again.");
-            return;
-          }
-          const ok = await verifyTokenWithWorker(turnstileToken);
-          if (!ok) {
-            setError("Bot verification failed. Please try again.");
-            resetMainTurnstile();
-            return;
-          }
+        // Turnstile is non-blocking: Managed mode + Safari / iCloud Private Relay can fail the widget
+        // while Supabase auth has no server-side Turnstile gate on sign-in. Log token when present.
+        if (turnstileToken) {
+          logTurnstileTokenToWorker(turnstileToken);
         }
         const { error: err } = await signIn(form.email, form.password);
         if (err) {
@@ -402,21 +392,8 @@ export function AuthScreen({ onAuth }) {
           setError("This password has appeared in a known data breach. Please choose a different one.");
           return;
         }
-        if (turnstileRequired) {
-          if (!turnstileReady) {
-            setError(turnstileBlockedMessage(turnstileUnavailable));
-            return;
-          }
-          if (!turnstileToken) {
-            setError("Bot verification failed. Please try again.");
-            return;
-          }
-          const ok = await verifyTokenWithWorker(turnstileToken);
-          if (!ok) {
-            setError("Bot verification failed. Please try again.");
-            resetMainTurnstile();
-            return;
-          }
+        if (turnstileToken) {
+          logTurnstileTokenToWorker(turnstileToken);
         }
         setTurnstileToken(null);
         setMode("plans");
@@ -442,21 +419,8 @@ export function AuthScreen({ onAuth }) {
     setError("");
     setBusy(true);
     try {
-      if (turnstileRequired) {
-        if (!turnstileReady) {
-          setError(turnstileBlockedMessage(turnstileUnavailable));
-          return;
-        }
-        if (!turnstileToken) {
-          setError("Bot verification failed. Please try again.");
-          return;
-        }
-        const ok = await verifyTokenWithWorker(turnstileToken);
-        if (!ok) {
-          setError("Bot verification failed. Please try again.");
-          resetPlansTurnstile();
-          return;
-        }
+      if (turnstileToken) {
+        logTurnstileTokenToWorker(turnstileToken);
       }
       const { error: err } = await signUp(form.name.trim(), form.email.trim(), form.password, planId);
       if (err) {
@@ -484,10 +448,15 @@ export function AuthScreen({ onAuth }) {
     }
   };
 
+  const emailFilled = Boolean(form.email?.trim());
+  const passwordFilled = Boolean(form.password);
+  const registerNameFilled = Boolean(form.name?.trim());
   const authSubmitDisabled =
     busy ||
-    (turnstileRequired && (mode === "login" || mode === "register") && (!turnstileReady || !turnstileToken));
-  const plansSelectDisabled = busy || (turnstileRequired && (!turnstileReady || !turnstileToken));
+    !emailFilled ||
+    !passwordFilled ||
+    (mode === "register" && !registerNameFilled);
+  const plansSelectDisabled = busy;
 
   if (!isSupabaseConfigured()) {
     return (
