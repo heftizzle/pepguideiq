@@ -75,6 +75,19 @@ export function ProfileProvider({ userId, plan, children }) {
     [memberProfiles, userId]
   );
 
+  /**
+   * Optimistically patch one profile's fields in local state.
+   * For use right after a Worker write returns the authoritative new value;
+   * a subsequent refreshMemberProfiles() will reconcile.
+   * @param {string} profileId
+   * @param {Record<string, unknown>} patch
+   */
+  const patchMemberProfileLocal = useCallback((profileId, patch) => {
+    if (!profileId || !patch || typeof patch !== "object") return;
+    setMemberProfiles((prev) => prev.map((p) => (p.id === profileId ? { ...p, ...patch } : p)));
+    setMemberProfilesVersion((v) => v + 1);
+  }, []);
+
   const switchProfile = useCallback((id) => {
     setActiveProfileId(id);
     if (typeof window !== "undefined") window.location.reload();
@@ -96,6 +109,7 @@ export function ProfileProvider({ userId, plan, children }) {
       memberProfiles,
       memberProfilesVersion,
       refreshMemberProfiles: refresh,
+      patchMemberProfileLocal,
       setActiveProfileId,
       switchProfile,
       slotLimit,
@@ -108,6 +122,7 @@ export function ProfileProvider({ userId, plan, children }) {
       memberProfiles,
       memberProfilesVersion,
       refresh,
+      patchMemberProfileLocal,
       setActiveProfileId,
       switchProfile,
       slotLimit,

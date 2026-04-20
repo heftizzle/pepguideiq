@@ -846,11 +846,13 @@ export function ProfileTab({
   };
 
   const noopRefreshMemberProfiles = useCallback(async () => {}, []);
+  const noopPatchMemberProfileLocal = useCallback(() => {}, []);
   const profileCtx = useContext(ProfileCtx);
   const activeProfileId = profileCtx?.activeProfileId ?? null;
   const activeProfile = profileCtx?.activeProfile ?? null;
   const memberProfilesVersion = profileCtx?.memberProfilesVersion ?? 0;
   const refreshMemberProfiles = profileCtx?.refreshMemberProfiles ?? noopRefreshMemberProfiles;
+  const patchMemberProfileLocal = profileCtx?.patchMemberProfileLocal ?? noopPatchMemberProfileLocal;
   const demo = useDemoTourOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
@@ -1696,6 +1698,11 @@ export function ProfileTab({
       setErr(result.error);
       setAvatarBusy(false);
       return;
+    }
+    // Optimistic local update — bridges the window between POST resolving
+    // and refreshMemberProfiles() completing. Prevents the "D" flash.
+    if (typeof result.key === "string" && result.key.trim()) {
+      patchMemberProfileLocal(activeProfileId, { avatar_r2_key: result.key.trim() });
     }
     cancelAvatarCrop();
     await refreshMemberProfiles();
