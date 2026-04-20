@@ -16,6 +16,7 @@ const AFFILIATE_REF_BY_LOWER = Object.freeze({
   fire15: "Fire15",
   lake15: "Lake15",
   vitality15: "Vitality15",
+  chad15: "Chad15",
 });
 
 /** @param {unknown} raw */

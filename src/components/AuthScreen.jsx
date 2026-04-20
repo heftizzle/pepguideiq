@@ -569,8 +569,8 @@ export function AuthScreen({ onAuth }) {
         onAuth(u);
         return;
       }
-      setError("Check your email to confirm your account (if required), then sign in.");
-      setMode("login");
+      setError("");
+      setMode("checkEmail");
     } finally {
       setBusy(false);
     }
@@ -588,6 +588,84 @@ export function AuthScreen({ onAuth }) {
     busy || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
   const forgotSubmitDisabled =
     busy || !emailFilled || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
+
+  if (mode === "checkEmail") {
+    return (
+      <div
+        style={{
+          minHeight: "100dvh",
+          width: "100%",
+          boxSizing: "border-box",
+          background: "var(--color-bg-page)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "clamp(20px, 5vw, 32px)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 520,
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "clamp(16px, 4vw, 28px)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "clamp(72px, 18vw, 120px)",
+              lineHeight: 1,
+            }}
+            aria-hidden
+          >
+            📬
+          </div>
+          <h1
+            className="brand"
+            style={{
+              margin: 0,
+              fontSize: "clamp(28px, 7vw, 40px)",
+              fontWeight: 800,
+              lineHeight: 1.15,
+              color: "var(--color-text-primary)",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Check Your Email
+          </h1>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "clamp(17px, 4.5vw, 22px)",
+              fontWeight: 600,
+              lineHeight: 1.45,
+              color: "var(--color-text-primary)",
+              fontFamily: "'Outfit',sans-serif",
+              maxWidth: 400,
+            }}
+          >
+            Click the link we sent you to activate your account.
+          </p>
+          <p
+            className="mono"
+            style={{
+              margin: 0,
+              fontSize: "clamp(13px, 3.2vw, 15px)",
+              lineHeight: 1.5,
+              color: "var(--color-text-secondary)",
+              maxWidth: 380,
+            }}
+          >
+            Don&apos;t see it? Check your spam folder.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isSupabaseConfigured()) {
     return (
