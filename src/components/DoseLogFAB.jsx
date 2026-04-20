@@ -118,7 +118,7 @@ export function DoseLogFAB({ onSessionPicked }) {
   const [fabPos, setFabPos] = useState(() => getInitialFabPosition());
   const offsetX = fabPos.offsetX;
   const fabTopPx = fabPos.top;
-  const [transition, setTransition] = useState("transform 0.2s ease, top 0.2s ease");
+  const [transition, setTransition] = useState("transform 0.2s ease");
   const [expanded, setExpanded] = useState(false);
   const [fabBottomPx, setFabBottomPx] = useState(null);
 
@@ -342,7 +342,7 @@ export function DoseLogFAB({ onSessionPicked }) {
     const phase = dragPhaseRef.current;
     dragPhaseRef.current = "idle";
     draggingRef.current = false;
-    setTransition("transform 0.2s ease, top 0.2s ease");
+    setTransition("transform 0.2s ease");
 
     if (phase === "pending") {
       const { startX, startY } = dragRef.current;
@@ -364,7 +364,7 @@ export function DoseLogFAB({ onSessionPicked }) {
     const phase = dragPhaseRef.current;
     dragPhaseRef.current = "idle";
     draggingRef.current = false;
-    setTransition("transform 0.2s ease, top 0.2s ease");
+    setTransition("transform 0.2s ease");
     if (phase === "dragging") {
       restoreFabAfterAbortedDrag();
     }
@@ -377,7 +377,7 @@ export function DoseLogFAB({ onSessionPicked }) {
     const phase = dragPhaseRef.current;
     dragPhaseRef.current = "idle";
     draggingRef.current = false;
-    setTransition("transform 0.2s ease, top 0.2s ease");
+    setTransition("transform 0.2s ease");
     if (phase === "dragging") {
       restoreFabAfterAbortedDrag();
     }
@@ -401,14 +401,20 @@ export function DoseLogFAB({ onSessionPicked }) {
         zIndex: 38,
         left: "50%",
         right: "auto",
+        // Bottom-layout (tour-strip) mode stays anchored from bottom; top stays "auto".
+        // Normal mode anchors at top: 0 and uses transform for BOTH axes — this keeps
+        // vertical drag on the GPU-accelerated path (fixes iPhone Safari layout-defer bug).
         bottom: useBottomLayout ? bottomStyle : "auto",
-        top: useBottomLayout ? "auto" : fabTopPx,
+        top: useBottomLayout ? "auto" : 0,
         width: FAB_SIZE,
-        transform: `translateX(calc(-50% + ${offsetX}px))`,
+        transform: useBottomLayout
+          ? `translateX(calc(-50% + ${offsetX}px))`
+          : `translate(calc(-50% + ${offsetX}px), ${fabTopPx}px)`,
         transition,
         pointerEvents: "auto",
         touchAction: "none",
         userSelect: "none",
+        willChange: "transform",
       }}
     >
       {expanded && (
