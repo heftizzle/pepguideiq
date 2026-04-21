@@ -1234,7 +1234,8 @@ async function getSessionUser(env, authorization) {
     return { data: null, error: new Error("Unauthorized") };
   }
   const sub = typeof user.id === "string" ? user.id : null;
-  return { data: { sub }, error: null };
+  const email = typeof user.email === "string" ? user.email.trim() : "";
+  return { data: { sub, email }, error: null };
 }
 
 function supabaseAuthReady(env) {
@@ -1580,11 +1581,12 @@ async function supabasePatchProfileStripeSubscriptionFields(supabaseUrl, service
 }
 
 /**
+ * @param {string} [authEmail] — from verified Supabase Auth user (`/auth/v1/user`), used for new Stripe customers
  * @returns {Promise<{ ok: true, customer_id: string } | { ok: false, error: string }>}
  */
-async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey) {
+async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey, authEmail) {
   const pr = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=email,name,stripe_customer_id`,
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=name,stripe_customer_id`,
     {
       headers: {
         apikey: serviceKey,
@@ -1599,9 +1601,9 @@ async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId,
   if (existing) {
     return { ok: true, customer_id: existing };
   }
-  const email = profile && typeof profile.email === "string" ? profile.email.trim() : "";
+  const email = typeof authEmail === "string" ? authEmail.trim() : "";
   if (!email) {
-    return { ok: false, error: "Profile email missing" };
+    return { ok: false, error: "User email missing" };
   }
   const name = profile && typeof profile.name === "string" ? profile.name.trim() : "";
   const { ok, json } = await stripeFormPost(stripeKey, "customers", {
@@ -1682,7 +1684,7 @@ async function handleStripeCreateCustomer(request, env, cors) {
   const userId = user.sub;
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const ensured = await ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey);
+  const ensured = await ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey, user.email);
   if (!ensured.ok) {
     return jsonResponse({ error: ensured.error }, 400, cors);
   }
@@ -1733,7 +1735,14 @@ async function handleStripeCreateSubscription(request, env, cors) {
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-  const ensured = await ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId, stripeKey);
+  const ensured = await ensureStripeCustomerForUser(
+    env,
+    supabaseUrl,
+    serviceKey,
+    userId,
+    stripeKey,
+    sessionUser.email
+  );
   if (!ensured.ok) {
     return jsonResponse({ error: ensured.error }, 400, cors);
   }
