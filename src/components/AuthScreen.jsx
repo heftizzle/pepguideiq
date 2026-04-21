@@ -118,7 +118,7 @@ function turnstileForgotGateMessage(unavailable) {
 
 export function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
@@ -375,7 +375,7 @@ export function AuthScreen({ onAuth }) {
           onAuth(u);
         } else setError("Could not load profile.");
       } else {
-        if (!form.name?.trim() || !form.email?.trim() || !form.password) {
+        if (!form.firstName?.trim() || !form.lastName?.trim() || !form.email?.trim() || !form.password) {
           setError("All fields required.");
           setSignupPolicyErrors([]);
           return;
@@ -444,8 +444,9 @@ export function AuthScreen({ onAuth }) {
     setError("");
     setBusy(true);
     try {
+      const displayName = `${form.firstName.trim()} ${form.lastName.trim()}`;
       const { error: err } = await signUp(
-        form.name.trim(),
+        displayName,
         form.email.trim(),
         form.password,
         planId,
@@ -478,12 +479,12 @@ export function AuthScreen({ onAuth }) {
 
   const emailFilled = Boolean(form.email?.trim());
   const passwordFilled = Boolean(form.password);
-  const registerNameFilled = Boolean(form.name?.trim());
+  const registerNamesFilled = Boolean(form.firstName?.trim()) && Boolean(form.lastName?.trim());
   const authSubmitDisabled =
     busy ||
     !emailFilled ||
     !passwordFilled ||
-    (mode === "register" && !registerNameFilled);
+    (mode === "register" && !registerNamesFilled);
   const plansSelectDisabled = busy;
   const forgotSubmitDisabled =
     busy || !emailFilled || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
@@ -914,18 +915,34 @@ export function AuthScreen({ onAuth }) {
 
         <div style={{ background: "var(--color-bg-sunken)", border: "1px solid var(--color-border-default)", borderRadius: 10, padding: 24 }}>
           {mode === "register" && (
-            <div style={{ marginBottom: 14 }}>
-              <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
-                NAME
+            <>
+              <div style={{ marginBottom: 14 }}>
+                <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
+                  FIRST NAME
+                </div>
+                <input
+                  className="form-input"
+                  style={{ width: "100%" }}
+                  value={form.firstName}
+                  placeholder="First name"
+                  onChange={set("firstName")}
+                  autoComplete="given-name"
+                />
               </div>
-              <input
-                className="form-input"
-                style={{ width: "100%" }}
-                value={form.name}
-                placeholder="Your name"
-                onChange={set("name")}
-              />
-            </div>
+              <div style={{ marginBottom: 14 }}>
+                <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
+                  LAST NAME
+                </div>
+                <input
+                  className="form-input"
+                  style={{ width: "100%" }}
+                  value={form.lastName}
+                  placeholder="Last name"
+                  onChange={set("lastName")}
+                  autoComplete="family-name"
+                />
+              </div>
+            </>
           )}
           <div style={{ marginBottom: 14 }}>
             <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>

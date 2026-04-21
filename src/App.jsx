@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } fr
 import { createPortal } from "react-dom";
 import { PEPTIDES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
+import { HandleSetup } from "./components/HandleSetup.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
@@ -385,7 +386,19 @@ function readInitialActiveTab() {
 }
 
 function PepGuideIQApp({ user, setUser }) {
-  const { activeProfileId, activeProfile, memberProfilesVersion } = useActiveProfile();
+  const {
+    activeProfileId,
+    activeProfile,
+    memberProfilesVersion,
+    refreshMemberProfiles,
+    patchMemberProfileLocal,
+  } = useActiveProfile();
+
+  const needsHandleOnboarding =
+    Boolean(activeProfileId) &&
+    Boolean(activeProfile) &&
+    (!activeProfile.handle ||
+      (typeof activeProfile.handle === "string" && activeProfile.handle.trim() === ""));
   const [activeTab, setActiveTab] = useState(readInitialActiveTab);
 
   useEffect(() => {
@@ -1146,6 +1159,21 @@ function PepGuideIQApp({ user, setUser }) {
     setNetworkScrollToDosePostId,
     navTabButtonRefs,
   };
+
+  if (needsHandleOnboarding) {
+    return (
+      <>
+        <GlobalStyles />
+        <HandleSetup
+          activeProfileId={activeProfileId}
+          patchMemberProfileLocal={patchMemberProfileLocal}
+          onComplete={() => {
+            void refreshMemberProfiles();
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <DemoTourProvider
