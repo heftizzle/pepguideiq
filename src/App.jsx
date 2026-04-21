@@ -1458,8 +1458,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                               alt=""
                               draggable={false}
                               style={{
-                                width: 24,
-                                height: 24,
+                                width: 22,
+                                height: 22,
                                 borderRadius: "50%",
                                 objectFit: "cover",
                                 flexShrink: 0,
@@ -1470,8 +1470,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             <span
                               aria-hidden
                               style={{
-                                width: 24,
-                                height: 24,
+                                width: 22,
+                                height: 22,
                                 borderRadius: "50%",
                                 background: "var(--color-surface-hover)",
                                 border: "1px solid var(--color-border-emphasis)",

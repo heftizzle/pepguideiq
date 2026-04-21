@@ -403,9 +403,10 @@ export function GlobalStyles() {
       /* Persistent header — shared action control (App.jsx + header icons). */
       .pepv-header-action-btn{
         box-sizing:border-box;
-        height:44px;
-        min-width:44px;
-        padding:0 12px;
+        min-height:36px;
+        height:36px;
+        min-width:36px;
+        padding:8px 14px;
         border-radius:8px;
         border:1px solid var(--color-border-strong);
         background:var(--color-bg-card);
@@ -433,6 +434,7 @@ export function GlobalStyles() {
       .pepv-header-action-btn--icon{
         width:36px;
         min-width:36px;
+        max-width:36px;
         padding:0;
       }
       .pepv-header-action-btn[data-active="true"]{
@@ -479,6 +481,7 @@ export function GlobalStyles() {
       }
       .pepv-header-action-surface{
         box-sizing:border-box;
+        min-height:36px;
         height:36px;
         min-width:36px;
         max-width:260px;
@@ -491,7 +494,7 @@ export function GlobalStyles() {
         font-weight:500;
         color:var(--color-text-secondary);
         display:inline-flex;
-        align-items:center;
+        align-items:stretch;
         overflow:hidden;
         flex-shrink:0;
         transition:border-color 0.15s ease, background 0.15s ease;
@@ -512,20 +515,20 @@ export function GlobalStyles() {
         display:inline-flex;
         align-items:center;
         gap:6px;
-        height:100%;
         min-height:0;
         box-sizing:border-box;
+        align-self:stretch;
       }
       .pepv-header-profile-pill__segment--primary{
         flex:1 1 auto;
         min-width:0;
-        padding:0 10px 0 12px;
+        padding:0 10px 0 14px;
         justify-content:flex-start;
         text-align:left;
       }
       .pepv-header-profile-pill__segment--handle{
         flex-shrink:0;
-        padding:0 10px;
+        padding:0 14px 0 10px;
         max-width:130px;
         color:var(--tier-pro);
         overflow:hidden;

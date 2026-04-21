@@ -792,12 +792,23 @@ async function verifyStripeWebhookSignature(rawBody, sigHeader, secret) {
 async function fetchStripeSubscriptionExpanded(stripeKey, subscriptionId) {
   const qs = new URLSearchParams();
   qs.append("expand[]", "items.data.price");
+  qs.append("expand[]", "latest_invoice");
+  qs.append("expand[]", "latest_invoice.payment_intent");
   const r = await fetch(
     `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}?${qs}`,
     { headers: { Authorization: `Bearer ${stripeKey}` } }
   );
   if (!r.ok) return null;
   return r.json();
+}
+
+/** Best-effort immediate cancel (Stripe DELETE subscription). */
+async function stripeDeleteSubscription(stripeKey, subscriptionId) {
+  if (!stripeKey || !subscriptionId) return;
+  await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  }).catch(() => {});
 }
 
 /** Minimal HTML entity escape for transactional email snippets. */
@@ -1596,12 +1607,8 @@ async function stripeFormPost(stripeKey, path, fields) {
 /** @returns {string | null} */
 function paymentIntentClientSecretFromSubscriptionPayload(obj) {
   const inv = obj?.latest_invoice;
-  const pi =
-    inv && typeof inv === "object"
-      ? inv.payment_intent
-      : typeof inv === "string"
-        ? null
-        : null;
+  if (!inv || typeof inv !== "object") return null;
+  const pi = inv.payment_intent;
   if (pi && typeof pi === "object" && typeof pi.client_secret === "string") return pi.client_secret;
   return null;
 }
@@ -1676,9 +1683,17 @@ async function respondStripeCreateSubscriptionPayload(
   subJson,
   cors
 ) {
-  const secret = paymentIntentClientSecretFromSubscriptionPayload(subJson);
   const sid = typeof subJson.id === "string" ? subJson.id : "";
-  const st = typeof subJson.status === "string" ? subJson.status : "";
+  let effectiveSub = subJson;
+  let secret = paymentIntentClientSecretFromSubscriptionPayload(effectiveSub);
+  if (!secret && sid) {
+    const expanded = await fetchStripeSubscriptionExpanded(stripeKey, sid);
+    if (expanded && typeof expanded === "object") {
+      effectiveSub = expanded;
+      secret = paymentIntentClientSecretFromSubscriptionPayload(expanded);
+    }
+  }
+  const st = typeof effectiveSub.status === "string" ? effectiveSub.status : "";
   if (secret) {
     return jsonResponse({ client_secret: secret, subscription_id: sid || null, status: st }, 200, cors);
   }
@@ -1796,7 +1811,16 @@ async function handleStripeCreateSubscription(request, env, cors) {
   });
   const listJson = await listRes.json().catch(() => ({}));
   const subs = Array.isArray(listJson.data) ? listJson.data : [];
-  const existing = pickPrimaryStripeSubscription(subs, ["active", "trialing", "past_due", "unpaid"], false);
+  for (const sub of subs) {
+    const stx = String(sub?.status ?? "").trim().toLowerCase();
+    if (stx === "incomplete_expired" && typeof sub.id === "string") {
+      await stripeDeleteSubscription(stripeKey, sub.id);
+    }
+  }
+  let existing = pickPrimaryStripeSubscription(subs, ["active", "trialing", "past_due", "unpaid"], false);
+  if (!existing) {
+    existing = pickPrimaryStripeSubscription(subs, ["incomplete"], false);
+  }
 
   const expandFields = {
     "metadata[plan]": plan,
@@ -1805,6 +1829,16 @@ async function handleStripeCreateSubscription(request, env, cors) {
   };
 
   if (existing && typeof existing.id === "string") {
+    const stExisting = String(existing.status ?? "").trim().toLowerCase();
+    if (stExisting === "incomplete") {
+      for (const sub of subs) {
+        const oid = typeof sub?.id === "string" ? sub.id : "";
+        const ost = String(sub?.status ?? "").trim().toLowerCase();
+        if (ost === "incomplete" && oid && oid !== existing.id) {
+          await stripeDeleteSubscription(stripeKey, oid);
+        }
+      }
+    }
     const item0 = existing.items?.data?.[0];
     const itemId = item0 && typeof item0.id === "string" ? item0.id : "";
     if (!itemId) {
@@ -1820,6 +1854,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
     for (const [k, v] of Object.entries(form)) {
       formBody.append(k, String(v));
     }
+    formBody.append("expand[]", "latest_invoice");
     formBody.append("expand[]", "latest_invoice.payment_intent");
     const up = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(existing.id)}`, {
       method: "POST",
@@ -1855,6 +1890,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
   createBody.append("payment_behavior", "default_incomplete");
   createBody.append("payment_settings[save_default_payment_method]", "on_subscription");
   createBody.append("metadata[plan]", plan);
+  createBody.append("expand[]", "latest_invoice");
   createBody.append("expand[]", "latest_invoice.payment_intent");
   const cr = await fetch("https://api.stripe.com/v1/subscriptions", {
     method: "POST",
