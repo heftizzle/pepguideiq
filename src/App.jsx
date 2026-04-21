@@ -2816,7 +2816,15 @@ export default function PepGuideIQ() {
     })();
     const {
       data: { subscription },
-    } = onAuthStateChange(async () => {
+    } = onAuthStateChange(async (event) => {
+      if (
+        event === "SIGNED_IN" &&
+        typeof window !== "undefined" &&
+        window.location.hash &&
+        window.location.hash.includes("access_token")
+      ) {
+        window.history.replaceState({}, "", "/");
+      }
       const u = await getCurrentUser();
       if (!cancelled) setUser(u);
     });

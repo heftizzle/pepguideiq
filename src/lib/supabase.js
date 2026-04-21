@@ -1000,14 +1000,14 @@ export async function deleteAccountViaWorker() {
 }
 
 /**
- * @param {(session: import('@supabase/supabase-js').Session | null) => void} callback
+ * @param {(event: import('@supabase/supabase-js').AuthChangeEvent, session: import('@supabase/supabase-js').Session | null) => void} callback
  */
 export function onAuthStateChange(callback) {
   if (!supabase) {
     return { data: { subscription: { unsubscribe() {} } } };
   }
-  return supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
   });
 }
 
