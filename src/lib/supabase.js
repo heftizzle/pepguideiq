@@ -133,6 +133,11 @@ function browserTurnstileSiteKeyConfigured() {
   return Boolean(String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim());
 }
 
+/** Worker signup/reset enforce Turnstile only when both Worker URL and site key are set (matches AuthScreen). */
+function workerTurnstileEnforced() {
+  return isApiWorkerConfigured() && browserTurnstileSiteKeyConfigured();
+}
+
 /**
  * @returns {{ user: import('@supabase/supabase-js').User | null, session: import('@supabase/supabase-js').Session | null, error: Error | null }}
  */
@@ -166,54 +171,41 @@ export async function authSignUp(email, password, meta = {}, turnstileToken) {
   const userData = { name, plan };
   if (affiliateRef) userData.affiliate_ref = affiliateRef;
 
-  const turnstileWidgetUnavailable =
-    meta &&
-    typeof meta === "object" &&
-    /** @type {{ __pepv_turnstileUnavailable?: boolean }} */ (meta).__pepv_turnstileUnavailable === true;
-
-  const useWorkerSignup = isApiWorkerConfigured() && browserTurnstileSiteKeyConfigured();
-  if (useWorkerSignup) {
-    const tok = typeof turnstileToken === "string" ? turnstileToken.trim() : "";
-    if (!tok && !turnstileWidgetUnavailable) {
-      return {
-        user: null,
-        error: new Error("Please complete bot verification before signing up."),
-      };
-    }
-    if (tok) {
-      const res = await fetch(`${API_WORKER_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, turnstileToken: tok, userData }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const errMsg = body && typeof body.error === "string" ? body.error : "";
-        const passThrough = new Set([
-          "Bot verification required",
-          "Bot verification failed",
-          "Too many signup attempts. Try again later.",
-          "Auth service not configured",
-          "Missing email or password",
-          "Invalid JSON",
-        ]);
-        if (passThrough.has(errMsg)) {
-          return { user: null, error: new Error(errMsg || "Unable to create account. Try again or sign in.") };
-        }
-        return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
+  const tok = typeof turnstileToken === "string" ? turnstileToken.trim() : "";
+  /* Worker path only when Turnstile token present; if Worker + Turnstile are configured but token is missing,
+   * fall through to direct Supabase signup — same graceful pattern as login (non-blocking Turnstile). */
+  if (workerTurnstileEnforced() && tok) {
+    const res = await fetch(`${API_WORKER_URL}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, turnstileToken: tok, userData }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const errMsg = body && typeof body.error === "string" ? body.error : "";
+      const passThrough = new Set([
+        "Bot verification required",
+        "Bot verification failed",
+        "Too many signup attempts. Try again later.",
+        "Auth service not configured",
+        "Missing email or password",
+        "Invalid JSON",
+      ]);
+      if (passThrough.has(errMsg)) {
+        return { user: null, error: new Error(errMsg || "Unable to create account. Try again or sign in.") };
       }
-      const access_token = body?.access_token;
-      const refresh_token = body?.refresh_token;
-      const user = body?.user ?? null;
-      if (typeof access_token === "string" && typeof refresh_token === "string" && access_token && refresh_token) {
-        const { error: sesErr } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (sesErr && import.meta.env.DEV) {
-          console.warn("[authSignUp] setSession after Worker signup", sesErr);
-        }
-      }
-      return { user, error: null };
+      return { user: null, error: new Error("Unable to create account. Try again or sign in.") };
     }
-    /* Turnstile widget unavailable: same graceful fallback as login — direct Supabase signup. */
+    const access_token = body?.access_token;
+    const refresh_token = body?.refresh_token;
+    const user = body?.user ?? null;
+    if (typeof access_token === "string" && typeof refresh_token === "string" && access_token && refresh_token) {
+      const { error: sesErr } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (sesErr && import.meta.env.DEV) {
+        console.warn("[authSignUp] setSession after Worker signup", sesErr);
+      }
+    }
+    return { user, error: null };
   }
 
   const { data, error } = await supabase.auth.signUp({
