@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "./Modal.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { createStripePortalSession } from "../lib/stripeSubscription.js";
-import { formatPlan, getTier } from "../lib/tiers.js";
+import {
+  cancelStripeSubscriptionAtPeriodEnd,
+  createStripePortalSession,
+  fetchStripeSubscription,
+  reactivateStripeSubscription,
+} from "../lib/stripeSubscription.js";
+import { formatPlan, getTier, TIERS, TIER_RANK } from "../lib/tiers.js";
 import {
   deleteAccountViaWorker,
   deleteMemberProfileViaWorker,
@@ -42,6 +47,19 @@ const SECTION = {
   textTransform: "uppercase",
   fontFamily: "'JetBrains Mono', monospace",
 };
+
+const SUBSCRIPTION_CANCEL_POLICY =
+  "You may cancel at any time. Your subscription and full tier access remain active through the end of your current billing period. No refunds are issued for partial periods. After your period ends, your account downgrades to Entry (free) tier automatically.";
+
+function formatSubscriptionPeriodEndDisplay(unixSec) {
+  const n = typeof unixSec === "number" ? unixSec : Number(unixSec);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  try {
+    return new Date(n * 1000).toLocaleDateString(undefined, { dateStyle: "long" });
+  } catch {
+    return "—";
+  }
+}
 
 const SHIFT_SCHEDULE_OPTIONS = [
   { id: "days", label: "Days" },
@@ -147,6 +165,19 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   const [portalBusy, setPortalBusy] = useState(false);
   const [portalErr, setPortalErr] = useState(/** @type {string | null} */ (null));
 
+  /** @type {import("../lib/stripeSubscription.js").StripeSubscriptionInfo | null} */
+  const [stripeSub, setStripeSub] = useState(null);
+  const [stripeSubLoading, setStripeSubLoading] = useState(false);
+  const [stripeSubErr, setStripeSubErr] = useState(/** @type {string | null} */ (null));
+
+  const [showCancelSubModal, setShowCancelSubModal] = useState(false);
+  /** @type {"confirm" | "success"} */
+  const [cancelSubPhase, setCancelSubPhase] = useState("confirm");
+  const [cancelSubBusy, setCancelSubBusy] = useState(false);
+  const [cancelSubModalErr, setCancelSubModalErr] = useState(/** @type {string | null} */ (null));
+
+  const isPaidSubscriber = useMemo(() => TIER_RANK[user?.plan ?? "entry"] >= TIER_RANK.pro, [user?.plan]);
+
   const sortedCountries = useMemo(() => getCountriesForProfileForm(), []);
   const filteredCountries = useMemo(() => {
     const q = countryQuery.trim().toLowerCase();
@@ -192,6 +223,95 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     const u = await getCurrentUser();
     if (u) setUser(u);
   }, [setUser]);
+
+  useEffect(() => {
+    if (!workerOk || !isPaidSubscriber) {
+      setStripeSub(null);
+      setStripeSubErr(null);
+      setStripeSubLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setStripeSubLoading(true);
+      setStripeSubErr(null);
+      const { data, error } = await fetchStripeSubscription();
+      if (cancelled) return;
+      setStripeSubLoading(false);
+      if (error) {
+        setStripeSubErr(error.message);
+        setStripeSub(null);
+      } else {
+        setStripeSub(data);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workerOk, isPaidSubscriber, user.id]);
+
+  const openCancelSubModal = useCallback(() => {
+    setCancelSubModalErr(null);
+    setCancelSubPhase("confirm");
+    setShowCancelSubModal(true);
+    void (async () => {
+      const { data, error } = await fetchStripeSubscription();
+      if (error) setCancelSubModalErr(error.message);
+      else if (data) setStripeSub(data);
+    })();
+  }, []);
+
+  const closeCancelSubModal = useCallback(() => {
+    if (cancelSubBusy) return;
+    setShowCancelSubModal(false);
+    setCancelSubPhase("confirm");
+    setCancelSubModalErr(null);
+  }, [cancelSubBusy]);
+
+  const onConfirmCancelSubscription = useCallback(async () => {
+    setCancelSubModalErr(null);
+    setCancelSubBusy(true);
+    const result = await cancelStripeSubscriptionAtPeriodEnd();
+    setCancelSubBusy(false);
+    if (!result.ok || result.error) {
+      setCancelSubModalErr(result.error?.message ?? "Could not cancel subscription.");
+      return;
+    }
+    const periodEnd = result.current_period_end ?? stripeSub?.current_period_end ?? 0;
+    const planKey =
+      result.plan && ["pro", "elite", "goat"].includes(result.plan) ? result.plan : user.plan ?? "pro";
+    setStripeSub((prev) =>
+      prev
+        ? {
+            ...prev,
+            cancel_at_period_end: true,
+            current_period_end: periodEnd || prev.current_period_end,
+            plan: planKey,
+          }
+        : {
+            current_period_end: periodEnd,
+            cancel_at_period_end: true,
+            status: "active",
+            plan: planKey,
+            pending_plan: null,
+          }
+    );
+    setCancelSubPhase("success");
+  }, [stripeSub?.current_period_end, user.plan]);
+
+  const onReactivateSubscription = useCallback(async () => {
+    setMsg(null);
+    setErr(null);
+    setCancelSubBusy(true);
+    const result = await reactivateStripeSubscription();
+    setCancelSubBusy(false);
+    if (!result.ok || result.error) {
+      setErr(result.error?.message ?? "Could not reactivate subscription.");
+      return;
+    }
+    setStripeSub((prev) => (prev ? { ...prev, cancel_at_period_end: false } : prev));
+    setMsg("Subscription reactivated — billing continues at the next renewal.");
+  }, []);
 
   const openBillingPortal = useCallback(async () => {
     setPortalErr(null);
@@ -1013,9 +1133,28 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Current plan</div>
-            <span className="pill" style={tierPillStyle(user.plan)}>
-              {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
-            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              <span className="pill" style={tierPillStyle(user.plan)}>
+                {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
+              </span>
+              {isPaidSubscriber && stripeSub?.cancel_at_period_end ? (
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    color: "var(--color-warning)",
+                    border: "1px solid rgba(245, 158, 11, 0.45)",
+                    background: "rgba(245, 158, 11, 0.12)",
+                  }}
+                >
+                  Cancellation Scheduled
+                </span>
+              ) : null}
+            </div>
           </div>
           <button
             type="button"
@@ -1027,10 +1166,73 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             {portalBusy ? "…" : "Manage Billing"}
           </button>
         </div>
+        {isPaidSubscriber && workerOk && stripeSubLoading ? (
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 10 }}>
+            Loading billing status…
+          </div>
+        ) : null}
+        {isPaidSubscriber && workerOk && stripeSubErr ? (
+          <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 10, lineHeight: 1.45 }}>
+            {stripeSubErr}
+          </div>
+        ) : null}
         {portalErr ? (
           <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 10, lineHeight: 1.45 }}>
             {portalErr}
           </div>
+        ) : null}
+
+        {isPaidSubscriber && workerOk && stripeSub?.cancel_at_period_end ? (
+          <div
+            style={{
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 10,
+              border: "1px solid var(--color-border-tab)",
+              background: "var(--color-bg-page)",
+            }}
+          >
+            <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 12 }}>
+              Cancellation scheduled until{" "}
+              <strong style={{ color: "var(--color-text-primary)" }}>
+                {formatSubscriptionPeriodEndDisplay(stripeSub.current_period_end)}
+              </strong>
+              . You keep full {formatPlan(stripeSub.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan)} access
+              until then.
+            </div>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ fontSize: 13 }}
+              disabled={cancelSubBusy}
+              onClick={() => void onReactivateSubscription()}
+            >
+              {cancelSubBusy ? "…" : "Reactivate subscription"}
+            </button>
+          </div>
+        ) : null}
+
+        {isPaidSubscriber && workerOk && stripeSub && !stripeSub.cancel_at_period_end && !stripeSubLoading ? (
+          <button
+            type="button"
+            style={{
+              fontSize: 13,
+              marginTop: 14,
+              width: "100%",
+              minHeight: 44,
+              borderRadius: 10,
+              cursor: "pointer",
+              fontFamily: "'Outfit', sans-serif",
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              background: "transparent",
+              border: "1px solid rgba(248, 113, 113, 0.55)",
+              color: "var(--color-danger)",
+            }}
+            onClick={() => openCancelSubModal()}
+          >
+            Cancel subscription
+          </button>
         ) : null}
 
         {user.plan !== "goat" && (
@@ -1305,6 +1507,95 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           Delete My Account
         </button>
       </Card>
+
+      {showCancelSubModal && (
+        <Modal onClose={closeCancelSubModal} maxWidth={480} label="Cancel subscription">
+          {cancelSubPhase === "success" ? (
+            <>
+              <p style={{ fontSize: 15, color: "var(--color-text-primary)", lineHeight: 1.55, marginBottom: 20 }}>
+                Your{" "}
+                <strong>
+                  {formatPlan(stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan)}
+                </strong>{" "}
+                access continues until{" "}
+                <strong>{formatSubscriptionPeriodEndDisplay(stripeSub?.current_period_end)}</strong>. No further charges.
+              </p>
+              <button
+                type="button"
+                className="btn-teal"
+                style={{ fontSize: 13, width: "100%", minHeight: 44 }}
+                onClick={closeCancelSubModal}
+              >
+                Done
+              </button>
+            </>
+          ) : (
+            <>
+              <h2
+                style={{
+                  fontSize: 17,
+                  fontWeight: 600,
+                  margin: "0 0 12px",
+                  color: "var(--color-text-primary)",
+                  lineHeight: 1.35,
+                }}
+              >
+                Cancel subscription?
+              </h2>
+              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 16, lineHeight: 1.55 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <strong style={{ color: "var(--color-text-primary)" }}>Current plan:</strong>{" "}
+                  {formatPlan(stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan)} —{" "}
+                  {TIERS[stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan]?.label ?? "—"}
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <strong style={{ color: "var(--color-text-primary)" }}>Current period ends:</strong>{" "}
+                  {formatSubscriptionPeriodEndDisplay(stripeSub?.current_period_end)}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--color-text-secondary)",
+                    lineHeight: 1.55,
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border-tab)",
+                    background: "var(--color-bg-page)",
+                    marginBottom: 16,
+                  }}
+                >
+                  {SUBSCRIPTION_CANCEL_POLICY}
+                </div>
+              </div>
+              {cancelSubModalErr ? (
+                <div className="mono" style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 14, lineHeight: 1.45 }}>
+                  {cancelSubModalErr}
+                </div>
+              ) : null}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 13, flex: "1 1 140px", minHeight: 44 }}
+                  disabled={cancelSubBusy}
+                  onClick={closeCancelSubModal}
+                >
+                  Keep My Plan
+                </button>
+                <button
+                  type="button"
+                  className="btn-red"
+                  style={{ fontSize: 13, flex: "1 1 140px", minHeight: 44, fontWeight: 600 }}
+                  disabled={cancelSubBusy || !stripeSub?.current_period_end}
+                  onClick={() => void onConfirmCancelSubscription()}
+                >
+                  {cancelSubBusy ? "…" : "Cancel Subscription"}
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
 
       {showDeleteProfile && (
         <Modal onClose={() => setShowDeleteProfile(false)} maxWidth={420} label="Delete profile">

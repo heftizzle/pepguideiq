@@ -95,6 +95,68 @@ export async function createStripeSubscription(plan) {
  * @param {string} returnUrl — full URL after leaving the portal
  * @returns {Promise<{ url: string | null, error: Error | null }>}
  */
+/**
+ * POST /api/cancel-subscription — schedules cancellation at end of billing period (`cancel_at_period_end: true`).
+ * @returns {Promise<{ ok: boolean, error: Error | null, success?: boolean, already_scheduled?: boolean, current_period_end?: number, plan?: string }>}
+ */
+export async function cancelStripeSubscriptionAtPeriodEnd() {
+  if (!isApiWorkerConfigured()) {
+    return { ok: false, error: new Error("Worker URL not configured") };
+  }
+  const token = await getSessionAccessToken();
+  if (!token) {
+    return { ok: false, error: new Error("Not signed in") };
+  }
+  const res = await fetch(`${API_WORKER_URL}/api/cancel-subscription`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = typeof body.error === "string" ? body.error : `Worker ${res.status}`;
+    return { ok: false, error: new Error(msg) };
+  }
+  return {
+    ok: true,
+    error: null,
+    success: body.success === true,
+    already_scheduled: body.already_scheduled === true,
+    current_period_end: typeof body.current_period_end === "number" ? body.current_period_end : undefined,
+    plan: typeof body.plan === "string" ? body.plan : undefined,
+  };
+}
+
+/**
+ * POST /api/reactivate-subscription — clears scheduled cancellation (`cancel_at_period_end: false`).
+ * @returns {Promise<{ ok: boolean, error: Error | null, success?: boolean, already_active?: boolean, current_period_end?: number, plan?: string }>}
+ */
+export async function reactivateStripeSubscription() {
+  if (!isApiWorkerConfigured()) {
+    return { ok: false, error: new Error("Worker URL not configured") };
+  }
+  const token = await getSessionAccessToken();
+  if (!token) {
+    return { ok: false, error: new Error("Not signed in") };
+  }
+  const res = await fetch(`${API_WORKER_URL}/api/reactivate-subscription`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = typeof body.error === "string" ? body.error : `Worker ${res.status}`;
+    return { ok: false, error: new Error(msg) };
+  }
+  return {
+    ok: true,
+    error: null,
+    success: body.success === true,
+    already_active: body.already_active === true,
+    current_period_end: typeof body.current_period_end === "number" ? body.current_period_end : undefined,
+    plan: typeof body.plan === "string" ? body.plan : undefined,
+  };
+}
+
 export async function createStripePortalSession(returnUrl) {
   if (!isApiWorkerConfigured()) {
     return { url: null, error: new Error("Worker URL not configured") };

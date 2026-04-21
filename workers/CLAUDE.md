@@ -1,8 +1,8 @@
 # pepguideIQ Worker — agent brief
 
-Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` chain around line 3700.
+Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 29)
+## Routes (exactly 31)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -14,6 +14,8 @@ Single file: `workers/api-proxy.js` (3972 lines). Dispatch is a long `if/else` c
 - `POST /stripe/create-customer`
 - `POST /stripe/create-subscription` — returns PaymentIntent `client_secret` or `{no_payment_needed: true}`.
 - `POST /stripe/create-portal-session` — returns `{url}` for the Stripe-hosted billing portal.
+- `POST /api/cancel-subscription` — authed (Bearer); sets Stripe `cancel_at_period_end: true` on the caller’s primary paid subscription; optional confirmation email via Resend (`RESEND_API_KEY`). Response: `{ success, already_scheduled?, current_period_end, plan }`.
+- `POST /api/reactivate-subscription` — authed; sets `cancel_at_period_end: false` on that subscription. Response: `{ success, already_active?, current_period_end, plan }`.
 
 ### Auth-adjacent
 - `POST /auth/signup` — Turnstile + IP rate limit, then proxies to Supabase `POST /auth/v1/signup` with anon key. Body: `{ email, password, turnstileToken, userData }`.
@@ -95,6 +97,7 @@ bucket_name = "stack-photos"
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — required
 - `SUPABASE_ANON_KEY` — same value as `VITE_SUPABASE_ANON_KEY`; required for `POST /auth/signup` and `POST /auth/password-reset` (Turnstile-gated auth proxy)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — required for billing
+- `RESEND_API_KEY` — optional; enables transactional email on subscription cancel scheduling
 - `TURNSTILE_SECRET_KEY` — required when the app sets `VITE_TURNSTILE_SITE_KEY`
 
 ## Vars (non-secret)

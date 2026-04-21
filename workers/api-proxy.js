@@ -2,7 +2,7 @@
  * Cloudflare Worker: Anthropic proxy, Stripe billing helpers, R2 stack photos.
  *
  * Secrets: wrangler secret put ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- * Optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+ * Optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY (subscription cancel confirmation email)
  * Vars: STRIPE_PRICE_ID_PRO, STRIPE_PRICE_ID_ELITE, STRIPE_PRICE_ID_GOAT (required for create-subscription),
  *       ALLOWED_ORIGIN (exact origin, e.g. https://pepguideiq.com; omit or * for dev),
  *       ENVIRONMENT=production (strict: require Supabase + KV for /v1/chat, fail closed on rate limit)
@@ -798,6 +798,15 @@ async function fetchStripeSubscriptionExpanded(stripeKey, subscriptionId) {
   );
   if (!r.ok) return null;
   return r.json();
+}
+
+/** Minimal HTML entity escape for transactional email snippets. */
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(body, status = 200, cors) {
@@ -2461,6 +2470,305 @@ async function handleScheduleDowngrade(request, env, cors) {
   }
 
   return jsonResponse({ ok: true }, 200, cors);
+}
+
+/** Optional transactional mail via Resend (`wrangler secret put RESEND_API_KEY`). */
+async function resendSendEmail(env, { to, subject, html, text }) {
+  const key = String(env.RESEND_API_KEY ?? "").trim();
+  const dest = typeof to === "string" ? to.trim() : "";
+  if (!key || !dest) {
+    if (!key) log(env, "info", "resend_skipped_no_key", {});
+    return;
+  }
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "PepGuideIQ <noreply@pepguideiq.com>",
+      to: [dest],
+      subject,
+      html,
+      ...(typeof text === "string" && text ? { text } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    log(env, "warn", "resend_send_failed", { status: res.status, body: t.slice(0, 400) });
+  } else {
+    log(env, "info", "resend_sent", { subject: subject.slice(0, 120) });
+  }
+}
+
+function planTierDisplayName(plan, env) {
+  const p = normalizePlanTier(plan, env);
+  if (p === "pro") return "Pro";
+  if (p === "elite") return "Elite";
+  if (p === "goat") return "GOAT";
+  return "Entry";
+}
+
+function formatSubscriptionPeriodEndLabel(unixSec) {
+  const n = typeof unixSec === "number" ? unixSec : Number(unixSec);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  try {
+    return new Date(n * 1000).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
+async function handleApiCancelSubscription(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = user.sub;
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "No paid subscription to cancel" }, 403, cors);
+  }
+
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
+  }
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id,email`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const profileRows = await pr.json().catch(() => []);
+  const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+  const customerId =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+  const email = profile && typeof profile.email === "string" ? profile.email.trim() : "";
+  if (!customerId) {
+    return jsonResponse({ error: "No Stripe customer on file" }, 400, cors);
+  }
+
+  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
+  qs.append("expand[]", "data.default_payment_method");
+  const sr = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const sdata = await sr.json().catch(() => ({}));
+  if (!sr.ok) {
+    return jsonResponse(
+      { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
+      502,
+      cors
+    );
+  }
+  const list = Array.isArray(sdata.data) ? sdata.data : [];
+  const subscr = pickPrimaryStripeSubscription(list, ["active", "trialing", "past_due"], false);
+  if (!subscr || typeof subscr.current_period_end !== "number") {
+    return jsonResponse({ error: "No active subscription to cancel" }, 400, cors);
+  }
+
+  const subscriptionId = typeof subscr.id === "string" ? subscr.id.trim() : "";
+  if (!subscriptionId) {
+    return jsonResponse({ error: "No active subscription to cancel" }, 400, cors);
+  }
+
+  const stripeTier = tierPlanFromStripeSubscription(subscr, env);
+  if (TIER_RANK[stripeTier] < TIER_RANK.pro) {
+    return jsonResponse({ error: "No paid subscription to cancel" }, 400, cors);
+  }
+
+  const cpeNum = subscr.current_period_end;
+  if (subscr.cancel_at_period_end === true) {
+    return jsonResponse(
+      {
+        success: true,
+        already_scheduled: true,
+        current_period_end: cpeNum,
+        plan: stripeTier,
+      },
+      200,
+      cors
+    );
+  }
+
+  const cancelBody = new URLSearchParams();
+  cancelBody.set("cancel_at_period_end", "true");
+  const cancelRes = await fetch(
+    `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: cancelBody.toString(),
+    }
+  );
+  const cancelData = await cancelRes.json().catch(() => ({}));
+  if (!cancelRes.ok) {
+    return jsonResponse(
+      {
+        error:
+          cancelData.error?.message ||
+          cancelData.error ||
+          `Stripe error (${cancelRes.status})`,
+      },
+      cancelRes.status >= 400 && cancelRes.status < 600 ? cancelRes.status : 502,
+      cors
+    );
+  }
+
+  const full = await fetchStripeSubscriptionExpanded(stripeKey, subscriptionId);
+  if (full) {
+    await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+  }
+
+  const endLabel = formatSubscriptionPeriodEndLabel(cpeNum);
+  const planName = planTierDisplayName(stripeTier, env);
+  if (email) {
+    const safePlan = escapeHtml(planName);
+    const safeEnd = escapeHtml(endLabel || "the end of your billing period");
+    await resendSendEmail(env, {
+      to: email,
+      subject: `PepGuideIQ — ${planName} subscription cancellation scheduled`,
+      html: `<p>Hi,</p><p>We received your request to cancel your <strong>${safePlan}</strong> subscription.</p><p>Your access continues until <strong>${safeEnd}</strong>. You will not be charged again for this subscription.</p><p>After that date, your account moves to the free Entry tier unless you reactivate before then.</p><p>— PepGuideIQ</p>`,
+      text: `We received your request to cancel your ${planName} subscription. Your access continues until ${endLabel || "the end of your billing period"}. You will not be charged again. After that, your account moves to the free Entry tier unless you reactivate.`,
+    });
+  }
+
+  return jsonResponse(
+    {
+      success: true,
+      already_scheduled: false,
+      current_period_end: cpeNum,
+      plan: stripeTier,
+    },
+    200,
+    cors
+  );
+}
+
+async function handleApiReactivateSubscription(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = user.sub;
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const stripeKey = env.STRIPE_SECRET_KEY ?? "";
+  if (!stripeKey) {
+    return jsonResponse({ error: "STRIPE_SECRET_KEY is not set on the Worker" }, 503, cors);
+  }
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=stripe_customer_id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const profileRows = await pr.json().catch(() => []);
+  const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+  const customerId =
+    profile && typeof profile.stripe_customer_id === "string" ? profile.stripe_customer_id.trim() : "";
+  if (!customerId) {
+    return jsonResponse({ error: "No Stripe customer on file" }, 400, cors);
+  }
+
+  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
+  qs.append("expand[]", "data.default_payment_method");
+  const sr = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const sdata = await sr.json().catch(() => ({}));
+  if (!sr.ok) {
+    return jsonResponse(
+      { error: sdata.error?.message || sdata.error || `Stripe error (${sr.status})` },
+      502,
+      cors
+    );
+  }
+  const list = Array.isArray(sdata.data) ? sdata.data : [];
+  const subscr = pickPrimaryStripeSubscription(list, ["active", "trialing", "past_due"], false);
+  if (!subscr || typeof subscr.current_period_end !== "number") {
+    return jsonResponse({ error: "No active subscription to reactivate" }, 400, cors);
+  }
+  const subscriptionId = typeof subscr.id === "string" ? subscr.id.trim() : "";
+  if (!subscriptionId) {
+    return jsonResponse({ error: "No active subscription to reactivate" }, 400, cors);
+  }
+  if (subscr.cancel_at_period_end !== true) {
+    return jsonResponse({ success: true, already_active: true, current_period_end: subscr.current_period_end }, 200, cors);
+  }
+
+  const reBody = new URLSearchParams();
+  reBody.set("cancel_at_period_end", "false");
+  const reRes = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: reBody.toString(),
+  });
+  const reData = await reRes.json().catch(() => ({}));
+  if (!reRes.ok) {
+    return jsonResponse(
+      {
+        error: reData.error?.message || reData.error || `Stripe error (${reRes.status})`,
+      },
+      reRes.status >= 400 && reRes.status < 600 ? reRes.status : 502,
+      cors
+    );
+  }
+
+  const full = await fetchStripeSubscriptionExpanded(stripeKey, subscriptionId);
+  if (full) {
+    await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+  }
+
+  const cpe =
+    typeof full?.current_period_end === "number"
+      ? full.current_period_end
+      : typeof subscr.current_period_end === "number"
+        ? subscr.current_period_end
+        : 0;
+
+  return jsonResponse(
+    {
+      success: true,
+      already_active: false,
+      current_period_end: cpe,
+      plan: full ? tierPlanFromStripeSubscription(full, env) : tierPlanFromStripeSubscription(subscr, env),
+    },
+    200,
+    cors
+  );
 }
 
 async function handleUploadStackPhoto(request, env, cors) {
@@ -4554,6 +4862,8 @@ async function handleStripeWebhook(request, env) {
             stripe_subscription_id: null,
             stripe_price_id: null,
             subscription_status: "canceled",
+            pending_plan: null,
+            pending_plan_date: null,
           });
           log(env, "info", "stripe_subscription_synced", { userId, plan: "entry", type: event.type });
           break;
@@ -4840,6 +5150,14 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/stripe/subscription/schedule-downgrade" && request.method === "POST") {
       return handleScheduleDowngrade(request, env, cors);
+    }
+
+    if (url.pathname === "/api/cancel-subscription" && request.method === "POST") {
+      return handleApiCancelSubscription(request, env, cors);
+    }
+
+    if (url.pathname === "/api/reactivate-subscription" && request.method === "POST") {
+      return handleApiReactivateSubscription(request, env, cors);
     }
 
     if (url.pathname === "/stripe/create-customer" && request.method === "POST") {
