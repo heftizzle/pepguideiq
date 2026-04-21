@@ -62,6 +62,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_API_WORKER_URL: ${{ secrets.VITE_API_WORKER_URL }}
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
       - name: Deploy to Cloudflare Pages
         run: pnpm exec wrangler pages deploy dist --project-name pepguideiq --branch main
         env:
