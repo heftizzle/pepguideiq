@@ -1891,8 +1891,20 @@ export function ProfileTab({
 
       <div style={SECTION}>User</div>
       <Card>
-        <div className="pepv-profile-user-row" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-          <div ref={setFieldRef("avatar")} className="pepv-profile-user-avatar-wrap">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+            width: "100%",
+          }}
+        >
+          <div
+            ref={setFieldRef("avatar")}
+            className="pepv-profile-user-avatar-wrap"
+            style={{ width: "100%", display: "flex", justifyContent: "center" }}
+          >
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -1949,7 +1961,7 @@ export function ProfileTab({
             </button>
           </div>
           <input ref={fileRef} type="file" accept={R2_UPLOAD_ACCEPT_ATTR} hidden onChange={(e) => void onAvatarPick(e)} />
-          <div className="pepv-profile-user-fields" style={{ flex: "1 1 0", minWidth: 0 }}>
+          <div className="pepv-profile-user-fields" style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
             <div ref={setFieldRef("display_name")} style={{ marginBottom: 10, width: "100%" }}>
               <div
                 className="mono"
@@ -1995,7 +2007,7 @@ export function ProfileTab({
                 color: "var(--color-text-secondary)",
                 marginBottom: 12,
                 lineHeight: 1.35,
-                wordBreak: "break-word",
+                wordBreak: "break-all",
               }}
             >
               {user.email}

@@ -37,7 +37,7 @@ export function GlobalStyles() {
         overflow:visible;
         padding-bottom:32px;
       }
-      /* Profile User card: full-width inputs; stack avatar above fields at ≤360px (zoom / narrow viewports). */
+      /* Profile User card: full-width inputs (stacked avatar + fields layout lives in ProfileTab.jsx). */
       .pepv-profile-user-fields input.form-input,
       .pepv-profile-user-fields textarea.form-input{
         width:100%;
@@ -45,19 +45,6 @@ export function GlobalStyles() {
         box-sizing:border-box;
       }
       @media (max-width: 360px){
-        .pepv-profile-user-row{
-          flex-direction:column !important;
-          align-items:center !important;
-        }
-        .pepv-profile-user-avatar-wrap{
-          display:flex;
-          justify-content:center;
-          width:100%;
-        }
-        .pepv-profile-user-fields{
-          width:100% !important;
-          max-width:100%;
-        }
         .pepv-profile-route{
           padding-bottom:128px;
         }
