@@ -1,4 +1,4 @@
-import { ALL_TIERS_INCLUDE_LINES, formatProgressPhotoSetsLabel, TIERS, formatPrice } from "../lib/tiers.js";
+import { buildAllTiersIncludeLines, formatProgressPhotoSetsLabel, TIERS, formatPrice } from "../lib/tiers.js";
 import { COMPOUNDS } from "./compounds/index.js";
 import { normalizeNewCatalogEntry } from "../lib/normalizeNewCatalogEntry.js";
 import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
@@ -216,6 +216,9 @@ export const PEPTIDES = attachPopularityRanks(
   })
 );
 
+/** Merged catalog row count (batches + legacy core-only rows). Use in UI instead of hardcoding. */
+export const CATALOG_COUNT = PEPTIDES.length;
+
 export const CATEGORIES = [
   "All",
   "Anabolics / HRT",
@@ -305,7 +308,7 @@ const PLAN_CONFIG = [
       `${TIERS.entry.stack_advisor_calls_per_day} Stack Advisor calls/day`,
       `${formatProgressPhotoSetsLabel(TIERS.entry.progress_photo_sets)} progress photos`,
       `${TIERS.entry.profiles} profile`,
-      ...ALL_TIERS_INCLUDE_LINES,
+      ...buildAllTiersIncludeLines(CATALOG_COUNT),
     ],
   },
   {
@@ -319,7 +322,7 @@ const PLAN_CONFIG = [
       `${formatProgressPhotoSetsLabel(TIERS.pro.progress_photo_sets)} progress photos`,
       "InBody / DEXA scan upload",
       `${TIERS.pro.profiles} profile`,
-      ...ALL_TIERS_INCLUDE_LINES,
+      ...buildAllTiersIncludeLines(CATALOG_COUNT),
     ],
   },
   {
@@ -332,7 +335,7 @@ const PLAN_CONFIG = [
       `${formatProgressPhotoSetsLabel(TIERS.elite.progress_photo_sets)} progress photos`,
       `${TIERS.elite.profiles} profiles`,
       "Claude Vision OCR · Shift schedule",
-      ...ALL_TIERS_INCLUDE_LINES,
+      ...buildAllTiersIncludeLines(CATALOG_COUNT),
     ],
   },
   {
@@ -345,7 +348,7 @@ const PLAN_CONFIG = [
       `${formatProgressPhotoSetsLabel(TIERS.goat.progress_photo_sets)} progress photos`,
       `${TIERS.goat.profiles} profiles`,
       "Founding member · Early access",
-      ...ALL_TIERS_INCLUDE_LINES,
+      ...buildAllTiersIncludeLines(CATALOG_COUNT),
     ],
   },
 ];

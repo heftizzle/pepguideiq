@@ -1,11 +1,12 @@
 import { useCallback, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { CATALOG_COUNT } from "../data/catalog.js";
 
 const STORAGE_KEY = "pepv_nav_tips_seen";
 
 /** @type {{ id: string, text: string }[]} */
 const TAB_TOOLTIPS = [
-  { id: "library", text: "Browse 171+ research compounds" },
+  { id: "library", text: `Browse ${CATALOG_COUNT}+ research compounds` },
   { id: "vialTracker", text: "Log doses and track your vials" },
   { id: "stackBuilder", text: "Build your personal compound stack" },
   { id: "stacks", text: "View and manage your saved stacks" },

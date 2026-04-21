@@ -87,13 +87,21 @@ export const TIERS = {
 
 export const TIER_ORDER = ["entry", "pro", "elite", "goat"];
 
-/** Shown under tier columns in the upgrade modal. */
-export const ALL_TIERS_INCLUDE_LINES = [
-  "Full 153-compound library",
+/** Lines shared by every tier (upgrade modal / pricing) except the catalog-size hook — use `buildAllTiersIncludeLines`. */
+const ALL_TIERS_INCLUDE_LINE_SUFFIXES = [
   "Stack builder + cycle calculator",
   "Dose logging + vial tracking",
   "Complete profile",
 ];
+
+/**
+ * @param {number} catalogCount — merged library size, e.g. `CATALOG_COUNT` from `catalog.js`
+ * @returns {string[]}
+ */
+export function buildAllTiersIncludeLines(catalogCount) {
+  const n = typeof catalogCount === "number" && Number.isFinite(catalogCount) ? Math.max(0, Math.floor(catalogCount)) : 0;
+  return [`Full ${n}-compound library`, ...ALL_TIERS_INCLUDE_LINE_SUFFIXES];
+}
 
 /** For upgrade / downgrade comparisons (Stripe tier vs selected tier). */
 export const TIER_RANK = { entry: 0, pro: 1, elite: 2, goat: 3 };

@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { PEPTIDES, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
+import { PEPTIDES, CATALOG_COUNT, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { HandleSetup } from "./components/HandleSetup.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
@@ -2552,7 +2552,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
           >
             <button
               type="button"
-              aria-label={`Library, ${PEPTIDES.length} compounds`}
+              aria-label={`Library, ${CATALOG_COUNT} compounds`}
               data-demo-target={DEMO_TARGET.nav_library}
               {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_library))}
               ref={(el) => {
@@ -2588,7 +2588,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 }}
                 aria-hidden
               >
-                {PEPTIDES.length}
+                {CATALOG_COUNT}
               </span>
               <span
                 className="pepv-emoji"

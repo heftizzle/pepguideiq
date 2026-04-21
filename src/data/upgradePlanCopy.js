@@ -1,9 +1,10 @@
 import {
-  ALL_TIERS_INCLUDE_LINES,
+  buildAllTiersIncludeLines,
   formatProgressPhotoSetsLabel,
   TIERS,
   TIER_ORDER,
 } from "../lib/tiers.js";
+import { CATALOG_COUNT } from "./catalog.js";
 
 /** Single bold hook per tier (marketing line). */
 const HEADLINES = {
@@ -48,7 +49,6 @@ function tierLimitBullets(id) {
   }
   lines.push(`${t.profiles} profile${t.profiles === 1 ? "" : "s"}`);
   if (t.inbody_dexa_upload) lines.push("InBody / DEXA scan upload");
-  if (t.claude_vision_ocr) lines.push("Vision OCR (scans)");
   if (t.shift_schedule) lines.push("Personalized dosing schedule");
   if (t.early_access) lines.push("Early access to new features");
   return lines;
@@ -77,7 +77,7 @@ export function getUpgradeTierRows() {
       subline: SUBLINES[id],
       color: colors[id],
       limitBullets: tierLimitBullets(id),
-      allTiersInclude: ALL_TIERS_INCLUDE_LINES,
+      allTiersInclude: buildAllTiersIncludeLines(CATALOG_COUNT),
     };
   });
 }

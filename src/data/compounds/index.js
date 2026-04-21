@@ -1,6 +1,7 @@
 /**
  * Batch-sourced compound rows (pre-merge into `PEPTIDES` via catalog.js).
  * Adding a batch: create batchN.js exporting BATCHN, then add import + spread below.
+ * Live merged library size (core + batches, popularity, stability) → `CATALOG_COUNT` in `catalog.js`.
  */
 import { BATCH1 } from "./batch1.js";
 import { BATCH2 } from "./batch2.js";
@@ -12,7 +13,7 @@ import { BATCH7 } from "./batch7.js";
 import { BATCH8 } from "./batch8.js";
 import { BATCH9 } from "./batch9.js";
 
-export const COMPOUNDS = [
+export const ALL_COMPOUNDS = [
   ...BATCH1,
   ...BATCH2,
   ...BATCH3,
@@ -23,3 +24,6 @@ export const COMPOUNDS = [
   ...BATCH8,
   ...BATCH9,
 ];
+
+/** @deprecated Prefer `ALL_COMPOUNDS` — same array reference. */
+export const COMPOUNDS = ALL_COMPOUNDS;

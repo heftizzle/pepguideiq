@@ -1613,6 +1613,43 @@ function paymentIntentClientSecretFromSubscriptionPayload(obj) {
   return null;
 }
 
+/** TEMPORARY — remove after debugging Stripe subscription create/update response shape. */
+function debugLogStripeCreateSubscriptionResponse(subJson, label) {
+  const inv = subJson?.latest_invoice;
+  const latestInvoiceType =
+    inv === null || inv === undefined ? "null/undefined" : typeof inv;
+  let paymentIntentType = "n/a";
+  let paymentIntentValue = "n/a";
+  if (inv && typeof inv === "object") {
+    const pi = inv.payment_intent;
+    paymentIntentType = pi === null || pi === undefined ? "null/undefined" : typeof pi;
+    if (typeof pi === "string") {
+      paymentIntentValue = pi;
+    } else if (pi && typeof pi === "object") {
+      paymentIntentValue = JSON.stringify({
+        id: pi.id,
+        has_client_secret: typeof pi.client_secret === "string",
+      });
+    } else {
+      paymentIntentValue = String(pi);
+    }
+  }
+  let rawBody = "";
+  try {
+    rawBody = JSON.stringify(subJson);
+  } catch {
+    rawBody = "[unserializable]";
+  }
+  console.error("[stripe create-subscription TEMP]", label, {
+    subscription_id: subJson?.id,
+    status: subJson?.status,
+    latest_invoice_type: latestInvoiceType,
+    latest_invoice_payment_intent_type: paymentIntentType,
+    latest_invoice_payment_intent_value: paymentIntentValue,
+    raw_stripe_response: rawBody,
+  });
+}
+
 async function supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, subscr) {
   if (!subscr || typeof subscr !== "object") return false;
   const priceId =
@@ -1872,6 +1909,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
         cors
       );
     }
+    debugLogStripeCreateSubscriptionResponse(subJson, "subscription_update_reuse");
     return respondStripeCreateSubscriptionPayload(
       env,
       supabaseUrl,
@@ -1908,6 +1946,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
       cors
     );
   }
+  debugLogStripeCreateSubscriptionResponse(subJson, "subscription_create_new");
   return respondStripeCreateSubscriptionPayload(
     env,
     supabaseUrl,
