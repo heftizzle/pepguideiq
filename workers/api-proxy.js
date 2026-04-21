@@ -1529,6 +1529,47 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
 }
 
 /**
+ * Persist Stripe customer id on profiles — column is not in authenticated UPDATE grants (047).
+ * Always uses `SUPABASE_SERVICE_ROLE_KEY` from env for `Authorization` (service_role JWT).
+ * When `SUPABASE_ANON_KEY` is set, tries `apikey: anon` + `Authorization: service` first (Supabase
+ * server pattern); falls back to both headers using the service key if needed.
+ * @returns {Promise<boolean>}
+ */
+async function supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl, userId, stripeCustomerId) {
+  const serviceRoleKey = (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
+  if (!serviceRoleKey) return false;
+  const anonKey = (env.SUPABASE_ANON_KEY ?? "").trim();
+  const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`;
+  const bodyJson = JSON.stringify({ stripe_customer_id: stripeCustomerId });
+  const headerSets = [];
+  if (anonKey) headerSets.push({ apikey: anonKey, Authorization: `Bearer ${serviceRoleKey}` });
+  headerSets.push({ apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` });
+
+  for (const h of headerSets) {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        ...h,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: bodyJson,
+    });
+    const raw = await res.text().catch(() => "");
+    let body;
+    try {
+      body = raw ? JSON.parse(raw) : null;
+    } catch {
+      body = null;
+    }
+    if (!res.ok) continue;
+    if (Array.isArray(body) && body.length > 0) return true;
+    if (body && typeof body === "object" && typeof body.id === "string") return true;
+  }
+  return false;
+}
+
+/**
  * @param {string} stripeKey
  * @param {string} path — e.g. `customers` or `subscriptions/sub_xxx` (no leading slash)
  * @param {Record<string, string>} fields — flat x-www-form-urlencoded keys (use `items[0][price]` style)
@@ -1615,7 +1656,7 @@ async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId,
     const msg = json?.error?.message || json?.error || `Stripe customer create failed (${ok ? 200 : "err"})`;
     return { ok: false, error: String(msg) };
   }
-  const patched = await supabasePatchProfile(supabaseUrl, serviceKey, userId, { stripe_customer_id: json.id });
+  const patched = await supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl, userId, json.id);
   if (!patched) {
     return { ok: false, error: "Could not save Stripe customer id" };
   }
@@ -2271,9 +2312,7 @@ async function supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, use
     return false;
   }
   if (stripeCustomerId) {
-    return supabasePatchProfile(supabaseUrl, serviceKey, userId, {
-      stripe_customer_id: stripeCustomerId,
-    });
+    return supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl, userId, stripeCustomerId);
   }
   return true;
 }
