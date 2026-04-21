@@ -1891,8 +1891,8 @@ export function ProfileTab({
 
       <div style={SECTION}>User</div>
       <Card>
-        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-          <div ref={setFieldRef("avatar")}>
+        <div className="pepv-profile-user-row" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <div ref={setFieldRef("avatar")} className="pepv-profile-user-avatar-wrap">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -1949,42 +1949,45 @@ export function ProfileTab({
             </button>
           </div>
           <input ref={fileRef} type="file" accept={R2_UPLOAD_ACCEPT_ATTR} hidden onChange={(e) => void onAvatarPick(e)} />
-          <div style={{ flex: "1 1 0", minWidth: 0 }}>
-            <div ref={setFieldRef("display_name")} style={{ marginBottom: 10 }}>
+          <div className="pepv-profile-user-fields" style={{ flex: "1 1 0", minWidth: 0 }}>
+            <div ref={setFieldRef("display_name")} style={{ marginBottom: 10, width: "100%" }}>
               <div
                 className="mono"
                 style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}
               >
                 DISPLAY NAME
               </div>
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                <input
-                  className="form-input"
-                  style={{
-                    fontSize: 17,
-                    fontWeight: 700,
-                    flex: "1 1 200px",
-                    minWidth: 0,
-                    fontFamily: "'Outfit', sans-serif",
-                  }}
-                  value={displayNameDraft}
-                  onChange={(e) => setDisplayNameDraft(e.target.value.slice(0, 120))}
-                  onBlur={() => void commitDisplayName()}
-                  placeholder="Your display name"
-                  aria-label="Display name"
-                />
-                {goalIds.slice(0, 6).map((gid) => (
-                  <span
-                    key={gid}
-                    className="pepv-emoji"
-                    style={{ fontSize: 20, lineHeight: 1 }}
-                    aria-hidden
-                    title={GOAL_OPTIONS.find((g) => g.id === gid)?.label ?? ""}
-                  >
-                    {goalEmojiFromId(gid)}
-                  </span>
-                ))}
-              </div>
+              <input
+                className="form-input"
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  minWidth: 0,
+                  fontFamily: "'Outfit', sans-serif",
+                }}
+                value={displayNameDraft}
+                onChange={(e) => setDisplayNameDraft(e.target.value.slice(0, 120))}
+                onBlur={() => void commitDisplayName()}
+                placeholder="Your display name"
+                aria-label="Display name"
+              />
+              {goalIds.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, alignItems: "center" }}>
+                  {goalIds.slice(0, 6).map((gid) => (
+                    <span
+                      key={gid}
+                      className="pepv-emoji"
+                      style={{ fontSize: 20, lineHeight: 1 }}
+                      aria-hidden
+                      title={GOAL_OPTIONS.find((g) => g.id === gid)?.label ?? ""}
+                    >
+                      {goalEmojiFromId(gid)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <div
               style={{
@@ -2006,7 +2009,7 @@ export function ProfileTab({
               </div>
               <input
                 className="form-input"
-                style={{ fontSize: 13, width: "100%", fontFamily: "'JetBrains Mono', monospace" }}
+                style={{ fontSize: 13, width: "100%", boxSizing: "border-box", fontFamily: "'JetBrains Mono', monospace" }}
                 value={handleDraft}
                 onChange={(e) => {
                   let v = e.target.value;
@@ -2043,7 +2046,14 @@ export function ProfileTab({
               </div>
               <textarea
                 className="form-input"
-                style={{ fontSize: 13, width: "100%", minHeight: 72, resize: "vertical", lineHeight: 1.45 }}
+                style={{
+                  fontSize: 13,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  minHeight: 72,
+                  resize: "vertical",
+                  lineHeight: 1.45,
+                }}
                 value={bioDraft}
                 onChange={(e) => setBioDraft(e.target.value.slice(0, 500))}
                 onBlur={() => void commitBio()}
@@ -2074,7 +2084,12 @@ export function ProfileTab({
                   </div>
                   <input
                     className="form-input"
-                    style={{ fontSize: 13, width: "100%", fontFamily: "'JetBrains Mono', monospace" }}
+                    style={{
+                      fontSize: 13,
+                      width: "100%",
+                      boxSizing: "border-box",
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}
                     value={socialDrafts[field.key] ?? ""}
                     onChange={(e) =>
                       setSocialDrafts((prev) => ({

@@ -2540,6 +2540,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
           }}
         >
           <div
+            className="pepv-bottom-nav-tabs"
             style={{
               maxWidth: 1200,
               margin: "0 auto",
@@ -2597,6 +2598,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 🧬
               </span>
               <span
+                className="pepv-bottom-nav-label"
                 style={{
                   fontSize: 13,
                   lineHeight: 1.15,
@@ -2681,7 +2683,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               >
                 {item.labelTop ? (
                   <span
-                    className="mono"
+                    className="mono pepv-bottom-nav-label"
                     style={{
                       fontSize: 10,
                       lineHeight: 1,
@@ -2704,6 +2706,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   {item.emoji}
                 </span>
                 <span
+                  className="pepv-bottom-nav-label"
                   style={{
                     fontSize: 13,
                     lineHeight: 1.15,

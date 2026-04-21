@@ -37,6 +37,49 @@ export function GlobalStyles() {
         overflow:visible;
         padding-bottom:32px;
       }
+      /* Profile User card: full-width inputs; stack avatar above fields at ≤360px (zoom / narrow viewports). */
+      .pepv-profile-user-fields input.form-input,
+      .pepv-profile-user-fields textarea.form-input{
+        width:100%;
+        max-width:100%;
+        box-sizing:border-box;
+      }
+      @media (max-width: 360px){
+        .pepv-profile-user-row{
+          flex-direction:column !important;
+          align-items:center !important;
+        }
+        .pepv-profile-user-avatar-wrap{
+          display:flex;
+          justify-content:center;
+          width:100%;
+        }
+        .pepv-profile-user-fields{
+          width:100% !important;
+          max-width:100%;
+        }
+        .pepv-profile-route{
+          padding-bottom:128px;
+        }
+      }
+      /* Bottom nav: pill labels never wrap; allow horizontal scroll if needed (≤360px). */
+      .pepv-bottom-nav-label{
+        white-space:nowrap;
+      }
+      @media (max-width: 360px){
+        .pepv-bottom-nav-tabs{
+          justify-content:flex-start;
+          overflow-x:auto;
+          flex-wrap:nowrap;
+          -webkit-overflow-scrolling:touch;
+          scrollbar-width:none;
+        }
+        .pepv-bottom-nav-tabs::-webkit-scrollbar{display:none}
+        .pepv-bottom-nav-tabs > button{
+          flex:0 0 auto;
+          min-width:max-content;
+        }
+      }
       @supports (min-height:100dvh){
         body{min-height:100dvh}
         .pepv-app-shell{min-height:100dvh}
