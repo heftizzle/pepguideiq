@@ -110,12 +110,6 @@ function turnstileBlockedMessage(unavailable) {
     : "Optional verification is still loading — you can sign in when email and password are ready.";
 }
 
-function turnstileSignupGateMessage(unavailable) {
-  return unavailable
-    ? "Bot verification unavailable — refresh the page or try again shortly before completing signup."
-    : "Complete the verification challenge above before selecting a plan.";
-}
-
 function turnstileForgotGateMessage(unavailable) {
   return unavailable
     ? "Bot verification unavailable — try again in a few minutes."
@@ -140,7 +134,6 @@ export function AuthScreen({ onAuth }) {
   /** EDON15 / TSource15 (and variants) captured from URL or localStorage — drives 15% off copy on plan cards. */
   const [partnerDiscountActive, setPartnerDiscountActive] = useState(false);
   const mainWidgetIdRef = useRef(null);
-  const plansWidgetIdRef = useRef(null);
   const forgotWidgetIdRef = useRef(null);
 
   useEffect(() => {
@@ -183,19 +176,6 @@ export function AuthScreen({ onAuth }) {
 
   const resetMainTurnstile = () => {
     const id = mainWidgetIdRef.current;
-    if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
-      try {
-        window.turnstile.reset(id);
-      } catch {
-        /* ignore */
-      }
-    }
-    setTurnstileToken(null);
-    setTurnstileUnavailable(false);
-  };
-
-  const resetPlansTurnstile = () => {
-    const id = plansWidgetIdRef.current;
     if (id != null && typeof window !== "undefined" && window.turnstile?.reset) {
       try {
         window.turnstile.reset(id);
@@ -283,79 +263,6 @@ export function AuthScreen({ onAuth }) {
       setTurnstileReady(false);
       const id = mainWidgetIdRef.current;
       mainWidgetIdRef.current = null;
-      if (id != null && window.turnstile?.remove) {
-        try {
-          window.turnstile.remove(id);
-        } catch {
-          /* ignore */
-        }
-      }
-    };
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode !== "plans") return;
-    if (!workerTurnstileEnforced()) return;
-    let cancelled = false;
-    plansWidgetIdRef.current = null;
-    setTurnstileReady(false);
-    setTurnstileUnavailable(false);
-    const stopPolling = waitForTurnstile(
-      () => {
-        if (cancelled) return;
-        const el = document.getElementById("turnstile-widget-plans");
-        if (!el || typeof window.turnstile === "undefined") {
-          setTurnstileUnavailable(true);
-          return;
-        }
-        el.innerHTML = "";
-        let widgetId;
-        try {
-          widgetId = window.turnstile.render("#turnstile-widget-plans", {
-            sitekey: TURNSTILE_SITE_KEY,
-            callback: (t) => {
-              setTurnstileToken(t);
-              setTurnstileUnavailable(false);
-            },
-            "expired-callback": () => setTurnstileToken(null),
-            "error-callback": () => setTurnstileToken(null),
-            "timeout-callback": () => setTurnstileToken(null),
-            retry: "auto",
-            "retry-interval": 8000,
-            "refresh-expired": "auto",
-            appearance: "always",
-            theme: "auto",
-          });
-        } catch {
-          setTurnstileUnavailable(true);
-          return;
-        }
-        if (cancelled) {
-          if (window.turnstile?.remove) {
-            try {
-              window.turnstile.remove(widgetId);
-            } catch {
-              /* ignore */
-            }
-          }
-          return;
-        }
-        plansWidgetIdRef.current = widgetId;
-        setTurnstileReady(true);
-      },
-      () => {
-        if (cancelled) return;
-        setTurnstileReady(false);
-        setTurnstileToken(null);
-        setTurnstileUnavailable(true);
-      }
-    );
-    return () => {
-      cancelled = true;
-      stopPolling();
-      setTurnstileReady(false);
-      const id = plansWidgetIdRef.current;
-      plansWidgetIdRef.current = null;
       if (id != null && window.turnstile?.remove) {
         try {
           window.turnstile.remove(id);
@@ -499,7 +406,7 @@ export function AuthScreen({ onAuth }) {
         if (turnstileToken) {
           logTurnstileTokenToWorker(turnstileToken);
         }
-        setTurnstileToken(null);
+        /* Keep token for Worker signup on plan pick; plans step has no Turnstile widget. */
         setMode("plans");
       }
     } finally {
@@ -535,30 +442,19 @@ export function AuthScreen({ onAuth }) {
 
   const selectPlan = async (planId) => {
     setError("");
-    const plansRequireTurnstileToken = workerTurnstileEnforced() && !turnstileUnavailable;
-    if (plansRequireTurnstileToken && !turnstileToken) {
-      setError("Please complete bot verification before signing up.");
-      return;
-    }
     setBusy(true);
     try {
-      if (turnstileToken) {
-        logTurnstileTokenToWorker(turnstileToken);
-      }
       const { error: err } = await signUp(
         form.name.trim(),
         form.email.trim(),
         form.password,
         planId,
-        turnstileToken,
-        workerTurnstileEnforced() && turnstileUnavailable ? { turnstileWidgetUnavailable: true } : {}
+        turnstileToken
       );
       if (err) {
         setError(err.message || "Sign up failed.");
-        resetPlansTurnstile();
         return;
       }
-      resetPlansTurnstile();
       const u = await getCurrentUser();
       if (u) {
         try {
@@ -568,9 +464,11 @@ export function AuthScreen({ onAuth }) {
         } catch {
           /* demo counter is best-effort */
         }
+        setTurnstileToken(null);
         onAuth(u);
         return;
       }
+      setTurnstileToken(null);
       setError("");
       setMode("checkEmail");
     } finally {
@@ -586,11 +484,7 @@ export function AuthScreen({ onAuth }) {
     !emailFilled ||
     !passwordFilled ||
     (mode === "register" && !registerNameFilled);
-  const plansSelectDisabled =
-    busy ||
-    (workerTurnstileEnforced() &&
-      !turnstileUnavailable &&
-      (!turnstileReady || !turnstileToken));
+  const plansSelectDisabled = busy;
   const forgotSubmitDisabled =
     busy || !emailFilled || (workerTurnstileEnforced() && (!turnstileReady || !turnstileToken));
 
@@ -825,20 +719,6 @@ export function AuthScreen({ onAuth }) {
         >
           SELECT YOUR PLAN
         </div>
-        {workerTurnstileEnforced() && (
-          <div
-            id="turnstile-widget-plans"
-            style={{ display: "flex", justifyContent: "center", marginBottom: 20, minHeight: 65 }}
-          />
-        )}
-        {workerTurnstileEnforced() && !turnstileReady && (
-          <div
-            className="mono"
-            style={{ fontSize: 12, color: turnstileUnavailable ? "var(--color-warning)" : "var(--color-text-secondary)", marginBottom: 16, textAlign: "center" }}
-          >
-            {turnstileSignupGateMessage(turnstileUnavailable)}
-          </div>
-        )}
         {partnerDiscountActive && (
           <div
             className="mono"
