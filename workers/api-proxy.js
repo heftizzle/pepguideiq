@@ -2643,12 +2643,126 @@ async function handleApiCancelSubscription(request, env, cors) {
   const endLabel = formatSubscriptionPeriodEndLabel(cpeNum);
   const planName = planTierDisplayName(stripeTier, env);
   if (email) {
+    const formattedDate = endLabel || "the end of your billing period";
     const safePlan = escapeHtml(planName);
-    const safeEnd = escapeHtml(endLabel || "the end of your billing period");
+    const safeEnd = escapeHtml(formattedDate);
     await resendSendEmail(env, {
       to: email,
-      subject: `PepGuideIQ — ${planName} subscription cancellation scheduled`,
-      html: `<p>Hi,</p><p>We received your request to cancel your <strong>${safePlan}</strong> subscription.</p><p>Your access continues until <strong>${safeEnd}</strong>. You will not be charged again for this subscription.</p><p>After that date, your account moves to the free Entry tier unless you reactivate before then.</p><p>— PepGuideIQ</p>`,
+      subject: `Your ${safePlan} plan is cancelled – access continues until ${safeEnd}`,
+      html: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Subscription Cancellation Scheduled</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0e1a;font-family:'Segoe UI',
+Arial,sans-serif;color:#e8eaf0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" 
+  style="background:#0a0e1a;padding:40px 20px;">
+  <tr><td align="center">
+
+    <table width="600" cellpadding="0" cellspacing="0" 
+      style="max-width:600px;width:100%;background:#0e1520;
+      border-radius:12px;border:1px solid #1e2a3a;overflow:hidden;">
+
+      <!-- HEADER -->
+      <tr>
+        <td style="background:linear-gradient(135deg,#0e1520 0%,#1a2435 100%);
+          padding:32px 40px;border-bottom:1px solid #1e2a3a;text-align:center;">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">
+            <span style="color:#4fc3f7;">pep</span><span 
+            style="color:#e8eaf0;">guide</span><span 
+            style="color:#4fc3f7;">IQ</span>
+          </div>
+          <div style="color:#7986a3;font-size:13px;margin-top:6px;
+            letter-spacing:1px;text-transform:uppercase;">
+            Subscription Update
+          </div>
+        </td>
+      </tr>
+
+      <!-- BODY -->
+      <tr>
+        <td style="padding:40px;">
+
+          <!-- STATUS BADGE -->
+          <div style="text-align:center;margin-bottom:32px;">
+            <span style="display:inline-block;background:#1a2435;
+              border:1px solid #2a3a50;border-radius:20px;
+              padding:8px 20px;font-size:13px;color:#7986a3;
+              letter-spacing:0.5px;text-transform:uppercase;">
+              Cancellation Scheduled
+            </span>
+          </div>
+
+          <p style="font-size:16px;color:#b0bcd4;margin:0 0 24px;
+            line-height:1.6;">
+            Your <strong style="color:#e8eaf0;">${safePlan} plan</strong> 
+            cancellation has been scheduled. You keep full access to every 
+            feature until your billing period ends.
+          </p>
+
+          <!-- ACCESS BOX -->
+          <div style="background:#0a0e1a;border:1px solid #1e2a3a;
+            border-left:3px solid #4fc3f7;border-radius:8px;
+            padding:20px 24px;margin:0 0 28px;">
+            <div style="font-size:12px;color:#7986a3;
+              text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+              Full Access Through
+            </div>
+            <div style="font-size:22px;font-weight:600;color:#4fc3f7;">
+              ${safeEnd}
+            </div>
+            <div style="font-size:13px;color:#7986a3;margin-top:4px;">
+              No further charges after this date
+            </div>
+          </div>
+
+          <p style="font-size:14px;color:#7986a3;margin:0 0 28px;
+            line-height:1.6;">
+            After ${safeEnd}, your account will automatically move to the free 
+            Entry tier. Your profile and logged data are never deleted.
+          </p>
+
+          <!-- REACTIVATE CTA -->
+          <div style="text-align:center;margin:32px 0;">
+            <a href="https://pepguideiq.com" 
+              style="display:inline-block;background:#4fc3f7;color:#0a0e1a;
+              font-weight:700;font-size:14px;padding:14px 32px;
+              border-radius:8px;text-decoration:none;letter-spacing:0.3px;">
+              Reactivate Anytime →
+            </a>
+            <div style="font-size:12px;color:#7986a3;margin-top:10px;">
+              Log in → Account Settings → Reactivate Subscription
+            </div>
+          </div>
+
+        </td>
+      </tr>
+
+      <!-- FOOTER -->
+      <tr>
+        <td style="background:#080c14;padding:24px 40px;
+          border-top:1px solid #1e2a3a;text-align:center;">
+          <p style="margin:0 0 8px;font-size:12px;color:#4a5568;">
+            pepguideIQ LLC · Riverview, FL
+          </p>
+          <p style="margin:0;font-size:12px;color:#4a5568;">
+            Questions? <a href="mailto:hello@pepguideiq.com" 
+            style="color:#4fc3f7;text-decoration:none;">
+            hello@pepguideiq.com</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+
+</body>
+</html>`,
       text: `We received your request to cancel your ${planName} subscription. Your access continues until ${endLabel || "the end of your billing period"}. You will not be charged again. After that, your account moves to the free Entry tier unless you reactivate.`,
     });
   }
