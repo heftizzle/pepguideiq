@@ -52,13 +52,11 @@ compatibility_date = "2024-12-01"
 [dev]
 port = 8787
 
-# Production: set ENVIRONMENT = "production" and ALLOWED_ORIGIN = "https://your-domain.com"
-# [vars]
-# ENVIRONMENT = "production"
-# ALLOWED_ORIGIN = "https://pepguideiq.com"
-# STRIPE_PRICE_ID_PRO = "price_1TM98cDtHiMNTdJ0FMxPf94X"
-# STRIPE_PRICE_ID_ELITE = "price_1TMCfYDtHiMNTdJ0urEVgoxc"
-# STRIPE_PRICE_ID_GOAT = "price_1TMCjnDtHiMNTdJ0CiOHHmQD"
+# Production: also set ENVIRONMENT = "production" and ALLOWED_ORIGIN in [vars] when ready (see checklist above)
+[vars]
+STRIPE_PRICE_ID_PRO = "price_1TM98cDtHiMNTdJ0FMxPf94X"
+STRIPE_PRICE_ID_ELITE = "price_1TMCfYDtHiMNTdJ0urEVgoxc"
+STRIPE_PRICE_ID_GOAT = "price_1TMCjnDtHiMNTdJ0CiOHHmQD"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
