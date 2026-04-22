@@ -794,12 +794,38 @@ async function fetchStripeSubscriptionExpanded(stripeKey, subscriptionId) {
   qs.append("expand[]", "items.data.price");
   qs.append("expand[]", "latest_invoice");
   qs.append("expand[]", "latest_invoice.payment_intent");
+  qs.append("expand[]", "pending_setup_intent");
   const r = await fetch(
     `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}?${qs}`,
     { headers: { Authorization: `Bearer ${stripeKey}` } }
   );
   if (!r.ok) return null;
   return r.json();
+}
+
+/**
+ * New customers / no default PM: subscription may have `pending_setup_intent` (seti_…) instead of invoice PI.
+ * @returns {Promise<string | null>}
+ */
+async function fetchStripeSetupIntentClientSecretFromSubscription(stripeKey, subJson) {
+  if (!stripeKey || !subJson || typeof subJson !== "object") return null;
+  const raw = subJson.pending_setup_intent;
+  if (raw && typeof raw === "object" && typeof raw.client_secret === "string") {
+    return raw.client_secret;
+  }
+  const id =
+    typeof raw === "string"
+      ? raw.trim()
+      : raw && typeof raw === "object" && typeof raw.id === "string"
+        ? raw.id.trim()
+        : "";
+  if (!id || !id.startsWith("seti_")) return null;
+  const r = await fetch(`https://api.stripe.com/v1/setup_intents/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j || typeof j.client_secret !== "string") return null;
+  return j.client_secret;
 }
 
 /** Best-effort immediate cancel (Stripe DELETE subscription). */
@@ -1730,6 +1756,10 @@ async function respondStripeCreateSubscriptionPayload(
       secret = paymentIntentClientSecretFromSubscriptionPayload(expanded);
     }
   }
+  if (!secret && stripeKey) {
+    const setupSecret = await fetchStripeSetupIntentClientSecretFromSubscription(stripeKey, effectiveSub);
+    if (setupSecret) secret = setupSecret;
+  }
   const st = typeof effectiveSub.status === "string" ? effectiveSub.status : "";
   if (secret) {
     return jsonResponse({ client_secret: secret, subscription_id: sid || null, status: st }, 200, cors);
@@ -1893,6 +1923,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
     }
     formBody.append("expand[]", "latest_invoice");
     formBody.append("expand[]", "latest_invoice.payment_intent");
+    formBody.append("expand[]", "pending_setup_intent");
     const up = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(existing.id)}`, {
       method: "POST",
       headers: {
@@ -1930,6 +1961,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
   createBody.append("metadata[plan]", plan);
   createBody.append("expand[]", "latest_invoice");
   createBody.append("expand[]", "latest_invoice.payment_intent");
+  createBody.append("expand[]", "pending_setup_intent");
   const cr = await fetch("https://api.stripe.com/v1/subscriptions", {
     method: "POST",
     headers: {
