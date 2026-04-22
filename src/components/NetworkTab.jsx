@@ -2,12 +2,57 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
 import { NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
 import { fetchNetworkFeed, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
-import { isSupabaseConfigured } from "../lib/config.js";
+import { API_WORKER_URL, isSupabaseConfigured } from "../lib/config.js";
+import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
+
+const AVATAR_BASE = `${String(API_WORKER_URL || "").replace(/\/$/, "")}/avatars`;
+
+/**
+ * Public avatar image URL. Prefer full R2 key (`userId/member-profiles/…`) via Worker `/avatars/{key}`;
+ * otherwise `{userId}/{r2Key}` when `r2Key` is a bare filename.
+ * @param {string | null | undefined} userId
+ * @param {string | null | undefined} r2Key
+ * @returns {string | null}
+ */
+function buildAvatarUrl(userId, r2Key) {
+  const key = typeof r2Key === "string" ? r2Key.trim() : "";
+  if (!key || key.includes("..")) return null;
+  if (key.includes("/")) {
+    const u = resolveMemberAvatarDisplayUrlFromKey(key);
+    return u || null;
+  }
+  const uid = typeof userId === "string" ? userId.trim() : "";
+  if (!uid || !String(API_WORKER_URL || "").trim()) return null;
+  return `${AVATAR_BASE}/${uid}/${key}`;
+}
+
+/**
+ * @param {{ userId?: string | null; r2Key?: string | null }} p
+ */
+function NetworkAvatar({ userId, r2Key }) {
+  const src = buildAvatarUrl(userId, r2Key);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      draggable={false}
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        objectFit: "cover",
+        flexShrink: 0,
+        border: "1px solid var(--color-border-default)",
+      }}
+    />
+  );
+}
 
 /** Tier emoji for Network stack cards (aligned with `TIERS` / plan cards). */
 function networkTierEmoji(tier) {
@@ -106,6 +151,8 @@ function InbodyNetworkProgressCard({ row }) {
   const deltas = o.deltas != null && typeof o.deltas === "object" ? /** @type {Record<string, unknown>} */ (o.deltas) : {};
   const selected = Array.isArray(o.selectedMetrics) ? o.selectedMetrics.map(String) : [];
   const stackSnap = Array.isArray(o.stackSnapshot) ? o.stackSnapshot : [];
+  const userId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+  const avatarR2Key = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
   const handle = typeof row.handle === "string" ? row.handle.trim() : "";
   const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";
   const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
@@ -142,6 +189,7 @@ function InbodyNetworkProgressCard({ row }) {
       }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+        <NetworkAvatar userId={userId} r2Key={avatarR2Key} />
         {handle ? (
           <button
             type="button"
@@ -540,6 +588,8 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             const expiresAt = typeof row.expires_at === "string" ? row.expires_at : "";
             const expiresSoon = isExpiresWithinHours(expiresAt, 6);
             const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
+            const userId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+            const avatarR2Key = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
 
             return (
               <div
@@ -557,6 +607,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                 }}
               >
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+                  <NetworkAvatar userId={userId} r2Key={avatarR2Key} />
                   {handle ? (
                     <button
                       type="button"
@@ -693,6 +744,8 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             const tierEmoji = networkTierEmoji(tier);
             const url = shareId ? buildStackShareUrl(shareId) : "";
             const compoundLabel = `${compoundCount} compound${compoundCount === 1 ? "" : "s"}`;
+            const stackUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+            const stackAvatarKey = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
 
             return (
               <div
@@ -724,39 +777,42 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                    {handle ? (
-                      <button
-                        type="button"
-                        className="mono"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openPublicMemberProfile(handle);
-                        }}
-                        style={{
-                          fontSize: 14,
-                          color: "var(--color-accent)",
-                          marginBottom: 6,
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                          textAlign: "left",
-                          textDecoration: "underline",
-                          textDecorationColor: "var(--color-accent-subtle-50)",
-                          textUnderlineOffset: 3,
-                        }}
-                      >
-                        {formatHandleDisplay(handle)}
-                      </button>
-                    ) : (
-                      <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 0 }}>
-                        {displayName}
-                      </div>
-                    )}
-                    {handle ? (
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{displayName}</div>
-                    ) : null}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+                    <NetworkAvatar userId={stackUserId} r2Key={stackAvatarKey} />
+                    <div style={{ minWidth: 0 }}>
+                      {handle ? (
+                        <button
+                          type="button"
+                          className="mono"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPublicMemberProfile(handle);
+                          }}
+                          style={{
+                            fontSize: 14,
+                            color: "var(--color-accent)",
+                            marginBottom: 6,
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            textAlign: "left",
+                            textDecoration: "underline",
+                            textDecorationColor: "var(--color-accent-subtle-50)",
+                            textUnderlineOffset: 3,
+                          }}
+                        >
+                          {formatHandleDisplay(handle)}
+                        </button>
+                      ) : (
+                        <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 0 }}>
+                          {displayName}
+                        </div>
+                      )}
+                      {handle ? (
+                        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{displayName}</div>
+                      ) : null}
+                    </div>
                   </div>
                   <span className="pepv-emoji" style={{ fontSize: 22, flexShrink: 0 }} title={tier} aria-hidden>
                     {tierEmoji}
