@@ -340,7 +340,7 @@ export function GlobalStyles() {
       }
       .pepv-dose-toast-wrap{
         position:fixed;left:50%;top:auto;
-        bottom:calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+        bottom:calc(env(safe-area-inset-bottom, 0px) + 7rem);
         transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),440px);
         pointer-events:none;box-sizing:border-box;padding:0 12px;
       }
