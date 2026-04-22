@@ -427,8 +427,9 @@ function MediaPostCard({ row }) {
           style={{
             width: "100%",
             display: "block",
-            maxHeight: 480,
-            objectFit: "cover",
+            objectFit: "contain",
+            background: "var(--color-bg-sunken)",
+            maxHeight: 600,
           }}
         />
       ) : null}
