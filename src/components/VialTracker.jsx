@@ -951,13 +951,13 @@ function DoseHistoryCalendar({
               const meta = [timeStr, sess].filter(Boolean).join(" · ");
               return (
                 <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none" }}>
+                  {typeof onDeleteDoseLog === "function" && typeof log.id === "string" && log.id.trim() ? (
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                  ) : null}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="mono" style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
                     <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>{amount}{meta ? ` · ${meta}` : ""}</div>
                   </div>
-                  {typeof onDeleteDoseLog === "function" && typeof log.id === "string" && log.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
-                  ) : null}
                 </div>
               );
             })}
@@ -1349,13 +1349,13 @@ function VialRow({
               </div>
               {doses.map((d) => (
                 <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
+                  {canMutate && typeof onDeleteDoseLog === "function" && typeof d.id === "string" && d.id.trim() ? (
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                  ) : null}
                   <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
                     {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry)}
                     {d.notes ? ` · ${d.notes}` : ""}
                   </span>
-                  {canMutate && typeof onDeleteDoseLog === "function" && typeof d.id === "string" && d.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
-                  ) : null}
                 </div>
               ))}
             </div>
