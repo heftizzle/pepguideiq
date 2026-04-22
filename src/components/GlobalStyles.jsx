@@ -333,18 +333,19 @@ export function GlobalStyles() {
         50%{outline-color:var(--color-demo-pulse-outline-2);box-shadow:0 0 18px var(--color-demo-pulse-shadow-2)}
       }
       @keyframes pepv-dose-toast-anim{
-        0%{opacity:0;transform:translateY(-8px)}
+        0%{opacity:0;transform:translateY(8px)}
         12%{opacity:1;transform:translateY(0)}
-        72%{opacity:1;transform:translateY(0)}
-        100%{opacity:0;transform:translateY(-4px)}
+        85%{opacity:1;transform:translateY(0)}
+        100%{opacity:0;transform:translateY(4px)}
       }
       .pepv-dose-toast-wrap{
-        position:fixed;left:50%;top:max(5.25rem,calc(env(safe-area-inset-top,0px) + 3.5rem));
+        position:fixed;left:50%;top:auto;
+        bottom:calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
         transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),440px);
         pointer-events:none;box-sizing:border-box;padding:0 12px;
       }
       .pepv-dose-toast-inner{
-        animation:pepv-dose-toast-anim 3.5s cubic-bezier(0.22,1,0.36,1) forwards;
+        animation:pepv-dose-toast-anim 5.3s cubic-bezier(0.22,1,0.36,1) forwards;
         background:var(--color-bg-card);border:1px solid var(--color-accent);color:var(--color-accent);min-height:44px;
         padding:12px 20px;border-radius:10px;font-size:14px;line-height:1.45;text-align:center;
         box-shadow:0 10px 40px var(--color-shadow-50);

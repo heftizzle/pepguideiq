@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * Global post–dose confirmation (fixed below top chrome, clears header + notch).
+ * Global post–dose confirmation (fixed above bottom nav, clears home indicator + notch).
  * @param {{ message: string | null; onDismiss: () => void }} props
  */
 export function DoseToast({ message, onDismiss }) {
   useEffect(() => {
     if (!message) return;
-    const t = window.setTimeout(() => onDismiss(), 4500);
+    const t = window.setTimeout(() => onDismiss(), 5300);
     return () => window.clearTimeout(t);
   }, [message, onDismiss]);
 
