@@ -1891,7 +1891,6 @@ async function handleStripeCreateSubscription(request, env, cors) {
 
   const expandFields = {
     "metadata[plan]": plan,
-    payment_behavior: "default_incomplete",
     "payment_settings[save_default_payment_method]": "on_subscription",
   };
 
@@ -1924,6 +1923,7 @@ async function handleStripeCreateSubscription(request, env, cors) {
     formBody.append("expand[]", "latest_invoice");
     formBody.append("expand[]", "latest_invoice.payment_intent");
     formBody.append("expand[]", "pending_setup_intent");
+    formBody.append("payment_behavior", "default_incomplete");
     const up = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(existing.id)}`, {
       method: "POST",
       headers: {
@@ -1956,12 +1956,12 @@ async function handleStripeCreateSubscription(request, env, cors) {
   const createBody = new URLSearchParams();
   createBody.append("customer", customerId);
   createBody.append("items[0][price]", priceId);
-  createBody.append("payment_behavior", "default_incomplete");
   createBody.append("payment_settings[save_default_payment_method]", "on_subscription");
   createBody.append("metadata[plan]", plan);
   createBody.append("expand[]", "latest_invoice");
   createBody.append("expand[]", "latest_invoice.payment_intent");
   createBody.append("expand[]", "pending_setup_intent");
+  createBody.append("payment_behavior", "default_incomplete");
   const cr = await fetch("https://api.stripe.com/v1/subscriptions", {
     method: "POST",
     headers: {
