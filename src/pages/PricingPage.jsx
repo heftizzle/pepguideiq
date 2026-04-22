@@ -6,14 +6,6 @@ import { Logo } from "../components/Logo.jsx";
 const BG = "var(--color-bg-page)";
 const ACCENT = "var(--color-accent)";
 
-/** Marketing emojis (override catalog tier emojis on this page). */
-const TIER_EMOJI = {
-  entry: "🌱",
-  pro: "🔬",
-  elite: "⚡",
-  goat: "🐐",
-};
-
 function tierCtaHref(id) {
   if (id === "entry") return buildSignupHref({});
   return buildSignupHref({ plan: id });
@@ -107,7 +99,7 @@ function PricingPage() {
         }}
       >
         {rows.map((row) => {
-          const emoji = TIER_EMOJI[row.id] ?? row.emoji;
+          const emoji = row.emoji;
           const borderColor = row.id === "entry" ? "var(--color-border-tab)" : row.color;
           return (
             <article
@@ -172,7 +164,7 @@ function PricingPage() {
                   textAlign: "left",
                 }}
               >
-                {row.limitBullets.slice(0, 5).map((line) => (
+                {row.limitBullets.map((line) => (
                   <li key={line} style={{ marginBottom: 4 }}>
                     {line}
                   </li>

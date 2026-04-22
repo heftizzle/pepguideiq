@@ -7,18 +7,12 @@ import { buildStackShareUrl } from "../lib/stackShare.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
+import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
-/** Tier emoji for Network stack cards (entry shown as free 🌱). */
-const NETWORK_TIER_EMOJI = {
-  entry: "🌱",
-  pro: "🔬",
-  elite: "⚡",
-  goat: "🐐",
-};
-
+/** Tier emoji for Network stack cards (aligned with `TIERS` / plan cards). */
 function networkTierEmoji(tier) {
   const t = typeof tier === "string" ? tier.trim().toLowerCase() : "entry";
-  return NETWORK_TIER_EMOJI[t] ?? NETWORK_TIER_EMOJI.entry;
+  return (TIERS[t] ?? TIERS.entry).emoji;
 }
 
 function formatTimeAgo(iso) {
@@ -724,6 +718,9 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
                   gap: 10,
                   fontFamily: "'Outfit', sans-serif",
                   color: "var(--color-text-primary)",
+                  borderLeft: `3px solid ${tierAccentCssVar(tier)}`,
+                  paddingLeft: 12,
+                  boxSizing: "border-box",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>

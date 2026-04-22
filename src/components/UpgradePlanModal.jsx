@@ -4,27 +4,17 @@ import { getUpgradeTierRows } from "../data/upgradePlanCopy.js";
 import { isApiWorkerConfigured } from "../lib/config.js";
 import { createStripeSubscription, fetchStripeSubscription, scheduleDowngrade } from "../lib/stripeSubscription.js";
 import { getCurrentUser } from "../lib/supabase.js";
-import { formatPlan, getNextTierId, TIER_ORDER, TIER_RANK } from "../lib/tiers.js";
+import { formatPlan, getNextTierId, TIERS, TIER_ORDER, TIER_RANK } from "../lib/tiers.js";
 import { getSuggestedUpgradeTier, getUpgradeGateCopy } from "../lib/upgradeGateCopy.js";
 
 const ROWS = getUpgradeTierRows();
 
-/** Modal-only accents (do not change tier pricing / Stripe ids). */
-const TIER_ACCENTS = {
-  entry: "#22c55e",
-  pro: "#06b6d4",
-  elite: "#a855f7",
-  goat: "#f59e0b",
-};
-
-const CARD_EMOJI = {
-  entry: "🌱",
-  pro: "🔬",
-  elite: "⚡",
-  goat: "🐐",
-};
-
 const CTA_DARK_TEXT = "#0f172a";
+
+/** Modal glow / CTA fill — solid hex from `TIERS.*.modalGlowHex` (Elite amber, GOAT purple). */
+function tierModalGlowHex(rowId) {
+  return TIERS[rowId]?.modalGlowHex ?? "#64748b";
+}
 
 function hexToRgbTriple(hex) {
   const h = String(hex).replace("#", "");
@@ -61,7 +51,7 @@ function neutralDisabledCtaStyle() {
 
 /** @param {string} rowId */
 function tierPrimaryCtaStyle(rowId, disabled) {
-  const accent = TIER_ACCENTS[rowId] ?? "#64748b";
+  const accent = tierModalGlowHex(rowId);
   const isGoat = rowId === "goat";
   const base = {
     width: "100%",
@@ -85,10 +75,10 @@ function tierPrimaryCtaStyle(rowId, disabled) {
     return { ...base, background: accent, color: CTA_DARK_TEXT, border: "none" };
   }
   if (rowId === "elite") {
-    return { ...base, background: accent, color: "#ffffff", border: "none" };
+    return { ...base, background: accent, color: CTA_DARK_TEXT, border: "none" };
   }
   if (rowId === "goat") {
-    return { ...base, background: accent, color: CTA_DARK_TEXT, border: "none" };
+    return { ...base, background: accent, color: "#ffffff", border: "none" };
   }
   return { ...base, ...neutralDisabledCtaStyle() };
 }
@@ -368,9 +358,9 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
 
   const renderPricingTierCard = (row) => {
     const isGoat = row.id === "goat";
-    const accent = TIER_ACCENTS[row.id];
+    const accent = tierModalGlowHex(row.id);
     const rgb = hexToRgbTriple(accent);
-    const emoji = CARD_EMOJI[row.id];
+    const emoji = row.emoji;
     const hover = hoverTierId === row.id;
     const isCurrent = row.id === stripeTier;
     const isNext = row.id === nextStripeTier;
@@ -428,8 +418,8 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
               fontWeight: 800,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: CTA_DARK_TEXT,
-              background: "rgba(245, 158, 11, 0.92)",
+              color: "#ffffff",
+              background: "rgba(168, 85, 247, 0.92)",
               padding: "5px 10px",
               borderRadius: 6,
             }}
@@ -476,8 +466,6 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{row.subline}</div>
 
         <ul style={featureListStyle}>{row.limitBullets.map(checkRow)}</ul>
-
-        <ul style={featureListStyle}>{row.allTiersInclude.map(checkRow)}</ul>
 
         <div style={{ marginTop: "auto", paddingTop: 8 }}>{renderTierActions(row)}</div>
       </div>

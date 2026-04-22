@@ -8,6 +8,10 @@ export const TIERS = {
   entry: {
     name: "Entry",
     emoji: "💸",
+    /** Plan card border on Pricing / signup (`PLANS`). */
+    cardAccent: "#b0bec5",
+    /** Solid hex for Upgrade modal RGB glows + CTAs (`hexToRgbTriple`). */
+    modalGlowHex: "#22c55e",
     price: 0,
     label: "Free",
     ai_guide_calls_per_day: 2,
@@ -29,6 +33,8 @@ export const TIERS = {
   pro: {
     name: "Pro",
     emoji: "🔬",
+    cardAccent: "var(--color-accent)",
+    modalGlowHex: "#06b6d4",
     price: 8.99,
     label: "$8.99/mo",
     ai_guide_calls_per_day: 4,
@@ -48,6 +54,9 @@ export const TIERS = {
   elite: {
     name: "Elite",
     emoji: "⚡",
+    /** Elite = amber / gold (matches `--tier-elite` in themes). */
+    cardAccent: "#f59e0b",
+    modalGlowHex: "#f59e0b",
     price: 16.99,
     label: "$16.99/mo",
     ai_guide_calls_per_day: 8,
@@ -67,6 +76,9 @@ export const TIERS = {
   goat: {
     name: "GOAT",
     emoji: "🐐",
+    /** GOAT = purple (matches `--tier-goat` in themes). */
+    cardAccent: "#a855f7",
+    modalGlowHex: "#a855f7",
     price: 22.99,
     label: "$22.99/mo",
     ai_guide_calls_per_day: 16,
@@ -87,20 +99,88 @@ export const TIERS = {
 
 export const TIER_ORDER = ["entry", "pro", "elite", "goat"];
 
-/** Lines shared by every tier (upgrade modal / pricing) except the catalog-size hook — use `buildAllTiersIncludeLines`. */
-const ALL_TIERS_INCLUDE_LINE_SUFFIXES = [
-  "Stack builder + cycle calculator",
-  "Dose logging + vial tracking",
-  "Complete profile",
-];
+/**
+ * Theme tier token for inline `color` / `borderColor` (see `themes.css` `--tier-*`).
+ * @param {string | null | undefined} plan
+ */
+export function tierAccentCssVar(plan) {
+  const p = String(plan ?? "entry").trim().toLowerCase();
+  if (p === "pro") return "var(--tier-pro)";
+  if (p === "elite") return "var(--tier-elite)";
+  if (p === "goat") return "var(--tier-goat)";
+  return "var(--tier-entry)";
+}
 
 /**
+ * Entry-tier-only lines (full library + core tools). Shown on Entry cards only — paid tiers list differentiators on top of this baseline.
  * @param {number} catalogCount — merged library size, e.g. `CATALOG_COUNT` from `catalog.js`
  * @returns {string[]}
  */
-export function buildAllTiersIncludeLines(catalogCount) {
+export function buildEntryTierBaseFeatureLines(catalogCount) {
   const n = typeof catalogCount === "number" && Number.isFinite(catalogCount) ? Math.max(0, Math.floor(catalogCount)) : 0;
-  return [`Full ${n}-compound library`, ...ALL_TIERS_INCLUDE_LINE_SUFFIXES];
+  return [`Full ${n}-compound library`, "Stack builder + dose logging", "Vial tracker"];
+}
+
+function aiModelDisplayNameForPlanCard(id) {
+  return (TIERS[id] ?? TIERS.entry).ai_guide_model === "sonnet" ? "Deep Intel AI" : "Standard AI";
+}
+
+function profileLineForPlanCard(id) {
+  const n = TIERS[id]?.profiles ?? 1;
+  return n === 1 ? "1 profile" : `${n} profiles`;
+}
+
+/** @returns {string | null} `null` when omitted from card (GOAT list in product copy). */
+function progressPhotosLineForPlanCard(id) {
+  if (id === "goat") return null;
+  const p = TIERS[id]?.progress_photo_sets;
+  if (typeof p === "number" && Number.isFinite(p)) {
+    return p === 1 ? "Progress photos: 1 set" : `Progress photos: ${p} sets`;
+  }
+  return "Progress photos: unlimited";
+}
+
+/**
+ * Feature bullets for pricing, upgrade modal, and signup plan cards.
+ * Entry appends {@link buildEntryTierBaseFeatureLines}; Pro / Elite / GOAT list differentiators only (stacked on top of Entry in UX).
+ * @param {string} id
+ * @param {number} catalogCount
+ * @returns {string[]}
+ */
+export function getTierPlanCardBullets(id, catalogCount) {
+  const t = TIERS[id] ?? TIERS.entry;
+  const lim = typeof t.stackLimit === "number" && Number.isFinite(t.stackLimit) ? t.stackLimit : 2;
+  const track = `Track up to ${lim} compounds`;
+  const ai = `AI Guide: ${t.ai_guide_calls_per_day}/day (${aiModelDisplayNameForPlanCard(id)})`;
+  const sa = `Stack Advisor: ${t.stack_advisor_calls_per_day}/day`;
+  const prof = profileLineForPlanCard(id);
+  const photo = progressPhotosLineForPlanCard(id);
+
+  if (id === "entry") {
+    const out = [track, ai, sa, prof];
+    if (photo) out.push(photo);
+    out.push(...buildEntryTierBaseFeatureLines(catalogCount));
+    return out;
+  }
+  if (id === "pro") {
+    const out = [track, ai, sa, prof];
+    if (photo) out.push(photo);
+    out.push("InBody / DEXA scan upload");
+    return out;
+  }
+  if (id === "elite") {
+    const out = [track, ai, sa, prof];
+    if (photo) out.push(photo);
+    out.push("InBody / DEXA scan upload", "Personalized dosing schedule");
+    return out;
+  }
+  if (id === "goat") {
+    return [track, ai, sa, prof, "InBody / DEXA scan upload", "Personalized dosing schedule", "Early access to new features"];
+  }
+  const out = [track, ai, sa, prof];
+  if (photo) out.push(photo);
+  out.push(...buildEntryTierBaseFeatureLines(catalogCount));
+  return out;
 }
 
 /** For upgrade / downgrade comparisons (Stripe tier vs selected tier). */

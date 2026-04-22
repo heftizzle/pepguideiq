@@ -1,4 +1,4 @@
-import { buildAllTiersIncludeLines, formatProgressPhotoSetsLabel, TIERS, formatPrice } from "../lib/tiers.js";
+import { getTierPlanCardBullets, TIERS, formatPrice } from "../lib/tiers.js";
 import { COMPOUNDS } from "./compounds/index.js";
 import { normalizeNewCatalogEntry } from "../lib/normalizeNewCatalogEntry.js";
 import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
@@ -302,54 +302,27 @@ const PLAN_CONFIG = [
   {
     id: "entry",
     period: "forever",
-    color: "#b0bec5",
-    features: [
-      `${TIERS.entry.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,
-      `${TIERS.entry.stack_advisor_calls_per_day} Stack Advisor calls/day`,
-      `${formatProgressPhotoSetsLabel(TIERS.entry.progress_photo_sets)} progress photos`,
-      `${TIERS.entry.profiles} profile`,
-      ...buildAllTiersIncludeLines(CATALOG_COUNT),
-    ],
+    color: TIERS.entry.cardAccent,
+    features: getTierPlanCardBullets("entry", CATALOG_COUNT),
   },
   {
     id: "pro",
     period: "/mo",
-    color: "var(--color-accent)",
+    color: TIERS.pro.cardAccent,
     popular: true,
-    features: [
-      `${TIERS.pro.ai_guide_calls_per_day} AI Guide calls/day (Haiku)`,
-      `${TIERS.pro.stack_advisor_calls_per_day} Stack Advisor calls/day`,
-      `${formatProgressPhotoSetsLabel(TIERS.pro.progress_photo_sets)} progress photos`,
-      "InBody / DEXA scan upload",
-      `${TIERS.pro.profiles} profile`,
-      ...buildAllTiersIncludeLines(CATALOG_COUNT),
-    ],
+    features: getTierPlanCardBullets("pro", CATALOG_COUNT),
   },
   {
     id: "elite",
     period: "/mo",
-    color: "#f59e0b",
-    features: [
-      `${TIERS.elite.ai_guide_calls_per_day} AI Guide calls/day (Sonnet)`,
-      `${TIERS.elite.stack_advisor_calls_per_day} Stack Advisor calls/day`,
-      `${formatProgressPhotoSetsLabel(TIERS.elite.progress_photo_sets)} progress photos`,
-      `${TIERS.elite.profiles} profiles`,
-      "Claude Vision OCR · Shift schedule",
-      ...buildAllTiersIncludeLines(CATALOG_COUNT),
-    ],
+    color: TIERS.elite.cardAccent,
+    features: getTierPlanCardBullets("elite", CATALOG_COUNT),
   },
   {
     id: "goat",
     period: "/mo",
-    color: "#a855f7",
-    features: [
-      `${TIERS.goat.ai_guide_calls_per_day} AI Guide calls/day (Sonnet)`,
-      `${TIERS.goat.stack_advisor_calls_per_day} Stack Advisor calls/day`,
-      `${formatProgressPhotoSetsLabel(TIERS.goat.progress_photo_sets)} progress photos`,
-      `${TIERS.goat.profiles} profiles`,
-      "Founding member · Early access",
-      ...buildAllTiersIncludeLines(CATALOG_COUNT),
-    ],
+    color: TIERS.goat.cardAccent,
+    features: getTierPlanCardBullets("goat", CATALOG_COUNT),
   },
 ];
 

@@ -8,7 +8,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
 
 ### Stripe
-- `POST /stripe/webhook` — event handler: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`. Syncs plan via `update_user_plan`.
+- `POST /stripe/webhook` — event handler: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`. Syncs plan via `update_user_plan`. After a successful paid `checkout.session.completed`, sends a Resend confirmation email (plan + amount + CTA) when `RESEND_API_KEY` is set.
 - `GET /stripe/subscription` — current user's sub info.
 - `POST /stripe/subscription/schedule-downgrade` — sets `profiles.pending_plan` + `pending_plan_date` from Stripe period end.
 - `POST /stripe/create-customer`
@@ -97,7 +97,7 @@ bucket_name = "stack-photos"
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — required
 - `SUPABASE_ANON_KEY` — same value as `VITE_SUPABASE_ANON_KEY`; required for `POST /auth/signup` and `POST /auth/password-reset` (Turnstile-gated auth proxy)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — required for billing
-- `RESEND_API_KEY` — optional; enables transactional email on subscription cancel scheduling
+- `RESEND_API_KEY` — optional; enables transactional email on subscription cancel scheduling and post-checkout welcome/confirmation
 - `TURNSTILE_SECRET_KEY` — required when the app sets `VITE_TURNSTILE_SITE_KEY`
 
 ## Vars (non-secret)

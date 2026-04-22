@@ -48,6 +48,7 @@ import { hasInjectableRoute } from "./lib/doseRouteKind.js";
 import { findCatalogPeptideForStackRow } from "./lib/resolveStackCatalogPeptide.js";
 import {
   getCurrentUser,
+  getCurrentUserFreshAfterCheckout,
   getSessionAccessToken,
   loadStack,
   onAuthStateChange,
@@ -2813,9 +2814,30 @@ export default function PepGuideIQ() {
     }
     let cancelled = false;
     (async () => {
-      const u = await getCurrentUser();
+      let checkoutSuccess = false;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        checkoutSuccess = params.get("checkout") === "success";
+      } catch {
+        /* ignore */
+      }
+      const u = checkoutSuccess
+        ? await getCurrentUserFreshAfterCheckout()
+        : await getCurrentUser();
       if (!cancelled && u) setUser(u);
       if (!cancelled) setAuthReady(true);
+      if (!cancelled && checkoutSuccess) {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          params.delete("checkout");
+          const qs = params.toString();
+          const path = window.location.pathname || "/";
+          const hash = window.location.hash || "";
+          window.history.replaceState({}, "", `${path}${qs ? `?${qs}` : ""}${hash}`);
+        } catch {
+          /* ignore */
+        }
+      }
     })();
     const {
       data: { subscription },

@@ -11,17 +11,11 @@ import { buildStackShareUrl } from "../lib/stackShare.js";
 import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
-
-const TIER_EMOJI = {
-  entry: "🌱",
-  pro: "🔬",
-  elite: "⚡",
-  goat: "🐐",
-};
+import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
 function tierEmoji(t) {
   const k = String(t ?? "").toLowerCase();
-  return TIER_EMOJI[k] ?? TIER_EMOJI.entry;
+  return (TIERS[k] ?? TIERS.entry).emoji;
 }
 
 function initialsFromProfile(displayName, handle) {
@@ -281,7 +275,16 @@ export function PublicMemberProfilePage({
                 <span title="Plan tier" aria-hidden>
                   {tierEmoji(plan)}
                 </span>
-                <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>{plan}</span>
+                <span
+                  style={{
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: tierAccentCssVar(plan),
+                    fontWeight: 600,
+                  }}
+                >
+                  {plan}
+                </span>
                 {locationLine ? (
                   <>
                     <span aria-hidden>·</span>

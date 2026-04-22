@@ -2550,6 +2550,147 @@ function formatSubscriptionPeriodEndLabel(unixSec) {
   }
 }
 
+/** Stripe Checkout `amount_total` (minor units) + ISO currency → display string for transactional email. */
+function formatStripeAmountChargedLine(amountTotal, currency) {
+  const n = typeof amountTotal === "number" ? amountTotal : Number(amountTotal);
+  if (!Number.isFinite(n) || n < 0) return "";
+  const cur = typeof currency === "string" && currency.trim() ? currency.trim().toUpperCase() : "USD";
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format(n / 100);
+  } catch {
+    return `${(n / 100).toFixed(2)} ${cur}`;
+  }
+}
+
+/**
+ * Post-checkout welcome / confirmation (same table layout as cancel-subscription Resend mail).
+ * `RESEND_API_KEY` optional — `resendSendEmail` no-ops when missing.
+ */
+async function resendSendCheckoutPlanConfirmationEmail(env, { to, planDisplayName, amountChargedLine }) {
+  const dest = typeof to === "string" ? to.trim() : "";
+  if (!dest) return;
+  const safePlan = escapeHtml(planDisplayName);
+  const hasAmount = typeof amountChargedLine === "string" && amountChargedLine.trim();
+  const safeAmount = hasAmount ? escapeHtml(amountChargedLine.trim()) : "";
+  const amountHtml = hasAmount
+    ? `<div style="font-size:22px;font-weight:600;color:#4fc3f7;">${safeAmount}</div>
+            <div style="font-size:13px;color:#7986a3;margin-top:4px;">
+              Charged today (see your Stripe receipt for tax and line items)
+            </div>`
+    : `<div style="font-size:15px;color:#b0bcd4;line-height:1.5;">
+              The exact total is on your Stripe receipt email.
+            </div>`;
+  const amountPlain = hasAmount ? amountChargedLine.trim() : "See your Stripe receipt for the amount.";
+  await resendSendEmail(env, {
+    to: dest,
+    subject: `Welcome to pepguideIQ — your ${planDisplayName} plan is active`,
+    html: `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Subscription confirmed</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0e1a;font-family:'Segoe UI',
+Arial,sans-serif;color:#e8eaf0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" 
+  style="background:#0a0e1a;padding:40px 20px;">
+  <tr><td align="center">
+
+    <table width="600" cellpadding="0" cellspacing="0" 
+      style="max-width:600px;width:100%;background:#0e1520;
+      border-radius:12px;border:1px solid #1e2a3a;overflow:hidden;">
+
+      <tr>
+        <td style="background:linear-gradient(135deg,#0e1520 0%,#1a2435 100%);
+          padding:32px 40px;border-bottom:1px solid #1e2a3a;text-align:center;">
+          <div style="font-size:28px;font-weight:700;letter-spacing:-0.5px;">
+            <span style="color:#4fc3f7;">pep</span><span 
+            style="color:#e8eaf0;">guide</span><span 
+            style="color:#4fc3f7;">IQ</span>
+          </div>
+          <div style="color:#7986a3;font-size:13px;margin-top:6px;
+            letter-spacing:1px;text-transform:uppercase;">
+            Subscription confirmed
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:40px;">
+
+          <div style="text-align:center;margin-bottom:32px;">
+            <span style="display:inline-block;background:#1a2435;
+              border:1px solid #2a3a50;border-radius:20px;
+              padding:8px 20px;font-size:13px;color:#7986a3;
+              letter-spacing:0.5px;text-transform:uppercase;">
+              You're in
+            </span>
+          </div>
+
+          <p style="font-size:16px;color:#b0bcd4;margin:0 0 24px;
+            line-height:1.6;">
+            Thanks for subscribing. Your account is now on the
+            <strong style="color:#e8eaf0;">${safePlan}</strong> plan — every
+            pepguideIQ feature at that tier is unlocked for you.
+          </p>
+
+          <div style="background:#0a0e1a;border:1px solid #1e2a3a;
+            border-left:3px solid #4fc3f7;border-radius:8px;
+            padding:20px 24px;margin:0 0 28px;">
+            <div style="font-size:12px;color:#7986a3;
+              text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+              Amount charged
+            </div>
+            ${amountHtml}
+          </div>
+
+          <p style="font-size:14px;color:#7986a3;margin:0 0 28px;
+            line-height:1.6;">
+            Questions about billing? Reply to this email thread or write
+            <a href="mailto:hello@pepguideiq.com" style="color:#4fc3f7;text-decoration:none;">hello@pepguideiq.com</a>.
+          </p>
+
+          <div style="text-align:center;margin:32px 0;">
+            <a href="https://pepguideiq.com" 
+              style="display:inline-block;background:#4fc3f7;color:#0a0e1a;
+              font-weight:700;font-size:14px;padding:14px 32px;
+              border-radius:8px;text-decoration:none;letter-spacing:0.3px;">
+              Open pepguideIQ →
+            </a>
+            <div style="font-size:12px;color:#7986a3;margin-top:10px;">
+              https://pepguideiq.com
+            </div>
+          </div>
+
+        </td>
+      </tr>
+
+      <tr>
+        <td style="background:#080c14;padding:24px 40px;
+          border-top:1px solid #1e2a3a;text-align:center;">
+          <p style="margin:0 0 8px;font-size:12px;color:#4a5568;">
+            pepguideIQ LLC · Riverview, FL
+          </p>
+          <p style="margin:0;font-size:12px;color:#4a5568;">
+            Questions? <a href="mailto:hello@pepguideiq.com" 
+            style="color:#4fc3f7;text-decoration:none;">
+            hello@pepguideiq.com</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+
+</body>
+</html>`,
+    text: `Welcome to pepguideIQ. Your ${planDisplayName} plan is now active. Amount charged: ${amountPlain} Open https://pepguideiq.com to get started. Support: hello@pepguideiq.com`,
+  });
+}
+
 async function handleApiCancelSubscription(request, env, cors) {
   if (!supabaseAuthReady(env)) {
     return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
@@ -5007,6 +5148,44 @@ async function handleStripeWebhook(request, env) {
         }
 
         log(env, "info", "stripe_checkout_completed", { userId, plan, customerId, subId });
+
+        if (TIER_RANK[plan] >= TIER_RANK.pro) {
+          const prMail = await fetch(
+            `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=email`,
+            {
+              headers: {
+                apikey: serviceKey,
+                Authorization: `Bearer ${serviceKey}`,
+              },
+            }
+          );
+          const mailRows = await prMail.json().catch(() => []);
+          const mailProfile = Array.isArray(mailRows) ? mailRows[0] : null;
+          let mailTo =
+            mailProfile && typeof mailProfile.email === "string" ? mailProfile.email.trim() : "";
+          if (!mailTo) {
+            const ce = typeof session.customer_email === "string" ? session.customer_email.trim() : "";
+            const cd =
+              session.customer_details &&
+              typeof session.customer_details === "object" &&
+              !Array.isArray(session.customer_details) &&
+              typeof session.customer_details.email === "string"
+                ? session.customer_details.email.trim()
+                : "";
+            mailTo = ce || cd || "";
+          }
+          const currency =
+            typeof session.currency === "string" && session.currency.trim()
+              ? session.currency.trim()
+              : "usd";
+          const amountLine = formatStripeAmountChargedLine(session.amount_total, currency);
+          await resendSendCheckoutPlanConfirmationEmail(env, {
+            to: mailTo,
+            planDisplayName: planTierDisplayName(plan, env),
+            amountChargedLine: amountLine,
+          });
+        }
+
         break;
       }
       case "customer.subscription.created":

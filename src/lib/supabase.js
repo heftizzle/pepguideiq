@@ -394,6 +394,24 @@ export async function getCurrentUser() {
 }
 
 /**
+ * After Stripe Checkout return (`?checkout=success`): refresh the auth session from GoTrue,
+ * then load `profiles` (including `plan`) so the UI matches the webhook-updated row instead of stale client session hints.
+ * @returns {Promise<Awaited<ReturnType<typeof getCurrentUser>>>}
+ */
+export async function getCurrentUserFreshAfterCheckout() {
+  if (!supabase) return null;
+  try {
+    const { error } = await supabase.auth.refreshSession();
+    if (error && import.meta.env.DEV) {
+      console.warn("[getCurrentUserFreshAfterCheckout] refreshSession:", error.message);
+    }
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn("[getCurrentUserFreshAfterCheckout]", e);
+  }
+  return getCurrentUser();
+}
+
+/**
  * Body metrics for one member profile (`public.body_metrics`).
  * @param {string} profileId — member_profiles.id
  * @returns {Promise<{ row: object | null, error: Error | null }>}

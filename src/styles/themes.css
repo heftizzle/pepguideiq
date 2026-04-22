@@ -50,7 +50,7 @@
   /* Overlay */
   --color-overlay: rgba(0, 0, 0, 0.6);
 
-  /* Tiers — header pills (.pepv-header-tier--* in GlobalStyles.jsx); not from tiers.js */
+  /* Tiers — header pills (.pepv-header-tier--* in GlobalStyles.jsx). Elite = amber, GOAT = purple (`TIERS.*.cardAccent` / `modalGlowHex`). */
   --tier-entry: #b0bec5;
   --tier-entry-dim: rgba(176, 190, 197, 0.12);
   --tier-pro: #00d4aa;
