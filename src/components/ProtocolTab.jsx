@@ -2,14 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide.js";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
-import { formatConcWithUnit, formatProtocolInjectableDosePreview } from "../lib/doseLogDisplay.js";
+import {
+  formatConcWithUnit,
+  formatInjectableDoseHistoryAmount,
+  formatProtocolInjectableDosePreview,
+} from "../lib/doseLogDisplay.js";
 import { resolveCatalogBlendBacRefMl } from "../lib/peptideMath.js";
 import { roundToHalf, unitsToMcg } from "../lib/vialDoseMath.js";
 import {
+  deleteDoseLog,
   getUserStackRowId,
   insertDoseLog,
   insertNetworkFeedDosePost,
+  listDoseLogsForPeptideIdsRange,
   listLatestDosedAtByPeptideOnLocalDay,
+  updateDoseLog,
   updateNetworkFeedPostPublicVisible,
 } from "../lib/supabase.js";
 import { lockMapFromLatestDosedAtIso } from "../lib/protocolLogCooldown.js";
@@ -34,6 +41,26 @@ function protocolHeaderLine() {
 
 function clampUnits(u) {
   return Math.max(0.5, Math.min(300, roundToHalf(Number(u) || 0.5)));
+}
+
+/** Local calendar day bounds as ISO strings (same semantics as dose day queries). */
+function localDayStartEndIso(ymd) {
+  const [Y, Mo, D] = String(ymd)
+    .split("-")
+    .map((x) => parseInt(x, 10));
+  if (!Y || !Mo || !D) return { startIso: "", endIso: "" };
+  const start = new Date(Y, Mo - 1, D, 0, 0, 0, 0);
+  const end = new Date(Y, Mo - 1, D, 23, 59, 59, 999);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+function formatDosedAtTime(iso) {
+  if (typeof iso !== "string" || !iso.trim()) return "—";
+  try {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
 }
 
 /**
@@ -81,6 +108,11 @@ export function ProtocolTab({
   );
   const [networkPostBusy, setNetworkPostBusy] = useState(false);
   const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
+  const [todayDosesByPeptide, setTodayDosesByPeptide] = useState(() => /** @type {Record<string, object[]>} */ ({}));
+  const networkPromptRef = useRef(
+    /** @type {null | { networkFeedId: string; compoundName: string; previewLine: string; toastMessage: string }} */ (null)
+  );
+  networkPromptRef.current = networkPrompt;
   const showDoseToast = useShowDoseToast();
   const skipGuardrailForPeptideIdRef = useRef(null);
   const deepLinkConsumedRef = useRef(false);
@@ -108,6 +140,7 @@ export function ProtocolTab({
     if (!userId || !profileId || !isSupabaseConfigured() || !canUse || protocolCandidates.length === 0) {
       setRows([]);
       setLogLockUntilMs({});
+      setTodayDosesByPeptide({});
       return;
     }
     const ymd = localTodayYmd();
@@ -124,6 +157,31 @@ export function ProtocolTab({
       const peptide = findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name });
       built.push(await buildProtocolDoseRow(userId, profileId, row.peptideId, row.name, peptide, ymd));
     }
+    const { startIso, endIso } = localDayStartEndIso(ymd);
+    const peptideIds = protocolCandidates.map((r) => r.peptideId).filter((id) => typeof id === "string" && id);
+    /** @type {Record<string, object[]>} */
+    const todayByPeptide = {};
+    if (startIso && endIso && peptideIds.length > 0) {
+      const { doses: todayDoses, error: dayErr } = await listDoseLogsForPeptideIdsRange(
+        userId,
+        profileId,
+        peptideIds,
+        startIso,
+        endIso
+      );
+      if (!dayErr && Array.isArray(todayDoses)) {
+        for (const d of todayDoses) {
+          const pid = typeof d.peptide_id === "string" ? d.peptide_id : "";
+          if (!pid) continue;
+          if (!todayByPeptide[pid]) todayByPeptide[pid] = [];
+          todayByPeptide[pid].push(d);
+        }
+        for (const pid of Object.keys(todayByPeptide)) {
+          todayByPeptide[pid].sort((a, b) => String(b.dosed_at).localeCompare(String(a.dosed_at)));
+        }
+      }
+    }
+    setTodayDosesByPeptide(todayByPeptide);
     setRows(built);
   }, [userId, profileId, canUse, protocolCandidates]);
 
@@ -233,13 +291,13 @@ export function ProtocolTab({
     setLogLockUntilMs((prev) => ({ ...prev, [peptideId]: lockUntil }));
     setGuardrail(null);
     void refreshMemberProfiles();
-    bumpReload();
     const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
     const planKey = typeof userPlan === "string" ? userPlan.trim().toLowerCase() : "entry";
     const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [peptideId], planKey);
     const doseLogId =
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {
+      bumpReload();
       showDoseToast(toastMessage);
       return;
     }
@@ -259,12 +317,14 @@ export function ProtocolTab({
     if (nfErr || !nf?.id) {
       if (nfErr) console.error("[ProtocolTab] network_feed insert failed", nfErr);
       else console.error("[ProtocolTab] network_feed insert returned no id", nf);
+      bumpReload();
       showDoseToast(toastMessage);
       return;
     }
     const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
     if (!networkFeedId) {
       console.error("[ProtocolTab] network_feed insert id empty", nf);
+      bumpReload();
       showDoseToast(toastMessage);
       return;
     }
@@ -277,19 +337,23 @@ export function ProtocolTab({
       previewLine,
       toastMessage,
     });
+    bumpReload();
   };
 
   const dismissNetworkPrompt = useCallback(() => {
-    const msg = networkPrompt?.toastMessage;
+    const prompt = networkPromptRef.current;
+    const msg = prompt?.toastMessage;
     setNetworkPrompt(null);
     setNetworkPostError(null);
     setNetworkPostBusy(false);
     if (msg) showDoseToast(msg);
-  }, [networkPrompt, showDoseToast]);
+  }, [showDoseToast]);
 
   const confirmNetworkPost = useCallback(async () => {
-    const id = networkPrompt?.networkFeedId?.trim();
+    const prompt = networkPromptRef.current;
+    const id = prompt?.networkFeedId?.trim();
     if (!id) return;
+    const msg = prompt?.toastMessage;
     setNetworkPostBusy(true);
     setNetworkPostError(null);
     const { error } = await updateNetworkFeedPostPublicVisible(id, true);
@@ -299,11 +363,10 @@ export function ProtocolTab({
       setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
       return;
     }
-    const msg = networkPrompt.toastMessage;
     setNetworkPrompt(null);
     setNetworkPostBusy(false);
-    showDoseToast(msg);
-  }, [networkPrompt, showDoseToast]);
+    if (msg) showDoseToast(msg);
+  }, [showDoseToast]);
 
   const emptyBecauseNoStack = protocolBaseRows.length === 0;
 
@@ -384,6 +447,8 @@ export function ProtocolTab({
                   onUnitsDelta={(delta) => updateRowUnits(r.peptideId, r.units + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}
                   demoLogDose={rowIdx === 0 && Boolean(demo?.isHighlighted(DEMO_TARGET.protocol_log_dose))}
+                  todayLogs={todayDosesByPeptide[r.peptideId] ?? []}
+                  onDoseLogsChanged={bumpReload}
                 />
               ) : r.kind === "nonInjectable" ? (
                 <ProtocolNonInjectableRow
@@ -395,6 +460,8 @@ export function ProtocolTab({
                   onDoseDelta={(delta) => updateRowDoseCount(r.peptideId, r.doseCount + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}
                   demoLogDose={rowIdx === 0 && Boolean(demo?.isHighlighted(DEMO_TARGET.protocol_log_dose))}
+                  todayLogs={todayDosesByPeptide[r.peptideId] ?? []}
+                  onDoseLogsChanged={bumpReload}
                 />
               ) : (
                 <ProtocolMissingVialRow key={r.peptideId} name={r.name} />
@@ -465,6 +532,336 @@ export function ProtocolTab({
   );
 }
 
+/**
+ * Today's dose log lines for one peptide (edit / delete).
+ * @param {{
+ *   logs: object[],
+ *   rowKind: "injectable" | "nonInjectable",
+ *   protocolRow: { peptideId: string, name: string, kind: string, vials?: object[], unitLabel?: string },
+ *   onChanged: () => void,
+ * }} props
+ */
+function ProtocolTodayDoseLogs({ logs, rowKind, protocolRow, onChanged }) {
+  const [menuId, setMenuId] = useState(/** @type {string | null} */ (null));
+  const rowMenuHostRef = useRef(/** @type {Record<string, HTMLElement | null>} */ ({}));
+  const [editing, setEditing] = useState(
+    /** @type {null | { id: string, doseMcg: string, doseCount: string, doseUnit: string, notes: string }} */ (null)
+  );
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveErr, setSaveErr] = useState(/** @type {string | null} */ (null));
+
+  useEffect(() => {
+    if (!menuId) return;
+    const onDown = (e) => {
+      const host = rowMenuHostRef.current[menuId];
+      if (host && e.target instanceof Node && !host.contains(e.target)) setMenuId(null);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [menuId]);
+
+  const catalog = useMemo(
+    () => findCatalogPeptideForStackRow({ id: protocolRow.peptideId, name: protocolRow.name }),
+    [protocolRow.peptideId, protocolRow.name]
+  );
+  const blendComponents = Array.isArray(catalog?.components) ? catalog.components : null;
+  const catalogBacRefMl = useMemo(() => resolveCatalogBlendBacRefMl(catalog), [catalog]);
+
+  if (!logs || logs.length === 0) return null;
+
+  function logSummary(log) {
+    if (rowKind === "injectable" && protocolRow.kind === "injectable") {
+      const vid = typeof log.vial_id === "string" ? log.vial_id : "";
+      const vial = protocolRow.vials?.find((x) => x.id === vid) ?? protocolRow.vials?.[0] ?? null;
+      return formatInjectableDoseHistoryAmount(log.dose_mcg, vial, blendComponents, catalogBacRefMl, catalog);
+    }
+    const c = log.dose_count;
+    const u = typeof log.dose_unit === "string" ? log.dose_unit : "";
+    return `${c ?? "—"} ${u}`.trim();
+  }
+
+  async function handleDelete(log) {
+    const id = typeof log.id === "string" ? log.id.trim() : "";
+    if (!id) return;
+    setMenuId(null);
+    if (!window.confirm("Delete this log?")) return;
+    const { error } = await deleteDoseLog(id);
+    if (error) {
+      window.alert(typeof error.message === "string" ? error.message : "Could not delete.");
+      return;
+    }
+    onChanged();
+  }
+
+  function openEdit(log) {
+    const id = typeof log.id === "string" ? log.id.trim() : "";
+    if (!id) return;
+    setMenuId(null);
+    setSaveErr(null);
+    const dm = log.dose_mcg != null ? Number(log.dose_mcg) : NaN;
+    setEditing({
+      id,
+      doseMcg: Number.isFinite(dm) && dm > 0 ? String(Math.round(dm)) : "",
+      doseCount: String(log.dose_count ?? 1),
+      doseUnit:
+        typeof log.dose_unit === "string" && log.dose_unit.trim()
+          ? log.dose_unit.trim()
+          : protocolRow.kind === "nonInjectable"
+            ? String(protocolRow.unitLabel ?? "")
+            : "",
+      notes: typeof log.notes === "string" ? log.notes : "",
+    });
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setSaveErr(null);
+    setSaveBusy(true);
+    /** @type {Record<string, unknown>} */
+    let patch = {};
+    if (rowKind === "injectable") {
+      const mcgN = parseFloat(String(editing.doseMcg).replace(/,/g, ""));
+      if (!Number.isFinite(mcgN) || mcgN <= 0) {
+        setSaveErr("Enter a valid dose (mcg).");
+        setSaveBusy(false);
+        return;
+      }
+      patch = { dose_mcg: mcgN, notes: editing.notes.trim() ? editing.notes.trim() : null };
+    } else {
+      const c = parseInt(String(editing.doseCount).replace(/\D/g, ""), 10);
+      if (!Number.isFinite(c) || c < 1 || c > 99) {
+        setSaveErr("Count must be 1–99.");
+        setSaveBusy(false);
+        return;
+      }
+      const u = editing.doseUnit.trim();
+      if (!u) {
+        setSaveErr("Unit label required.");
+        setSaveBusy(false);
+        return;
+      }
+      patch = { dose_count: c, dose_unit: u, notes: editing.notes.trim() ? editing.notes.trim() : null };
+    }
+    const { error } = await updateDoseLog(editing.id, patch);
+    setSaveBusy(false);
+    if (error) {
+      setSaveErr(typeof error.message === "string" ? error.message : "Could not save.");
+      return;
+    }
+    setEditing(null);
+    onChanged();
+  }
+
+  return (
+    <>
+      <div
+        className="mono"
+        style={{ fontSize: 11, color: "var(--color-text-muted)", letterSpacing: "0.08em", marginTop: 14, marginBottom: 6 }}
+      >
+        {"TODAY'S LOGS"}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {logs.map((log, idx) => {
+          const id = typeof log.id === "string" ? log.id : "";
+          if (!id) return null;
+          const open = menuId === id;
+          return (
+            <div
+              key={id}
+              ref={(el) => {
+                rowMenuHostRef.current[id] = el;
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 0",
+                borderTop: idx > 0 ? "1px solid var(--color-border-hairline)" : "none",
+                fontSize: 13,
+              }}
+            >
+              <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{formatDosedAtTime(log.dosed_at)}</div>
+                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 2, lineHeight: 1.4 }}>
+                  {logSummary(log)}
+                  {log.notes ? ` · ${String(log.notes)}` : ""}
+                </div>
+              </div>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className="form-input"
+                  aria-expanded={open}
+                  aria-haspopup="menu"
+                  aria-label="Log actions"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuId(open ? null : id);
+                  }}
+                  style={{
+                    minWidth: 36,
+                    minHeight: 36,
+                    padding: 0,
+                    fontSize: 18,
+                    lineHeight: 1,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                  }}
+                >
+                  ⋯
+                </button>
+                {open ? (
+                  <div
+                    role="menu"
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: "calc(100% + 4px)",
+                      zIndex: 8,
+                      minWidth: 120,
+                      borderRadius: 10,
+                      border: "1px solid var(--color-border-default)",
+                      background: "var(--color-bg-elevated)",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                      padding: 4,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="form-input"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        fontSize: 13,
+                        padding: "8px 10px",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => openEdit(log)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="form-input"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        fontSize: 13,
+                        padding: "8px 10px",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        color: "#f87171",
+                      }}
+                      onClick={() => void handleDelete(log)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {editing ? (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 210,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            boxSizing: "border-box",
+          }}
+          onClick={() => !saveBusy && setEditing(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="mono"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 400,
+              borderRadius: 12,
+              border: "1px solid var(--color-border-default)",
+              background: "var(--color-bg-card)",
+              padding: 16,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 12 }}>Edit dose log</div>
+            {rowKind === "injectable" ? (
+              <>
+                <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
+                  Dose (mcg)
+                </span>
+                <input
+                  className="form-input"
+                  style={{ width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+                  value={editing.doseMcg}
+                  onChange={(e) => setEditing((prev) => (prev ? { ...prev, doseMcg: e.target.value } : prev))}
+                  inputMode="decimal"
+                />
+              </>
+            ) : (
+              <>
+                <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
+                  Count
+                </span>
+                <input
+                  className="form-input"
+                  style={{ width: "100%", marginBottom: 8, boxSizing: "border-box" }}
+                  value={editing.doseCount}
+                  onChange={(e) => setEditing((prev) => (prev ? { ...prev, doseCount: e.target.value } : prev))}
+                  inputMode="numeric"
+                />
+                <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
+                  Unit
+                </span>
+                <input
+                  className="form-input"
+                  style={{ width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+                  value={editing.doseUnit}
+                  onChange={(e) => setEditing((prev) => (prev ? { ...prev, doseUnit: e.target.value } : prev))}
+                />
+              </>
+            )}
+            <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
+              Notes (optional)
+            </span>
+            <input
+              className="form-input"
+              style={{ width: "100%", marginBottom: 10, boxSizing: "border-box" }}
+              value={editing.notes}
+              onChange={(e) => setEditing((prev) => (prev ? { ...prev, notes: e.target.value } : prev))}
+            />
+            {saveErr ? <div style={{ fontSize: 12, color: "#f87171", marginBottom: 10 }}>{saveErr}</div> : null}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+              <button type="button" className="form-input" disabled={saveBusy} onClick={() => setEditing(null)} style={{ fontSize: 13 }}>
+                Cancel
+              </button>
+              <button type="button" className="btn-teal" disabled={saveBusy} onClick={() => void saveEdit()} style={{ fontSize: 13 }}>
+                {saveBusy ? "…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function ProtocolMissingVialRow({ name }) {
   return (
     <div style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}>
@@ -476,7 +873,17 @@ function ProtocolMissingVialRow({ name }) {
   );
 }
 
-function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta, onLogDose, demoLogDose = false }) {
+function ProtocolNonInjectableRow({
+  row,
+  session,
+  loggedToday,
+  busy,
+  onDoseDelta,
+  onLogDose,
+  demoLogDose = false,
+  todayLogs = [],
+  onDoseLogsChanged = () => {},
+}) {
   const timingWarning = getTimingWarning(row.peptideId, session);
   return (
     <div
@@ -558,11 +965,22 @@ function ProtocolNonInjectableRow({ row, session, loggedToday, busy, onDoseDelta
           {loggedToday ? "✓ Logged" : busy ? "…" : "✓ LOG DOSE"}
         </button>
       </div>
+      <ProtocolTodayDoseLogs logs={todayLogs} rowKind="nonInjectable" protocolRow={row} onChanged={onDoseLogsChanged} />
     </div>
   );
 }
 
-function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, onLogDose, demoLogDose = false }) {
+function ProtocolInjectableRow({
+  row,
+  session,
+  loggedToday,
+  busy,
+  onUnitsDelta,
+  onLogDose,
+  demoLogDose = false,
+  todayLogs = [],
+  onDoseLogsChanged = () => {},
+}) {
   const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
   const catalog = useMemo(
     () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }),
@@ -667,6 +1085,7 @@ function ProtocolInjectableRow({ row, session, loggedToday, busy, onUnitsDelta, 
           {loggedToday ? "✓ Logged" : busy ? "…" : "✓ LOG DOSE"}
         </button>
       </div>
+      <ProtocolTodayDoseLogs logs={todayLogs} rowKind="injectable" protocolRow={row} onChanged={onDoseLogsChanged} />
     </div>
   );
 }

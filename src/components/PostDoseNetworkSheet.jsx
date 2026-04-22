@@ -49,9 +49,9 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
         pointerEvents: "auto",
       }}
     >
-      <button
-        type="button"
-        aria-label="Dismiss"
+      {/* Div (not <button>): a focusable scrim button can steal focus after LOG DOSE and receive the tail of a Space keyup, firing onKeepPrivate + toast while the sheet is opening. Escape still dismisses via the effect above. */}
+      <div
+        role="presentation"
         onClick={() => onKeepPrivate()}
         style={{
           position: "absolute",

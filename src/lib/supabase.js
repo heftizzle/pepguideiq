@@ -1521,6 +1521,44 @@ export async function insertDoseLog(row) {
   return { data: data ?? null, error: error ?? null };
 }
 
+/** Allowed columns for `updateDoseLog` (RLS: own rows). */
+const DOSE_LOG_UPDATE_KEYS = /** @type {const} */ (["dose_mcg", "dose_count", "dose_unit", "notes"]);
+
+/**
+ * Delete a single dose log by id (RLS enforces ownership).
+ * @param {string} id — `dose_logs.id`
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function deleteDoseLog(id) {
+  if (!supabase) return { error: notConfiguredError() };
+  const rid = typeof id === "string" ? id.trim() : "";
+  if (!rid) return { error: new Error("Missing dose log id.") };
+  const { error } = await supabase.from("dose_logs").delete().eq("id", rid);
+  return { error: error ?? null };
+}
+
+/**
+ * Edit dose_mcg, dose_count, dose_unit, notes on an existing log.
+ * @param {string} id — `dose_logs.id`
+ * @param {Record<string, unknown>} patch
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function updateDoseLog(id, patch) {
+  if (!supabase) return { error: notConfiguredError() };
+  const rid = typeof id === "string" ? id.trim() : "";
+  if (!rid) return { error: new Error("Missing dose log id.") };
+  /** @type {Record<string, unknown>} */
+  const safe = {};
+  if (patch && typeof patch === "object") {
+    for (const k of DOSE_LOG_UPDATE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(patch, k)) safe[k] = patch[k];
+    }
+  }
+  if (Object.keys(safe).length === 0) return { error: new Error("Nothing to update.") };
+  const { error } = await supabase.from("dose_logs").update(safe).eq("id", rid);
+  return { error: error ?? null };
+}
+
 /**
  * Saved stack row id for the active member profile (one row per user+profile).
  * @param {string} userId

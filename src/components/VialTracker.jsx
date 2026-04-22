@@ -3,6 +3,7 @@ import { PEPTIDES } from "../data/catalog.js";
 import { PROTOCOL_SESSION_UI } from "../data/protocolSessions.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import {
+  deleteDoseLog,
   deleteUserVial,
   getEarliestDosedAtForPeptideIds,
   getSessionAccessToken,
@@ -563,6 +564,7 @@ function DoseHistoryCalendar({
   catalogBlendComponents,
   catalogBlendBacRefMl,
   catalogEntry,
+  onDeleteDoseLog,
 }) {
   const [selectedYmd, setSelectedYmd] = useState(null);
 
@@ -948,22 +950,14 @@ function DoseHistoryCalendar({
               const sess = protocolSessionPillLabel(log.protocol_session);
               const meta = [timeStr, sess].filter(Boolean).join(" · ");
               return (
-                <div
-                  key={log.id}
-                  className="mono"
-                  style={{
-                    padding: "10px 0",
-                    borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none",
-                    fontSize: 13,
-                    color: "var(--color-text-primary)",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  <div style={{ color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                    {amount}
-                    {meta ? ` · ${meta}` : ""}
+                <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="mono" style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
+                    <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>{amount}{meta ? ` · ${meta}` : ""}</div>
                   </div>
+                  {typeof onDeleteDoseLog === "function" && typeof log.id === "string" && log.id.trim() ? (
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                  ) : null}
                 </div>
               );
             })}
@@ -980,6 +974,7 @@ function VialRow({
   canMutate,
   doses,
   onReload,
+  onDeleteDoseLog,
   stabilityNote,
   workerConfigured,
   onUpgrade,
@@ -991,6 +986,11 @@ function VialRow({
   const [savingLabel, setSavingLabel] = useState(false);
   const [expiryDetailOpen, setExpiryDetailOpen] = useState(false);
   const expiryDetailRef = useRef(null);
+  const [editingRecipe, setEditingRecipe] = useState(false);
+  const [editMg, setEditMg] = useState("");
+  const [editMl, setEditMl] = useState("");
+  const [recipeErr, setRecipeErr] = useState(/** @type {string | null} */ (null));
+  const [savingRecipe, setSavingRecipe] = useState(false);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
@@ -1060,6 +1060,32 @@ function VialRow({
     )
       return;
     void deleteUserVial(vial.id, userId, profileId).then(() => onReload());
+  }
+
+  function openRecipeEdit() {
+    setRecipeErr(null);
+    setEditMg(String(vial.vial_size_mg ?? ""));
+    setEditMl(String(vial.bac_water_ml ?? ""));
+    setEditingRecipe(true);
+  }
+
+  async function saveRecipeEdit() {
+    const mg = parseFloat(String(editMg).replace(/,/g, ""));
+    const ml = parseFloat(String(editMl).replace(/,/g, ""));
+    if (!Number.isFinite(mg) || mg <= 0 || !Number.isFinite(ml) || ml <= 0) {
+      setRecipeErr("Enter valid total mg and BAC water mL.");
+      return;
+    }
+    setSavingRecipe(true);
+    setRecipeErr(null);
+    const { error } = await updateUserVial(vial.id, userId, profileId, { vial_size_mg: mg, bac_water_ml: ml });
+    setSavingRecipe(false);
+    if (error) {
+      setRecipeErr(typeof error.message === "string" ? error.message : "Could not save.");
+      return;
+    }
+    setEditingRecipe(false);
+    onReload();
   }
 
   return (
@@ -1241,15 +1267,95 @@ function VialRow({
             </div>
           )}
 
+          {canMutate && !depleted && !expired ? (
+            <div style={{ marginTop: 10 }}>
+              {!editingRecipe ? (
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                  onClick={() => openRecipeEdit()}
+                >
+                  Edit reconstitution (mg / BAC mL)
+                </button>
+              ) : (
+                <div
+                  style={{
+                    marginTop: 4,
+                    padding: 10,
+                    borderRadius: 10,
+                    border: "1px solid var(--color-border-default)",
+                    background: "var(--color-bg-sunken)",
+                  }}
+                >
+                  <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8, lineHeight: 1.45 }}>
+                    Vial powder (mg) and bacteriostatic water (mL). Updates concentration for dose math.
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                      Total mg
+                    </span>
+                    <input
+                      className="form-input"
+                      style={{ width: 100, fontSize: 13 }}
+                      value={editMg}
+                      onChange={(e) => setEditMg(e.target.value)}
+                      inputMode="decimal"
+                    />
+                    <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                      BAC mL
+                    </span>
+                    <input
+                      className="form-input"
+                      style={{ width: 80, fontSize: 13 }}
+                      value={editMl}
+                      onChange={(e) => setEditMl(e.target.value)}
+                      inputMode="decimal"
+                    />
+                  </div>
+                  {recipeErr ? <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{recipeErr}</div> : null}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      style={{ fontSize: 13, padding: "6px 12px" }}
+                      disabled={savingRecipe}
+                      onClick={() => void saveRecipeEdit()}
+                    >
+                      {savingRecipe ? "…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="form-input"
+                      style={{ fontSize: 13, padding: "6px 12px" }}
+                      disabled={savingRecipe}
+                      onClick={() => {
+                        setEditingRecipe(false);
+                        setRecipeErr(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {doses.length > 0 && (
             <div style={{ marginTop: 10 }}>
               <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 4 }}>
                 RECENT
               </div>
               {doses.map((d) => (
-                <div key={d.id} className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: "2px 0" }}>
-                  {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry)}
-                  {d.notes ? ` · ${d.notes}` : ""}
+                <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
+                  <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+                    {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry)}
+                    {d.notes ? ` · ${d.notes}` : ""}
+                  </span>
+                  {canMutate && typeof onDeleteDoseLog === "function" && typeof d.id === "string" && d.id.trim() ? (
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1490,6 +1596,22 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     setLoading(false);
   }, [userId, profileId, vialLookupIds, canUse]);
 
+  const handleDeleteDoseLog = useCallback(
+    async (id) => {
+      if (!canMutate) return;
+      const tid = typeof id === "string" ? id.trim() : "";
+      if (!tid) return;
+      if (!window.confirm("Delete this log?")) return;
+      const { error } = await deleteDoseLog(tid);
+      if (error) {
+        window.alert(typeof error.message === "string" ? error.message : "Could not delete.");
+        return;
+      }
+      void reload();
+    },
+    [canMutate, reload]
+  );
+
   useEffect(() => {
     void reload();
   }, [reload]);
@@ -1694,6 +1816,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
         catalogBlendComponents={blendComponents ?? undefined}
         catalogBlendBacRefMl={blendCatalogBacRefMl}
         catalogEntry={catalogEntry}
+        onDeleteDoseLog={canMutate ? handleDeleteDoseLog : undefined}
       />
 
       {canMutate && (
@@ -2038,6 +2161,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             canMutate={canMutate}
             doses={dosesByVial[v.id] ?? []}
             onReload={reload}
+            onDeleteDoseLog={canMutate ? handleDeleteDoseLog : undefined}
             stabilityNote={stabilityNote}
             workerConfigured={workerConfigured}
             onUpgrade={onUpgrade}
