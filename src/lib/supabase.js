@@ -1094,6 +1094,34 @@ export async function fetchNetworkFeed() {
 }
 
 /**
+ * Find People: suggested profiles (graph + public stack overlap), RPC get_suggested_profiles.
+ * @param {string} profileId — member_profiles.id (caller's default profile)
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
+ */
+export async function fetchSuggestedProfiles(profileId) {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  if (!profileId) return { rows: [], error: new Error("Missing profile") };
+  try {
+    const { data, error } = await supabase.rpc("get_suggested_profiles", { p_profile_id: profileId });
+    if (error) return { rows: [], error };
+    if (data == null) return { rows: [], error: null };
+    if (Array.isArray(data)) return { rows: data, error: null };
+    if (typeof data === "string") {
+      try {
+        const parsed = JSON.parse(data);
+        return { rows: Array.isArray(parsed) ? parsed : [], error: null };
+      } catch {
+        return { rows: [], error: new Error("Could not parse suggested profiles response.") };
+      }
+    }
+    if (data != null && typeof data === "object") return { rows: [data], error: null };
+    return { rows: [], error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load suggested profiles.") };
+  }
+}
+
+/**
  * Live dose posts (non-expired), enriched via RPC — max 50, newest first.
  * @returns {Promise<{ rows: object[], error: Error | null }>}
  */

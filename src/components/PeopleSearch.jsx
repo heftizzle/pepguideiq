@@ -8,6 +8,7 @@ import {
   unfollowMemberProfile,
 } from "../lib/follows.js";
 import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
+import { fetchSuggestedProfiles } from "../lib/supabase.js";
 
 /** Match App.jsx fixed bottom nav band so overlay leaves it visible and tappable. */
 const PEOPLE_SEARCH_NAV_RESERVE_PX = "calc(80px + env(safe-area-inset-bottom, 0px))";
@@ -23,6 +24,26 @@ function bioSnippet(bio) {
   const t = typeof bio === "string" ? bio.trim() : "";
   if (!t) return null;
   return t.length > 80 ? `${t.slice(0, 80)}…` : t;
+}
+
+function SuggestedProfileSkeleton() {
+  return (
+    <div
+      className="pcard"
+      style={{
+        cursor: "default",
+        pointerEvents: "none",
+        minHeight: 96,
+        transform: "none",
+        boxShadow: "none",
+      }}
+      aria-hidden
+    >
+      <div style={{ height: 12, background: "var(--color-surface-hover)", borderRadius: 6, width: "44%", marginBottom: 12 }} />
+      <div style={{ height: 18, background: "var(--color-surface-hover)", borderRadius: 6, width: "88%", marginBottom: 8 }} />
+      <div style={{ height: 12, background: "var(--color-surface-hover)", borderRadius: 6, width: "55%" }} />
+    </div>
+  );
 }
 
 /**
@@ -62,6 +83,8 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
   const [followingSet, setFollowingSet] = useState(() => new Set());
   const [followingLoaded, setFollowingLoaded] = useState(false);
   const [pending, setPending] = useState(() => new Set());
+  const [suggestedRows, setSuggestedRows] = useState(/** @type {object[]} */ ([]));
+  const [suggestedLoading, setSuggestedLoading] = useState(false);
   const reqId = useRef(0);
 
   useEffect(() => {
@@ -94,6 +117,28 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
       cancelled = true;
     };
   }, [accessToken, activeProfileId, workerUrl]);
+
+  useEffect(() => {
+    if (!accessToken || !activeProfileId) {
+      setSuggestedRows([]);
+      setSuggestedLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSuggestedLoading(true);
+    void fetchSuggestedProfiles(activeProfileId).then(({ rows, error }) => {
+      if (cancelled) return;
+      setSuggestedLoading(false);
+      if (error) {
+        setSuggestedRows([]);
+        return;
+      }
+      setSuggestedRows(Array.isArray(rows) ? rows : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeProfileId]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -220,6 +265,206 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         >
           FIND PEOPLE
         </div>
+
+        {suggestedLoading || suggestedRows.length > 0 ? (
+          <div style={{ marginBottom: 20 }}>
+            <div
+              className="mono"
+              style={{
+                fontSize: 12,
+                color: "var(--color-text-secondary)",
+                letterSpacing: "0.1em",
+                marginBottom: 10,
+              }}
+            >
+              RUNNING SIMILAR PROTOCOLS
+            </div>
+            {suggestedLoading ? (
+              <div className="pepv-advisor-skeleton" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <SuggestedProfileSkeleton />
+                <SuggestedProfileSkeleton />
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {suggestedRows
+                  .filter((row) => typeof row?.profile_id === "string" && row.profile_id)
+                  .map((row) => {
+                    const id = String(row.profile_id);
+                    const isFollowing = followingSet.has(id);
+                    const busy = pending.has(id);
+                    const handleLine = formatHandleDisplay(row.handle ?? "", row.display_handle ?? "");
+                    const dispName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+                    const avK =
+                      typeof row.avatar_r2_key === "string" && row.avatar_r2_key.trim() ? row.avatar_r2_key.trim() : "";
+                    const av = avK ? resolveMemberAvatarDisplayUrlFromKey(avK) : "";
+                    const namesRaw = row.shared_compound_names;
+                    const compoundNames = Array.isArray(namesRaw)
+                      ? namesRaw.filter((n) => typeof n === "string" && n.trim())
+                      : [];
+                    const via =
+                      typeof row.via_handle === "string" && row.via_handle.trim() ? row.via_handle.trim() : "";
+                    const sharedN =
+                      typeof row.shared_compounds === "number" && Number.isFinite(row.shared_compounds)
+                        ? row.shared_compounds
+                        : compoundNames.length;
+                    const canOpenProfile = typeof row.handle === "string" && Boolean(normalizeHandleInput(row.handle));
+
+                    return (
+                      <div
+                        key={id}
+                        className="scard"
+                        style={{
+                          flexDirection: "column",
+                          alignItems: "stretch",
+                          gap: 10,
+                          cursor: canOpenProfile ? "pointer" : "default",
+                        }}
+                        onClick={() => {
+                          const ch = normalizeHandleInput(row.handle ?? "");
+                          if (ch) openPublicMemberProfile(ch);
+                        }}
+                        onKeyDown={
+                          canOpenProfile
+                            ? (e) => {
+                                if (e.key !== "Enter" && e.key !== " ") return;
+                                e.preventDefault();
+                                const ch = normalizeHandleInput(row.handle ?? "");
+                                if (ch) openPublicMemberProfile(ch);
+                              }
+                            : undefined
+                        }
+                        role={canOpenProfile ? "link" : undefined}
+                        tabIndex={canOpenProfile ? 0 : undefined}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%" }}>
+                          <div
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: "50%",
+                              overflow: "hidden",
+                              flexShrink: 0,
+                              background: "var(--color-bg-elevated)",
+                              border: "1px solid var(--color-border-default)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "var(--color-accent)",
+                              fontFamily: "'Outfit', sans-serif",
+                            }}
+                          >
+                            {av ? (
+                              <img src={av} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : (
+                              initialsFromProfile(row)
+                            )}
+                          </div>
+                          <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                            <div
+                              className="brand"
+                              style={{ fontSize: 15, fontWeight: 600, color: "var(--color-accent)", lineHeight: 1.3 }}
+                            >
+                              {handleLine || "—"}
+                            </div>
+                            {dispName ? (
+                              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>{dispName}</div>
+                            ) : null}
+                          </div>
+                          {isFollowing ? (
+                            <button
+                              type="button"
+                              className="btn-green"
+                              disabled={busy || !id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void toggleFollow(id, false);
+                              }}
+                              style={{ flexShrink: 0, alignSelf: "center" }}
+                            >
+                              Following
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-teal"
+                              disabled={busy || !id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void toggleFollow(id, true);
+                              }}
+                              style={{ flexShrink: 0, alignSelf: "center" }}
+                            >
+                              Follow
+                            </button>
+                          )}
+                        </div>
+                        {compoundNames.length > 0 ? (
+                          <div
+                            className="mono"
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 6,
+                              paddingLeft: 54,
+                              boxSizing: "border-box",
+                            }}
+                          >
+                            {compoundNames.map((nm) => (
+                              <span
+                                key={nm}
+                                style={{
+                                  fontSize: 11,
+                                  lineHeight: 1.3,
+                                  padding: "3px 8px",
+                                  borderRadius: 6,
+                                  background: "var(--color-accent-dim)",
+                                  border: "1px solid var(--color-accent)",
+                                  color: "var(--color-text-primary)",
+                                  maxWidth: "100%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {nm}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {via ? (
+                          <div
+                            className="mono"
+                            style={{
+                              fontSize: 11,
+                              color: "var(--color-text-muted)",
+                              paddingLeft: 54,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            Connected through @{via}
+                          </div>
+                        ) : sharedN > 0 ? (
+                          <div
+                            className="mono"
+                            style={{
+                              fontSize: 11,
+                              color: "var(--color-text-muted)",
+                              paddingLeft: 54,
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {sharedN} shared compound{sharedN === 1 ? "" : "s"}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <span className="mono" style={{ fontSize: 15, color: "var(--color-text-secondary)", flexShrink: 0 }}>
