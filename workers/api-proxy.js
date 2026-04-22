@@ -1541,18 +1541,17 @@ async function supabasePatchProfile(supabaseUrl, serviceKey, userId, patch) {
 }
 
 /**
- * Persist Stripe customer id on profiles — column is not in authenticated UPDATE grants (047).
- * Always uses `SUPABASE_SERVICE_ROLE_KEY` from env for `Authorization` (service_role JWT).
- * When `SUPABASE_ANON_KEY` is set, tries `apikey: anon` + `Authorization: service` first (Supabase
- * server pattern); falls back to both headers using the service key if needed.
+ * PATCH `profiles` using service role. Tries `apikey: anon` + `Authorization: service` first when
+ * `SUPABASE_ANON_KEY` is set (Supabase server pattern from migration 047), then both headers service-only.
+ * @param {Record<string, unknown>} patch — JSON-serializable profile columns
  * @returns {Promise<boolean>}
  */
-async function supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl, userId, stripeCustomerId) {
+async function supabasePatchProfileWithServiceRoleHeaders(env, supabaseUrl, userId, patch) {
   const serviceRoleKey = (env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim();
-  if (!serviceRoleKey) return false;
+  if (!serviceRoleKey || !userId || !patch || typeof patch !== "object") return false;
   const anonKey = (env.SUPABASE_ANON_KEY ?? "").trim();
   const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`;
-  const bodyJson = JSON.stringify({ stripe_customer_id: stripeCustomerId });
+  const bodyJson = JSON.stringify(patch);
   const headerSets = [];
   if (anonKey) headerSets.push({ apikey: anonKey, Authorization: `Bearer ${serviceRoleKey}` });
   headerSets.push({ apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}` });
@@ -1579,6 +1578,14 @@ async function supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl,
     if (body && typeof body === "object" && typeof body.id === "string") return true;
   }
   return false;
+}
+
+/**
+ * Persist Stripe customer id on profiles — column is not in authenticated UPDATE grants (047).
+ * @returns {Promise<boolean>}
+ */
+async function supabasePatchProfileStripeCustomerIdServiceRole(env, supabaseUrl, userId, stripeCustomerId) {
+  return supabasePatchProfileWithServiceRoleHeaders(env, supabaseUrl, userId, { stripe_customer_id: stripeCustomerId });
 }
 
 /**
@@ -2251,10 +2258,10 @@ async function handleCreateMemberProfile(request, env, cors) {
 }
 
 /**
- * Updates plan in profiles + auth user metadata via trusted RPC (see migration 008).
- * Optionally sets Stripe customer id (service role only).
+ * `public.update_user_plan` — only service_role may call (migration 008).
+ * @returns {Promise<boolean>}
  */
-async function supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, stripeCustomerId) {
+async function supabaseInvokeUpdateUserPlan(env, supabaseUrl, serviceKey, userId, plan) {
   const rpc = await fetch(`${supabaseUrl}/rest/v1/rpc/update_user_plan`, {
     method: "POST",
     headers: {
@@ -2268,6 +2275,17 @@ async function supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, use
   if (!rpc.ok) {
     const t = await rpc.text().catch(() => "");
     log(env, "error", "update_user_plan_rpc_failed", { status: rpc.status, body: t.slice(0, 500) });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Updates plan in profiles + auth user metadata via trusted RPC (see migration 008).
+ * Optionally sets Stripe customer id (service role only).
+ */
+async function supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, stripeCustomerId) {
+  if (!(await supabaseInvokeUpdateUserPlan(env, supabaseUrl, serviceKey, userId, plan))) {
     return false;
   }
   if (stripeCustomerId) {
@@ -4902,51 +4920,93 @@ async function handleStripeWebhook(request, env) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data?.object ?? {};
-        const customerId =
-          typeof session.customer === "string"
-            ? session.customer
-            : session.customer && typeof session.customer === "object"
-              ? session.customer.id
-              : "";
+        const meta =
+          session.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata)
+            ? session.metadata
+            : {};
+        const metaUserRaw = typeof meta.supabase_user_id === "string" ? meta.supabase_user_id.trim() : "";
+        const crefRaw =
+          typeof session.client_reference_id === "string" ? session.client_reference_id.trim() : "";
         const userId =
-          session.metadata?.supabase_user_id ||
-          (isUUID(session.client_reference_id) ? session.client_reference_id : null);
-        let plan =
-          (typeof session.metadata?.plan === "string" && normalizePlanTier(session.metadata.plan, env)) ||
-          "entry";
+          (metaUserRaw && isUUID(metaUserRaw) ? metaUserRaw : null) ||
+          (crefRaw && isUUID(crefRaw) ? crefRaw : null);
+
+        let customerId =
+          typeof session.customer === "string"
+            ? session.customer.trim()
+            : session.customer && typeof session.customer === "object" && typeof session.customer.id === "string"
+              ? session.customer.id.trim()
+              : "";
+
+        let subId =
+          typeof session.subscription === "string"
+            ? session.subscription.trim()
+            : session.subscription && typeof session.subscription === "object" && typeof session.subscription.id === "string"
+              ? session.subscription.id.trim()
+              : "";
+
+        const rawPlanMeta = typeof meta.plan === "string" ? meta.plan.trim() : "";
+        let plan = normalizePlanTier(rawPlanMeta, env);
+
         if (!userId) {
           log(env, "warn", "stripe_checkout_session_user_unresolved", {
             eventId,
-            client_reference_id:
-              typeof session.client_reference_id === "string" ? session.client_reference_id : "",
+            client_reference_id: crefRaw,
+            has_meta_supabase_user_id: Boolean(metaUserRaw),
             customerId: customerId || "",
           });
-          break;
+          return new Response("checkout.session.completed: missing user id (metadata.supabase_user_id or client_reference_id)", {
+            status: 400,
+          });
         }
-        if (userId && customerId) {
-          const subId =
-            typeof session.subscription === "string"
-              ? session.subscription
-              : session.subscription && typeof session.subscription === "object"
-                ? session.subscription.id
+
+        if (!customerId && subId) {
+          const subPeek = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+          const c =
+            subPeek && typeof subPeek.customer === "string"
+              ? subPeek.customer.trim()
+              : subPeek?.customer && typeof subPeek.customer === "object" && typeof subPeek.customer.id === "string"
+                ? subPeek.customer.id.trim()
                 : "";
-          if ((plan === "entry" || !VALID_PLAN_TIERS.has(plan)) && subId) {
-            const sub = await fetchStripeSubscriptionExpanded(stripeKey, subId);
-            if (sub) plan = tierPlanFromStripeSubscription(sub, env);
-          }
-          const ok = await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
-          if (!ok) {
-            log(env, "error", "stripe_webhook_profile_sync_failed", { userId, eventId });
-            return new Response("Profile sync failed", { status: 502 });
-          }
-          if (subId) {
-            const full = await fetchStripeSubscriptionExpanded(stripeKey, subId);
-            if (full) {
-              await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
-            }
-          }
-          log(env, "info", "stripe_checkout_completed", { userId, plan, customerId });
+          if (c) customerId = c;
         }
+
+        if (!customerId) {
+          log(env, "error", "stripe_checkout_session_customer_missing", { userId, eventId, subId });
+          return new Response("checkout.session.completed: missing customer id", { status: 502 });
+        }
+
+        if (subId && (plan === "entry" || !VALID_PLAN_TIERS.has(plan))) {
+          const sub = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+          if (sub) plan = tierPlanFromStripeSubscription(sub, env);
+        }
+
+        if (!(await supabaseInvokeUpdateUserPlan(env, supabaseUrl, serviceKey, userId, plan))) {
+          log(env, "error", "stripe_webhook_checkout_update_user_plan_failed", { userId, eventId, plan });
+          return new Response("update_user_plan failed", { status: 502 });
+        }
+
+        let stripePriceId = null;
+        if (subId) {
+          const full = await fetchStripeSubscriptionExpanded(stripeKey, subId);
+          if (full?.items?.data?.[0]?.price && typeof full.items.data[0].price.id === "string") {
+            stripePriceId = full.items.data[0].price.id;
+          }
+        }
+
+        const billingPatch = {
+          stripe_customer_id: customerId,
+          subscription_status: "active",
+        };
+        if (subId) billingPatch.stripe_subscription_id = subId;
+        if (stripePriceId) billingPatch.stripe_price_id = stripePriceId;
+
+        if (!(await supabasePatchProfileWithServiceRoleHeaders(env, supabaseUrl, userId, billingPatch))) {
+          log(env, "error", "stripe_webhook_checkout_profile_patch_failed", { userId, eventId });
+          return new Response("Profile billing fields patch failed", { status: 502 });
+        }
+
+        log(env, "info", "stripe_checkout_completed", { userId, plan, customerId, subId });
         break;
       }
       case "customer.subscription.created":
