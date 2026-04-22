@@ -12,7 +12,7 @@ You are working on pepguideIQ, a research-peptide reference and personal-protoco
 - React 19.0 + Vite 6 — **no router library**, **no state-management library**, **no Tailwind**, **no CSS modules**
 - Supabase (Postgres + Auth + RLS)
 - Cloudflare Workers, R2, KV, Pages, Turnstile
-- Stripe Elements (embedded checkout) + Payment Links + webhook. Uses `@stripe/stripe-js` + `@stripe/react-stripe-js` on client.
+- Stripe hosted Checkout (subscription upgrades) + Payment Links + webhook. `@stripe/stripe-js` + `@stripe/react-stripe-js` remain in `package.json`; plan upgrades redirect to Checkout or Billing Portal URLs from the Worker (no card form in-app for that path).
 
 `package.json` production deps — exhaustive (7):
 - `@stripe/react-stripe-js` ^3.10.0

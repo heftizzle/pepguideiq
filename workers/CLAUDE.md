@@ -12,7 +12,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `GET /stripe/subscription` — current user's sub info.
 - `POST /stripe/subscription/schedule-downgrade` — sets `profiles.pending_plan` + `pending_plan_date` from Stripe period end.
 - `POST /stripe/create-customer`
-- `POST /stripe/create-subscription` — returns PaymentIntent `client_secret` or `{no_payment_needed: true}`.
+- `POST /stripe/create-subscription` — returns `{ url }` for Stripe Checkout (new subscription) or Billing Portal `subscription_update_confirm` (change price on an existing paid subscription), or `{ no_payment_needed: true }` when already on that price.
 - `POST /stripe/create-portal-session` — returns `{url}` for the Stripe-hosted billing portal.
 - `POST /api/cancel-subscription` — authed (Bearer); sets Stripe `cancel_at_period_end: true` on the caller’s primary paid subscription; optional confirmation email via Resend (`RESEND_API_KEY`). Response: `{ success, already_scheduled?, current_period_end, plan }`.
 - `POST /api/reactivate-subscription` — authed; sets `cancel_at_period_end: false` on that subscription. Response: `{ success, already_active?, current_period_end, plan }`.

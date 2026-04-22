@@ -803,31 +803,6 @@ async function fetchStripeSubscriptionExpanded(stripeKey, subscriptionId) {
   return r.json();
 }
 
-/**
- * New customers / no default PM: subscription may have `pending_setup_intent` (seti_…) instead of invoice PI.
- * @returns {Promise<string | null>}
- */
-async function fetchStripeSetupIntentClientSecretFromSubscription(stripeKey, subJson) {
-  if (!stripeKey || !subJson || typeof subJson !== "object") return null;
-  const raw = subJson.pending_setup_intent;
-  if (raw && typeof raw === "object" && typeof raw.client_secret === "string") {
-    return raw.client_secret;
-  }
-  const id =
-    typeof raw === "string"
-      ? raw.trim()
-      : raw && typeof raw === "object" && typeof raw.id === "string"
-        ? raw.id.trim()
-        : "";
-  if (!id || !id.startsWith("seti_")) return null;
-  const r = await fetch(`https://api.stripe.com/v1/setup_intents/${encodeURIComponent(id)}`, {
-    headers: { Authorization: `Bearer ${stripeKey}` },
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j || typeof j.client_secret !== "string") return null;
-  return j.client_secret;
-}
-
 /** Best-effort immediate cancel (Stripe DELETE subscription). */
 async function stripeDeleteSubscription(stripeKey, subscriptionId) {
   if (!stripeKey || !subscriptionId) return;
@@ -1630,50 +1605,16 @@ async function stripeFormPost(stripeKey, path, fields) {
   return { ok: r.ok, status: r.status, json };
 }
 
-/** @returns {string | null} */
-function paymentIntentClientSecretFromSubscriptionPayload(obj) {
-  const inv = obj?.latest_invoice;
-  if (!inv || typeof inv !== "object") return null;
-  const pi = inv.payment_intent;
-  if (pi && typeof pi === "object" && typeof pi.client_secret === "string") return pi.client_secret;
-  return null;
-}
-
-/** TEMPORARY — remove after debugging Stripe subscription create/update response shape. */
-function debugLogStripeCreateSubscriptionResponse(subJson, label) {
-  const inv = subJson?.latest_invoice;
-  const latestInvoiceType =
-    inv === null || inv === undefined ? "null/undefined" : typeof inv;
-  let paymentIntentType = "n/a";
-  let paymentIntentValue = "n/a";
-  if (inv && typeof inv === "object") {
-    const pi = inv.payment_intent;
-    paymentIntentType = pi === null || pi === undefined ? "null/undefined" : typeof pi;
-    if (typeof pi === "string") {
-      paymentIntentValue = pi;
-    } else if (pi && typeof pi === "object") {
-      paymentIntentValue = JSON.stringify({
-        id: pi.id,
-        has_client_secret: typeof pi.client_secret === "string",
-      });
-    } else {
-      paymentIntentValue = String(pi);
-    }
-  }
-  let rawBody = "";
-  try {
-    rawBody = JSON.stringify(subJson);
-  } catch {
-    rawBody = "[unserializable]";
-  }
-  console.error("[stripe create-subscription TEMP]", label, {
-    subscription_id: subJson?.id,
-    status: subJson?.status,
-    latest_invoice_type: latestInvoiceType,
-    latest_invoice_payment_intent_type: paymentIntentType,
-    latest_invoice_payment_intent_value: paymentIntentValue,
-    raw_stripe_response: rawBody,
+/** @returns {Promise<Array<Record<string, unknown>>>} */
+async function listStripeSubscriptionsForCustomer(stripeKey, customerId) {
+  if (!stripeKey || !customerId) return [];
+  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
+  qs.append("expand[]", "data.items.data.price");
+  const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
+    headers: { Authorization: `Bearer ${stripeKey}` },
   });
+  const listJson = await listRes.json().catch(() => ({}));
+  return Array.isArray(listJson.data) ? listJson.data : [];
 }
 
 async function supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, subscr) {
@@ -1731,65 +1672,6 @@ async function ensureStripeCustomerForUser(env, supabaseUrl, serviceKey, userId,
     return { ok: false, error: "Could not save Stripe customer id" };
   }
   return { ok: true, customer_id: json.id };
-}
-
-/**
- * Returns create-subscription JSON: client_secret when payment is required, or syncs Supabase when already active/trialing.
- */
-async function respondStripeCreateSubscriptionPayload(
-  env,
-  supabaseUrl,
-  serviceKey,
-  userId,
-  customerId,
-  stripeKey,
-  subJson,
-  cors
-) {
-  const sid = typeof subJson.id === "string" ? subJson.id : "";
-  let effectiveSub = subJson;
-  let secret = paymentIntentClientSecretFromSubscriptionPayload(effectiveSub);
-  if (!secret && sid) {
-    const expanded = await fetchStripeSubscriptionExpanded(stripeKey, sid);
-    if (expanded && typeof expanded === "object") {
-      effectiveSub = expanded;
-      secret = paymentIntentClientSecretFromSubscriptionPayload(expanded);
-    }
-  }
-  if (!secret && stripeKey) {
-    const setupSecret = await fetchStripeSetupIntentClientSecretFromSubscription(stripeKey, effectiveSub);
-    if (setupSecret) secret = setupSecret;
-  }
-  const st = typeof effectiveSub.status === "string" ? effectiveSub.status : "";
-  if (secret) {
-    return jsonResponse({ client_secret: secret, subscription_id: sid || null, status: st }, 200, cors);
-  }
-  if (["active", "trialing"].includes(st) && sid) {
-    const full = await fetchStripeSubscriptionExpanded(stripeKey, sid);
-    if (full) {
-      const plan = tierPlanFromStripeSubscription(full, env);
-      await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, plan, customerId);
-      await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
-    }
-    return jsonResponse(
-      {
-        client_secret: null,
-        subscription_id: sid,
-        status: st,
-        no_payment_needed: true,
-      },
-      200,
-      cors
-    );
-  }
-  return jsonResponse(
-    {
-      error:
-        "No payment client_secret from Stripe — subscription may still be incomplete. Check the Stripe Dashboard or try again.",
-    },
-    502,
-    cors
-  );
 }
 
 async function handleStripeCreateCustomer(request, env, cors) {
@@ -1871,124 +1753,94 @@ async function handleStripeCreateSubscription(request, env, cors) {
   }
   const customerId = ensured.customer_id;
 
-  const qs = new URLSearchParams({ customer: customerId, limit: "20", status: "all" });
-  qs.append("expand[]", "data.items.data.price");
-  const listRes = await fetch(`https://api.stripe.com/v1/subscriptions?${qs}`, {
-    headers: { Authorization: `Bearer ${stripeKey}` },
-  });
-  const listJson = await listRes.json().catch(() => ({}));
-  const subs = Array.isArray(listJson.data) ? listJson.data : [];
+  let subs = await listStripeSubscriptionsForCustomer(stripeKey, customerId);
   for (const sub of subs) {
     const stx = String(sub?.status ?? "").trim().toLowerCase();
     if (stx === "incomplete_expired" && typeof sub.id === "string") {
       await stripeDeleteSubscription(stripeKey, sub.id);
     }
   }
-  let existing = pickPrimaryStripeSubscription(subs, ["active", "trialing", "past_due", "unpaid"], false);
-  if (!existing) {
-    existing = pickPrimaryStripeSubscription(subs, ["incomplete"], false);
+  subs = await listStripeSubscriptionsForCustomer(stripeKey, customerId);
+  for (const sub of subs) {
+    const stx = String(sub?.status ?? "").trim().toLowerCase();
+    if (stx === "incomplete" && typeof sub.id === "string") {
+      await stripeDeleteSubscription(stripeKey, sub.id);
+    }
   }
+  subs = await listStripeSubscriptionsForCustomer(stripeKey, customerId);
 
-  const expandFields = {
-    "metadata[plan]": plan,
-    "payment_settings[save_default_payment_method]": "on_subscription",
-  };
+  const baseOrigin = stripePortalAllowedOrigin(env);
+  const successUrl = `${baseOrigin}/?checkout=success`;
+  const cancelUrl = `${baseOrigin}/?checkout=cancel`;
 
-  if (existing && typeof existing.id === "string") {
-    const stExisting = String(existing.status ?? "").trim().toLowerCase();
-    if (stExisting === "incomplete") {
-      for (const sub of subs) {
-        const oid = typeof sub?.id === "string" ? sub.id : "";
-        const ost = String(sub?.status ?? "").trim().toLowerCase();
-        if (ost === "incomplete" && oid && oid !== existing.id) {
-          await stripeDeleteSubscription(stripeKey, oid);
-        }
-      }
-    }
-    const item0 = existing.items?.data?.[0];
+  const existingPaid = pickPrimaryStripeSubscription(subs, ["active", "trialing", "past_due", "unpaid"], false);
+  if (existingPaid && typeof existingPaid.id === "string") {
+    const item0 = existingPaid.items?.data?.[0];
+    const currentPriceId = item0?.price && typeof item0.price.id === "string" ? item0.price.id : "";
     const itemId = item0 && typeof item0.id === "string" ? item0.id : "";
-    if (!itemId) {
-      return jsonResponse({ error: "Could not read subscription item id" }, 502, cors);
-    }
-    const form = {
-      "items[0][id]": itemId,
-      "items[0][price]": priceId,
-      proration_behavior: "create_prorations",
-      ...expandFields,
-    };
-    const formBody = new URLSearchParams();
-    for (const [k, v] of Object.entries(form)) {
-      formBody.append(k, String(v));
-    }
-    formBody.append("expand[]", "latest_invoice");
-    formBody.append("expand[]", "latest_invoice.payment_intent");
-    formBody.append("expand[]", "pending_setup_intent");
-    formBody.append("payment_behavior", "default_incomplete");
-    const up = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(existing.id)}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${stripeKey}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formBody,
-    });
-    const subJson = await up.json().catch(() => ({}));
-    if (!up.ok) {
+    if (currentPriceId && currentPriceId === priceId) {
+      const full = await fetchStripeSubscriptionExpanded(stripeKey, existingPaid.id);
+      if (full) {
+        const planResolved = tierPlanFromStripeSubscription(full, env);
+        await supabaseSyncUserPlanAndCustomer(env, supabaseUrl, serviceKey, userId, planResolved, customerId);
+        await supabasePatchProfileStripeSubscriptionFields(supabaseUrl, serviceKey, userId, full);
+      }
+      const st = typeof existingPaid.status === "string" ? existingPaid.status : "";
       return jsonResponse(
-        { error: subJson.error?.message || subJson.error || `Stripe error (${up.status})` },
-        up.status >= 400 && up.status < 600 ? up.status : 502,
+        {
+          no_payment_needed: true,
+          subscription_id: existingPaid.id,
+          status: st,
+        },
+        200,
         cors
       );
     }
-    debugLogStripeCreateSubscriptionResponse(subJson, "subscription_update_reuse");
-    return respondStripeCreateSubscriptionPayload(
-      env,
-      supabaseUrl,
-      serviceKey,
-      userId,
-      customerId,
-      stripeKey,
-      subJson,
-      cors
-    );
+    if (!itemId) {
+      return jsonResponse({ error: "Could not read subscription item id" }, 502, cors);
+    }
+    const portalReturn = `${baseOrigin}/`;
+    const portalRes = await stripeFormPost(stripeKey, "billing_portal/sessions", {
+      customer: customerId,
+      return_url: portalReturn,
+      "flow_data[type]": "subscription_update_confirm",
+      "flow_data[subscription_update_confirm][subscription]": existingPaid.id,
+      "flow_data[subscription_update_confirm][items][0][id]": itemId,
+      "flow_data[subscription_update_confirm][items][0][price]": priceId,
+      "flow_data[subscription_update_confirm][items][0][quantity]": "1",
+      "flow_data[after_completion][type]": "redirect",
+      "flow_data[after_completion][redirect][return_url]": successUrl,
+    });
+    if (!portalRes.ok || typeof portalRes.json?.url !== "string") {
+      const msg =
+        portalRes.json?.error?.message ||
+        portalRes.json?.error ||
+        "Could not start plan change. Ensure Customer Portal allows subscription updates for these prices.";
+      const st = portalRes.status >= 400 && portalRes.status < 600 ? portalRes.status : 502;
+      return jsonResponse({ error: String(msg) }, st, cors);
+    }
+    return jsonResponse({ url: portalRes.json.url }, 200, cors);
   }
 
-  const createBody = new URLSearchParams();
-  createBody.append("customer", customerId);
-  createBody.append("items[0][price]", priceId);
-  createBody.append("payment_settings[save_default_payment_method]", "on_subscription");
-  createBody.append("metadata[plan]", plan);
-  createBody.append("expand[]", "latest_invoice");
-  createBody.append("expand[]", "latest_invoice.payment_intent");
-  createBody.append("expand[]", "pending_setup_intent");
-  createBody.append("payment_behavior", "default_incomplete");
-  const cr = await fetch("https://api.stripe.com/v1/subscriptions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${stripeKey}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: createBody,
+  const checkoutRes = await stripeFormPost(stripeKey, "checkout/sessions", {
+    mode: "subscription",
+    customer: customerId,
+    "line_items[0][price]": priceId,
+    "line_items[0][quantity]": "1",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    client_reference_id: userId,
+    "metadata[plan]": plan,
+    "metadata[supabase_user_id]": userId,
+    "subscription_data[metadata][plan]": plan,
   });
-  const subJson = await cr.json().catch(() => ({}));
-  if (!cr.ok) {
-    return jsonResponse(
-      { error: subJson.error?.message || subJson.error || `Stripe error (${cr.status})` },
-      cr.status >= 400 && cr.status < 600 ? cr.status : 502,
-      cors
-    );
+  if (!checkoutRes.ok || typeof checkoutRes.json?.url !== "string") {
+    const msg =
+      checkoutRes.json?.error?.message || checkoutRes.json?.error || "Could not start Stripe Checkout";
+    const st = checkoutRes.status >= 400 && checkoutRes.status < 600 ? checkoutRes.status : 502;
+    return jsonResponse({ error: String(msg) }, st, cors);
   }
-  debugLogStripeCreateSubscriptionResponse(subJson, "subscription_create_new");
-  return respondStripeCreateSubscriptionPayload(
-    env,
-    supabaseUrl,
-    serviceKey,
-    userId,
-    customerId,
-    stripeKey,
-    subJson,
-    cors
-  );
+  return jsonResponse({ url: checkoutRes.json.url }, 200, cors);
 }
 
 async function handleStripePortalSession(request, env, cors) {

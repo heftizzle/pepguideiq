@@ -116,7 +116,7 @@ Normalize with `normalizeStackSessions(s)` from `components/SavedStackEntryRow.j
 - **Config**: `config.js`
 - **Data layer**: `supabase.js` (57 exports)
 - **Tiers/plans**: `tiers.js`, `upgradeGateCopy.js`
-- **Stripe**: `checkout.js` (Payment Links), `stripeBrowser.js` (lazy Stripe.js singleton — used by UpgradePlanModal for Elements), `stripeSubscription.js` (Elements via `/stripe/create-subscription`)
+- **Stripe**: `checkout.js` (Payment Links), `stripeBrowser.js` (lazy Stripe.js singleton), `stripeSubscription.js` (`/stripe/create-subscription` → hosted Checkout or Portal `url`, redirect in `UpgradePlanModal`)
 - **Affiliate**: `affiliateRef.js`
 - **Age gate**: `ageVerification.js`
 - **Peptide math**: `peptideMath.js`, `vialDoseMath.js`, `peptideBioavailability.js`

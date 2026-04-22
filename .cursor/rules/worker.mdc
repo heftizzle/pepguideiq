@@ -18,7 +18,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `GET /stripe/subscription`
 - `POST /stripe/subscription/schedule-downgrade`
 - `POST /stripe/create-customer`
-- `POST /stripe/create-subscription`
+- `POST /stripe/create-subscription` — `{ url }` (Stripe Checkout new sub, or Billing Portal `subscription_update_confirm` when changing an existing paid sub’s price), or `{ no_payment_needed: true }`
 - `POST /stripe/create-portal-session`
 
 ### Account billing (2)

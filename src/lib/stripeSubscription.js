@@ -62,9 +62,10 @@ export async function scheduleDowngrade(targetPlan) {
 }
 
 /**
- * POST /stripe/create-subscription — returns PaymentIntent client_secret for Elements, or no_payment_needed when already charged.
+ * POST /stripe/create-subscription — returns Stripe Checkout or Billing Portal `url` to redirect,
+ * or `no_payment_needed` when the profile already matches the selected price.
  * @param {"pro"|"elite"|"goat"} plan
- * @returns {Promise<{ data: { client_secret: string | null, subscription_id: string | null, status: string, no_payment_needed?: boolean } | null, error: Error | null }>}
+ * @returns {Promise<{ data: { url?: string, no_payment_needed?: boolean, subscription_id?: string, status?: string } | null, error: Error | null }>}
  */
 export async function createStripeSubscription(plan) {
   if (!isApiWorkerConfigured()) {

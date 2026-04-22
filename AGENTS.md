@@ -15,7 +15,7 @@ A research-peptide reference and personal-protocol tracker. Production: [pepguid
 - Cloudflare KV — per-user daily AI query rate limit (namespace binding: `RATE_LIMIT_KV`)
 - Cloudflare Pages — static hosting
 - Cloudflare Turnstile — bot check on auth
-- Stripe Elements (embedded checkout) + Payment Links + webhook. Elements path uses `@stripe/stripe-js` + `@stripe/react-stripe-js` client-side; the Worker issues the PaymentIntent `client_secret`.
+- Stripe hosted Checkout (subscription) + Payment Links + webhook. `@stripe/stripe-js` / `@stripe/react-stripe-js` remain in deps; plan upgrades from `UpgradePlanModal` redirect to Checkout or a Billing Portal `subscription_update_confirm` URL from the Worker (no `client_secret` in browser).
 
 Production deps (7, exhaustive):
 - `@stripe/react-stripe-js` ^3.10.0 — `<Elements>`, `<PaymentElement>`, hooks
@@ -64,7 +64,7 @@ Subdirectory briefs: `src/AGENTS.md`, `workers/AGENTS.md`, `supabase/AGENTS.md`.
 - **Tier emojis are 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** Source: `src/lib/tiers.js`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.
-- **Stripe Elements is live.** Primary checkout is embedded Elements via `UpgradePlanModal.jsx` → Worker `POST /stripe/create-subscription` → PaymentIntent `client_secret`. Payment Links are the fallback / alternative path.
+- **Stripe hosted checkout for plan upgrades.** `UpgradePlanModal.jsx` → Worker `POST /stripe/create-subscription` → `{ url }` (Stripe Checkout for new subscriptions, or Billing Portal when changing an existing paid subscription’s price). Payment Links remain a fallback / alternative path.
 - **Affiliate codes (13 whitelisted).** Canonical codes (all 15% flat, case-insensitive via `normalizeAffiliateRef()` in `src/lib/affiliateRef.js`):
 
   | Name             | Code          |
