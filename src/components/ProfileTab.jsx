@@ -33,6 +33,7 @@ import {
   normalizeSocialHandleForColumn,
   storedSocialHandleString,
 } from "../lib/socialProfileLinks.js";
+import { PostItComposer } from "./PostItComposer.jsx";
 import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
 import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
 import { BodyScanView } from "./BodyScanView.jsx";
@@ -874,6 +875,7 @@ export function ProfileTab({
   const [bodyFatMetricsLocked, setBodyFatMetricsLocked] = useState(true);
   const [stats, setStats] = useState(null);
   const [clientStreakFallback, setClientStreakFallback] = useState(0);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCrop, setAvatarCrop] = useState(/** @type {{ url: string, revoke: () => void } | null} */ (null));
   const [archiveProgressBusy, setArchiveProgressBusy] = useState(false);
@@ -1901,63 +1903,108 @@ export function ProfileTab({
           }}
         >
           <div
-            ref={setFieldRef("avatar")}
-            className="pepv-profile-user-avatar-wrap"
-            style={{ width: "100%", display: "flex", justifyContent: "center" }}
+            style={{
+              position: "relative",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 16,
+            }}
           >
+            <div ref={setFieldRef("avatar")} className="pepv-profile-user-avatar-wrap" style={{ display: "flex", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                data-demo-target={DEMO_TARGET.profile_avatar}
+                {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_avatar)))}
+                style={{
+                  width: 112,
+                  height: 112,
+                  minWidth: 112,
+                  minHeight: 112,
+                  borderRadius: "50%",
+                  border: "2px solid var(--color-border-emphasis)",
+                  overflow: "hidden",
+                  padding: 0,
+                  cursor: avatarBusy ? "wait" : "pointer",
+                  background: "var(--color-bg-input)",
+                  flexShrink: 0,
+                  opacity: avatarBusy ? 0.85 : 1,
+                }}
+                aria-label="Upload or replace profile photo"
+              >
+                {memberAvatarSrc ? (
+                  <img
+                    src={memberAvatarSrc}
+                    alt=""
+                    draggable={false}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      pointerEvents: "none",
+                      userSelect: "none",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 36,
+                      fontWeight: 700,
+                      color: "var(--color-accent)",
+                      fontFamily: "'Outfit', sans-serif",
+                      pointerEvents: "none",
+                      userSelect: "none",
+                    }}
+                  >
+                    {avatarInitialLetter(displayNameShown, user.name, user.email)}
+                  </div>
+                )}
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
-              data-demo-target={DEMO_TARGET.profile_avatar}
-              {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_avatar)))}
+              onClick={() => setComposerOpen(true)}
               style={{
-                width: 112,
-                height: 112,
-                minWidth: 112,
-                minHeight: 112,
-                borderRadius: "50%",
-                border: "2px solid var(--color-border-emphasis)",
-                overflow: "hidden",
-                padding: 0,
-                cursor: avatarBusy ? "wait" : "pointer",
-                background: "var(--color-bg-input)",
-                flexShrink: 0,
-                opacity: avatarBusy ? 0.85 : 1,
+                position: "absolute",
+                left: "calc(50% + 56px + 12px)",
+                top: "50%",
+                transform: "translateY(-50%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+                padding: "6px 10px",
+                borderRadius: 12,
+                border: "1px solid var(--color-accent-subtle-50)",
+                background: "var(--color-accent-subtle-0e)",
+                color: "var(--color-accent)",
+                cursor: "pointer",
+                minHeight: 44,
+                fontSize: 16,
+                lineHeight: 1,
               }}
-              aria-label="Upload or replace profile photo"
+              aria-label="Create a post"
             >
-              {memberAvatarSrc ? (
-                <img
-                  src={memberAvatarSrc}
-                  alt=""
-                  draggable={false}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    pointerEvents: "none",
-                    userSelect: "none",
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 36,
-                    fontWeight: 700,
-                    color: "var(--color-accent)",
-                    fontFamily: "'Outfit', sans-serif",
-                    pointerEvents: "none",
-                    userSelect: "none",
-                  }}
-                >
-                  {avatarInitialLetter(displayNameShown, user.name, user.email)}
-                </div>
-              )}
+              <span className="pepv-emoji" aria-hidden>
+                📸
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: "0.06em",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                Post It
+              </span>
             </button>
           </div>
           <input ref={fileRef} type="file" accept={R2_UPLOAD_ACCEPT_ATTR} hidden onChange={(e) => void onAvatarPick(e)} />
@@ -2966,6 +3013,13 @@ export function ProfileTab({
         </div>
       </Card>
 
+      <PostItComposer
+        open={composerOpen}
+        activeProfileId={activeProfileId ?? ""}
+        displayName={displayNameShown}
+        onClose={() => setComposerOpen(false)}
+        onPosted={() => setComposerOpen(false)}
+      />
     </div>
   );
 }

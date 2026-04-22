@@ -86,6 +86,17 @@ A live Supabase project may add grants or policies outside this repo; confirm wi
 
 ---
 
+### posts
+
+- RLS enabled: yes (`065_posts_media_visibility.sql`)
+- anon SELECT: denied
+- anon INSERT: denied
+- authenticated: `posts: insert own profile` / `posts: select own profile` — `profile_id` must belong to `auth.uid()` via `member_profiles`; `GRANT SELECT, INSERT ON public.posts TO authenticated`
+- Status: ✅ OK
+- Notes: `media_url` stores the R2 object key (no cache-bust query params). Network/profile visibility flags are `visible_network` / `visible_profile`.
+
+---
+
 ### ai_queries
 
 - **Removed** in `047_network_feed_public_visible_indexes_ai_queries_drop.sql` (unused; Worker uses KV + `query_log` for usage). `get_daily_ai_count` now counts from `query_log`.
@@ -138,6 +149,7 @@ These are not RLS policies on tables but affect what **anon** can read.
 
 ## Changes Applied
 
+- **`065_posts_media_visibility.sql`**: `public.posts` — member-authored image posts; RLS insert/select scoped to the caller’s `member_profiles` rows.
 - **`055_inbody_scan_history.sql`**: `public.inbody_scan_history` — RLS enabled; `authenticated` **SELECT** + **INSERT**; policies require `auth.uid() = user_id` and a matching `member_profiles` row for `profile_id`.
 - **`057_inbody_scan_history_delete_scoped.sql`**: adds **DELETE** for the same ownership scope (replace-within–scan-date window in the client).
 - **`058_inbody_scan_history_ai_interpretation.sql`**: adds `ai_interpretation` / `ai_interpreted_at` on `inbody_scan_history`. No new `authenticated` **UPDATE** policy — rows are updated by the API Worker with the **service role** only.

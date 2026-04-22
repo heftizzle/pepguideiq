@@ -4747,7 +4747,9 @@ async function handlePostStackPhoto(request, env, cors) {
     return jsonResponse({ error: "Invalid multipart body" }, 400, cors);
   }
 
-  const kindRaw = formData.get("kind");
+  const uploadPathname = new URL(request.url).pathname.replace(/\/+$/, "") || "/";
+  const isUploadPostMedia = uploadPathname === "/upload-post-media";
+  const kindRaw = isUploadPostMedia ? "post" : formData.get("kind");
   const kind = typeof kindRaw === "string" ? kindRaw.trim().toLowerCase() : "";
   const vialIdRaw = formData.get("vial_id");
   const vialId = typeof vialIdRaw === "string" ? vialIdRaw.trim() : "";
@@ -4770,12 +4772,13 @@ async function handlePostStackPhoto(request, env, cors) {
     "progress_front",
     "progress_side",
     "progress_back",
+    "post",
   ]);
   if (!["stack_shot_1", "stack_shot_2", "vial", "avatar", ...memberScopedKinds].includes(kind)) {
     return jsonResponse(
       {
         error:
-          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, inbody_scan_history, progress_front, progress_side, or progress_back",
+          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, inbody_scan_history, progress_front, progress_side, progress_back, or post",
       },
       400,
       cors
@@ -4856,6 +4859,7 @@ async function handlePostStackPhoto(request, env, cors) {
   else if (kind === "progress_front") key = `${userId}/member-profiles/${memberProfileId}/progress-front-${sha}.jpg`;
   else if (kind === "progress_side") key = `${userId}/member-profiles/${memberProfileId}/progress-side-${sha}.jpg`;
   else if (kind === "progress_back") key = `${userId}/member-profiles/${memberProfileId}/progress-back-${sha}.jpg`;
+  else if (kind === "post") key = `${userId}/member-profiles/${memberProfileId}/posts/${sha}.jpg`;
   else if (kind === "avatar") {
     if (memberProfileId && UUID_RE.test(memberProfileId)) {
       const mr = await fetch(
@@ -4990,6 +4994,9 @@ async function handlePostStackPhoto(request, env, cors) {
       progress_photo_back_at: isoNow,
     });
     patched = prPatch.ok;
+    url = privateStackPhotoUrl(request, key);
+  } else if (kind === "post") {
+    patched = true;
     url = privateStackPhotoUrl(request, key);
   } else {
     patched = await supabasePatchUserVial(supabaseUrl, serviceKey, userId, vialId, { vial_photo_r2_key: key }, profileId);
@@ -5339,6 +5346,7 @@ async function handleRequest(request, env) {
     const isR2Write =
       (pathname === "/stack-photo" && method === "POST") ||
       (pathname === "/upload-stack-photo" && method === "POST") ||
+      (pathname === "/upload-post-media" && method === "POST") ||
       ((pathname === "/avatars" || pathname === "/avatars/") &&
         (method === "POST" || method === "PUT"));
 
@@ -5599,6 +5607,10 @@ async function handleRequest(request, env) {
       if (request.method === "POST") {
         return handleInbodyScanInterpret(request, env, cors);
       }
+    }
+
+    if (url.pathname === "/upload-post-media" && request.method === "POST") {
+      return handlePostStackPhoto(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {

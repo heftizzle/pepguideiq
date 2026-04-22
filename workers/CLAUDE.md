@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 31)
+## Routes (exactly 32)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -43,6 +43,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 
 ### R2 images
 - `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated).
+- `POST /upload-post-media` — same handler as `POST /stack-photo`; forces `kind=post` + `member_profile_id` (UUID). Keys under `{userId}/member-profiles/{memberProfileId}/posts/{sha}.jpg`. No `member_profiles` column update; client inserts `public.posts`.
 - `POST /upload-stack-photo` — alias of the above, kept for compatibility.
 - `GET /stack-photo?key=…` — authenticated private read. User can only read keys prefixed with their own user id.
 - `GET /avatars/{key}` — **public** R2 read (no auth, no rate limit). Never rate-limit these — cascades to broken `<img>` tags.
