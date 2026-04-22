@@ -94,14 +94,30 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
             id="pepv-post-dose-title"
             style={{
               fontFamily: "'Outfit', sans-serif",
-              fontSize: 17,
-              fontWeight: 600,
+              fontSize: 22,
+              fontWeight: 700,
               color: "var(--color-text-primary)",
               marginBottom: 8,
               textAlign: "center",
+              lineHeight: 1.2,
             }}
           >
             Post to Network?
+          </div>
+          <div
+            style={{
+              fontFamily: "'Outfit', sans-serif",
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--color-text-secondary)",
+              lineHeight: 1.45,
+              textAlign: "center",
+              marginBottom: 12,
+              paddingLeft: 4,
+              paddingRight: 4,
+            }}
+          >
+            Share this dose to the community feed (72h)
           </div>
           <div
             style={{

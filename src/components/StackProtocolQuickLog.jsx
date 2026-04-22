@@ -245,6 +245,8 @@ export function StackProtocolQuickLog({
       return;
     }
     setNetworkPostError(null);
+    // Network "Post It" sheet is shown for every tier; do not gate on planKey.
+    if (import.meta.env.DEV) console.log("[PostIt] networkFeedId set:", networkFeedId, "plan:", planKey);
     setNetworkPrompt({
       networkFeedId,
       compoundName: r.name,

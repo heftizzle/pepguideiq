@@ -1607,11 +1607,17 @@ export async function updateNetworkFeedPostPublicVisible(networkFeedId, publicVi
   if (!supabase) return { error: notConfiguredError() };
   const id = typeof networkFeedId === "string" ? networkFeedId.trim() : "";
   if (!id) return { error: new Error("Missing network feed id.") };
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("network_feed")
     .update({ public_visible: Boolean(publicVisible) })
-    .eq("id", id);
-  return { error: error ?? null };
+    .eq("id", id)
+    .select("id");
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    console.warn("[Post It] zero rows updated — id:", id);
+    return { error: new Error("Could not post — try logging a fresh dose and sharing again.") };
+  }
+  return { error: null };
 }
 
 export async function listRecentDosedAtDates(userId, profileId) {
