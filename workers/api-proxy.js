@@ -582,7 +582,7 @@ const RATE_LIMITS = {
   password_reset: { windowMs: 3_600_000, max: 5 },
   /** Authed image uploads (POST/PUT): 20/min per IP. */
   r2_write: { windowMs: 60_000, max: 20 },
-  /** Authenticated private image reads (GET /stack-photo): 500/min per IP. Public /avatars/ is unrate-limited. */
+  /** Private stack reads + network post media reads (GET /stack-photo, GET /post-media/…): 500/min per IP. Public /avatars/ is unrate-limited. */
   r2_read: { windowMs: 60_000, max: 500 },
 };
 
@@ -3220,6 +3220,79 @@ const AVATAR_R2_KEY_RE = new RegExp(
   "i"
 );
 
+/** R2 keys for member post images (upload kind `post`). */
+const POST_MEDIA_R2_KEY_RE = new RegExp(
+  `^${UUID_RE.source.slice(1, -1)}/member-profiles/${UUID_RE.source.slice(1, -1)}/posts/[0-9a-f]{6}\\.jpg$`,
+  "i"
+);
+
+/**
+ * Network-visible post images under `{userId}/member-profiles/{profileId}/posts/{sha}.jpg`.
+ * Served via GET /post-media/… after `posts.visible_network` + `media_url` gate (no Bearer; safe for `<img src>`).
+ */
+async function handleGetPostMedia(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return new Response("Service unavailable", { status: 503, headers: cors });
+  }
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return new Response("Not configured", { status: 503, headers: cors });
+  }
+
+  const reqUrl = new URL(request.url);
+  const prefix = "/post-media/";
+  if (!reqUrl.pathname.startsWith(prefix)) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+  let key = "";
+  try {
+    key = decodeURIComponent(reqUrl.pathname.slice(prefix.length));
+  } catch {
+    return new Response("Bad request", { status: 400, headers: cors });
+  }
+  if (!key || key.includes("..") || !POST_MEDIA_R2_KEY_RE.test(key)) {
+    return new Response("Forbidden", { status: 403, headers: cors });
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/posts?media_url=eq.${encodeURIComponent(key)}&visible_network=eq.true&select=id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+
+  try {
+    const obj = await bucket.get(key);
+    if (!obj) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+    const ct =
+      (obj.httpMetadata && typeof obj.httpMetadata.contentType === "string" && obj.httpMetadata.contentType) ||
+      contentTypeFromKey(key);
+    const isHead = request.method === "HEAD";
+    return new Response(isHead ? null : obj.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": ct,
+        "Cache-Control": "private, max-age=120",
+      },
+    });
+  } catch (e) {
+    log(env, "error", "r2_post_media_get_failed", { message: String(e) });
+    return new Response("Storage error", { status: 502, headers: cors });
+  }
+}
+
 /**
  * @param {Request} request
  * @param {string} key
@@ -5350,8 +5423,10 @@ async function handleRequest(request, env) {
       ((pathname === "/avatars" || pathname === "/avatars/") &&
         (method === "POST" || method === "PUT"));
 
-    /** Authed private reads: GET /stack-photo. Higher limit for <img> rendering bursts. */
-    const isR2Read = pathname === "/stack-photo" && (method === "GET" || method === "HEAD");
+    /** Authed private reads + network post media (DB-gated): GET /stack-photo, GET /post-media/… */
+    const isR2Read =
+      (pathname === "/stack-photo" && (method === "GET" || method === "HEAD")) ||
+      (pathname.startsWith("/post-media/") && (method === "GET" || method === "HEAD"));
 
     if (!skipRateLimitPublicAvatar && !skipAuthWorkerTurnstileRoutes) {
       let rlType;
@@ -5611,6 +5686,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/upload-post-media" && request.method === "POST") {
       return handlePostStackPhoto(request, env, cors);
+    }
+
+    if (url.pathname.startsWith("/post-media/") && (request.method === "GET" || request.method === "HEAD")) {
+      return handleGetPostMedia(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {

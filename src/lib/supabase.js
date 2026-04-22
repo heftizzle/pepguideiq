@@ -1148,6 +1148,30 @@ export async function fetchPublicNetworkDoseFeed() {
 }
 
 /**
+ * Network tab: recent member posts with media (`posts.visible_network`).
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
+ */
+export async function fetchNetworkMediaPosts() {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const { data, error } = await supabase
+    .from("posts")
+    .select(
+      `
+      id, content, media_url, media_type, created_at, profile_id,
+      member_profiles!posts_profile_id_fkey(
+        handle, display_handle, display_name, avatar_r2_key, user_id
+      )
+    `
+    )
+    .eq("visible_network", true)
+    .not("media_url", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error) return { rows: [], error };
+  return { rows: data ?? [], error: null };
+}
+
+/**
  * @param {string} userId
  * @param {string} profileId — member_profiles.id
  * @param {unknown[]} stack JSON-serializable peptide stack rows

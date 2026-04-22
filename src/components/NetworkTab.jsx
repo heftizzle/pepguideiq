@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
 import { NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
-import { fetchNetworkFeed, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
+import { fetchNetworkFeed, fetchNetworkMediaPosts, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
 import { API_WORKER_URL, isSupabaseConfigured } from "../lib/config.js";
 import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
@@ -357,6 +357,109 @@ function DoseFeedSkeleton() {
 }
 
 /**
+ * @param {{ row: Record<string, unknown> }} p
+ */
+function MediaPostCard({ row }) {
+  const profile = row.member_profiles != null && typeof row.member_profiles === "object" ? row.member_profiles : {};
+  const handle = typeof profile.handle === "string" ? profile.handle.trim() : "";
+  const displayHandle = typeof profile.display_handle === "string" ? profile.display_handle.trim() : "";
+  const displayName = typeof profile.display_name === "string" ? profile.display_name.trim() : "";
+  const avatarR2Key = typeof profile.avatar_r2_key === "string" ? profile.avatar_r2_key.trim() : "";
+  const profileUserId = typeof profile.user_id === "string" ? profile.user_id.trim() : "";
+  const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
+  const keyRaw = typeof row.media_url === "string" ? row.media_url.trim() : "";
+  const mediaUrl = keyRaw
+    ? `${String(API_WORKER_URL || "").replace(/\/$/, "")}/post-media/${encodeURIComponent(keyRaw)}`
+    : null;
+  const content = typeof row.content === "string" ? row.content.trim() : "";
+  const createdAt = typeof row.created_at === "string" ? row.created_at : "";
+
+  return (
+    <div
+      className="pcard"
+      role="article"
+      style={{
+        cursor: "default",
+        transform: "none",
+        fontFamily: "'Outfit', sans-serif",
+        color: "var(--color-text-primary)",
+        padding: 0,
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "8px 12px", padding: "12px 14px 10px" }}>
+        <NetworkAvatar userId={profileUserId} r2Key={avatarR2Key} />
+        {handle ? (
+          <button
+            type="button"
+            onClick={() => openPublicMemberProfile(handle)}
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textDecoration: "underline",
+              textDecorationColor: "rgba(248,250,252,0.25)",
+              textUnderlineOffset: 3,
+            }}
+          >
+            {handleShown}
+          </button>
+        ) : (
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{handleShown}</span>
+        )}
+        {createdAt ? (
+          <span className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+            {formatTimeAgo(createdAt)}
+          </span>
+        ) : null}
+      </div>
+
+      {mediaUrl ? (
+        <img
+          src={mediaUrl}
+          alt={content || "Post"}
+          loading="lazy"
+          style={{
+            width: "100%",
+            display: "block",
+            maxHeight: 480,
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
+
+      {content ? (
+        <div style={{ padding: "10px 14px 12px", fontSize: 14, lineHeight: 1.5, color: "var(--color-text-primary)" }}>
+          {content}
+        </div>
+      ) : null}
+
+      <div style={{ padding: content ? "0 14px 12px" : "10px 14px 12px" }}>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.08em",
+            color: "var(--color-accent)",
+            border: "1px solid var(--color-accent-nav-border)",
+            borderRadius: 6,
+            padding: "2px 8px",
+            background: "var(--color-accent-nav-fill)",
+          }}
+        >
+          📸 POST
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * @param {unknown} raw
  * @returns {object[]}
  */
@@ -372,10 +475,13 @@ function normalizeDoseRpcRows(raw) {
 export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePostScrollTarget }) {
   const [stackItems, setStackItems] = useState(/** @type {object[]} */ ([]));
   const [doseItems, setDoseItems] = useState(/** @type {object[]} */ ([]));
+  const [mediaPostItems, setMediaPostItems] = useState(/** @type {object[]} */ ([]));
   const [stackLoading, setStackLoading] = useState(true);
   const [doseLoading, setDoseLoading] = useState(true);
+  const [mediaPostLoading, setMediaPostLoading] = useState(true);
   const [stackError, setStackError] = useState(/** @type {string | null} */ (null));
   const [doseError, setDoseError] = useState(/** @type {string | null} */ (null));
+  const [mediaPostError, setMediaPostError] = useState(/** @type {string | null} */ (null));
 
   const loadStackFeed = useCallback(async () => {
     if (!isSupabaseConfigured() || !userId) {
@@ -413,10 +519,29 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
     setDoseLoading(false);
   }, [userId]);
 
+  const loadMediaPostFeed = useCallback(async () => {
+    if (!isSupabaseConfigured() || !userId) {
+      setMediaPostItems([]);
+      setMediaPostError(null);
+      setMediaPostLoading(false);
+      return;
+    }
+    setMediaPostLoading(true);
+    const { rows, error } = await fetchNetworkMediaPosts();
+    if (error) {
+      setMediaPostError(error.message || "Could not load posts.");
+    } else {
+      setMediaPostItems(rows);
+      setMediaPostError(null);
+    }
+    setMediaPostLoading(false);
+  }, [userId]);
+
   const refreshAll = useCallback(() => {
     void loadStackFeed();
     void loadDoseFeed();
-  }, [loadStackFeed, loadDoseFeed]);
+    void loadMediaPostFeed();
+  }, [loadStackFeed, loadDoseFeed, loadMediaPostFeed]);
 
   useEffect(() => {
     void loadStackFeed();
@@ -427,12 +552,20 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   }, [loadDoseFeed]);
 
   useEffect(() => {
+    void loadMediaPostFeed();
+  }, [loadMediaPostFeed]);
+
+  useEffect(() => {
     if (!userId || !isSupabaseConfigured()) return;
-    const id = window.setInterval(() => void loadDoseFeed(), 60_000);
+    const id = window.setInterval(() => {
+      void loadDoseFeed();
+      void loadMediaPostFeed();
+    }, 60_000);
     const onVis = () => {
       if (document.visibilityState === "visible") {
         void loadDoseFeed();
         void loadStackFeed();
+        void loadMediaPostFeed();
       }
     };
     document.addEventListener("visibilitychange", onVis);
@@ -440,7 +573,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [userId, loadDoseFeed, loadStackFeed]);
+  }, [userId, loadDoseFeed, loadStackFeed, loadMediaPostFeed]);
 
   useEffect(() => {
     const pid = typeof scrollToDosePostId === "string" ? scrollToDosePostId.trim() : "";
@@ -455,7 +588,10 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
     return () => window.clearTimeout(t);
   }, [scrollToDosePostId, doseLoading, doseItems, onConsumedDosePostScrollTarget]);
 
-  const headerBusy = useMemo(() => stackLoading || doseLoading, [stackLoading, doseLoading]);
+  const headerBusy = useMemo(
+    () => stackLoading || doseLoading || mediaPostLoading,
+    [stackLoading, doseLoading, mediaPostLoading]
+  );
 
   if (!userId) {
     return (
@@ -670,6 +806,70 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
               </div>
             );
           })}
+        </div>
+      )}
+
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.1em", marginBottom: 10 }}>
+        POSTS
+      </div>
+      {mediaPostError ? (
+        <div
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "var(--color-warning)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            background: "rgba(245, 158, 11, 0.08)",
+          }}
+        >
+          {mediaPostItems.length > 0 ? `Could not refresh posts: ${mediaPostError}` : `Posts are unavailable: ${mediaPostError}`}
+        </div>
+      ) : null}
+      {mediaPostLoading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          <DoseFeedSkeleton />
+        </div>
+      ) : mediaPostError && mediaPostItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed rgba(245, 158, 11, 0.4)",
+            borderRadius: 12,
+            padding: "28px 20px",
+            textAlign: "center",
+            marginBottom: 28,
+            background: "var(--color-bg-elevated)",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "#fcd34d", lineHeight: 1.55 }}>
+            Posts could not be loaded right now. Try refresh in a moment.
+          </div>
+        </div>
+      ) : mediaPostItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed var(--color-border-default)",
+            borderRadius: 12,
+            padding: "28px 20px",
+            textAlign: "center",
+            marginBottom: 28,
+            background: "var(--color-bg-elevated)",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
+            No posts yet. Hit Post It on your profile to share a photo.
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+          {mediaPostItems.map((row, idx) => (
+            <MediaPostCard
+              key={typeof row.id === "string" && row.id ? row.id : `post-${idx}`}
+              row={row}
+            />
+          ))}
         </div>
       )}
 

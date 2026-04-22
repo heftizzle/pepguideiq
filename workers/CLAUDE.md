@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 32)
+## Routes (exactly 33)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -46,6 +46,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `POST /upload-post-media` — same handler as `POST /stack-photo`; forces `kind=post` + `member_profile_id` (UUID). Keys under `{userId}/member-profiles/{memberProfileId}/posts/{sha}.jpg`. No `member_profiles` column update; client inserts `public.posts`.
 - `POST /upload-stack-photo` — alias of the above, kept for compatibility.
 - `GET /stack-photo?key=…` — authenticated private read. User can only read keys prefixed with their own user id.
+- `GET /post-media/{urlEncodedR2Key}` — **no Bearer** (for `<img src>`). Key must match `{userId}/member-profiles/{profileId}/posts/{6hex}.jpg`; Worker verifies a `posts` row exists with `media_url` = key and `visible_network = true` (service role), then streams from R2. IP rate limit: `r2_read`.
 - `GET /avatars/{key}` — **public** R2 read (no auth, no rate limit). Never rate-limit these — cascades to broken `<img>` tags.
 - `POST /avatars` / `PUT /avatars` — authenticated avatar upload.
 
@@ -112,7 +113,7 @@ bucket_name = "stack-photos"
 - **Never trust client-supplied `plan`.** Always fetch from `public.profiles` with `fetchProfilePlan()`.
 - **Stripe webhook signature verification is required** (`verifyStripeWebhookSignature`). Don't skip.
 - **Image uploads must pass `imageMagicMatchesClaimedMime()`** — reject when magic bytes don't match the claimed MIME.
-- **R2 private reads must check ownership** — the key must start with the caller's user id prefix.
+- **R2 private reads must check ownership** — for `GET /stack-photo`, the key must start with the caller's user id prefix. `GET /post-media/…` is an exception: gate on `posts.visible_network` + `media_url` via service role (no Bearer on `<img>`).
 - **Service-role key bypasses RLS.** Always check ownership explicitly in the handler — don't rely on RLS alone when using the service key.
 - **Turnstile verify is one-shot per token.** Don't replay.
 
