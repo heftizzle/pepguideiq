@@ -158,6 +158,7 @@ function TutorialSpotlightInner() {
           border: "1px solid var(--color-border-default)",
           zIndex: OVERLAY_Z + 1,
           pointerEvents: "all",
+          fontFamily: "var(--font-sans)",
         }}
       >
         {(currentStep.tooltip || currentStep.text) ? (
@@ -167,6 +168,7 @@ function TutorialSpotlightInner() {
               color: "var(--color-text-primary)",
               margin: "0 0 10px 0",
               lineHeight: 1.5,
+              fontFamily: "var(--font-sans)",
             }}
           >
             {currentStep.tooltip || currentStep.text}
