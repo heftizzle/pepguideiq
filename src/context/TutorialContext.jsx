@@ -40,6 +40,10 @@ export const TUTORIAL_TARGET = {
   profile_default_session: "profile_default_session",
   profile_shift_schedule: "profile_shift_schedule",
   profile_score: "profile_score",
+  /** Profile Measurement hub — opens Body Scan subview */
+  body_scan_section: "body_scan_section",
+  /** Body Scan screen — Upload scan (Pro+ gate) */
+  inbody_upload: "inbody_upload",
   protocol_log_dose: "protocol_log_dose",
   stack_share: "stack_share",
   /** BUILD tab (`stackBuilder`): compound search + save */
@@ -167,14 +171,28 @@ const STATIC_FLOWS = {
       target: TUTORIAL_TARGET.nav_profile,
       tab: "profile",
       text: "Open your Profile",
-      tooltip: "Your body metrics live here. This is where your transformation gets tracked.",
+      tooltip: "Your body metrics and scan history live here. This is where your transformation gets tracked.",
     },
     {
       target: TUTORIAL_TARGET.profile_body_metrics,
       tab: "profile",
       text: "Set your goal, body stats, DOB, gender, and training experience",
       tooltip:
-        "The more you fill in, the smarter your AI recommendations get. Pick your goal first — Build, Cut, Recomp, or Maintain. Add DOB, gender, and training experience so the AI Stack Advisor knows who it's talking to. If you have an InBody scan, use those numbers — they're the most accurate baseline you have.",
+        "The more you fill in, the smarter your AI recommendations get. Pick your goal first — Build, Cut, Recomp, or Maintain. Add DOB, gender, and training experience so the AI Stack Advisor knows who it's talking to. If you have an InBody scan, use those numbers as your baseline.",
+    },
+    {
+      target: TUTORIAL_TARGET.body_scan_section,
+      tab: "profile",
+      text: "Open Body Scan — your transformation tracker",
+      tooltip:
+        "Body Scan uploads let you track Weight, Skeletal Muscle Mass, and Body Fat % over time. Every scan is a receipt. Your progress is the proof.",
+    },
+    {
+      target: TUTORIAL_TARGET.inbody_upload,
+      tab: "profile",
+      text: "Upload your InBody scan — Pro+ feature",
+      tooltip:
+        "This is a Pro+ feature. Upload your InBody scan image and we extract your stats automatically. Your baseline. Your progress. All in one place. Upgrade to unlock.",
     },
   ],
 
@@ -263,6 +281,13 @@ const STATIC_FLOWS = {
       tooltip:
         "Your score is based on profile completion, dose logging consistency, vial tracking, and community engagement. The higher the score, the more the app works for you. Think of it as your engagement XP.",
     },
+    {
+      target: TUTORIAL_TARGET.inbody_upload,
+      tab: "profile",
+      text: "Unlock more with Pro+",
+      tooltip:
+        "Body Scan uploads, advanced AI guidance, and more are unlocked at Pro+ and above. Your score reflects everything you're doing — upgrading adds more ways to earn it.",
+    },
   ],
 
   build: [
@@ -300,10 +325,10 @@ export function getTutorialFlowSteps(key, firstProtocolSessionId) {
 export const HELP_SECTIONS = [
   { key: /** @type {TutorialFlowKey} */ ("core"), label: "Replay Tutorial — walk through the 12-step core setup" },
   { key: "profile", label: "Set Up Your Profile — photo, name, handle" },
-  { key: "body", label: "Body Metrics & Goal — InBody stats, DOB, gender, training experience" },
+  { key: "body", label: "Body Metrics & Scans — InBody upload, DOB, gender, training experience" },
   { key: "schedule", label: "Schedule & Settings — sessions, wake time, shift schedule" },
   { key: "build", label: "BUILD Tab — design your stack, save to protocol" },
-  { key: "score", label: "Your pepguideIQ Score — how it works and how to raise it" },
+  { key: "score", label: "Your pepguideIQ Score — XP system, tiers, and what Pro+ unlocks" },
   { key: "guide", label: "AI Guide — your personal peptide research assistant" },
 ];
 

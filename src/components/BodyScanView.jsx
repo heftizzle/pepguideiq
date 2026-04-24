@@ -8,6 +8,7 @@ import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
 import { Modal } from "./Modal.jsx";
 import { BodyScanShareComposer } from "./BodyScanShareComposer.jsx";
 import { BodyScanTrendsView } from "./BodyScanTrendsView.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 
 const EM = INBODY_EM;
 
@@ -92,6 +93,7 @@ export function BodyScanView({
   onGuideDeepAnalysis,
   onInterpretationPersisted,
 }) {
+  const tutorial = useTutorialOptional();
   const planKey = typeof tier === "string" ? tier.trim().toLowerCase() : "entry";
   const isProPlus = (TIER_RANK[planKey] ?? 0) >= TIER_RANK.pro;
 
@@ -160,7 +162,14 @@ export function BodyScanView({
           <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>Body Scan</div>
           <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{countLabel}</div>
         </div>
-        <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "8px 14px", marginLeft: "auto" }} onClick={onUploadClick}>
+        <button
+          type="button"
+          className="btn-teal"
+          style={{ fontSize: 12, padding: "8px 14px", marginLeft: "auto" }}
+          data-tutorial-target={TUTORIAL_TARGET.inbody_upload}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.inbody_upload)))}
+          onClick={onUploadClick}
+        >
           Upload scan
         </button>
       </div>

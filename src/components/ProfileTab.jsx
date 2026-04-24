@@ -858,21 +858,6 @@ export function ProfileTab({
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
-
-  useEffect(() => {
-    if (
-      tutorial?.highlightTarget === TUTORIAL_TARGET.settings_wake &&
-      tutorial?.flowKey === "core"
-    ) {
-      setSubView("settings");
-    }
-  }, [tutorial?.highlightTarget, tutorial?.flowKey]);
-
-  useEffect(() => {
-    if (tutorial?.highlightTarget === TUTORIAL_TARGET.profile_handle && tutorial?.flowKey === "profile") {
-      setSubView("profile");
-    }
-  }, [tutorial?.highlightTarget, tutorial?.flowKey]);
   const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
   const [heightUnit, setHeightUnit] = useState(() => {
@@ -900,6 +885,31 @@ export function ProfileTab({
   const [msg, setMsg] = useState(null);
   const [bodyMetricsRow, setBodyMetricsRow] = useState(null);
   const [healthSubview, setHealthSubview] = useState(/** @type {null | "bodyScan"} */ (null));
+
+  useEffect(() => {
+    if (!tutorial) return;
+    const t = tutorial.highlightTarget;
+    const fk = tutorial.flowKey;
+
+    if (t === TUTORIAL_TARGET.settings_wake && fk === "core") {
+      setSubView("settings");
+      return;
+    }
+    if (t === TUTORIAL_TARGET.profile_handle && fk === "profile") {
+      setSubView("profile");
+      return;
+    }
+    if (t === TUTORIAL_TARGET.body_scan_section) {
+      setSubView("profile");
+      setHealthSubview(null);
+      return;
+    }
+    if (t === TUTORIAL_TARGET.inbody_upload) {
+      setSubView("profile");
+      setHealthSubview("bodyScan");
+    }
+  }, [tutorial, tutorial?.highlightTarget, tutorial?.flowKey]);
+
   const [latestInbodyRow, setLatestInbodyRow] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [handleDraft, setHandleDraft] = useState("@");
@@ -2212,6 +2222,8 @@ export function ProfileTab({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
         <button
           type="button"
+          data-tutorial-target={TUTORIAL_TARGET.body_scan_section}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.body_scan_section)))}
           onClick={() => {
             if (user?.id && activeProfileId) setHealthSubview("bodyScan");
           }}
