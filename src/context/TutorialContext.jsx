@@ -203,7 +203,7 @@ export function getTutorialFlowSteps(key, firstProtocolSessionId) {
 }
 
 export const HELP_SECTIONS = [
-  { key: /** @type {TutorialFlowKey} */ ("core"), label: "Your First Protocol — 11-step core walkthrough" },
+  { key: /** @type {TutorialFlowKey} */ ("core"), label: "Replay Tutorial — walk through the 11-step core setup" },
   { key: "profile", label: "Set Up Your Profile — avatar, display name, handle" },
   { key: "body", label: "Body Metrics & Goal — goal selector, weight, height, body fat" },
   { key: "schedule", label: "Schedule & Settings — default session, wake time, shift schedule" },

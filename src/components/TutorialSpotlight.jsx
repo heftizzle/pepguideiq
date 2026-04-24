@@ -5,10 +5,23 @@ import { useTutorial } from "../context/TutorialContext.jsx";
 
 const OVERLAY_DIM = "rgba(0,0,0,0.82)";
 const OVERLAY_Z = 9999;
+const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
+const CARD_WIDTH = 260;
+const CARD_ESTIMATED_HEIGHT = 68;
+const CARD_MARGIN = 12;
+
+function getBottomNavReservePx() {
+  if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVE_PX;
+  const nav = document.querySelector('nav[aria-label="Main"]');
+  if (!(nav instanceof HTMLElement)) return DEFAULT_BOTTOM_NAV_RESERVE_PX;
+  const height = nav.getBoundingClientRect().height;
+  return Number.isFinite(height) && height > 0 ? Math.ceil(height) : DEFAULT_BOTTOM_NAV_RESERVE_PX;
+}
 
 function TutorialSpotlightInner() {
-  const { currentStep, steps, stepIndex, goNext, highlightTarget } = useTutorial();
+  const { currentStep, steps, stepIndex, goNext, clearFlow, forced, highlightTarget } = useTutorial();
   const [rect, setRect] = useState(/** @type {DOMRect | null} */ (null));
+  const [bottomNavReserve, setBottomNavReserve] = useState(DEFAULT_BOTTOM_NAV_RESERVE_PX);
 
   const measure = useCallback(() => {
     if (typeof document === "undefined" || !highlightTarget) {
@@ -21,6 +34,7 @@ function TutorialSpotlightInner() {
       return;
     }
     setRect(el.getBoundingClientRect());
+    setBottomNavReserve(getBottomNavReservePx());
   }, [highlightTarget]);
 
   useLayoutEffect(() => {
@@ -61,44 +75,57 @@ function TutorialSpotlightInner() {
 
   if (!currentStep || !highlightTarget || !rect || typeof document === "undefined") return null;
 
-  const tooltip = typeof currentStep.tooltip === "string" ? currentStep.tooltip.trim() : "";
   const pad = 6;
   const top = rect.top - pad;
   const left = rect.left - pad;
   const w = rect.width + pad * 2;
   const h = rect.height + pad * 2;
-  const tooltipAbove = rect.top > 200;
-  const cardWidth = 260;
-  const cardLeft = Math.max(12, Math.min(left, window.innerWidth - cardWidth - 12));
-  const cardTop = tooltipAbove ? top - 110 : rect.bottom + 12;
 
   const total = steps.length;
   const idx = stepIndex + 1;
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  /** Full-screen dim with rectangular cutout (evenodd); hit-testing matches paint so outside hole is locked. */
+  const overlayBottom = Math.max(0, vh - bottomNavReserve);
+  const cardLeft = Math.max(CARD_MARGIN, Math.min(left, vw - CARD_WIDTH - CARD_MARGIN));
+  const cardBelowTop = rect.bottom + CARD_MARGIN;
+  const cardAboveTop = top - CARD_ESTIMATED_HEIGHT - CARD_MARGIN;
+  const cardTop =
+    cardBelowTop + CARD_ESTIMATED_HEIGHT <= overlayBottom - CARD_MARGIN
+      ? cardBelowTop
+      : Math.max(CARD_MARGIN, cardAboveTop);
+
+  /** Dim layer excludes the bottom nav; cutout uses evenodd so outside the hole stays locked. */
   const L = left;
   const T = top;
   const R = left + w;
   const B = top + h;
-  const clipPath = `polygon(evenodd, 0px 0px, ${vw}px 0px, ${vw}px ${vh}px, 0px ${vh}px, 0px 0px, ${L}px ${T}px, ${L}px ${B}px, ${R}px ${B}px, ${R}px ${T}px, ${L}px ${T}px)`;
+  const clipPath = `polygon(evenodd, 0px 0px, ${vw}px 0px, ${vw}px ${overlayBottom}px, 0px ${overlayBottom}px, 0px 0px, ${L}px ${T}px, ${L}px ${B}px, ${R}px ${B}px, ${R}px ${T}px, ${L}px ${T}px)`;
 
   return createPortal(
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: bottomNavReserve,
         zIndex: OVERLAY_Z,
         pointerEvents: "all",
       }}
       aria-hidden={false}
     >
-      {/* Dim + click capture; hole is transparent (clip-path), so events reach targets below */}
+      {/* Dim + click capture stops above the fixed nav so active tabs remain visible. */}
       <div
+        onClick={() => {
+          if (!forced) clearFlow();
+        }}
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           background: OVERLAY_DIM,
           clipPath,
           WebkitClipPath: clipPath,
@@ -123,7 +150,7 @@ function TutorialSpotlightInner() {
           position: "fixed",
           top: cardTop,
           left: cardLeft,
-          width: cardWidth,
+          width: CARD_WIDTH,
           background: "var(--color-bg-elevated)",
           borderRadius: 12,
           padding: "12px 16px",
@@ -133,19 +160,6 @@ function TutorialSpotlightInner() {
           pointerEvents: "all",
         }}
       >
-        {tooltip ? (
-          <p
-            style={{
-              fontSize: 13,
-              color: "var(--color-text-primary)",
-              margin: "0 0 10px",
-              lineHeight: 1.5,
-              fontFamily: "'Outfit', sans-serif",
-            }}
-          >
-            {tooltip}
-          </p>
-        ) : null}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
             Step {idx} of {total}

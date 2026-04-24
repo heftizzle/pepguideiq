@@ -1,11 +1,20 @@
 #!/bin/bash
 set -e
 
+# PowerShell does not reliably pass environment variables into a child `bash` the same way
+# POSIX shells do (e.g. `SKIP_DEPLOY_GIT=1 bash ./deploy.sh` may leave SKIP_DEPLOY_GIT unset inside bash).
+# Set the variable inside bash explicitly, for example from repo root in PowerShell:
+#   bash -c "SKIP_DEPLOY_GIT=1 bash ./deploy.sh"
+# Or use the toggle below: uncomment SKIP_DEPLOY_GIT=1 for one run instead of fighting env syntax.
+
+# Uncomment the next line to skip git (add/commit/push) on this run:
+# SKIP_DEPLOY_GIT=1
+
 cd "$(dirname "$0")"
 
 # ─── Optional git: stage, commit (if dirty), push to GitHub (origin) ─────────
 # Same repo every time: origin → github.com/heftizzle/pepguideiq.git
-# Skip with: SKIP_DEPLOY_GIT=1 ./deploy.sh
+# Skip with: SKIP_DEPLOY_GIT=1 ./deploy.sh (Git Bash / macOS / Linux), or bash -c "SKIP_DEPLOY_GIT=1 bash ./deploy.sh" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 near the top of this file.
 #
 # Credentials: do NOT embed tokens in this script. For fast local pushes, use one of:
 #   • HTTPS + Git Credential Manager (Windows) — sign in once; Git caches for origin.
@@ -29,7 +38,7 @@ if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .
       -m "Branch: ${_branch}" \
       -m "Remote push target: origin → ${_origin_url}" \
       -m "Working tree was non-empty after git add -A; review this commit in git log if anything unexpected was included." \
-      -m "To run deploy without git steps: SKIP_DEPLOY_GIT=1 ./deploy.sh"
+      -m "To run deploy without git: SKIP_DEPLOY_GIT=1 ./deploy.sh, bash -c \"SKIP_DEPLOY_GIT=1 bash ./deploy.sh\" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 at top of deploy.sh."
   else
     echo "Git: nothing to commit (clean working tree)."
   fi
