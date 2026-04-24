@@ -135,33 +135,19 @@ function TutorialSpotlightInner() {
   const overlayDim = forced ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.45)";
 
   const cardW = CARD_WIDTH;
-  const cardH = CARD_ESTIMATED_HEIGHT;
-  const margin = CARD_MARGIN;
 
-  const targetCenterX = left + w / 2;
-  const targetCenterY = top + h / 2;
+  const cardBelowTop = top + h + CARD_MARGIN;
+  const cardAboveTop = top - CARD_ESTIMATED_HEIGHT - CARD_MARGIN;
 
-  const spaceAbove = top - margin;
-  const spaceBelow = overlayBottom - (top + h) - margin;
-  const spaceLeft = left - margin;
-  const spaceRight = vw - (left + w) - margin;
+  const cardTop = !forced
+    ? CARD_MARGIN
+    : cardBelowTop + CARD_ESTIMATED_HEIGHT <= overlayBottom - CARD_MARGIN
+      ? cardBelowTop
+      : Math.max(CARD_MARGIN, cardAboveTop);
 
-  let cardTop;
-  let cardLeft;
-
-  if (spaceBelow >= cardH + margin) {
-    cardTop = top + h + margin;
-    cardLeft = Math.max(margin, Math.min(left, vw - cardW - margin));
-  } else if (spaceAbove >= cardH + margin) {
-    cardTop = top - cardH - margin;
-    cardLeft = Math.max(margin, Math.min(left, vw - cardW - margin));
-  } else if (spaceRight >= cardW + margin) {
-    cardLeft = left + w + margin;
-    cardTop = Math.max(margin, Math.min(targetCenterY - cardH / 2, overlayBottom - cardH - margin));
-  } else {
-    cardLeft = Math.max(margin, left - cardW - margin);
-    cardTop = Math.max(margin, Math.min(targetCenterY - cardH / 2, overlayBottom - cardH - margin));
-  }
+  const cardLeft = !forced
+    ? CARD_MARGIN
+    : Math.max(CARD_MARGIN, Math.min(left, vw - CARD_WIDTH - CARD_MARGIN));
 
   /** Dim layer excludes the bottom nav; cutout uses evenodd so outside the hole stays locked. */
   const L = left;
