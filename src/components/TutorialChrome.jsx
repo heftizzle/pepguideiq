@@ -37,7 +37,7 @@ const SUPPORT_HREF =
   "mailto:hello@pepguideiq.com?subject=" + encodeURIComponent("pepguideIQ Support");
 
 export function TutorialHelpButton() {
-  const { helpMenuOpen, setHelpMenuOpen, startFlow, HELP_SECTIONS: sections } = useTutorial();
+  const { helpMenuOpen, setHelpMenuOpen, startFlow, HELP_SECTIONS: sections, currentStep, highlightTarget } = useTutorial();
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuRect, setMenuRect] = useState(/** @type {{ top: number; left: number; width: number } | null} */ (null));
@@ -85,6 +85,8 @@ export function TutorialHelpButton() {
       document.removeEventListener("keydown", onKey);
     };
   }, [helpMenuOpen, setHelpMenuOpen]);
+
+  if (currentStep && highlightTarget) return null;
 
   const menuPortal =
     helpMenuOpen &&
@@ -175,6 +177,7 @@ export function TutorialBar() {
     expandFromCollapsed,
     flowKey,
     currentStep,
+    highlightTarget,
     stepIndex,
     steps,
     goNext,
@@ -183,6 +186,7 @@ export function TutorialBar() {
     forced,
   } = useTutorial();
 
+  if (currentStep && highlightTarget) return null;
   if (!stripVisible) return null;
 
   if (showCollapsedTeaser) {
