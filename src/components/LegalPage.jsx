@@ -188,7 +188,7 @@ export function LegalPage() {
             <strong style={{ color: "var(--color-text-primary)" }}>3. Research Use Only — No Medical Advice</strong>
           </p>
           <p style={BODY}>
-            ALL content on pepguideIQ — including compound data, dosing information, reconstitution calculators, AI Guide responses, and
+            ALL content on pepguideIQ — including compound data, dosing information, reconstitution calculators, AI Atlas responses, and
             community posts — is provided for educational and research reference purposes only.
           </p>
           <p style={BODY}>
@@ -217,11 +217,11 @@ export function LegalPage() {
             and may not apply to your specific situation.
           </p>
           <p style={BODY}>
-            <strong style={{ color: "var(--color-text-primary)" }}>6. AI Guide</strong>
+            <strong style={{ color: "var(--color-text-primary)" }}>6. AI Atlas</strong>
           </p>
           <p style={BODY}>
-            The pepguideIQ AI Guide is powered by large language model technology. AI outputs may be inaccurate, incomplete, or outdated. AI
-            responses are not a substitute for professional medical advice. Do not make health decisions based solely on AI Guide output.
+            The pepguideIQ AI Atlas is powered by large language model technology. AI outputs may be inaccurate, incomplete, or outdated. AI
+            responses are not a substitute for professional medical advice. Do not make health decisions based solely on AI Atlas output.
           </p>
           <p style={BODY}>
             <strong style={{ color: "var(--color-text-primary)" }}>7. Network Tab and User Content</strong>

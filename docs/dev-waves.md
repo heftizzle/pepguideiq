@@ -90,9 +90,9 @@ Keep these as unchecked epic rows in this doc and split into child tickets later
 | [ ] | Mobile/offline: Capacitor shell spike | App shell packaging, nav behavior, auth callback handling, and native-bridge feasibility. |
 | [ ] | Mobile/offline: offline cache boundaries | Decide what is safe to cache offline for catalog, stacks, vials, and calculators. Depends on the shell spike. |
 | [ ] | Mobile/offline: sync + conflict model | Reconnect behavior, stale writes, and background refresh strategy. Depends on the cache-boundary row. |
-| [ ] | AI Guide RAG: corpus prep + embedding pipeline | Catalog/dose-history corpus prep, embedding job, and update triggers. |
-| [ ] | AI Guide RAG: vector schema + retrieval layer | pgvector schema, retrieval queries, and ranking logic. Depends on corpus prep. |
-| [ ] | AI Guide RAG: prompt integration + plan controls | Inject retrieval into guide prompts, add plan-aware guardrails, and validate privacy boundaries. Depends on the retrieval layer. |
+| [ ] | AI Atlas RAG: corpus prep + embedding pipeline | Catalog/dose-history corpus prep, embedding job, and update triggers. |
+| [ ] | AI Atlas RAG: vector schema + retrieval layer | pgvector schema, retrieval queries, and ranking logic. Depends on corpus prep. |
+| [ ] | AI Atlas RAG: prompt integration + plan controls | Inject retrieval into guide prompts, add plan-aware guardrails, and validate privacy boundaries. Depends on the retrieval layer. |
 | [ ] | Profile health hub: progress photo gallery + privacy model | Public/private visibility and photo-set UX. |
 | [ ] | Profile health hub: scans/labs schema + upload flow | DEXA/InBody/lab ingestion, storage, and metadata model. Depends on the privacy model row. |
 | [ ] | Profile health hub: consent/waiver UX | Explicit consent boundaries before exposing richer health records. Depends on the schema/privacy rows. |

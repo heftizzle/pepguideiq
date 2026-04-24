@@ -221,7 +221,7 @@ export function GlobalStyles() {
       @media (max-width: 640px) {
         .tab-btn{padding:10px 10px;font-size:13px}
       }
-      /* AI Guide full-screen takeover — open/close use same duration per breakpoint */
+      /* AI Atlas full-screen takeover — open/close use same duration per breakpoint */
       .guide-takeover-root{
         position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;box-sizing:border-box;
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
@@ -367,7 +367,7 @@ export function GlobalStyles() {
         animation:pepv-notifications-bell-glow 1.5s ease-in-out infinite;
       }
 
-      /* Header: AI Guide / tier / profile pills — desktop may wrap; mobile = one scrollable row */
+      /* Header: AI Atlas / tier / profile pills — desktop may wrap; mobile = one scrollable row */
       .pepv-nav-account-pill-row{
         display:flex;
         align-items:center;

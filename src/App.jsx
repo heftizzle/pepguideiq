@@ -70,7 +70,7 @@ import ReactMarkdown from "react-markdown";
 
 const getCatColor = (cat) => CAT_COLORS[cat] ?? "var(--color-accent)";
 
-/** Assistant message markdown (AI Guide); stable ref for react-markdown. */
+/** Assistant message markdown (AI Atlas); stable ref for react-markdown. */
 const AI_GUIDE_MARKDOWN_COMPONENTS = {
   h2: ({ children }) => (
     <div className="brand" style={{ fontSize: 14, fontWeight: 700, color: "var(--color-accent)", marginBottom: 6, marginTop: 12 }}>
@@ -428,7 +428,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
-  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Guide). */
+  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Atlas). */
   const [buildRows, setBuildRows] = useState([]);
   const [buildLocalStackName, setBuildLocalStackName] = useState("");
   const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -458,7 +458,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
   const [guideExiting, setGuideExiting] = useState(false);
-  /** AI Guide: below 768px hides sidebar; goals live in a toggle + horizontal pill row. */
+  /** AI Atlas: below 768px hides sidebar; goals live in a toggle + horizontal pill row. */
   const [guideLayoutMobile, setGuideLayoutMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
@@ -468,7 +468,7 @@ function PepGuideIQApp({ user, setUser }) {
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
   const buildPrevTabRef = useRef(activeTab);
-  /** After Stack Builder → AI Guide, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
+  /** After Stack Builder → AI Atlas, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
   const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
@@ -1426,7 +1426,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
                             🧙
                           </span>
-                          AI GUIDE
+                          {" "}AI Atlas
                         </button>
                         <button
                           type="button"
@@ -2097,7 +2097,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="AI Guide"
+            aria-label="AI Atlas"
             className={`guide-takeover-root${guideExiting ? " guide-takeover-root--exit" : ""}`}
             style={{ zIndex: 72 }}
             onClick={onGuideTakeoverRootClick}
@@ -2106,7 +2106,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             <button
               type="button"
               className="guide-takeover-close"
-              aria-label="Close AI Guide"
+              aria-label="Close AI Atlas"
               style={{ zIndex: 72 }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -2492,7 +2492,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
                     setActiveTab("guide");
                   }}>
-                  Ask Pep Guide →
+                  Ask AI Atlas →
                 </button>
                 <button
                   type="button"

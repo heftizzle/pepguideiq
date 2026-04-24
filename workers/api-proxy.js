@@ -332,7 +332,7 @@ async function supabasePatchInbodyScanHistory(supabaseUrl, serviceKey, scanId, u
 }
 
 /**
- * POST /inbody-scan/interpret — Pro+ only. Sonnet stream; caches per `scanId` on `inbody_scan_history`. Does not use AI Guide KV quota.
+ * POST /inbody-scan/interpret — Pro+ only. Sonnet stream; caches per `scanId` on `inbody_scan_history`. Does not use AI Atlas KV quota.
  * Body: `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`.
  * Cached hit: JSON `{ cached: true, interpretation, ai_interpreted_at }` (no stream).
  * @param {Request} request
@@ -841,7 +841,7 @@ function normalizeMessages(messages) {
   }));
 }
 
-// ─── AI GUIDE (stack recommendations) ───────────────────────────────────────
+// ─── AI ATLAS (stack recommendations) ───────────────────────────────────────
 /**
  * POST /ai-guide (aliases: /ai-stack-advisor, /stack-advisor) — Build-tab stack suggestions (permissive CORS).
  * Upstream / transport failures → 502 { error }; invalid model JSON on 200 → empty insight/recommendations.
@@ -931,7 +931,7 @@ async function handleStackAdvisor(request, env) {
             insight: "",
             recommendations: [],
             rateLimited: true,
-            limitMessage: `You've used your ${dailyLimit} daily AI Guide calls on the ${plan} plan.`,
+            limitMessage: `You've used your ${dailyLimit} daily AI Atlas calls on the ${plan} plan.`,
           }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -1338,7 +1338,7 @@ function trainingExperiencePromptLineFromDb(raw) {
 }
 
 /**
- * Profile fields used for AI Guide and Stack Advisor safety context (single REST round-trip).
+ * Profile fields used for AI Atlas and Stack Advisor safety context (single REST round-trip).
  * @param {string} supabaseUrl
  * @param {string} serviceKey
  * @param {string} userId
@@ -1373,7 +1373,7 @@ async function fetchProfileAiContextFields(supabaseUrl, serviceKey, userId) {
   };
 }
 
-/** Cached system prefix for AI Guide (/v1/chat); dynamic user context is a separate block. */
+/** Cached system prefix for AI Atlas (/v1/chat); dynamic user context is a separate block. */
 const AI_GUIDE_SYSTEM_BASE =
   "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
 
@@ -5708,7 +5708,7 @@ async function handleRequest(request, env) {
       return handleGetStackPhoto(request, env, cors);
     }
 
-    // ─── AI GUIDE (stack recommendations) ────────────────────────────────
+    // ─── AI ATLAS (stack recommendations) ────────────────────────────────
     // Normalize trailing slash so POST /ai-guide/ still matches (avoids 404 from typo/proxies).
     const stackAdvisorPath = (url.pathname.replace(/\/+$/, "") || "/");
     if (

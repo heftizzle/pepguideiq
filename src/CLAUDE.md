@@ -29,7 +29,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
                            └── <DoseLogFAB/>
 ```
 
-`PepGuideIQApp` (line 386 in App.jsx) owns the giant state surface: tabs, library filters, stack, AI Guide, modals, mobile layout flags. Over 40 `useState` calls. Don't "simplify" this without understanding the cross-tab flows.
+`PepGuideIQApp` (line 386 in App.jsx) owns the giant state surface: tabs, library filters, stack, AI Atlas, modals, mobile layout flags. Over 40 `useState` calls. Don't "simplify" this without understanding the cross-tab flows.
 
 ## Tabs (`PEPV_VALID_TABS`)
 
@@ -155,7 +155,7 @@ Before inventing a new util, grep this list.
 
 Normalize defensively with `normalizeStackSessions(s)` from `components/SavedStackEntryRow.jsx`.
 
-## AI Guide request contract
+## AI Atlas request contract
 
 ```
 POST ${API_WORKER_URL}/v1/chat

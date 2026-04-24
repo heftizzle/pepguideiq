@@ -10,7 +10,7 @@ const HEADLINES = {
 };
 
 const SUBLINES = {
-  entry: "Track up to 2 compounds, AI Guide + Stack Advisor, one profile — full library and core tools on us.",
+  entry: "Track up to 2 compounds, AI Atlas + Stack Advisor, one profile — full library and core tools on us.",
   pro: "Ten compounds, higher AI limits, body scans, and four progress photo sets.",
   elite: "Deep Intel AI, 25 compounds, two profiles, unlimited progress photos, and a personalized dosing schedule.",
   goat: "Max compounds and AI, four profiles, early access to new features — the full stack.",

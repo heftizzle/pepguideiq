@@ -43,7 +43,7 @@ In **`themes.css`**, `--color-accent` and the full **`--color-*` / `--tier-*`** 
 |------|-------------|--------|
 | Page / shell | `#07090e` | Matches `--bg-primary` |
 | Card / panel | `#0e1520` | `.pcard`, `.scard`, many modals |
-| Deeper strip / sticky footer (AI Guide mobile input bar) | `#0b0f17` | e.g. `.guide-takeover-input-bar` |
+| Deeper strip / sticky footer (AI Atlas mobile input bar) | `#0b0f17` | e.g. `.guide-takeover-input-bar` |
 | Bottom navigation bar | `#07090e` | Inline in `App.jsx` `<nav>` (not `#131b28`) |
 | Dividers / borders | `#14202e`, `#1a2d40`, `#1e2a38`, `#0e1822` | Mix used for hierarchy |
 | Muted grid (library) | `rgba(0,212,170,.025)` | `.grid-bg` lines |

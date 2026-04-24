@@ -36,7 +36,7 @@
 #
 # 6. Stripe: Dashboard → Webhook URL {worker}/stripe/webhook with signing secret as STRIPE_WEBHOOK_SECRET.
 #
-# 7. Test: submit a query in AI Guide
+# 7. Test: submit a query in AI Atlas
 #    → network request must go to workers.dev (never api.anthropic.com)
 #    → response must include usage.queries_today
 #    → Entry user: 2nd query same day should return 429

@@ -4,7 +4,7 @@ Read before making changes. This file tells you what's actually in the repo vs w
 
 ## What this is
 
-A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 171-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Guide (Anthropic) and Stack Advisor — both proxied through a Cloudflare Worker so the API key never hits the browser.
+A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 171-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Atlas (Anthropic) and Stack Advisor — both proxied through a Cloudflare Worker so the API key never hits the browser.
 
 ## Stack (exact)
 
@@ -23,7 +23,7 @@ Production deps (7, exhaustive):
 - `@supabase/supabase-js` ^2.49.1
 - `react` ^19.0.0
 - `react-dom` ^19.0.0
-- `react-markdown` ^9.0.3 — renders AI Guide assistant messages
+- `react-markdown` ^9.0.3 — renders AI Atlas assistant messages
 - `zxcvbn` ^4.4.2 — lazy-loaded in AuthScreen for password strength
 
 Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`ing anything else, add it to `package.json` first.
@@ -45,7 +45,7 @@ Local Worker + Vite same-origin option: set `VITE_API_WORKER_URL=http://localhos
 
 ```
 workers/api-proxy.js              ~5400 lines — Anthropic proxy, Stripe, R2, member profiles, Turnstile
-src/App.jsx                       2784 lines — main shell, 8 tabs, AI Guide
+src/App.jsx                       2784 lines — main shell, 8 tabs, AI Atlas
 src/components/ProfileTab.jsx     2752 lines
 src/components/VialTracker.jsx    2003 lines
 src/components/BuildTab.jsx       1385 lines

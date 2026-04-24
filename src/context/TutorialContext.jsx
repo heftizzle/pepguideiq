@@ -178,7 +178,7 @@ const STATIC_FLOWS = {
       tab: "profile",
       text: "Set your goal, body stats, DOB, gender, and training experience",
       tooltip:
-        "The more you fill in, the smarter your AI recommendations get. Pick your goal first — Build, Cut, Recomp, or Maintain. Add DOB, gender, and training experience so the AI Stack Advisor knows who it's talking to. If you have an InBody scan, use those numbers as your baseline.",
+        "The more you fill in, the smarter your AI recommendations get. Pick your goal first — Build, Cut, Recomp, or Maintain. Add DOB, gender, and training experience so AI Atlas knows who it's talking to. If you have an InBody scan, use those numbers as your baseline.",
     },
     {
       target: TUTORIAL_TARGET.body_scan_section,
@@ -261,7 +261,7 @@ const STATIC_FLOWS = {
     {
       target: TUTORIAL_TARGET.nav_guide,
       tab: null,
-      text: "Open the AI Guide from the header",
+      text: "Open AI Atlas from the header",
       tooltip:
         "Your personal peptide research assistant. Ask it anything — protocols, interactions, dosing, timing. The more profile data you've filled in, the more personalized the answers.",
     },
@@ -329,7 +329,7 @@ export const HELP_SECTIONS = [
   { key: "schedule", label: "Schedule & Settings — sessions, wake time, shift schedule" },
   { key: "build", label: "BUILD Tab — design your stack, save to protocol" },
   { key: "score", label: "Your pepguideIQ Score — XP system, tiers, and what Pro+ unlocks" },
-  { key: "guide", label: "AI Guide — your personal peptide research assistant" },
+  { key: "guide", label: "AI Atlas — your personal peptide research assistant" },
 ];
 
 const TutorialCtx = createContext(null);

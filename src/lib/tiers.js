@@ -2,7 +2,7 @@
 
 /**
  * Canonical plan limits (source of truth for client copy + helpers).
- * Keep `aiQueriesPerDay` in sync with `ai_guide_calls_per_day` (AI Guide / Worker daily cap).
+ * Keep `aiQueriesPerDay` in sync with `ai_guide_calls_per_day` (AI Atlas / Worker daily cap).
  */
 export const TIERS = {
   entry: {
@@ -151,7 +151,7 @@ export function getTierPlanCardBullets(id, catalogCount) {
   const t = TIERS[id] ?? TIERS.entry;
   const lim = typeof t.stackLimit === "number" && Number.isFinite(t.stackLimit) ? t.stackLimit : 2;
   const track = `Track up to ${lim} compounds`;
-  const ai = `AI Guide: ${t.ai_guide_calls_per_day}/day (${aiModelDisplayNameForPlanCard(id)})`;
+  const ai = `AI Atlas: ${t.ai_guide_calls_per_day}/day (${aiModelDisplayNameForPlanCard(id)})`;
   const sa = `Stack Advisor: ${t.stack_advisor_calls_per_day}/day`;
   const prof = profileLineForPlanCard(id);
   const photo = progressPhotosLineForPlanCard(id);

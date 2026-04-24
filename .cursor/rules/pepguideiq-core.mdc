@@ -20,7 +20,7 @@ You are working on pepguideIQ, a research-peptide reference and personal-protoco
 - `@supabase/supabase-js` ^2.49.1
 - `react` ^19.0.0
 - `react-dom` ^19.0.0
-- `react-markdown` ^9.0.3 (renders AI Guide output)
+- `react-markdown` ^9.0.3 (renders AI Atlas output)
 - `zxcvbn` ^4.4.2 (password strength, lazy-loaded)
 
 Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import` any other library without first adding it to `package.json`.**
@@ -42,7 +42,7 @@ All Supabase access goes through `src/lib/supabase.js` (57 exported functions). 
 
 Worker routes (33 total, list in `workers/CLAUDE.md`). Do not invent routes.
 
-## AI Guide / Stack Advisor request contract
+## AI Atlas / Stack Advisor request contract
 
 ```
 POST ${API_WORKER_URL}/v1/chat

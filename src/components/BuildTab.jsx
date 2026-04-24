@@ -301,7 +301,7 @@ export function BuildTab({
             if (myId === advisorFetchGen.current) {
               setAdvisorData(null);
               setAdvisorError(
-                "Stack rows do not match the catalog, so AI Guide has nothing to analyze. Add compounds from search above."
+                "Stack rows do not match the catalog, so AI Atlas has nothing to analyze. Add compounds from search above."
               );
             }
             return;
@@ -313,7 +313,7 @@ export function BuildTab({
           if (!accessToken) {
             if (myId === advisorFetchGen.current) {
               setAdvisorData(null);
-              setAdvisorError("Sign in to use AI Guide.");
+              setAdvisorError("Sign in to use AI Atlas.");
             }
             return;
           }
@@ -332,7 +332,7 @@ export function BuildTab({
           if (res.status === 401) {
             if (myId === advisorFetchGen.current) {
               setAdvisorData(null);
-              setAdvisorError("Session expired or not signed in. Sign in again to use AI Guide.");
+              setAdvisorError("Session expired or not signed in. Sign in again to use AI Atlas.");
             }
             return;
           }
@@ -344,7 +344,7 @@ export function BuildTab({
               insight:
                 typeof data.limitMessage === "string" && data.limitMessage.trim()
                   ? data.limitMessage.trim()
-                  : "Daily AI Guide limit reached. Upgrade for more.",
+                  : "Daily AI Atlas limit reached. Upgrade for more.",
               recommendations: [],
             });
             setAdvisorError(null);
@@ -356,7 +356,7 @@ export function BuildTab({
           if (!res.ok) {
             if (myId === advisorFetchGen.current) {
               setAdvisorData(null);
-              setAdvisorError(`AI Guide request failed (${res.status}). Check that the Worker exposes POST /ai-guide.`);
+              setAdvisorError(`AI Atlas request failed (${res.status}). Check that the Worker exposes POST /ai-guide.`);
             }
             return;
           }
@@ -366,7 +366,7 @@ export function BuildTab({
 
           if (!data || typeof data !== "object") {
             setAdvisorData(null);
-            setAdvisorError("Invalid response from AI Guide.");
+            setAdvisorError("Invalid response from AI Atlas.");
             return;
           }
           const insightRaw = typeof data.insight === "string" ? data.insight : "";
@@ -411,7 +411,7 @@ export function BuildTab({
         } catch {
           if (myId === advisorFetchGen.current) {
             setAdvisorData(null);
-            setAdvisorError("Could not reach AI Guide. Check your network and API worker URL.");
+            setAdvisorError("Could not reach AI Atlas. Check your network and API worker URL.");
           }
         } finally {
           if (myId === advisorFetchGen.current) setAdvisorLoading(false);
@@ -883,9 +883,9 @@ export function BuildTab({
               }}
             >
               <span className="pepv-emoji" aria-hidden>
-                🤖{" "}
+                🧙{" "}
               </span>
-              AI Guide
+              AI Atlas
             </div>
             <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", letterSpacing: "0.12em" }}>
               BETA

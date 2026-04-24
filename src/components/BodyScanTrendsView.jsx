@@ -534,7 +534,7 @@ export function BodyScanTrendsView({
 
   const deepPrompt = useMemo(() => {
     if (!interpretText.trim()) return "";
-    return `You are the PepGuideIQ AI Guide. The user just ran an Elite InBody trend interpretation:\n\n${interpretText}\n\nGive a deeper, structured analysis: key drivers, what to watch next scan, and how protocol timing lines up — still no medical directives or dosing changes.`;
+    return `You are the PepGuideIQ AI Atlas. The user just ran an Elite InBody trend interpretation:\n\n${interpretText}\n\nGive a deeper, structured analysis: key drivers, what to watch next scan, and how protocol timing lines up — still no medical directives or dosing changes.`;
   }, [interpretText]);
 
   const toggleMetric = (id) => {

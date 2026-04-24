@@ -88,8 +88,8 @@
 - [ ] App Store + Google Play via Capacitor (~2 weeks post-launch)
 - [ ] Coach Tier — $50/mo, handle-based client roster, permission-based visibility
 - [ ] Network tab full — follower system, handles as universal IDs, @DihexaDan in top nav, receipted feed
-- [ ] PWA offline — catalog, vials, calculator offline; AI Guide requires connectivity
-- [ ] RAG for AI Guide — pgvector in Supabase, embed catalog + dose history, top-k retrieval
+- [ ] PWA offline — catalog, vials, calculator offline; AI Atlas requires connectivity
+- [ ] RAG for AI Atlas — pgvector in Supabase, embed catalog + dose history, top-k retrieval
 - [ ] Profile health data hub — progress photos (public/private), DEXA/InBody scans, labs with consent + waiver flow
 - [ ] Daily movie quote — in-app dose-logging reward
 - [ ] Oasis purity data integration
@@ -133,7 +133,7 @@
 - [x] Dose history calendar with backfill
 - [x] Per-compound LOG DOSE (oral + injectable + nasal + topical)
 - [x] Saved stacks with R2 photo upload
-- [x] AI Guide (Haiku for Entry/Pro, Sonnet for Elite/GOAT)
+- [x] AI Atlas (Haiku for Entry/Pro, Sonnet for Elite/GOAT)
 - [x] AI Stack Advisor
 - [x] 4-tier pricing — 💸 Free / 🔬 Pro $8.99 / ⚡ Elite $16.99 / 🐐 GOAT $22.99
 - [x] Streak system + protocol guardrails (timing warnings per compound)
@@ -157,6 +157,6 @@
 - [x] Rewardful affiliate integration — 12-code whitelist, case-insensitive, referral ID capture, webhook UUID resolution
 - [x] Account deletion — Stripe cancel + R2 cleanup + auth delete + `window.location.replace` redirect
 - [x] Find People X button — z-index fix + `history.back()` fallback
-- [x] AI Guide X button — z-index fix, clean Library landing
+- [x] AI Atlas X button — z-index fix, clean Library landing
 - [x] DMARC + SPF + DKIM — full email auth stack on `pepguideiq.com`
 - [x] `hello@pepguideiq.com` — Google Workspace alias, zero additional cost
