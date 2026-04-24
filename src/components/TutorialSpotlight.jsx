@@ -135,33 +135,13 @@ function TutorialSpotlightInner() {
   const overlayDim = forced ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.45)";
 
   const cardW = CARD_WIDTH;
-  const cardH = CARD_ESTIMATED_HEIGHT;
-  const margin = CARD_MARGIN;
 
-  const targetCenterX = left + w / 2;
-  const targetCenterY = top + h / 2;
+  const cardTop =
+    rect.top > overlayBottom * 0.5
+      ? CARD_MARGIN
+      : Math.min(rect.bottom + CARD_MARGIN, overlayBottom - CARD_ESTIMATED_HEIGHT - CARD_MARGIN);
 
-  const spaceAbove = top - margin;
-  const spaceBelow = overlayBottom - (top + h) - margin;
-  const spaceLeft = left - margin;
-  const spaceRight = vw - (left + w) - margin;
-
-  let cardTop;
-  let cardLeft;
-
-  if (spaceBelow >= cardH + margin) {
-    cardTop = top + h + margin;
-    cardLeft = Math.max(margin, Math.min(left, vw - cardW - margin));
-  } else if (spaceAbove >= cardH + margin) {
-    cardTop = top - cardH - margin;
-    cardLeft = Math.max(margin, Math.min(left, vw - cardW - margin));
-  } else if (spaceRight >= cardW + margin) {
-    cardLeft = left + w + margin;
-    cardTop = Math.max(margin, Math.min(targetCenterY - cardH / 2, overlayBottom - cardH - margin));
-  } else {
-    cardLeft = Math.max(margin, left - cardW - margin);
-    cardTop = Math.max(margin, Math.min(targetCenterY - cardH / 2, overlayBottom - cardH - margin));
-  }
+  const cardLeft = CARD_MARGIN;
 
   /** Dim layer excludes the bottom nav; cutout uses evenodd so outside the hole stays locked. */
   const L = left;
