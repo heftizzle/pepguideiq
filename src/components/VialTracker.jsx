@@ -28,6 +28,15 @@ import {
   vialQueryPeptideIds,
 } from "../lib/resolveStackCatalogPeptide.js";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
+
+/** Core tutorial steps that need the add-vial form open (not `vial_add` — user taps + first). */
+const TUTORIAL_OPEN_ADD_VIAL_FORM = new Set([
+  TUTORIAL_TARGET.vial_name,
+  TUTORIAL_TARGET.vial_mix_date,
+  TUTORIAL_TARGET.vial_mg,
+  TUTORIAL_TARGET.vial_reconstitute,
+  TUTORIAL_TARGET.vial_desired_dose,
+]);
 import {
   formatConcWithUnit,
   formatDoseAmountFromMcg,
@@ -1533,7 +1542,14 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   }, [viewMonth.y, viewMonth.m, calendarLimits.maxD]);
 
   useEffect(() => {
-    if (highlightTarget === TUTORIAL_TARGET.vial_reconstitute && canMutate && tutorialAnchorFirst) setShowAdd(true);
+    if (
+      canMutate &&
+      tutorialAnchorFirst &&
+      highlightTarget &&
+      TUTORIAL_OPEN_ADD_VIAL_FORM.has(highlightTarget)
+    ) {
+      setShowAdd(true);
+    }
   }, [highlightTarget, canMutate, tutorialAnchorFirst]);
 
   const reload = useCallback(async () => {
@@ -1862,22 +1878,26 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
-            <div>
+            <div
+              data-tutorial-target={TUTORIAL_TARGET.vial_name}
+              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.vial_name)))}
+            >
               <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 2 }}>LABEL</div>
               <input className="form-input" style={{ fontSize: 13 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
             <div
-              data-tutorial-target={tutorialAnchorFirst ? TUTORIAL_TARGET.vial_reconstitute : undefined}
-              {...tutorialHighlightProps(
-                tutorialAnchorFirst && tutorial?.isHighlighted(TUTORIAL_TARGET.vial_reconstitute)
-              )}
+              data-tutorial-target={TUTORIAL_TARGET.vial_mix_date}
+              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.vial_mix_date)))}
             >
               <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 2 }}>RECONSTITUTION DATE</div>
               <input className="form-input" style={{ fontSize: 13 }} type="date" value={formRecon} onChange={(e) => setFormRecon(e.target.value)} />
             </div>
           </div>
 
-          <div>
+          <div
+            data-tutorial-target={TUTORIAL_TARGET.vial_mg}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.vial_mg)))}
+          >
             <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
               {useIuVial ? "VIAL SIZE (IU)" : "VIAL SIZE (mg)"}
             </div>
@@ -1928,7 +1948,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             </div>
           )}
 
-          <div>
+          <div
+            data-tutorial-target={TUTORIAL_TARGET.vial_reconstitute}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.vial_reconstitute)))}
+          >
             <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>BAC WATER (mL)</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {ADD_VIAL_ML_OPTIONS.map((o) => (
@@ -2041,7 +2064,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             </div>
           )}
 
-          <div>
+          <div
+            data-tutorial-target={TUTORIAL_TARGET.vial_desired_dose}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.vial_desired_dose)))}
+          >
             <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
               {useIuVial ? "DESIRED DOSE (IU per injection)" : "DESIRED DOSE (mcg per injection)"}
             </div>

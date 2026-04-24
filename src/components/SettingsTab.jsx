@@ -879,8 +879,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </div>
             </div>
             <div
-              data-tutorial-target={TUTORIAL_TARGET.profile_wake}
-              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_wake)))}
+              data-tutorial-target={TUTORIAL_TARGET.settings_wake}
+              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.settings_wake)))}
             >
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Wake time</div>
               <input

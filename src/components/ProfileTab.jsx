@@ -858,6 +858,15 @@ export function ProfileTab({
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
+
+  useEffect(() => {
+    if (
+      tutorial?.highlightTarget === TUTORIAL_TARGET.settings_wake &&
+      tutorial?.flowKey === "core"
+    ) {
+      setSubView("settings");
+    }
+  }, [tutorial?.highlightTarget, tutorial?.flowKey]);
   const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
   const [heightUnit, setHeightUnit] = useState(() => {
