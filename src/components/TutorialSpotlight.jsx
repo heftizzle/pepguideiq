@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { collectScrollRootElements } from "../lib/tutorialScrollRoots.js";
 import { useTutorial } from "../context/TutorialContext.jsx";
 
-const OVERLAY_DIM = "rgba(0,0,0,0.82)";
 const OVERLAY_Z = 9999;
 const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 const CARD_WIDTH = 260;
@@ -133,13 +132,13 @@ function TutorialSpotlightInner() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const overlayBottom = Math.max(0, vh - bottomNavReserve);
+  const overlayDim = forced ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.35)";
   const cardLeft = Math.max(CARD_MARGIN, Math.min(left, vw - CARD_WIDTH - CARD_MARGIN));
   const cardBelowTop = rect.bottom + CARD_MARGIN;
   const cardAboveTop = top - CARD_ESTIMATED_HEIGHT - CARD_MARGIN;
+  /** Prefer above the target when it sits in the lower ~60% of the overlay (e.g. full-screen modals). */
   const cardTop =
-    cardBelowTop + CARD_ESTIMATED_HEIGHT <= overlayBottom - CARD_MARGIN
-      ? cardBelowTop
-      : Math.max(CARD_MARGIN, cardAboveTop);
+    rect.top > overlayBottom * 0.4 ? Math.max(CARD_MARGIN, cardAboveTop) : cardBelowTop;
 
   /** Dim layer excludes the bottom nav; cutout uses evenodd so outside the hole stays locked. */
   const L = left;
@@ -172,7 +171,7 @@ function TutorialSpotlightInner() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: OVERLAY_DIM,
+          background: overlayDim,
           clipPath,
           WebkitClipPath: clipPath,
           pointerEvents: "all",
