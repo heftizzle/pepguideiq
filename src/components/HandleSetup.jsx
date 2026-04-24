@@ -36,6 +36,8 @@ async function checkHandleAvailableDirect(handle, profileId) {
 /**
  * @param {{ activeProfileId: string; patchMemberProfileLocal: (id: string, patch: Record<string, unknown>) => void; onComplete: () => void }} props
  */
+const PENDING_CORE_TUTORIAL_KEY = "pepv_pending_core_tutorial";
+
 export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComplete }) {
   const [draft, setDraft] = useState("");
   const [handleCelebrate, setHandleCelebrate] = useState(false);
@@ -131,6 +133,13 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
         setSaveError(res.error.message || "Could not save handle");
         setConfirmBusy(false);
         return;
+      }
+      try {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem(PENDING_CORE_TUTORIAL_KEY, "1");
+        }
+      } catch {
+        /* ignore */
       }
       patchMemberProfileLocal(activeProfileId, { handle: h, display_handle: h });
       setHandleCelebrate(true);

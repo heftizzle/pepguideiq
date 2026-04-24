@@ -1181,6 +1181,9 @@ function PepGuideIQApp({ user, setUser }) {
         activeProfileHandle={activeProfile?.handle}
         activeProfileId={activeProfile?.id}
         activeProfileTutorialCompleted={activeProfile?.tutorial_completed === true}
+        activeProfileTutorialExplicitlyIncomplete={
+          activeProfile != null && activeProfile.tutorial_completed === false
+        }
       />
       {needsHandleOnboarding ? (
         <>
