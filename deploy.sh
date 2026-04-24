@@ -12,23 +12,25 @@ set -e
 
 cd "$(dirname "$0")"
 
-# ─── Optional git: stage, commit (if dirty), push to GitHub (origin) ─────────
-# Same repo every time: origin → github.com/heftizzle/pepguideiq.git
+# ─── Optional git: stage, commit (if dirty), push to GitHub ──────────────────
+# Push URL is explicit (not `origin`): https://github.com/heftizzle/pepguideiq.git
 # Skip with: SKIP_DEPLOY_GIT=1 ./deploy.sh (Git Bash / macOS / Linux), or bash -c "SKIP_DEPLOY_GIT=1 bash ./deploy.sh" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 near the top of this file.
 #
 # Credentials: do NOT embed tokens in this script. For fast local pushes, use one of:
 #   • HTTPS + Git Credential Manager (Windows) — sign in once; Git caches for origin.
 #   • SSH remote (git@github.com:…/pepguideiq.git) + ssh-agent with your key loaded.
 #   • gh auth login (GitHub CLI) if you use gh as credential helper.
-# GIT_TERMINAL_PROMPT=0 avoids hanging when there is no TTY (e.g. some agent terminals); push fails fast instead.
-if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .git ]; then
+# Only disable terminal prompts in non-interactive environments (avoids hang in CI / no TTY).
+if [ ! -t 1 ]; then
   export GIT_TERMINAL_PROMPT=0
+fi
 
+if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .git ]; then
   echo "Git: staging all changes (git add -A)…"
   git add -A
 
   _branch=$(git branch --show-current 2>/dev/null || echo main)
-  _origin_url=$(git remote get-url origin 2>/dev/null || echo "(origin not configured)")
+  _github_push_url="https://github.com/heftizzle/pepguideiq.git"
   _ts_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   if [ -n "$(git status --porcelain)" ]; then
@@ -36,15 +38,15 @@ if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .
     git commit -m "chore: pre-deploy snapshot (${_ts_utc})" \
       -m "Automated commit from ./deploy.sh immediately before production build and Cloudflare deploy (Worker + Pages)." \
       -m "Branch: ${_branch}" \
-      -m "Remote push target: origin → ${_origin_url}" \
+      -m "Remote push target: ${_github_push_url} (branch: ${_branch})" \
       -m "Working tree was non-empty after git add -A; review this commit in git log if anything unexpected was included." \
       -m "To run deploy without git: SKIP_DEPLOY_GIT=1 ./deploy.sh, bash -c \"SKIP_DEPLOY_GIT=1 bash ./deploy.sh\" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 at top of deploy.sh."
   else
     echo "Git: nothing to commit (clean working tree)."
   fi
 
-  echo "Git: pushing to GitHub (git push origin ${_branch})…"
-  git push origin "${_branch}"
+  echo "Git: pushing to GitHub (git push ${_github_push_url} ${_branch})…"
+  git push "${_github_push_url}" "${_branch}"
 else
   if [ "${SKIP_DEPLOY_GIT:-}" = "1" ]; then
     echo "Git: skipped (SKIP_DEPLOY_GIT=1)."
