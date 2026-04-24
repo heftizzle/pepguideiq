@@ -1352,12 +1352,29 @@ function PepGuideIQMainTree({ mainUiRef }) {
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
   useEffect(() => {
-    if (flowKey !== "guide" || highlightTarget !== TUTORIAL_TARGET.atlas_compound_cta) return;
-    if (activeTab !== "library") return;
-    if (selPeptide) return;
-    const first = sortedPeptides[0];
-    if (first) setSelPeptide(first);
-  }, [flowKey, highlightTarget, activeTab, selPeptide, sortedPeptides, setSelPeptide]);
+    // Step 2 — auto-open first compound so CTA is in DOM
+    if (
+      flowKey === "guide" &&
+      highlightTarget === TUTORIAL_TARGET.atlas_compound_cta &&
+      activeTab === "library" &&
+      !selPeptide
+    ) {
+      const first = sortedPeptides[0];
+      if (first) setSelPeptide(first);
+      return;
+    }
+
+    // Close modal when guide flow moves past step 2 (not on library intro or compound CTA)
+    if (
+      flowKey === "guide" &&
+      highlightTarget != null &&
+      highlightTarget !== TUTORIAL_TARGET.nav_library &&
+      highlightTarget !== TUTORIAL_TARGET.atlas_compound_cta &&
+      selPeptide
+    ) {
+      setSelPeptide(null);
+    }
+  }, [flowKey, highlightTarget, activeTab]);
 
   useLayoutEffect(() => {
     const el = topHeaderRef.current;
