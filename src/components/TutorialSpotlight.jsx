@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { collectScrollRootElements } from "../lib/tutorialScrollRoots.js";
 import { useTutorial } from "../context/TutorialContext.jsx";
@@ -9,6 +9,9 @@ const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 const CARD_WIDTH = 260;
 const CARD_ESTIMATED_HEIGHT = 130;
 const CARD_MARGIN = 12;
+const MEASURE_RETRY_MS = 150;
+/** Initial try plus delayed retries when the target is not in the DOM or has zero layout yet. */
+const MEASURE_MAX_ATTEMPTS = 5;
 
 function getBottomNavReservePx() {
   if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVE_PX;
@@ -22,27 +25,70 @@ function TutorialSpotlightInner() {
   const { currentStep, steps, stepIndex, goNext, clearFlow, forced, highlightTarget } = useTutorial();
   const [rect, setRect] = useState(/** @type {DOMRect | null} */ (null));
   const [bottomNavReserve, setBottomNavReserve] = useState(DEFAULT_BOTTOM_NAV_RESERVE_PX);
+  /** When true, scroll/resize listeners can attach — stays in sync with a successful measure for this target. */
+  const [targetLayoutReady, setTargetLayoutReady] = useState(false);
+  const measureRetryTimeoutRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
 
   const measure = useCallback(() => {
+    if (measureRetryTimeoutRef.current != null) {
+      clearTimeout(measureRetryTimeoutRef.current);
+      measureRetryTimeoutRef.current = null;
+    }
+
     if (typeof document === "undefined" || !highlightTarget) {
       setRect(null);
+      setTargetLayoutReady(false);
       return;
     }
-    const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
-    if (!(el instanceof Element)) {
-      setRect(null);
-      return;
-    }
-    setRect(el.getBoundingClientRect());
-    setBottomNavReserve(getBottomNavReservePx());
+
+    const tryMeasure = (attempt) => {
+      const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
+      if (!(el instanceof Element)) {
+        if (attempt + 1 < MEASURE_MAX_ATTEMPTS) {
+          measureRetryTimeoutRef.current = setTimeout(() => {
+            measureRetryTimeoutRef.current = null;
+            tryMeasure(attempt + 1);
+          }, MEASURE_RETRY_MS);
+        } else {
+          setRect(null);
+          setTargetLayoutReady(false);
+        }
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) {
+        if (attempt + 1 < MEASURE_MAX_ATTEMPTS) {
+          measureRetryTimeoutRef.current = setTimeout(() => {
+            measureRetryTimeoutRef.current = null;
+            tryMeasure(attempt + 1);
+          }, MEASURE_RETRY_MS);
+        } else {
+          setRect(null);
+          setTargetLayoutReady(false);
+        }
+        return;
+      }
+      setRect(r);
+      setBottomNavReserve(getBottomNavReservePx());
+      setTargetLayoutReady(true);
+    };
+
+    tryMeasure(0);
   }, [highlightTarget]);
 
   useLayoutEffect(() => {
+    setTargetLayoutReady(false);
     measure();
+    return () => {
+      if (measureRetryTimeoutRef.current != null) {
+        clearTimeout(measureRetryTimeoutRef.current);
+        measureRetryTimeoutRef.current = null;
+      }
+    };
   }, [measure, stepIndex, highlightTarget, currentStep?.target]);
 
   useLayoutEffect(() => {
-    if (typeof document === "undefined" || !highlightTarget) return;
+    if (typeof document === "undefined" || !highlightTarget || !targetLayoutReady) return;
     const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
     if (!(el instanceof Element)) return;
 
@@ -71,7 +117,7 @@ function TutorialSpotlightInner() {
       }
       ro?.disconnect();
     };
-  }, [highlightTarget, measure]);
+  }, [highlightTarget, measure, targetLayoutReady]);
 
   if (!currentStep || !highlightTarget || !rect || typeof document === "undefined") return null;
 

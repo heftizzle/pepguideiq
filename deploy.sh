@@ -16,6 +16,9 @@ cd "$(dirname "$0")"
 # Push URL is explicit (not `origin`): https://github.com/heftizzle/pepguideiq.git
 # Skip with: SKIP_DEPLOY_GIT=1 ./deploy.sh (Git Bash / macOS / Linux), or bash -c "SKIP_DEPLOY_GIT=1 bash ./deploy.sh" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 near the top of this file.
 #
+# Commit subject/body are derived from the staged diff (git shortstat + --stat + file list).
+# Hand-written subject only: DEPLOY_COMMIT_SUBJECT='fix: spotlight copy' bash ./deploy.sh
+#
 # Credentials: do NOT embed tokens in this script. For fast local pushes, use one of:
 #   • HTTPS + Git Credential Manager (Windows) — sign in once; Git caches for origin.
 #   • SSH remote (git@github.com:…/pepguideiq.git) + ssh-agent with your key loaded.
@@ -34,13 +37,31 @@ if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .
   _ts_utc=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   if [ -n "$(git status --porcelain)" ]; then
-    echo "Git: committing with verbose message…"
-    git commit -m "chore: pre-deploy snapshot (${_ts_utc})" \
-      -m "Automated commit from ./deploy.sh immediately before production build and Cloudflare deploy (Worker + Pages)." \
-      -m "Branch: ${_branch}" \
-      -m "Remote push target: ${_github_push_url} (branch: ${_branch})" \
-      -m "Working tree was non-empty after git add -A; review this commit in git log if anything unexpected was included." \
-      -m "To run deploy without git: SKIP_DEPLOY_GIT=1 ./deploy.sh, bash -c \"SKIP_DEPLOY_GIT=1 bash ./deploy.sh\" (PowerShell), or uncomment SKIP_DEPLOY_GIT=1 at top of deploy.sh."
+    echo "Git: committing with message derived from staged changes…"
+    _shortstat=$(git diff --cached --shortstat 2>/dev/null | xargs || true)
+    [ -z "${_shortstat}" ] && _shortstat="(no shortstat; binary or rename only — see file list below)"
+    if [ -n "${DEPLOY_COMMIT_SUBJECT:-}" ]; then
+      _deploy_subj="${DEPLOY_COMMIT_SUBJECT}"
+    else
+      _deploy_subj="deploy: ${_shortstat} · ${_ts_utc}"
+      if [ "${#_deploy_subj}" -gt 72 ]; then
+        _deploy_subj="deploy: ${_shortstat}"
+        [ "${#_deploy_subj}" -gt 72 ] && _deploy_subj="${_deploy_subj:0:69}..."
+      fi
+    fi
+    _deploy_paths=$(git diff --cached --name-only | sed 's/^/- /' | awk 'NF' || true)
+    git commit -F - <<EOF
+${_deploy_subj}
+
+Pre-deploy snapshot (./deploy.sh → Cloudflare Worker + Pages).
+Branch: ${_branch} · push: ${_github_push_url}
+
+$(git diff --cached --stat)
+
+${_deploy_paths}
+
+Skip git on a deploy run: SKIP_DEPLOY_GIT=1 ./deploy.sh
+EOF
   else
     echo "Git: nothing to commit (clean working tree)."
   fi
