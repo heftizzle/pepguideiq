@@ -904,7 +904,11 @@ export function ProfileTab({
       setHealthSubview(null);
       return;
     }
-    if (t === TUTORIAL_TARGET.inbody_upload) {
+    if (
+      t === TUTORIAL_TARGET.inbody_upload ||
+      t === TUTORIAL_TARGET.atlas_scan_interpret ||
+      t === TUTORIAL_TARGET.atlas_scan_upload
+    ) {
       setSubView("profile");
       setHealthSubview("bodyScan");
     }

@@ -44,6 +44,14 @@ export const TUTORIAL_TARGET = {
   body_scan_section: "body_scan_section",
   /** Body Scan screen — Upload scan (Pro+ gate) */
   inbody_upload: "inbody_upload",
+  /** Library compound tile — Ask AI Atlas CTA */
+  atlas_compound_cta: "atlas_compound_cta",
+  /** BUILD tab — AI Atlas advisor panel */
+  atlas_build_panel: "atlas_build_panel",
+  /** Reserved: Body Scan upload (OCR); reuse `inbody_upload` on DOM for guide step */
+  atlas_scan_upload: "atlas_scan_upload",
+  /** Body Scan Trends — AI interpretation (POST /inbody-scan/interpret) */
+  atlas_scan_interpret: "atlas_scan_interpret",
   protocol_log_dose: "protocol_log_dose",
   stack_share: "stack_share",
   /** BUILD tab (`stackBuilder`): compound search + save */
@@ -259,11 +267,52 @@ const STATIC_FLOWS = {
 
   guide: [
     {
+      target: TUTORIAL_TARGET.nav_library,
+      tab: "library",
+      text: "Start in the Library",
+      tooltip:
+        "Every compound card has an 'Ask AI Atlas →' button at the bottom. AI Atlas knows the full 171-compound catalog — ask it anything about any compound.",
+    },
+    {
+      target: TUTORIAL_TARGET.atlas_compound_cta,
+      tab: "library",
+      text: "Tap 'Ask AI Atlas →' on any compound",
+      tooltip:
+        "Opens AI Atlas pre-loaded with that compound's context. Dosing, interactions, stacking, cycling — it knows the research. This uses your daily AI Atlas quota.",
+    },
+    {
+      target: TUTORIAL_TARGET.nav_build,
+      tab: "stackBuilder",
+      text: "Open the BUILD tab",
+      tooltip: "AI Atlas lives here too — in advisor mode. Build your stack and it analyzes it in real time.",
+    },
+    {
+      target: TUTORIAL_TARGET.atlas_build_panel,
+      tab: "stackBuilder",
+      text: "AI Atlas analyzes your stack",
+      tooltip:
+        "Must Have, Nice to Have, Consider Adding — AI Atlas reviews your full stack and tells you exactly what to add, what's redundant, and what gaps you have. The more your profile is filled in, the sharper the recommendations.",
+    },
+    {
+      target: TUTORIAL_TARGET.inbody_upload,
+      tab: "profile",
+      text: "Body Scan — AI Atlas reads your InBody results",
+      tooltip:
+        "Upload your InBody scan image and AI Atlas extracts every metric automatically — weight, skeletal muscle mass, body fat %, visceral fat, and more. Pro+ feature. Does NOT use your daily AI Atlas quota.",
+    },
+    {
+      target: TUTORIAL_TARGET.atlas_scan_interpret,
+      tab: "profile",
+      text: "AI Atlas interprets your scan results",
+      tooltip:
+        "After extraction, AI Atlas writes a full interpretation of your scan — what the numbers mean, what's trending, and what to focus on next. Pro+ feature. Does NOT use your daily AI Atlas quota.",
+    },
+    {
       target: TUTORIAL_TARGET.nav_guide,
       tab: null,
-      text: "Open AI Atlas from the header",
+      text: "Open AI Atlas from the header anytime",
       tooltip:
-        "Your personal peptide research assistant. Ask it anything — protocols, interactions, dosing, timing. The more profile data you've filled in, the more personalized the answers.",
+        "The 🧙 button is always in the header. Open AI Atlas as a full chat — ask anything about protocols, dosing math, interactions, timing, or research. Your 24/7 peptide research partner.",
     },
   ],
 
@@ -329,7 +378,7 @@ export const HELP_SECTIONS = [
   { key: "schedule", label: "Schedule & Settings — sessions, wake time, shift schedule" },
   { key: "build", label: "BUILD Tab — design your stack, save to protocol" },
   { key: "score", label: "Your pepguideIQ Score — XP system, tiers, and what Pro+ unlocks" },
-  { key: "guide", label: "AI Atlas — your personal peptide research assistant" },
+  { key: "guide", label: "AI Atlas — every place it lives and what it does there" },
 ];
 
 const TutorialCtx = createContext(null);

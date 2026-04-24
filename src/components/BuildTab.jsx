@@ -8,7 +8,7 @@ import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
 import { canAddStackRow } from "../lib/tiers.js";
-import { TUTORIAL_TARGET } from "../context/TutorialContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 
 const FREQ_OPTIONS = [
   { id: "daily", label: "Daily" },
@@ -210,6 +210,7 @@ export function BuildTab({
   user = null,
   plan = "entry",
 }) {
+  const tutorial = useTutorialOptional();
   const { activeProfileId } = useActiveProfile();
   const wide = useWideLayout();
   const [calcOpen, setCalcOpen] = useState(false);
@@ -854,8 +855,10 @@ export function BuildTab({
         )}
       </div>
 
-      {rows.length > 0 && isApiWorkerConfigured() && (
+      {isApiWorkerConfigured() && (
         <div
+          data-tutorial-target={TUTORIAL_TARGET.atlas_build_panel}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atlas_build_panel)))}
           style={{
             marginTop: 16,
             border: "1px solid var(--color-border-emphasis)",
@@ -892,7 +895,11 @@ export function BuildTab({
             </span>
           </div>
           <div style={{ height: 1, background: "var(--color-accent-subtle-30)", marginBottom: 12 }} />
-          {advisorLoading ? (
+          {rows.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, margin: 0 }}>
+              Add compounds above to unlock AI Atlas stack analysis.
+            </p>
+          ) : advisorLoading ? (
             <>
               <div className="pepv-advisor-skeleton" style={{ height: 40, marginBottom: 14 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

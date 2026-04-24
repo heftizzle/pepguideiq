@@ -105,6 +105,10 @@ export function BodyScanView({
   const [sharePair, setSharePair] = useState(/** @type {{ current: Record<string, unknown>, previous: Record<string, unknown> } | null} */ (null));
   const [bodyTab, setBodyTab] = useState(/** @type {"scans" | "trends"} */ ("scans"));
 
+  const guideInterpretSpotlight =
+    tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret;
+  const trendsUnlocked = rows.length >= 2 || (guideInterpretSpotlight && rows.length >= 1);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setLoadErr(null);
@@ -121,8 +125,17 @@ export function BodyScanView({
   }, [reload]);
 
   useEffect(() => {
-    if (bodyTab === "trends" && rows.length < 2) setBodyTab("scans");
-  }, [bodyTab, rows.length]);
+    if (tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret && rows.length > 0) {
+      setBodyTab("trends");
+    }
+  }, [tutorial?.flowKey, tutorial?.highlightTarget, rows.length]);
+
+  useEffect(() => {
+    if (bodyTab !== "trends" || rows.length >= 2) return;
+    if (!(tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret)) {
+      setBodyTab("scans");
+    }
+  }, [bodyTab, rows.length, tutorial?.flowKey, tutorial?.highlightTarget]);
 
   const countLabel = useMemo(() => {
     const n = rows.length;
@@ -195,20 +208,20 @@ export function BodyScanView({
           </button>
           <button
             type="button"
-            title={rows.length < 2 ? "Upload a second scan to unlock trends." : undefined}
-            disabled={rows.length < 2}
-            onClick={() => rows.length >= 2 && setBodyTab("trends")}
+            title={!trendsUnlocked ? "Upload a second scan to unlock trends." : undefined}
+            disabled={!trendsUnlocked}
+            onClick={() => trendsUnlocked && setBodyTab("trends")}
             style={{
               flex: 1,
               padding: "10px 12px",
               borderRadius: 8,
               border: bodyTab === "trends" ? "2px solid var(--color-accent)" : "1px solid var(--color-border-default)",
               background: bodyTab === "trends" ? "var(--color-bg-elevated)" : "var(--color-bg-card)",
-              color: rows.length < 2 ? "var(--color-text-muted)" : "var(--color-text-primary)",
+              color: !trendsUnlocked ? "var(--color-text-muted)" : "var(--color-text-primary)",
               fontSize: 13,
               fontWeight: 600,
-              cursor: rows.length < 2 ? "not-allowed" : "pointer",
-              opacity: rows.length < 2 ? 0.55 : 1,
+              cursor: !trendsUnlocked ? "not-allowed" : "pointer",
+              opacity: !trendsUnlocked ? 0.55 : 1,
             }}
           >
             Trends

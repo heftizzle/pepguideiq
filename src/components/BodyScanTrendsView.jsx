@@ -4,6 +4,7 @@ import { TIER_RANK } from "../lib/tiers.js";
 import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
 import { fetchProtocolEventsForTrends, getSessionAccessToken } from "../lib/supabase.js";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 
 const CHART_CDN = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
 
@@ -338,6 +339,7 @@ export function BodyScanTrendsView({
   onGuideDeepAnalysis,
   onInterpretationPersisted,
 }) {
+  const tutorial = useTutorialOptional();
   const planKey = typeof tier === "string" ? tier.trim().toLowerCase() : "entry";
   const isProPlus = (TIER_RANK[planKey] ?? 0) >= TIER_RANK.pro;
 
@@ -625,6 +627,8 @@ export function BodyScanTrendsView({
       ) : null}
 
       <div
+        data-tutorial-target={TUTORIAL_TARGET.atlas_scan_interpret}
+        {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atlas_scan_interpret)))}
         style={{
           border: "1px solid var(--color-border-default)",
           borderRadius: 10,

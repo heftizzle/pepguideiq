@@ -1255,7 +1255,7 @@ function PepGuideIQApp({ user, setUser }) {
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const topHeaderRef = useRef(null);
-  const { isHighlighted, stripVisible } = useTutorial();
+  const { isHighlighted, stripVisible, highlightTarget, flowKey } = useTutorial();
   const {
     user,
     setUser,
@@ -1350,6 +1350,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
   } = mainUiRef.current;
 
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
+
+  useEffect(() => {
+    if (flowKey !== "guide" || highlightTarget !== TUTORIAL_TARGET.atlas_compound_cta) return;
+    if (activeTab !== "library") return;
+    if (selPeptide) return;
+    const first = sortedPeptides[0];
+    if (first) setSelPeptide(first);
+  }, [flowKey, highlightTarget, activeTab, selPeptide, sortedPeptides, setSelPeptide]);
 
   useLayoutEffect(() => {
     const el = topHeaderRef.current;
@@ -2482,7 +2490,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>
-                <button type="button" className="btn-teal" style={{ fontSize: 13 }}
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 13 }}
+                  data-tutorial-target={TUTORIAL_TARGET.atlas_compound_cta}
+                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atlas_compound_cta))}
                   onClick={() => {
                     if (!canAI) {
                       openUpgradeModal("ai_guide");
@@ -2491,7 +2504,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     setSelPeptide(null);
                     setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
                     setActiveTab("guide");
-                  }}>
+                  }}
+                >
                   Ask AI Atlas →
                 </button>
                 <button
