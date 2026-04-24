@@ -7,14 +7,16 @@ import {
   useRef,
   useState,
 } from "react";
+import { isApiWorkerConfigured } from "../lib/config.js";
+import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
 import { useActiveProfile } from "./ProfileContext.jsx";
 
-/** @typedef {'core'|'profile'|'body'|'schedule'|'stack'|'share'|'guide'|'score'|'build'} DemoFlowKey */
+/** @typedef {'core'|'profile'|'body'|'schedule'|'stack'|'share'|'guide'|'score'|'build'} TutorialFlowKey */
 
 /** Bottom nav NETWORK tab emoji — keep in sync with App.jsx + NetworkTab.jsx empty state. */
 export const NETWORK_TAB_EMOJI = "🌐";
 
-export const DEMO_TARGET = {
+export const TUTORIAL_TARGET = {
   nav_library: "nav_library",
   nav_stacks: "nav_stacks",
   nav_network: "nav_network",
@@ -40,12 +42,12 @@ export const DEMO_TARGET = {
 };
 
 /** @param {string} session */
-export function demoNavProtocolTarget(session) {
+export function tutorialNavProtocolTarget(session) {
   return `nav_protocol_${session}`;
 }
 
 /**
- * @typedef {{ target: string, tab: string | null, protocolSession?: string, text: string }} DemoStep
+ * @typedef {{ target: string, tab: string | null, protocolSession?: string, text: string, tooltip?: string }} TutorialStep
  */
 
 /** @param {string} firstProtocolSessionId */
@@ -55,70 +57,107 @@ function coreSteps(firstProtocolSessionId) {
       ? firstProtocolSessionId.trim()
       : "morning";
   return [
-    { target: DEMO_TARGET.nav_library, tab: "library", text: "Browse the compound library" },
-    { target: DEMO_TARGET.library_add_stack, tab: "library", text: "Add a compound to your stack" },
-    { target: DEMO_TARGET.nav_vials, tab: "vialTracker", text: "Create a vial" },
-    { target: DEMO_TARGET.vial_reconstitute, tab: "vialTracker", text: "Reconstitute your vial" },
-    { target: DEMO_TARGET.profile_wake, tab: "profile", text: "Set your time of day" },
-    { target: DEMO_TARGET.protocol_log_dose, tab: "protocol", protocolSession: sid, text: "Log your dose" },
+    {
+      target: TUTORIAL_TARGET.nav_library,
+      tab: "library",
+      text: "Start here — browse the compound library",
+      tooltip: "The Library is the foundation. Every compound you track starts here.",
+    },
+    {
+      target: TUTORIAL_TARGET.library_add_stack,
+      tab: "library",
+      text: "Tap ADD on a compound to put it in your stack",
+      tooltip: "No compound in your stack = nothing to track. Add one now.",
+    },
+    {
+      target: TUTORIAL_TARGET.nav_vials,
+      tab: "vialTracker",
+      text: "Open the Vial Tracker",
+      tooltip: "Your vials live here. You draw doses from a vial, so you need one first.",
+    },
+    {
+      target: TUTORIAL_TARGET.vial_add,
+      tab: "vialTracker",
+      text: "Tap + to create a vial for your compound",
+      tooltip: "Create a vial for the compound you just added. This is what you'll pull doses from.",
+    },
+    {
+      target: TUTORIAL_TARGET.vial_reconstitute,
+      tab: "vialTracker",
+      text: "Enter your BAC water volume to set up dosing math",
+      tooltip: "This tells the app how many units are in your vial so dose amounts calculate correctly.",
+    },
+    {
+      target: TUTORIAL_TARGET.profile_wake,
+      tab: "profile",
+      text: "Set your wake time so your protocol sessions line up correctly",
+      tooltip: "Morning / afternoon / evening sessions are based on your wake time.",
+    },
+    {
+      target: TUTORIAL_TARGET.protocol_log_dose,
+      tab: "protocol",
+      protocolSession: sid,
+      text: "Tap LOG DOSE — this is your daily workflow",
+      tooltip: "You did it. Library → Vial → Log Dose. That's the core loop every day.",
+    },
   ];
 }
 
-/** @type {Record<Exclude<DemoFlowKey, 'core'>, DemoStep[]>} */
+/** @type {Record<Exclude<TutorialFlowKey, 'core'>, TutorialStep[]>} */
 const STATIC_FLOWS = {
   profile: [
-    { target: DEMO_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
-    { target: DEMO_TARGET.profile_avatar, tab: "profile", text: "Upload a photo and set your display name" },
-    { target: DEMO_TARGET.profile_handle, tab: "profile", text: "Choose a public @handle" },
+    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    { target: TUTORIAL_TARGET.profile_avatar, tab: "profile", text: "Upload a photo and set your display name" },
+    { target: TUTORIAL_TARGET.profile_handle, tab: "profile", text: "Choose a public @handle" },
   ],
   body: [
-    { target: DEMO_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
     {
-      target: DEMO_TARGET.profile_body_metrics,
+      target: TUTORIAL_TARGET.profile_body_metrics,
       tab: "profile",
       text: "Use the goal selector and set weight, height, and body fat",
     },
   ],
   schedule: [
-    { target: DEMO_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
     {
-      target: DEMO_TARGET.profile_default_session,
+      target: TUTORIAL_TARGET.profile_default_session,
       tab: "profile",
       text: "Pick your default session for the protocol view",
     },
     {
-      target: DEMO_TARGET.profile_shift_schedule,
+      target: TUTORIAL_TARGET.profile_shift_schedule,
       tab: "profile",
       text: "Set shift schedule and wake time",
     },
   ],
   stack: [
-    { target: DEMO_TARGET.nav_library, tab: "library", text: "Browse compounds in the library" },
-    { target: DEMO_TARGET.library_add_stack, tab: "library", text: "Add compounds to your saved stack" },
-    { target: DEMO_TARGET.nav_stacks, tab: "stack", text: "Review and name your stack" },
+    { target: TUTORIAL_TARGET.nav_library, tab: "library", text: "Browse compounds in the library" },
+    { target: TUTORIAL_TARGET.library_add_stack, tab: "library", text: "Add compounds to your saved stack" },
+    { target: TUTORIAL_TARGET.nav_stacks, tab: "stack", text: "Review and name your stack" },
   ],
   share: [
-    { target: DEMO_TARGET.nav_stacks, tab: "stack", text: "Open Stacks" },
-    { target: DEMO_TARGET.stack_share, tab: "stack", text: "Share your stack" },
+    { target: TUTORIAL_TARGET.nav_stacks, tab: "stack", text: "Open Stacks" },
+    { target: TUTORIAL_TARGET.stack_share, tab: "stack", text: "Share your stack" },
   ],
-  guide: [{ target: DEMO_TARGET.nav_guide, tab: null, text: "Open the AI Guide from the header" }],
+  guide: [{ target: TUTORIAL_TARGET.nav_guide, tab: null, text: "Open the AI Guide from the header" }],
   score: [
-    { target: DEMO_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
     {
-      target: DEMO_TARGET.profile_score,
+      target: TUTORIAL_TARGET.profile_score,
       tab: "profile",
       text: "Review the score card to see how your pepguideIQ Score is explained",
     },
   ],
   build: [
-    { target: DEMO_TARGET.nav_build, tab: "stackBuilder", text: "Open the BUILD tab" },
+    { target: TUTORIAL_TARGET.nav_build, tab: "stackBuilder", text: "Open the BUILD tab" },
     {
-      target: DEMO_TARGET.build_catalog_search,
+      target: TUTORIAL_TARGET.build_catalog_search,
       tab: "stackBuilder",
       text: "Search the catalog and add compounds to your builder",
     },
     {
-      target: DEMO_TARGET.build_save_stack,
+      target: TUTORIAL_TARGET.build_save_stack,
       tab: "stackBuilder",
       text: "Save your stack to update your saved protocol",
     },
@@ -126,17 +165,17 @@ const STATIC_FLOWS = {
 };
 
 /**
- * @param {DemoFlowKey} key
+ * @param {TutorialFlowKey} key
  * @param {string} firstProtocolSessionId
- * @returns {DemoStep[]}
+ * @returns {TutorialStep[]}
  */
-export function getDemoFlowSteps(key, firstProtocolSessionId) {
+export function getTutorialFlowSteps(key, firstProtocolSessionId) {
   if (key === "core") return coreSteps(firstProtocolSessionId);
   return STATIC_FLOWS[key] ?? [];
 }
 
 export const HELP_SECTIONS = [
-  { key: /** @type {DemoFlowKey} */ ("core"), label: "Your First Protocol — 6-step core walkthrough" },
+  { key: /** @type {TutorialFlowKey} */ ("core"), label: "Your First Protocol — 7-step core walkthrough" },
   { key: "profile", label: "Set Up Your Profile — avatar, display name, handle" },
   { key: "body", label: "Body Metrics & Goal — goal selector, weight, height, body fat" },
   { key: "schedule", label: "Schedule & Settings — default session, wake time, shift schedule" },
@@ -145,7 +184,7 @@ export const HELP_SECTIONS = [
   { key: "guide", label: "AI Guide — how to use the AI Guide" },
 ];
 
-const DemoCtx = createContext(null);
+const TutorialCtx = createContext(null);
 
 /**
  * @param {{
@@ -155,8 +194,8 @@ const DemoCtx = createContext(null);
  *   firstProtocolSessionId: string;
  * }} props
  */
-export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, firstProtocolSessionId }) {
-  const { activeProfile, ready } = useActiveProfile();
+export function TutorialProvider({ children, setActiveTab, setProtocolDeepLink, firstProtocolSessionId }) {
+  const { activeProfile, ready, patchMemberProfileLocal } = useActiveProfile();
   /** True once `demo_sessions_shown` is present on the row from API (avoid treating missing field as 0 before load). */
   const demoSessionsHydrated =
     ready &&
@@ -169,13 +208,12 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [helpStripActive, setHelpStripActive] = useState(false);
 
-  const [flowKey, setFlowKey] = useState(/** @type {DemoFlowKey | null} */ (null));
+  const [flowKey, setFlowKey] = useState(/** @type {TutorialFlowKey | null} */ (null));
   const [stepIndex, setStepIndex] = useState(0);
-
-  const autoStartedRef = useRef(false);
+  const [forced, setForced] = useState(false);
 
   const steps = useMemo(
-    () => (flowKey ? getDemoFlowSteps(flowKey, firstProtocolSessionId) : []),
+    () => (flowKey ? getTutorialFlowSteps(flowKey, firstProtocolSessionId) : []),
     [flowKey, firstProtocolSessionId]
   );
   const currentStep = steps.length && stepIndex < steps.length ? steps[stepIndex] : null;
@@ -190,16 +228,24 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
     [setActiveTab, setProtocolDeepLink]
   );
 
-  const clearFlow = useCallback(() => {
+  const clearFlowInternal = useCallback(() => {
     setFlowKey(null);
     setStepIndex(0);
     setHelpStripActive(false);
+    setForced(false);
   }, []);
 
+  const clearFlow = useCallback(() => {
+    if (forced) return;
+    clearFlowInternal();
+  }, [forced, clearFlowInternal]);
+
   const startFlow = useCallback(
-    (key) => {
-      const next = getDemoFlowSteps(key, firstProtocolSessionId);
+    (key, options) => {
+      const opts = options != null && typeof options === "object" ? options : {};
+      const next = getTutorialFlowSteps(key, firstProtocolSessionId);
       if (!next.length) return;
+      setForced(Boolean(opts.forced));
       setFlowKey(key);
       setStepIndex(0);
       applyStepNav(next[0]);
@@ -212,30 +258,55 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
 
   const goNext = useCallback(() => {
     if (!flowKey) return;
-    const list = getDemoFlowSteps(flowKey, firstProtocolSessionId);
+    const list = getTutorialFlowSteps(flowKey, firstProtocolSessionId);
     if (!list.length) return;
     if (stepIndex < list.length - 1) {
       const next = stepIndex + 1;
       setStepIndex(next);
       applyStepNav(list[next]);
     } else {
-      clearFlow();
+      const wasForcedCore = forced && flowKey === "core";
+      const profileId =
+        activeProfile && typeof activeProfile.id === "string" ? activeProfile.id.trim() : "";
+      clearFlowInternal();
+      if (wasForcedCore && profileId) {
+        patchMemberProfileLocal(profileId, { tutorial_completed: true });
+        void (async () => {
+          const res = isApiWorkerConfigured()
+            ? await patchMemberProfileViaWorker(profileId, { tutorial_completed: true })
+            : await updateMemberProfile(profileId, { tutorial_completed: true });
+          if (res.error) {
+            patchMemberProfileLocal(profileId, { tutorial_completed: false });
+          }
+        })();
+      }
     }
-  }, [flowKey, stepIndex, applyStepNav, clearFlow, firstProtocolSessionId]);
+  }, [
+    flowKey,
+    stepIndex,
+    forced,
+    activeProfile,
+    applyStepNav,
+    clearFlowInternal,
+    firstProtocolSessionId,
+    patchMemberProfileLocal,
+  ]);
 
   const goPrev = useCallback(() => {
+    if (forced) return;
     if (!flowKey) return;
-    const list = getDemoFlowSteps(flowKey, firstProtocolSessionId);
+    const list = getTutorialFlowSteps(flowKey, firstProtocolSessionId);
     if (!list.length || stepIndex <= 0) return;
     const prev = stepIndex - 1;
     setStepIndex(prev);
     applyStepNav(list[prev]);
-  }, [flowKey, stepIndex, applyStepNav, firstProtocolSessionId]);
+  }, [forced, flowKey, stepIndex, applyStepNav, firstProtocolSessionId]);
 
   const dismissBar = useCallback(() => {
+    if (forced) return;
     setBarDismissed(true);
-    clearFlow();
-  }, [clearFlow]);
+    clearFlowInternal();
+  }, [forced, clearFlowInternal]);
 
   const expandFromCollapsed = useCallback(() => {
     setBarExpanded(true);
@@ -266,19 +337,9 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
   }, [demoSessionsHydrated, sessionCount, activeProfile?.id]);
 
   useEffect(() => {
-    autoStartedRef.current = false;
     setBarDismissed(false);
-    clearFlow();
-  }, [activeProfile?.id, clearFlow]);
-
-  useEffect(() => {
-    if (autoStartedRef.current) return;
-    if (!demoSessionsHydrated || sessionCount == null) return;
-    if (sessionCount >= 1 && sessionCount <= 5 && !barDismissed) {
-      autoStartedRef.current = true;
-      startFlow("core");
-    }
-  }, [demoSessionsHydrated, sessionCount, barDismissed, startFlow]);
+    clearFlowInternal();
+  }, [activeProfile?.id, clearFlowInternal]);
 
   useEffect(() => {
     if (!highlightTarget || typeof document === "undefined") return;
@@ -291,7 +352,7 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
       ) {
         return;
       }
-      const el = document.querySelector(`[data-demo-target="${highlightTarget}"]`);
+      const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
       el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, 120);
     return () => window.clearTimeout(t);
@@ -309,6 +370,7 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
       stepIndex,
       currentStep,
       steps,
+      forced,
       startFlow,
       goNext,
       goPrev,
@@ -335,6 +397,7 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
       stepIndex,
       currentStep,
       steps,
+      forced,
       startFlow,
       goNext,
       goPrev,
@@ -351,19 +414,19 @@ export function DemoTourProvider({ children, setActiveTab, setProtocolDeepLink, 
     ]
   );
 
-  return <DemoCtx.Provider value={value}>{children}</DemoCtx.Provider>;
+  return <TutorialCtx.Provider value={value}>{children}</TutorialCtx.Provider>;
 }
 
-export function useDemoTour() {
-  const v = useContext(DemoCtx);
-  if (!v) throw new Error("useDemoTour must be used within DemoTourProvider");
+export function useTutorial() {
+  const v = useContext(TutorialCtx);
+  if (!v) throw new Error("useTutorial must be used within TutorialProvider");
   return v;
 }
 
-export function useDemoTourOptional() {
-  return useContext(DemoCtx);
+export function useTutorialOptional() {
+  return useContext(TutorialCtx);
 }
 
-export function demoHighlightProps(isOn) {
-  return isOn ? { "data-demo-highlight": "1" } : {};
+export function tutorialHighlightProps(isOn) {
+  return isOn ? { "data-tutorial-highlight": "1" } : {};
 }

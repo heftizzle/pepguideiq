@@ -25,7 +25,7 @@ import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/d
 import { getTimingWarning, hasAnyTimingConflict } from "../lib/protocolGuardrails.js";
 import { isProtocolSessionId } from "../data/protocolSessions.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
 import { getConfirmationMessage, protocolSessionFromHour } from "../lib/protocolMessages.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
@@ -116,7 +116,7 @@ export function ProtocolTab({
   const showDoseToast = useShowDoseToast();
   const skipGuardrailForPeptideIdRef = useRef(null);
   const deepLinkConsumedRef = useRef(false);
-  const demo = useDemoTourOptional();
+  const tutorial = useTutorialOptional();
   const { refreshMemberProfiles } = useActiveProfile();
 
   useEffect(() => {
@@ -446,7 +446,7 @@ export function ProtocolTab({
                   busy={loggingPeptideId === r.peptideId}
                   onUnitsDelta={(delta) => updateRowUnits(r.peptideId, r.units + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}
-                  demoLogDose={rowIdx === 0 && Boolean(demo?.isHighlighted(DEMO_TARGET.protocol_log_dose))}
+                  tutorialLogDose={rowIdx === 0 && Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.protocol_log_dose))}
                   todayLogs={todayDosesByPeptide[r.peptideId] ?? []}
                   onDoseLogsChanged={bumpReload}
                 />
@@ -459,7 +459,7 @@ export function ProtocolTab({
                   busy={loggingPeptideId === r.peptideId}
                   onDoseDelta={(delta) => updateRowDoseCount(r.peptideId, r.doseCount + delta)}
                   onLogDose={() => void logDoseForPeptide(r.peptideId)}
-                  demoLogDose={rowIdx === 0 && Boolean(demo?.isHighlighted(DEMO_TARGET.protocol_log_dose))}
+                  tutorialLogDose={rowIdx === 0 && Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.protocol_log_dose))}
                   todayLogs={todayDosesByPeptide[r.peptideId] ?? []}
                   onDoseLogsChanged={bumpReload}
                 />
@@ -880,7 +880,7 @@ function ProtocolNonInjectableRow({
   busy,
   onDoseDelta,
   onLogDose,
-  demoLogDose = false,
+  tutorialLogDose = false,
   todayLogs = [],
   onDoseLogsChanged = () => {},
 }) {
@@ -888,8 +888,8 @@ function ProtocolNonInjectableRow({
   return (
     <div
       style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}
-      data-demo-target={demoLogDose ? DEMO_TARGET.protocol_log_dose : undefined}
-      {...demoHighlightProps(demoLogDose)}
+      data-tutorial-target={tutorialLogDose ? TUTORIAL_TARGET.protocol_log_dose : undefined}
+      {...tutorialHighlightProps(tutorialLogDose)}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>{row.name}</div>
@@ -977,7 +977,7 @@ function ProtocolInjectableRow({
   busy,
   onUnitsDelta,
   onLogDose,
-  demoLogDose = false,
+  tutorialLogDose = false,
   todayLogs = [],
   onDoseLogsChanged = () => {},
 }) {
@@ -1005,8 +1005,8 @@ function ProtocolInjectableRow({
   return (
     <div
       style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}
-      data-demo-target={demoLogDose ? DEMO_TARGET.protocol_log_dose : undefined}
-      {...demoHighlightProps(demoLogDose)}
+      data-tutorial-target={tutorialLogDose ? TUTORIAL_TARGET.protocol_log_dose : undefined}
+      {...tutorialHighlightProps(tutorialLogDose)}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 14, color: "var(--color-text-primary)", fontWeight: 600 }}>

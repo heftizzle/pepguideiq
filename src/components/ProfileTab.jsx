@@ -39,7 +39,7 @@ import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.
 import { BodyScanView } from "./BodyScanView.jsx";
 import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
 import { ProfileCtx } from "../context/ProfileContext.jsx";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
 
 const SECTION = {
@@ -204,7 +204,7 @@ function pepguideIqScoreBreakdownLine(parts) {
   ].join(" | ");
 }
 
-function PepguideStatsStrip({ stats, demoHighlightProps, demoHighlighted }) {
+function PepguideStatsStrip({ stats, tutorialHighlightProps: tutHighlightProps, tutorialHighlighted }) {
   const parts = pepguideIqScoreParts(stats);
   const breakdown = pepguideIqScoreBreakdownLine(parts);
   const formulaTitle = parts
@@ -249,8 +249,8 @@ function PepguideStatsStrip({ stats, demoHighlightProps, demoHighlighted }) {
 
   return (
     <div
-      data-demo-target={DEMO_TARGET.profile_score}
-      {...demoHighlightProps(Boolean(demoHighlighted))}
+      data-tutorial-target={TUTORIAL_TARGET.profile_score}
+      {...tutHighlightProps(Boolean(tutorialHighlighted))}
       style={{
         background: "var(--color-bg-elevated)",
         border: "1px solid var(--color-border-default)",
@@ -854,7 +854,7 @@ export function ProfileTab({
   const memberProfilesVersion = profileCtx?.memberProfilesVersion ?? 0;
   const refreshMemberProfiles = profileCtx?.refreshMemberProfiles ?? noopRefreshMemberProfiles;
   const patchMemberProfileLocal = profileCtx?.patchMemberProfileLocal ?? noopPatchMemberProfileLocal;
-  const demo = useDemoTourOptional();
+  const tutorial = useTutorialOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
@@ -1916,8 +1916,8 @@ export function ProfileTab({
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                data-demo-target={DEMO_TARGET.profile_avatar}
-                {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_avatar)))}
+                data-tutorial-target={TUTORIAL_TARGET.profile_avatar}
+                {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_avatar)))}
                 style={{
                   width: 112,
                   height: 112,
@@ -2187,8 +2187,8 @@ export function ProfileTab({
       <PepguideStatsSectionHeading stats={stats} />
       <PepguideStatsStrip
         stats={stats}
-        demoHighlightProps={demoHighlightProps}
-        demoHighlighted={Boolean(demo?.isHighlighted(DEMO_TARGET.profile_score))}
+        tutorialHighlightProps={tutorialHighlightProps}
+        tutorialHighlighted={Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_score))}
       />
 
       <div style={SECTION}>Measurement hub</div>
@@ -2331,8 +2331,8 @@ export function ProfileTab({
       <div style={SECTION}>Body metrics</div>
       <Card>
         <div
-          data-demo-target={DEMO_TARGET.profile_body_metrics}
-          {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_body_metrics)))}
+          data-tutorial-target={TUTORIAL_TARGET.profile_body_metrics}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_body_metrics)))}
         >
           <div ref={setFieldRef("goal")}>
             <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}>

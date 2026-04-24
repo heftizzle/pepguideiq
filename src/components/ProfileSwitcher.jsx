@@ -6,7 +6,7 @@ import { createMemberProfileViaWorker } from "../lib/supabase.js";
 import { useFocusTrap } from "./useFocusTrap.js";
 import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 
 function initialLetter(displayName) {
   const s = String(displayName || "").trim();
@@ -22,7 +22,7 @@ function initialLetter(displayName) {
  * }} props
  */
 export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navTooltipAnchorRef }) {
-  const demo = useDemoTourOptional();
+  const tutorial = useTutorialOptional();
   const {
     activeProfileId,
     activeProfile,
@@ -318,8 +318,8 @@ export function ProfileSwitcher({ onOpenUpgrade, onGoToProfileSettings, navToolt
           btnRef.current = el;
           navTooltipAnchorRef?.(el);
         }}
-        data-demo-target={DEMO_TARGET.nav_profile}
-        {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.nav_profile)))}
+        data-tutorial-target={TUTORIAL_TARGET.nav_profile}
+        {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.nav_profile)))}
         role="group"
         aria-label="Profile switcher"
         style={{

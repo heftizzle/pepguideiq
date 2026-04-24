@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ensureUserStackShareId, updateStack } from "../lib/supabase.js";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { buildStackShareSmsUrl, buildStackShareUrl } from "../lib/stackShare.js";
 
 function canUseWebShare() {
@@ -30,7 +30,7 @@ export function StackShareControls({
   onFeedVisibleChange,
   disabled = false,
 }) {
-  const demo = useDemoTourOptional();
+  const tutorial = useTutorialOptional();
   const [open, setOpen] = useState(false);
   const [shareId, setShareId] = useState(initialShareId ?? null);
   const [busy, setBusy] = useState(false);
@@ -143,8 +143,8 @@ export function StackShareControls({
   return (
     <div
       style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}
-      data-demo-target={DEMO_TARGET.stack_share}
-      {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.stack_share)))}
+      data-tutorial-target={TUTORIAL_TARGET.stack_share}
+      {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.stack_share)))}
     >
       {hasShareId ? (
         <button

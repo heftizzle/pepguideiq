@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useDemoTour, NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
+import { useTutorial, NETWORK_TAB_EMOJI } from "../context/TutorialContext.jsx";
 
 const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
@@ -36,8 +36,8 @@ const HELP_MENU_ROW = {
 const SUPPORT_HREF =
   "mailto:hello@pepguideiq.com?subject=" + encodeURIComponent("pepguideIQ Support");
 
-export function DemoTourHelpButton() {
-  const { helpMenuOpen, setHelpMenuOpen, startFlow, HELP_SECTIONS: sections } = useDemoTour();
+export function TutorialHelpButton() {
+  const { helpMenuOpen, setHelpMenuOpen, startFlow, HELP_SECTIONS: sections } = useTutorial();
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuRect, setMenuRect] = useState(/** @type {{ top: number; left: number; width: number } | null} */ (null));
@@ -166,7 +166,7 @@ export function DemoTourHelpButton() {
   );
 }
 
-export function DemoTourBar() {
+export function TutorialBar() {
   const {
     stripVisible,
     showCollapsedTeaser,
@@ -180,14 +180,15 @@ export function DemoTourBar() {
     goNext,
     goPrev,
     sessionCount,
-  } = useDemoTour();
+    forced,
+  } = useTutorial();
 
   if (!stripVisible) return null;
 
   if (showCollapsedTeaser) {
     return (
       <div
-        id="pepv-demo-tour-strip"
+        id="pepv-tutorial-strip"
         style={{
           position: "fixed",
           left: 0,
@@ -243,7 +244,7 @@ export function DemoTourBar() {
 
   return (
     <div
-      id="pepv-demo-tour-strip"
+      id="pepv-tutorial-strip"
       style={{
         position: "fixed",
         left: 0,
@@ -295,7 +296,7 @@ export function DemoTourBar() {
                     marginBottom: 8,
                   }}
                 >
-                  Tap Next to follow along, or × to explore on your own
+                  {forced ? "Tap Next to follow along." : "Tap Next to follow along, or × to explore on your own"}
                 </div>
                 <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{label}</div>
               </div>
@@ -303,37 +304,41 @@ export function DemoTourBar() {
               <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{label}</div>
             )}
           </div>
-          <button
-            type="button"
-            aria-label="Dismiss demo bar"
-            onClick={() => dismissBar()}
-            style={{
-              flexShrink: 0,
-              ...hit44,
-              padding: 0,
-              borderRadius: 10,
-              border: "1px solid var(--color-border-emphasis)",
-              background: "rgba(255,255,255,0.04)",
-              color: "var(--color-text-secondary)",
-              cursor: "pointer",
-              fontSize: 20,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
+          {!forced ? (
+            <button
+              type="button"
+              aria-label="Dismiss tutorial bar"
+              onClick={() => dismissBar()}
+              style={{
+                flexShrink: 0,
+                ...hit44,
+                padding: 0,
+                borderRadius: 10,
+                border: "1px solid var(--color-border-emphasis)",
+                background: "rgba(255,255,255,0.04)",
+                color: "var(--color-text-secondary)",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          ) : null}
         </div>
         {flowKey && total > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, alignItems: "center" }}>
-            <button
-              type="button"
-              className="btn-teal"
-              disabled={stepIndex <= 0}
-              onClick={() => goPrev()}
-              style={{ fontSize: 13, minHeight: 44, padding: "8px 16px", opacity: stepIndex <= 0 ? 0.4 : 1 }}
-            >
-              Back
-            </button>
+            {!forced ? (
+              <button
+                type="button"
+                className="btn-teal"
+                disabled={stepIndex <= 0}
+                onClick={() => goPrev()}
+                style={{ fontSize: 13, minHeight: 44, padding: "8px 16px", opacity: stepIndex <= 0 ? 0.4 : 1 }}
+              >
+                Back
+              </button>
+            ) : null}
             <button type="button" className="btn-teal" onClick={() => goNext()} style={{ fontSize: 13, minHeight: 44, padding: "8px 16px" }}>
               {stepIndex >= total - 1 ? "Done" : "Next"}
             </button>

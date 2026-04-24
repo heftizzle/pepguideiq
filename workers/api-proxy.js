@@ -3669,7 +3669,7 @@ function normalizeWakeTimeForPatch(s) {
 async function fetchMemberProfilesListOnce(env, supabaseUrl, serviceKey, userId, attemptLabel) {
   const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=eq.${encodeURIComponent(
     userId
-  )}&select=id,user_id,display_name,avatar_r2_key,timezone,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,bio,instagram_handle,tiktok_handle,facebook_handle,snapchat_handle,linkedin_handle,x_handle,youtube_handle,rumble_handle,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
+  )}&select=id,user_id,display_name,avatar_r2_key,timezone,is_default,created_at,city,state,country,language,shift_schedule,wake_time,handle,display_handle,demo_sessions_shown,tutorial_completed,bio,instagram_handle,tiktok_handle,facebook_handle,snapchat_handle,linkedin_handle,x_handle,youtube_handle,rumble_handle,experience_level,goals,body_scan_r2_key,body_scan_uploaded_at,body_scan_ocr_pending,progress_photo_front_r2_key,progress_photo_front_at,progress_photo_side_r2_key,progress_photo_side_at,progress_photo_back_r2_key,progress_photo_back_at,progress_photo_sets,current_streak&order=created_at.asc`;
   try {
     const res = await fetch(sel, {
       headers: {
@@ -4574,6 +4574,14 @@ function parseMemberProfilePatchBody(body) {
     } else {
       return { error: "timezone must be a string or null" };
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "tutorial_completed")) {
+    hasKey = true;
+    if (body.tutorial_completed !== true) {
+      return { error: "tutorial_completed may only be set to true" };
+    }
+    patch.tutorial_completed = true;
   }
 
   if (!hasKey) {

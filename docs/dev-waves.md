@@ -54,7 +54,7 @@ Excludes non-engineering work (e.g. liability insurance, FinCEN calendar). Each 
 | [ ] | `#0b0f17` to `#0e1520` pass everywhere: shared primitives | Replace the remaining legacy card/panel background usages in shared styles first so downstream components inherit the new lift consistently. Main hotspot: [src/components/GlobalStyles.jsx](src/components/GlobalStyles.jsx). Independent PR. |
 | [ ] | `#0b0f17` to `#0e1520` pass everywhere: component sweep | Update remaining inline panels/modals/cards still hardcoding `#0b0f17`. Current obvious files from repo grep: [src/components/SettingsTab.jsx](src/components/SettingsTab.jsx), [src/components/ProfileTab.jsx](src/components/ProfileTab.jsx), [src/components/AuthScreen.jsx](src/components/AuthScreen.jsx), [src/components/PublicStackView.jsx](src/components/PublicStackView.jsx), [src/components/NotificationsBell.jsx](src/components/NotificationsBell.jsx), [src/components/Modal.jsx](src/components/Modal.jsx), [src/App.jsx](src/App.jsx), and others from the grep list. Can run after or alongside the shared-primitives row if touchpoints do not overlap. |
 | [ ] | 44px touch targets + padding pass | Combine the color lift with a targeted tap-target and spacing audit for mobile-heavy controls. Main hotspot is [src/components/GlobalStyles.jsx](src/components/GlobalStyles.jsx) plus button-heavy component screens. Best done after the shared primitive row so spacing is not restyled twice. |
-| [x] | Demo tour: BUILD tab flow | `DemoTourContext` flow `build` + `BuildTab` `data-demo-target`s. |
+| [x] | Tutorial: BUILD tab flow | `TutorialContext` flow `build` + `BuildTab` `data-tutorial-target`s. |
 
 ## Wave D - Post-launch and platform epics (defer)
 

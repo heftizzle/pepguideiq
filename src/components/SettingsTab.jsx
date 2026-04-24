@@ -22,7 +22,7 @@ import {
 } from "../lib/supabase.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import { ThemeToggle } from "./ThemeToggle.jsx";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { getCountriesForProfileForm } from "../data/countries.js";
 import { formatLanguageOptionLabel, PROFILE_LANGUAGE_OPTIONS } from "../data/profileLanguages.js";
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
@@ -128,7 +128,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     refreshMemberProfiles,
     switchProfile,
   } = useActiveProfile();
-  const demo = useDemoTourOptional();
+  const tutorial = useTutorialOptional();
   const workerOk = isApiWorkerConfigured();
 
   const [displayName, setDisplayName] = useState("");
@@ -807,8 +807,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <div style={SECTION}>Default session</div>
       <Card>
         <div
-          data-demo-target={DEMO_TARGET.profile_default_session}
-          {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_default_session)))}
+          data-tutorial-target={TUTORIAL_TARGET.profile_default_session}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_default_session)))}
           style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 0 }}
         >
           {getProtocolSessionsOrdered().map((s) => (
@@ -844,8 +844,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       <Card>
         {scheduleUnlocked ? (
           <div
-            data-demo-target={DEMO_TARGET.profile_shift_schedule}
-            {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_shift_schedule)))}
+            data-tutorial-target={TUTORIAL_TARGET.profile_shift_schedule}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_shift_schedule)))}
             style={{ display: "flex", flexDirection: "column", gap: 12 }}
           >
             <div>
@@ -879,8 +879,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </div>
             </div>
             <div
-              data-demo-target={DEMO_TARGET.profile_wake}
-              {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_wake)))}
+              data-tutorial-target={TUTORIAL_TARGET.profile_wake}
+              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_wake)))}
             >
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Wake time</div>
               <input
@@ -1314,8 +1314,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           </div>
 
           <div
-            data-demo-target={DEMO_TARGET.profile_handle}
-            {...demoHighlightProps(Boolean(demo?.isHighlighted(DEMO_TARGET.profile_handle)))}
+            data-tutorial-target={TUTORIAL_TARGET.profile_handle}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_handle)))}
           >
             <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Public handle</div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>

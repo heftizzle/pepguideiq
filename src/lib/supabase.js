@@ -745,7 +745,7 @@ export async function listMemberProfiles(userId) {
   const { data, error } = await supabase
     .from("member_profiles")
     .select(
-      "id, user_id, display_name, avatar_r2_key, timezone, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, bio, instagram_handle, tiktok_handle, facebook_handle, snapchat_handle, linkedin_handle, x_handle, youtube_handle, rumble_handle, experience_level, goals, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
+      "id, user_id, display_name, avatar_r2_key, timezone, is_default, created_at, city, state, country, language, shift_schedule, wake_time, handle, display_handle, demo_sessions_shown, tutorial_completed, bio, instagram_handle, tiktok_handle, facebook_handle, snapchat_handle, linkedin_handle, x_handle, youtube_handle, rumble_handle, experience_level, goals, body_scan_r2_key, body_scan_uploaded_at, body_scan_ocr_pending, progress_photo_front_r2_key, progress_photo_front_at, progress_photo_side_r2_key, progress_photo_side_at, progress_photo_back_r2_key, progress_photo_back_at, progress_photo_sets, current_streak"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });

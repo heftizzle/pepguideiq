@@ -33,13 +33,15 @@ import { ProfileProvider, useActiveProfile } from "./context/ProfileContext.jsx"
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { DoseToastProvider } from "./context/DoseToastContext.jsx";
 import {
-  DemoTourProvider,
-  DEMO_TARGET,
+  TutorialProvider,
+  TUTORIAL_TARGET,
   NETWORK_TAB_EMOJI,
-  demoHighlightProps,
-  useDemoTour,
-} from "./context/DemoTourContext.jsx";
-import { DemoTourBar, DemoTourHelpButton } from "./components/DemoTourChrome.jsx";
+  tutorialHighlightProps,
+  useTutorial,
+} from "./context/TutorialContext.jsx";
+import { TutorialBar, TutorialHelpButton } from "./components/TutorialChrome.jsx";
+import TutorialSpotlight from "./components/TutorialSpotlight.jsx";
+import { DeferredCoreTutorialLauncher } from "./components/DeferredCoreTutorialLauncher.jsx";
 import { canAddStackRow, getNextTierId, getSavedStackRowLimit, TIER_ORDER } from "./lib/tiers.js";
 import { getSuggestedUpgradeTier } from "./lib/upgradeGateCopy.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
@@ -373,6 +375,12 @@ const PEPV_VALID_TABS = new Set([
   "protocol",
   "profile",
 ]);
+
+function TutorialSpotlightGate() {
+  const { currentStep, highlightTarget } = useTutorial();
+  if (!currentStep || !highlightTarget) return null;
+  return <TutorialSpotlight />;
+}
 
 function readInitialActiveTab() {
   if (typeof sessionStorage === "undefined") return PEPV_DEFAULT_TAB;
@@ -1161,31 +1169,34 @@ function PepGuideIQApp({ user, setUser }) {
     navTabButtonRefs,
   };
 
-  if (needsHandleOnboarding) {
-    return (
-      <>
-        <GlobalStyles />
-        <HandleSetup
-          activeProfileId={activeProfileId}
-          patchMemberProfileLocal={patchMemberProfileLocal}
-          onComplete={() => {
-            void refreshMemberProfiles();
-          }}
-        />
-      </>
-    );
-  }
-
   return (
-    <DemoTourProvider
+    <TutorialProvider
       setActiveTab={setActiveTab}
       setProtocolDeepLink={setProtocolDeepLink}
       firstProtocolSessionId="morning"
     >
-      <DoseToastProvider>
-        <PepGuideIQMainTree mainUiRef={mainUiRef} />
-        <NavTooltips tabButtonRefs={navTabButtonRefs} />
-        <DemoTourBar />
+      <DeferredCoreTutorialLauncher
+        needsHandleOnboarding={needsHandleOnboarding}
+        activeProfileHandle={activeProfile?.handle}
+        activeProfileId={activeProfile?.id}
+        activeProfileTutorialCompleted={activeProfile?.tutorial_completed === true}
+      />
+      {needsHandleOnboarding ? (
+        <>
+          <GlobalStyles />
+          <HandleSetup
+            activeProfileId={activeProfileId}
+            patchMemberProfileLocal={patchMemberProfileLocal}
+            onComplete={() => {
+              void refreshMemberProfiles();
+            }}
+          />
+        </>
+      ) : (
+        <DoseToastProvider>
+          <PepGuideIQMainTree mainUiRef={mainUiRef} />
+          <NavTooltips tabButtonRefs={navTabButtonRefs} />
+          <TutorialBar />
         {showPeopleSearch && activeProfileId && typeof document !== "undefined"
           ? createPortal(
               <PeopleSearch
@@ -1231,14 +1242,16 @@ function PepGuideIQApp({ user, setUser }) {
               document.body
             )
           : null}
-      </DoseToastProvider>
-    </DemoTourProvider>
+          <TutorialSpotlightGate />
+        </DoseToastProvider>
+      )}
+    </TutorialProvider>
   );
 }
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const topHeaderRef = useRef(null);
-  const { isHighlighted, stripVisible } = useDemoTour();
+  const { isHighlighted, stripVisible } = useTutorial();
   const {
     user,
     setUser,
@@ -1397,13 +1410,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       : memberDisplayRaw;
                     return (
                       <>
-                        <DemoTourHelpButton />
+                        <TutorialHelpButton />
                         <button
                           type="button"
                           className="pepv-header-action-btn"
-                          data-demo-target={DEMO_TARGET.nav_guide}
+                          data-tutorial-target={TUTORIAL_TARGET.nav_guide}
                           data-active={guideOn ? "true" : undefined}
-                          {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_guide))}
+                          {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.nav_guide))}
                           onClick={() => setActiveTab("guide")}
                         >
                           <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
@@ -1722,8 +1735,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             fontSize: 13,
                             opacity: inStack ? 1 : !stackListReady ? 0.55 : 1,
                           }}
-                          data-demo-target={cardIdx === 0 ? DEMO_TARGET.library_add_stack : undefined}
-                          {...demoHighlightProps(cardIdx === 0 && isHighlighted(DEMO_TARGET.library_add_stack))}
+                          data-tutorial-target={cardIdx === 0 ? TUTORIAL_TARGET.library_add_stack : undefined}
+                          {...tutorialHighlightProps(cardIdx === 0 && isHighlighted(TUTORIAL_TARGET.library_add_stack))}
                           disabled={!inStack && !stackListReady}
                           title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
                           onClick={(e) => {
@@ -1984,7 +1997,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           }
                           canUse={canVialTracker}
                           onUpgrade={openUpgradeModal}
-                          demoAnchorFirst={vialIdx === 0}
+                          tutorialAnchorFirst={vialIdx === 0}
                         />
                       );
                     });
@@ -2554,8 +2567,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
             <button
               type="button"
               aria-label={`Library, ${CATALOG_COUNT} compounds`}
-              data-demo-target={DEMO_TARGET.nav_library}
-              {...demoHighlightProps(isHighlighted(DEMO_TARGET.nav_library))}
+              data-tutorial-target={TUTORIAL_TARGET.nav_library}
+              {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.nav_library))}
               ref={(el) => {
                 navTabButtonRefs.current.library = el;
               }}
@@ -2619,7 +2632,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 labelTop: "VIAL",
                 label: "TRACKER",
                 ariaLabel: "Vial Tracker",
-                demoTarget: DEMO_TARGET.nav_vials,
+                tutorialTarget: TUTORIAL_TARGET.nav_vials,
                 isActive: activeTab === "vialTracker",
                 onClick: () => setActiveTab("vialTracker"),
               },
@@ -2629,7 +2642,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 labelTop: "STACK",
                 label: "BUILDER",
                 ariaLabel: "Stack Builder",
-                demoTarget: DEMO_TARGET.nav_build,
+                tutorialTarget: TUTORIAL_TARGET.nav_build,
                 isActive: activeTab === "stackBuilder",
                 onClick: () => setActiveTab("stackBuilder"),
               },
@@ -2639,7 +2652,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 labelTop: "SAVED",
                 label: "STACKS",
                 ariaLabel: "Stacks",
-                demoTarget: DEMO_TARGET.nav_stacks,
+                tutorialTarget: TUTORIAL_TARGET.nav_stacks,
                 isActive: activeTab === "stack",
                 onClick: () => setActiveTab("stack"),
               },
@@ -2649,7 +2662,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 labelTop: "PEPGUIDE",
                 label: "NETWORK",
                 ariaLabel: "Network",
-                demoTarget: DEMO_TARGET.nav_network,
+                tutorialTarget: TUTORIAL_TARGET.nav_network,
                 isActive: activeTab === "network",
                 onClick: () => setActiveTab("network"),
               },
@@ -2658,8 +2671,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 key={item.tabId}
                 type="button"
                 aria-label={item.ariaLabel}
-                data-demo-target={item.demoTarget}
-                {...demoHighlightProps(isHighlighted(item.demoTarget))}
+                data-tutorial-target={item.tutorialTarget}
+                {...tutorialHighlightProps(isHighlighted(item.tutorialTarget))}
                 ref={(el) => {
                   navTabButtonRefs.current[item.tabId] = el;
                 }}

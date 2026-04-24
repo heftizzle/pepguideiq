@@ -10,7 +10,7 @@
 | `user_stacks` | One row per `(user_id, profile_id)`. `stack` JSONB holds the compound list. `public_share_id`, `share_feed_visible`. |
 | `user_vials` | Vial lifecycle. `peptide_id`, `concentration_mcg_ml`, `bac_water_ml`, `vial_size_mg`, `reconstituted_at`, `expires_at`, `desired_dose_mcg`, `photo_r2_key`, `status`. |
 | `dose_logs` | One row per dose. `peptide_id`, `vial_id` (null for oral/nasal/topical), `dose_mcg` OR `dose_count` + `dose_unit`, `dosed_at`, `session_label`, `route_kind`. |
-| `member_profiles` | Sub-profiles per user (Netflix-style, slot-limited by plan). `display_name`, `handle`, `display_handle`, `avatar_url`, `bio`, `goals` (CSV), `language`, `wake_time`, `schedule_shift`, `demo_sessions_shown`, `current_streak`, `consecutive_days`, `is_default`, `social_{instagram,tiktok,facebook,snapchat,linkedin,x,youtube,rumble}_handle`, `locale_{city,state,country_code}`. |
+| `member_profiles` | Sub-profiles per user (Netflix-style, slot-limited by plan). `display_name`, `handle`, `display_handle`, `avatar_url`, `bio`, `goals` (CSV), `language`, `wake_time`, `schedule_shift`, `demo_sessions_shown`, `tutorial_completed` (core walkthrough finished), `current_streak`, `consecutive_days`, `is_default`, `social_{instagram,tiktok,facebook,snapchat,linkedin,x,youtube,rumble}_handle`, `locale_{city,state,country_code}`. |
 | `body_metrics` | Scoped per profile. Weight/height/body-fat, InBody/DEXA fields. |
 | `member_follows` | Graph edges. `(follower_id, following_id)`. Unique constraint. |
 | `network_feed` | Receipted feed posts. `stack_id` for stack shares, `dose_log_id` for dose posts. `public_visible` flag. `expires_at` for TTL. |

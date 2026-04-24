@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
-import { NETWORK_TAB_EMOJI } from "../context/DemoTourContext.jsx";
+import { NETWORK_TAB_EMOJI } from "../context/TutorialContext.jsx";
 import { fetchNetworkFeed, fetchNetworkMediaPosts, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
 import { API_WORKER_URL, isSupabaseConfigured } from "../lib/config.js";
 import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";

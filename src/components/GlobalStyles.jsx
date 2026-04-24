@@ -322,15 +322,19 @@ export function GlobalStyles() {
           padding-bottom:max(10px,env(safe-area-inset-bottom));
         }
       }
-      [data-demo-highlight="1"]{
-        animation:pepvDemoPulse 2.2s ease-in-out infinite;
+      [data-tutorial-highlight="1"]{
+        animation:pepvTutorialTargetPulse 2.2s ease-in-out infinite;
         border-radius:12px;
         outline:2px solid var(--color-demo-outline);
         outline-offset:2px;
       }
-      @keyframes pepvDemoPulse{
+      @keyframes pepvTutorialTargetPulse{
         0%,100%{outline-color:var(--color-demo-pulse-outline-1);box-shadow:0 0 0 0 var(--color-demo-pulse-shadow)}
         50%{outline-color:var(--color-demo-pulse-outline-2);box-shadow:0 0 18px var(--color-demo-pulse-shadow-2)}
+      }
+      @keyframes tutorialPulse{
+        0%,100%{box-shadow:0 0 0 9999px rgba(0,0,0,0.65),0 0 0 3px rgba(255,255,255,0.9)}
+        50%{box-shadow:0 0 0 9999px rgba(0,0,0,0.65),0 0 0 7px rgba(255,255,255,0.4)}
       }
       @keyframes pepv-dose-toast-anim{
         0%{opacity:0;transform:translateY(8px)}

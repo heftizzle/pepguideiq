@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
-import { useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { useTutorialOptional } from "../context/TutorialContext.jsx";
 
 const FAB_SIZE = 56;
 const FAB_BODY_MIN_HEIGHT = 72;
@@ -14,7 +14,7 @@ const MARGIN_X = 28;
 const DRAG_THRESHOLD_PX = 6;
 /** Below this horizontal drag distance, snap back to the edge for the side we started on. */
 const COMMIT_DRAG_PX = 40;
-const TOUR_STRIP_ID = "pepv-demo-tour-strip";
+const TOUR_STRIP_ID = "pepv-tutorial-strip";
 const TOUR_GAP_PX = 8;
 /** Space reserved below header for clamping vertical position. */
 const HEADER_TOP_SAFE = 60;
@@ -154,8 +154,8 @@ function getInitialFabPosition() {
 
 /** @param {{ onSessionPicked: (session: "morning"|"afternoon"|"evening"|"night") => void }} props */
 export function DoseLogFAB({ onSessionPicked }) {
-  const demoTour = useDemoTourOptional();
-  const stripVisible = Boolean(demoTour?.stripVisible);
+  const tutorialTour = useTutorialOptional();
+  const stripVisible = Boolean(tutorialTour?.stripVisible);
 
   const [fabPos, setFabPos] = useState(() => getInitialFabPosition());
   const offsetX = fabPos.offsetX;
@@ -236,7 +236,7 @@ export function DoseLogFAB({ onSessionPicked }) {
       ro.disconnect();
       window.removeEventListener("resize", apply);
     };
-  }, [stripVisible, recomputeBottomAboveTour, demoTour?.showCollapsedTeaser, demoTour?.showFullPanel]);
+  }, [stripVisible, recomputeBottomAboveTour, tutorialTour?.showCollapsedTeaser, tutorialTour?.showFullPanel]);
 
   const syncPositionAfterResize = useCallback(() => {
     if (draggingRef.current) return;

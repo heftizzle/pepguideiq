@@ -38,6 +38,7 @@ async function checkHandleAvailableDirect(handle, profileId) {
  */
 export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComplete }) {
   const [draft, setDraft] = useState("");
+  const [handleCelebrate, setHandleCelebrate] = useState(false);
   /** idle | checking | available | taken | error */
   const [avail, setAvail] = useState(/** @type {"idle" | "checking" | "available" | "taken" | "error"} */ ("idle"));
   const [availError, setAvailError] = useState(/** @type {string | null} */ (null));
@@ -132,7 +133,11 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
         return;
       }
       patchMemberProfileLocal(activeProfileId, { handle: h, display_handle: h });
-      onComplete();
+      setHandleCelebrate(true);
+      setConfirmBusy(false);
+      window.setTimeout(() => {
+        onComplete();
+      }, 800);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Could not save handle");
     } finally {
@@ -165,6 +170,25 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
           boxSizing: "border-box",
         }}
       >
+        {handleCelebrate ? (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "14px 12px",
+              borderRadius: 10,
+              border: "1px solid var(--color-accent-nav-border)",
+              background: "var(--color-accent-nav-fill)",
+              textAlign: "center",
+              fontFamily: "'Outfit',sans-serif",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              lineHeight: 1.45,
+            }}
+          >
+            Handle set! Let’s show you around.
+          </div>
+        ) : null}
         <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)", letterSpacing: ".18em", marginBottom: 8, textAlign: "center" }}>
           CHOOSE YOUR HANDLE
         </div>

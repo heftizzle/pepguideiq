@@ -22,7 +22,7 @@ alwaysApply: false
   ├── <AuthScreen /> (if !user)
   └── <ProfileProvider userId plan>
        └── <DoseToastProvider>
-            └── <DemoTourProvider>
+            └── <TutorialProvider>
                  └── <PepGuideIQApp>  (holds the giant state surface, line 386)
                       └── <PepGuideIQMainTree>  (line 1207)
                            ├── Header: <Logo /> <ProfileSwitcher /> <NotificationsBell />
@@ -37,7 +37,7 @@ alwaysApply: false
 |---|---|---|
 | `ProfileContext` | `useActiveProfile()` | member_profiles list + active profile id. Throws outside provider. |
 | `DoseToastContext` | `useShowDoseToast()` | Post-log toast. No-op outside provider. |
-| `DemoTourContext` | `useDemoTour()` / `useDemoTourOptional()` | Onboarding tour. Highlights via `data-demo-target` + `demoHighlightProps()`. |
+| `TutorialContext` | `useTutorial()` / `useTutorialOptional()` | Onboarding tour. Highlights via `data-tutorial-target` + `tutorialHighlightProps()`. |
 
 ## State conventions
 
@@ -68,7 +68,7 @@ alwaysApply: false
 ```jsx
 <ProtocolTab />
 <BuildTab ... />
-<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade demoAnchorFirst />
+<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade tutorialAnchorFirst />
 <SettingsTab user setUser onOpenUpgrade onSignOut onBack />
 <ProfileTab user setUser ... />
 <StackProtocolQuickLog userId profileId protocolRows canUse onUpgrade wakeTime />

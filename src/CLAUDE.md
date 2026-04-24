@@ -20,7 +20,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
   ├── <AuthScreen onAuth={setUser}/> (if !user)
   └── <ProfileProvider userId plan>
        └── <DoseToastProvider>
-            └── <DemoTourProvider>
+            └── <TutorialProvider>
                  └── <PepGuideIQApp user setUser>
                       └── <PepGuideIQMainTree>
                            ├── Header: <Logo/> <ProfileSwitcher/> <NotificationsBell/>
@@ -41,14 +41,14 @@ There is no router library. Add one only if a new multi-page requirement justifi
 |---|---|---|
 | `ProfileContext` | `useActiveProfile()` | member_profiles list + active profile id. Throws if used outside provider. |
 | `DoseToastContext` | `useShowDoseToast()` | Toast after dose log. No-op outside provider. |
-| `DemoTourContext` | `useDemoTour()` / `useDemoTourOptional()` | Onboarding tour state. Highlights via `data-demo-target` attrs + `demoHighlightProps()`. |
+| `TutorialContext` | `useTutorial()` / `useTutorialOptional()` | Onboarding tour state. Highlights via `data-tutorial-target` attrs + `tutorialHighlightProps()`. |
 
 ## Component prop signatures
 
 ```jsx
 <ProtocolTab />                               // pulls from useActiveProfile + supabase directly
 <BuildTab ... />
-<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade demoAnchorFirst />
+<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade tutorialAnchorFirst />
 <SettingsTab user setUser onOpenUpgrade onSignOut onBack />
 <ProfileTab user setUser ...more />
 <StackProtocolQuickLog userId profileId protocolRows canUse onUpgrade wakeTime />
@@ -71,7 +71,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 <Modal onClose children maxWidth={580} label="Dialog" variant="default" />
 <PostDoseNetworkSheet open compoundName previewLine busy postError onPost onKeepPrivate />
 <DoseToast message onDismiss />
-<DemoTourBar />  <DemoTourHelpButton />
+<TutorialBar />  <TutorialHelpButton />
 <MemberProfileSocialIconRow profile />
 <LibraryMobileSearchIcon open onOpen />
 <LibraryMobileSearchPanel initialSearch onDismiss setSearch />

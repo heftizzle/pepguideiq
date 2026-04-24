@@ -27,7 +27,7 @@ import {
   persistVialPeptideId,
   vialQueryPeptideIds,
 } from "../lib/resolveStackCatalogPeptide.js";
-import { DEMO_TARGET, demoHighlightProps, useDemoTourOptional } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import {
   formatConcWithUnit,
   formatDoseAmountFromMcg,
@@ -1374,10 +1374,10 @@ function VialRow({
  *   catalogEntry: { id?: string, name?: string, stabilityDays: number, stabilityNote?: string | null, components?: { name: string, mg: number }[], reconstitutionVolumeMl?: number, vialSizeOptions?: { label: string, totalMg: number, bacWaterMl: number }[] },
  *   canUse: boolean,
  *   onUpgrade: () => void,
- *   demoAnchorFirst?: boolean,
+ *   tutorialAnchorFirst?: boolean,
  * }} props
  */
-export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade, demoAnchorFirst = false }) {
+export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade, tutorialAnchorFirst = false }) {
   const stabilityDays = catalogEntry?.stabilityDays;
   const stabilityNote = typeof catalogEntry?.stabilityNote === "string" ? catalogEntry.stabilityNote.trim() : "";
   const compoundName = (catalogEntry?.name && String(catalogEntry.name).trim()) || "this peptide";
@@ -1478,8 +1478,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
 
   const canMutate = canUse && isSupabaseConfigured();
   const workerConfigured = isApiWorkerConfigured();
-  const demo = useDemoTourOptional();
-  const highlightTarget = demo?.highlightTarget;
+  const tutorial = useTutorialOptional();
+  const highlightTarget = tutorial?.highlightTarget;
 
   const catalogIdKey =
     catalogEntry != null && catalogEntry.id != null && String(catalogEntry.id).trim()
@@ -1533,8 +1533,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   }, [viewMonth.y, viewMonth.m, calendarLimits.maxD]);
 
   useEffect(() => {
-    if (highlightTarget === DEMO_TARGET.vial_reconstitute && canMutate && demoAnchorFirst) setShowAdd(true);
-  }, [highlightTarget, canMutate, demoAnchorFirst]);
+    if (highlightTarget === TUTORIAL_TARGET.vial_reconstitute && canMutate && tutorialAnchorFirst) setShowAdd(true);
+  }, [highlightTarget, canMutate, tutorialAnchorFirst]);
 
   const reload = useCallback(async () => {
     const gen = ++reloadGen.current;
@@ -1826,9 +1826,9 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               type="button"
               className="btn-teal"
               style={{ fontSize: 13, padding: "5px 12px", borderRadius: 12, minHeight: 44 }}
-              data-demo-target={demoAnchorFirst ? DEMO_TARGET.vial_add : undefined}
-              {...demoHighlightProps(
-                demoAnchorFirst && demo?.isHighlighted(DEMO_TARGET.vial_add)
+              data-tutorial-target={tutorialAnchorFirst ? TUTORIAL_TARGET.vial_add : undefined}
+              {...tutorialHighlightProps(
+                tutorialAnchorFirst && tutorial?.isHighlighted(TUTORIAL_TARGET.vial_add)
               )}
               onClick={() => openAddVial()}
             >
@@ -1867,9 +1867,9 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               <input className="form-input" style={{ fontSize: 13 }} value={formLabel} onChange={(e) => setFormLabel(e.target.value)} />
             </div>
             <div
-              data-demo-target={demoAnchorFirst ? DEMO_TARGET.vial_reconstitute : undefined}
-              {...demoHighlightProps(
-                demoAnchorFirst && demo?.isHighlighted(DEMO_TARGET.vial_reconstitute)
+              data-tutorial-target={tutorialAnchorFirst ? TUTORIAL_TARGET.vial_reconstitute : undefined}
+              {...tutorialHighlightProps(
+                tutorialAnchorFirst && tutorial?.isHighlighted(TUTORIAL_TARGET.vial_reconstitute)
               )}
             >
               <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 2 }}>RECONSTITUTION DATE</div>

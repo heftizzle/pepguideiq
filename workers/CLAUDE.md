@@ -26,7 +26,7 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 ### Member profiles
 - `GET /member-profiles` — list caller's profiles.
 - `POST /member-profiles` — create new member profile (slot limit enforced per plan).
-- `PATCH /member-profiles/{id}` — update display_name, handle, display_handle, bio, goals, social_*_handle, locale_*, wake_time, schedule_shift, biological_sex, training_experience, date_of_birth, demo_sessions_shown, avatar_url, archive progress photo set, etc.
+- `PATCH /member-profiles/{id}` — update display_name, handle, display_handle, bio, goals, social_*_handle, locale_*, wake_time, schedule_shift, biological_sex, training_experience, date_of_birth, demo_sessions_shown, `tutorial_completed` (body `true` only), avatar_url, archive progress photo set, etc.
 - `DELETE /member-profiles/{id}` — delete non-default profile.
 - `GET /member-profiles/handle-available?handle=`
 - `GET /member-profiles/public?handle=` — **no auth.**

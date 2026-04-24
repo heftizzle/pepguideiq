@@ -8,7 +8,7 @@ import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
 import { canAddStackRow } from "../lib/tiers.js";
-import { DEMO_TARGET } from "../context/DemoTourContext.jsx";
+import { TUTORIAL_TARGET } from "../context/TutorialContext.jsx";
 
 const FREQ_OPTIONS = [
   { id: "daily", label: "Daily" },
@@ -690,7 +690,7 @@ export function BuildTab({
       <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
         ADD COMPOUND
       </div>
-      <div data-demo-target={DEMO_TARGET.build_catalog_search}>
+      <div data-tutorial-target={TUTORIAL_TARGET.build_catalog_search}>
         <LibrarySearchInput
           initialValue={searchQ}
           placeholder="Search catalog…"
@@ -1025,7 +1025,7 @@ export function BuildTab({
       <button
         type="button"
         className={saved ? "btn-teal btn-saved" : "btn-teal"}
-        data-demo-target={DEMO_TARGET.build_save_stack}
+        data-tutorial-target={TUTORIAL_TARGET.build_save_stack}
         style={{ width: "100%", marginTop: 16, fontSize: 13, opacity: stackListReady ? 1 : 0.55 }}
         disabled={!stackListReady}
         title={!stackListReady ? "Loading your stack…" : undefined}
