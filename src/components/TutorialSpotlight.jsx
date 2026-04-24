@@ -9,9 +9,9 @@ const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 const CARD_WIDTH = 260;
 const CARD_ESTIMATED_HEIGHT = 130;
 const CARD_MARGIN = 12;
-const MEASURE_RETRY_MS = 150;
+const MEASURE_RETRY_MS = 250;
 /** Initial try plus delayed retries when the target is not in the DOM or has zero layout yet. */
-const MEASURE_MAX_ATTEMPTS = 5;
+const MEASURE_MAX_ATTEMPTS = 10;
 
 function getBottomNavReservePx() {
   if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVE_PX;

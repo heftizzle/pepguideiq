@@ -36,7 +36,7 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`i
 | `pnpm run build` | Production build to `dist/` |
 | `pnpm run preview` | Preview the prod build |
 | `pnpm run deploy:worker` | Deploy Worker (`wrangler deploy --config wrangler.worker.toml`) |
-| `./deploy.sh` | `git add -A`, optional verbose commit if dirty, `git push origin <current-branch>`, then build + Worker + Pages. Skip git with `SKIP_DEPLOY_GIT=1`. |
+| `./deploy.sh` | `pnpm run build`, Worker deploy (`wrangler.worker.toml`), then Pages deploy (`pepguideiq` / `main`). Bash script from repo root; no git. Commit and push separately if you want source on GitHub. |
 | `pnpm exec wrangler dev --config wrangler.worker.toml` | Local Worker on port 8787 |
 
 Local Worker + Vite same-origin option: set `VITE_API_WORKER_URL=http://localhost:5173/api-worker` and Vite proxies to 8787 (see `vite.config.js`).
