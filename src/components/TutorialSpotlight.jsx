@@ -7,7 +7,7 @@ const OVERLAY_DIM = "rgba(0,0,0,0.82)";
 const OVERLAY_Z = 9999;
 const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 const CARD_WIDTH = 260;
-const CARD_ESTIMATED_HEIGHT = 110;
+const CARD_ESTIMATED_HEIGHT = 130;
 const CARD_MARGIN = 12;
 
 function getBottomNavReservePx() {
@@ -164,7 +164,7 @@ function TutorialSpotlightInner() {
         {(currentStep.tooltip || currentStep.text) ? (
           <p
             style={{
-              fontSize: 13,
+              fontSize: 15,
               color: "var(--color-text-primary)",
               margin: "0 0 10px 0",
               lineHeight: 1.5,
@@ -175,7 +175,7 @@ function TutorialSpotlightInner() {
           </p>
         ) : null}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+          <span className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Step {idx} of {total}
           </span>
           <button
