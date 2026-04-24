@@ -811,32 +811,38 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_default_session)))}
           style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 0 }}
         >
-          {getProtocolSessionsOrdered().map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => void saveDefaultSession(s.id)}
-              style={{
-                fontSize: 13,
-                padding: "6px 12px",
-                borderRadius: 12,
-                border:
-                  defaultSession === s.id ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-emphasis)",
-                background: defaultSession === s.id ? "var(--color-accent-nav-fill)" : "var(--color-bg-hover)",
-                color: defaultSession === s.id ? "var(--color-accent)" : "var(--color-text-secondary)",
-                cursor: "pointer",
-                fontFamily: "'JetBrains Mono', monospace",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }} aria-hidden>
-                {s.emoji}
-              </span>
-              {s.pillLabel}
-            </button>
-          ))}
+          <div
+            data-tutorial-target={TUTORIAL_TARGET.settings_wake}
+            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.settings_wake)))}
+            style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+          >
+            {getProtocolSessionsOrdered().map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => void saveDefaultSession(s.id)}
+                style={{
+                  fontSize: 13,
+                  padding: "6px 12px",
+                  borderRadius: 12,
+                  border:
+                    defaultSession === s.id ? "1px solid var(--color-accent-nav-border)" : "1px solid var(--color-border-emphasis)",
+                  background: defaultSession === s.id ? "var(--color-accent-nav-fill)" : "var(--color-bg-hover)",
+                  color: defaultSession === s.id ? "var(--color-accent)" : "var(--color-text-secondary)",
+                  cursor: "pointer",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }} aria-hidden>
+                  {s.emoji}
+                </span>
+                {s.pillLabel}
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -878,10 +884,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 })}
               </div>
             </div>
-            <div
-              data-tutorial-target={TUTORIAL_TARGET.settings_wake}
-              {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.settings_wake)))}
-            >
+            <div>
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Wake time</div>
               <input
                 className="form-input"
