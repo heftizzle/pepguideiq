@@ -332,9 +332,10 @@ export function GlobalStyles() {
         0%,100%{outline-color:var(--color-demo-pulse-outline-1);box-shadow:0 0 0 0 var(--color-demo-pulse-shadow)}
         50%{outline-color:var(--color-demo-pulse-outline-2);box-shadow:0 0 18px var(--color-demo-pulse-shadow-2)}
       }
+      /* Spotlight ring only — dim overlay is clip-path + rgba in TutorialSpotlight.jsx */
       @keyframes tutorialPulse{
-        0%,100%{box-shadow:0 0 0 9999px rgba(0,0,0,0.65),0 0 0 3px rgba(255,255,255,0.9)}
-        50%{box-shadow:0 0 0 9999px rgba(0,0,0,0.65),0 0 0 7px rgba(255,255,255,0.4)}
+        0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,0.9)}
+        50%{box-shadow:0 0 0 7px rgba(255,255,255,0.4)}
       }
       @keyframes pepv-dose-toast-anim{
         0%{opacity:0;transform:translateY(8px)}
