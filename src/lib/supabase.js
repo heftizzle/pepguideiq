@@ -28,11 +28,64 @@ function createBrowserClient() {
     }
     return res;
   };
-  return createClient(url, anonKey, { global: { fetch: wrappedFetch } });
+  return createClient(url, anonKey, {
+    global: { fetch: wrappedFetch },
+    auth: {
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+      flowType: "pkce",
+    },
+  });
 }
 
 /** Browser client; `null` when env is missing (auth UI will prompt to configure). */
 export const supabase = isSupabaseConfigured() ? createBrowserClient() : null;
+
+/** @type {Promise<{ error: Error | null }> | null} */
+let authCodeExchangeInFlight = null;
+
+/**
+ * Email confirmation / PKCE redirects append `?code=` (and `state`). Exchange once, then strip query params.
+ * Call before `getCurrentUser()` on app load so the session exists before auth gating.
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export function exchangeSupabaseAuthCodeFromUrlIfNeeded() {
+  if (!supabase || typeof window === "undefined") {
+    return Promise.resolve({ error: null });
+  }
+  /** @type {URL} */
+  let url;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return Promise.resolve({ error: null });
+  }
+  if (!url.searchParams.get("code")) {
+    return Promise.resolve({ error: null });
+  }
+  if (authCodeExchangeInFlight) return authCodeExchangeInFlight;
+  authCodeExchangeInFlight = (async () => {
+    try {
+      const href = window.location.href;
+      const { error } = await supabase.auth.exchangeCodeForSession(href);
+      try {
+        const u = new URL(href);
+        u.searchParams.delete("code");
+        u.searchParams.delete("state");
+        const qs = u.searchParams.toString();
+        const next = `${u.pathname}${qs ? `?${qs}` : ""}${u.hash}`;
+        window.history.replaceState({}, document.title, next);
+      } catch {
+        /* ignore */
+      }
+      return { error: error ? new Error(error.message) : null };
+    } finally {
+      authCodeExchangeInFlight = null;
+    }
+  })();
+  return authCodeExchangeInFlight;
+}
 
 function notConfiguredError() {
   return new Error("Supabase is not configured (set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).");

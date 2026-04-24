@@ -117,6 +117,8 @@ function turnstileForgotGateMessage(unavailable) {
 }
 
 export function AuthScreen({ onAuth }) {
+  /** Prevents double signUp (StrictMode re-entry, double-tap, duplicate plan picks). */
+  const signupSubmitLockRef = useRef(false);
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -441,6 +443,8 @@ export function AuthScreen({ onAuth }) {
   };
 
   const selectPlan = async (planId) => {
+    if (signupSubmitLockRef.current) return;
+    signupSubmitLockRef.current = true;
     setError("");
     setBusy(true);
     try {
@@ -473,6 +477,7 @@ export function AuthScreen({ onAuth }) {
       setError("");
       setMode("checkEmail");
     } finally {
+      signupSubmitLockRef.current = false;
       setBusy(false);
     }
   };

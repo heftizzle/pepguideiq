@@ -49,6 +49,7 @@ import { resolveStability } from "./lib/catalogStability.js";
 import { hasInjectableRoute } from "./lib/doseRouteKind.js";
 import { findCatalogPeptideForStackRow } from "./lib/resolveStackCatalogPeptide.js";
 import {
+  exchangeSupabaseAuthCodeFromUrlIfNeeded,
   getCurrentUser,
   getCurrentUserFreshAfterCheckout,
   getSessionAccessToken,
@@ -2827,6 +2828,15 @@ export default function PepGuideIQ() {
     }
     let cancelled = false;
     (async () => {
+      try {
+        const ex = await exchangeSupabaseAuthCodeFromUrlIfNeeded();
+        if (ex.error && import.meta.env.DEV) {
+          console.warn("[auth] exchangeCodeForSession:", ex.error.message);
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn("[auth] exchangeCodeForSession threw", e);
+      }
+      if (cancelled) return;
       let checkoutSuccess = false;
       try {
         const params = new URLSearchParams(window.location.search);
