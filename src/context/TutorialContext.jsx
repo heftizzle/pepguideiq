@@ -118,8 +118,8 @@ function coreSteps(firstProtocolSessionId) {
     {
       target: TUTORIAL_TARGET.settings_wake,
       tab: "profile",
-      text: "Set your wake time in Settings",
-      tooltip: "Your morning / afternoon / evening sessions are based on when you wake up.",
+      text: "Set your default session",
+      tooltip: "Pick Morning, Afternoon, Evening or Night — this sets when your daily protocol runs.",
     },
     {
       target: TUTORIAL_TARGET.protocol_log_dose,
