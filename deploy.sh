@@ -6,7 +6,15 @@ cd "$(dirname "$0")"
 # ─── Optional git: stage, commit (if dirty), push to GitHub (origin) ─────────
 # Same repo every time: origin → github.com/heftizzle/pepguideiq.git
 # Skip with: SKIP_DEPLOY_GIT=1 ./deploy.sh
+#
+# Credentials: do NOT embed tokens in this script. For fast local pushes, use one of:
+#   • HTTPS + Git Credential Manager (Windows) — sign in once; Git caches for origin.
+#   • SSH remote (git@github.com:…/pepguideiq.git) + ssh-agent with your key loaded.
+#   • gh auth login (GitHub CLI) if you use gh as credential helper.
+# GIT_TERMINAL_PROMPT=0 avoids hanging when there is no TTY (e.g. some agent terminals); push fails fast instead.
 if [ "${SKIP_DEPLOY_GIT:-}" != "1" ] && command -v git >/dev/null 2>&1 && [ -d .git ]; then
+  export GIT_TERMINAL_PROMPT=0
+
   echo "Git: staging all changes (git add -A)…"
   git add -A
 
