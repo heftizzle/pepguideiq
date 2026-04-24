@@ -142,60 +142,147 @@ function coreSteps(firstProtocolSessionId) {
 /** @type {Record<Exclude<TutorialFlowKey, 'core'>, TutorialStep[]>} */
 const STATIC_FLOWS = {
   profile: [
-    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
-    { target: TUTORIAL_TARGET.profile_avatar, tab: "profile", text: "Upload a photo and set your display name" },
-    { target: TUTORIAL_TARGET.profile_handle, tab: "profile", text: "Choose a public @handle" },
+    {
+      target: TUTORIAL_TARGET.nav_profile,
+      tab: "profile",
+      text: "Open your Profile",
+      tooltip: "Your profile is your identity on pepguideIQ. Let's get you set up.",
+    },
+    {
+      target: TUTORIAL_TARGET.profile_avatar,
+      tab: "profile",
+      text: "Upload a photo and set your display name",
+      tooltip: "Add a photo and a name the community will recognize you by.",
+    },
+    {
+      target: TUTORIAL_TARGET.profile_handle,
+      tab: "profile",
+      text: "Choose your public @handle",
+      tooltip: "This is your username on the Network feed. Pick something you'll own.",
+    },
   ],
+
   body: [
-    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    {
+      target: TUTORIAL_TARGET.nav_profile,
+      tab: "profile",
+      text: "Open your Profile",
+      tooltip: "Your body metrics live here. This is where your transformation gets tracked.",
+    },
     {
       target: TUTORIAL_TARGET.profile_body_metrics,
       tab: "profile",
-      text: "Use the goal selector and set weight, height, and body fat",
+      text: "Set your goal, body stats, DOB, gender, and training experience",
+      tooltip:
+        "The more you fill in, the smarter your AI recommendations get. Pick your goal first — Build, Cut, Recomp, or Maintain. Add DOB, gender, and training experience so the AI Stack Advisor knows who it's talking to. If you have an InBody scan, use those numbers — they're the most accurate baseline you have.",
     },
   ],
+
   schedule: [
-    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    {
+      target: TUTORIAL_TARGET.nav_profile,
+      tab: "profile",
+      text: "Open your Profile",
+      tooltip: "Your schedule settings control when your protocol sessions appear.",
+    },
     {
       target: TUTORIAL_TARGET.profile_default_session,
       tab: "profile",
-      text: "Pick your default session for the protocol view",
+      text: "Pick your default session",
+      tooltip:
+        "Morning, Afternoon, Evening, or Night — this sets which session loads first when you open the Protocol tab. Pick the one that matches when you do most of your dosing.",
     },
     {
       target: TUTORIAL_TARGET.profile_shift_schedule,
       tab: "profile",
-      text: "Set shift schedule and wake time",
+      text: "Set your shift schedule and wake time",
+      tooltip:
+        "Work nights? Rotating shifts? Set your schedule here so your protocol sessions line up with your actual day — not a 9-to-5 you don't work.",
     },
   ],
+
   stack: [
-    { target: TUTORIAL_TARGET.nav_library, tab: "library", text: "Browse compounds in the library" },
-    { target: TUTORIAL_TARGET.library_add_stack, tab: "library", text: "Add compounds to your saved stack" },
-    { target: TUTORIAL_TARGET.nav_stacks, tab: "stack", text: "Review and name your stack" },
+    {
+      target: TUTORIAL_TARGET.nav_library,
+      tab: "library",
+      text: "Browse the compound library",
+      tooltip: "171 compounds with stability data, dosing info, and Finnrick vendor links. This is your research hub.",
+    },
+    {
+      target: TUTORIAL_TARGET.library_add_stack,
+      tab: "library",
+      text: "Add compounds to your saved stack",
+      tooltip: "Tap ADD on any compound to save it. Your stack is the list of everything you're running.",
+    },
+    {
+      target: TUTORIAL_TARGET.nav_stacks,
+      tab: "stack",
+      text: "Review and name your stack",
+      tooltip:
+        "Name your stack something meaningful — 'Summer Cut', 'Healing Protocol', whatever fits. You can share it with the community from here.",
+    },
   ],
+
   share: [
-    { target: TUTORIAL_TARGET.nav_stacks, tab: "stack", text: "Open Stacks" },
-    { target: TUTORIAL_TARGET.stack_share, tab: "stack", text: "Share your stack" },
+    {
+      target: TUTORIAL_TARGET.nav_stacks,
+      tab: "stack",
+      text: "Open your Stacks",
+      tooltip: "Your saved stacks live here. Build one worth sharing first.",
+    },
+    {
+      target: TUTORIAL_TARGET.stack_share,
+      tab: "stack",
+      text: "Share your stack with the community",
+      tooltip:
+        "Sharing your stack puts it on the Network feed. Other users can see what you're running and follow your results. This is how the community grows.",
+    },
   ],
-  guide: [{ target: TUTORIAL_TARGET.nav_guide, tab: null, text: "Open the AI Guide from the header" }],
+
+  guide: [
+    {
+      target: TUTORIAL_TARGET.nav_guide,
+      tab: null,
+      text: "Open the AI Guide from the header",
+      tooltip:
+        "Your personal peptide research assistant. Ask it anything — protocols, interactions, dosing, timing. The more profile data you've filled in, the more personalized the answers.",
+    },
+  ],
+
   score: [
-    { target: TUTORIAL_TARGET.nav_profile, tab: "profile", text: "Open Profile" },
+    {
+      target: TUTORIAL_TARGET.nav_profile,
+      tab: "profile",
+      text: "Open your Profile",
+      tooltip: "Your pepguideIQ Score lives here. It goes up as you use the app.",
+    },
     {
       target: TUTORIAL_TARGET.profile_score,
       tab: "profile",
-      text: "Review the score card to see how your pepguideIQ Score is explained",
+      text: "Review your pepguideIQ Score card",
+      tooltip:
+        "Your score is based on profile completion, dose logging consistency, vial tracking, and community engagement. The higher the score, the more the app works for you. Think of it as your engagement XP.",
     },
   ],
+
   build: [
-    { target: TUTORIAL_TARGET.nav_build, tab: "stackBuilder", text: "Open the BUILD tab" },
+    {
+      target: TUTORIAL_TARGET.nav_build,
+      tab: "stackBuilder",
+      text: "Open the BUILD tab",
+      tooltip: "The BUILD tab is your stack designer. Search, add, and arrange compounds before saving to your protocol.",
+    },
     {
       target: TUTORIAL_TARGET.build_catalog_search,
       tab: "stackBuilder",
-      text: "Search the catalog and add compounds to your builder",
+      text: "Search the catalog and add compounds",
+      tooltip: "Type any compound name or goal — BPC-157, healing, GLP — and add what fits. You're building your protocol here.",
     },
     {
       target: TUTORIAL_TARGET.build_save_stack,
       tab: "stackBuilder",
-      text: "Save your stack to update your saved protocol",
+      text: "Save your stack",
+      tooltip: "Hit Save to push your build into your active protocol. This is what shows up when you log doses every day.",
     },
   ],
 };
@@ -212,12 +299,12 @@ export function getTutorialFlowSteps(key, firstProtocolSessionId) {
 
 export const HELP_SECTIONS = [
   { key: /** @type {TutorialFlowKey} */ ("core"), label: "Replay Tutorial — walk through the 12-step core setup" },
-  { key: "profile", label: "Set Up Your Profile — avatar, display name, handle" },
-  { key: "body", label: "Body Metrics & Goal — goal selector, weight, height, body fat" },
-  { key: "schedule", label: "Schedule & Settings — default session, wake time, shift schedule" },
-  { key: "build", label: "BUILD tab — search catalog, build protocol, save stack" },
-  { key: "score", label: "Your pepguideIQ Score — score card explanation" },
-  { key: "guide", label: "AI Guide — how to use the AI Guide" },
+  { key: "profile", label: "Set Up Your Profile — photo, name, handle" },
+  { key: "body", label: "Body Metrics & Goal — InBody stats, DOB, gender, training experience" },
+  { key: "schedule", label: "Schedule & Settings — sessions, wake time, shift schedule" },
+  { key: "build", label: "BUILD Tab — design your stack, save to protocol" },
+  { key: "score", label: "Your pepguideIQ Score — how it works and how to raise it" },
+  { key: "guide", label: "AI Guide — your personal peptide research assistant" },
 ];
 
 const TutorialCtx = createContext(null);
