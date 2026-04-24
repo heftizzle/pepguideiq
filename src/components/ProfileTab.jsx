@@ -867,6 +867,12 @@ export function ProfileTab({
       setSubView("settings");
     }
   }, [tutorial?.highlightTarget, tutorial?.flowKey]);
+
+  useEffect(() => {
+    if (tutorial?.highlightTarget === TUTORIAL_TARGET.profile_handle && tutorial?.flowKey === "profile") {
+      setSubView("profile");
+    }
+  }, [tutorial?.highlightTarget, tutorial?.flowKey]);
   const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
   const [heightUnit, setHeightUnit] = useState(() => {
@@ -2077,6 +2083,8 @@ export function ProfileTab({
               </div>
               <input
                 className="form-input"
+                data-tutorial-target={TUTORIAL_TARGET.profile_handle}
+                {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_handle)))}
                 style={{ fontSize: 13, width: "100%", boxSizing: "border-box", fontFamily: "'JetBrains Mono', monospace" }}
                 value={handleDraft}
                 onChange={(e) => {

@@ -24,6 +24,8 @@ export const TUTORIAL_TARGET = {
   nav_vials: "nav_vials",
   nav_profile: "nav_profile",
   nav_guide: "nav_guide",
+  /** Header ? help — core tour final step */
+  nav_help: "nav_help",
   library_add_stack: "library_add_stack",
   vial_add: "vial_add",
   vial_name: "vial_name",
@@ -128,6 +130,12 @@ function coreSteps(firstProtocolSessionId) {
       text: "Log your first dose — this is your daily workflow",
       tooltip: "You did it. Library → Vial → Log Dose. That's the loop, every single day.",
     },
+    {
+      target: TUTORIAL_TARGET.nav_help,
+      tab: null,
+      text: "Tap ? anytime to replay the tutorial",
+      tooltip: "If you need the reps, make that mental muscle grow!",
+    },
   ];
 }
 
@@ -203,7 +211,7 @@ export function getTutorialFlowSteps(key, firstProtocolSessionId) {
 }
 
 export const HELP_SECTIONS = [
-  { key: /** @type {TutorialFlowKey} */ ("core"), label: "Replay Tutorial — walk through the 11-step core setup" },
+  { key: /** @type {TutorialFlowKey} */ ("core"), label: "Replay Tutorial — walk through the 12-step core setup" },
   { key: "profile", label: "Set Up Your Profile — avatar, display name, handle" },
   { key: "body", label: "Body Metrics & Goal — goal selector, weight, height, body fat" },
   { key: "schedule", label: "Schedule & Settings — default session, wake time, shift schedule" },

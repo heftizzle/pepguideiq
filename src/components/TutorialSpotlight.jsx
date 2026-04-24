@@ -7,7 +7,7 @@ const OVERLAY_DIM = "rgba(0,0,0,0.82)";
 const OVERLAY_Z = 9999;
 const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 const CARD_WIDTH = 260;
-const CARD_ESTIMATED_HEIGHT = 130;
+const CARD_ESTIMATED_HEIGHT = 140;
 const CARD_MARGIN = 12;
 const MEASURE_RETRY_MS = 250;
 /** Initial try plus delayed retries when the target is not in the DOM or has zero layout yet. */

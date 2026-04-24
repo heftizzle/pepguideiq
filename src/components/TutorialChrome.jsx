@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useTutorial, NETWORK_TAB_EMOJI } from "../context/TutorialContext.jsx";
+import { NETWORK_TAB_EMOJI, TUTORIAL_TARGET, useTutorial } from "../context/TutorialContext.jsx";
 
 const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
@@ -86,7 +86,7 @@ export function TutorialHelpButton() {
     };
   }, [helpMenuOpen, setHelpMenuOpen]);
 
-  if (currentStep && highlightTarget) return null;
+  if (currentStep && highlightTarget && highlightTarget !== TUTORIAL_TARGET.nav_help) return null;
 
   const menuPortal =
     helpMenuOpen &&
@@ -147,11 +147,12 @@ export function TutorialHelpButton() {
 
   return (
     <>
-      <div style={{ display: "inline-flex" }}>
+      <div style={{ display: "inline-flex", flexShrink: 0 }}>
         <button
           ref={buttonRef}
           type="button"
           className="pepv-header-action-btn pepv-header-action-btn--icon"
+          data-tutorial-target={TUTORIAL_TARGET.nav_help}
           data-active={helpMenuOpen ? "true" : undefined}
           aria-label="Help and guided tour"
           aria-expanded={helpMenuOpen}

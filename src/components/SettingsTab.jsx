@@ -1316,10 +1316,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
             </div>
           </div>
 
-          <div
-            data-tutorial-target={TUTORIAL_TARGET.profile_handle}
-            {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_handle)))}
-          >
+          <div>
             <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>Public handle</div>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
               <div
@@ -1340,6 +1337,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                 </span>
                 <input
                   className="form-input"
+                  data-tutorial-target={TUTORIAL_TARGET.profile_handle}
+                  {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_handle)))}
                   style={{
                     fontSize: 13,
                     flex: 1,
