@@ -24,6 +24,7 @@ import { ProfileTab } from "./components/ProfileTab.jsx";
 import { PeopleSearch } from "./components/PeopleSearch.jsx";
 import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.jsx";
 import { NotificationsBell } from "./components/NotificationsBell.jsx";
+import DeleteUndoToast from "./components/DeleteUndoToast.jsx";
 import { NavTooltips } from "./components/NavTooltips.jsx";
 import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
@@ -1024,15 +1025,35 @@ function PepGuideIQApp({ user, setUser }) {
     const onOpenNetworkTabOnly = () => {
       setActiveTab("network");
     };
+    const onOpenPost = (
+      /** @type {CustomEvent<{ handle?: string; postId?: string; commentId?: string | null }>} */ e
+    ) => {
+      const h = normalizeHandleInput(e.detail?.handle ?? "");
+      const pid = typeof e.detail?.postId === "string" ? e.detail.postId.trim() : "";
+      const cidRaw = e.detail?.commentId;
+      const cid = typeof cidRaw === "string" ? cidRaw.trim() : "";
+      if (!h || !pid) return;
+      const qs = new URLSearchParams();
+      qs.set("post", pid);
+      if (cid) qs.set("comment", cid);
+      try {
+        window.history.pushState({}, "", `/profile/${encodeURIComponent(h)}?${qs.toString()}`);
+      } catch {
+        /* ignore */
+      }
+      setPublicProfileOverlayHandle(h);
+    };
     window.addEventListener("pepguide:open-public-profile", onOpenPublicProfile);
     window.addEventListener("popstate", syncPublicProfileFromUrl);
     window.addEventListener("pepguide:open-network-post", onOpenNetworkPost);
     window.addEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
+    window.addEventListener("pepguide:open-post", onOpenPost);
     return () => {
       window.removeEventListener("pepguide:open-public-profile", onOpenPublicProfile);
       window.removeEventListener("popstate", syncPublicProfileFromUrl);
       window.removeEventListener("pepguide:open-network-post", onOpenNetworkPost);
       window.removeEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
+      window.removeEventListener("pepguide:open-post", onOpenPost);
     };
   }, []);
 
@@ -1255,6 +1276,7 @@ function PepGuideIQApp({ user, setUser }) {
             )
           : null}
           <TutorialSpotlightGate />
+          <DeleteUndoToast />
         </DoseToastProvider>
       )}
     </TutorialProvider>

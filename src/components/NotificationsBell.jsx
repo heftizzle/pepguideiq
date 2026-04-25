@@ -10,6 +10,7 @@ import {
   markNotificationRead,
 } from "../lib/supabase.js";
 import { formatTimeAgo } from "../lib/formatTime.js";
+import { primaryGoalEmoji } from "../lib/goalEmoji.js";
 
 /** Keep in sync with `App.jsx` top header strip (`.grid-bg`) `zIndex`. */
 const PEPV_TOP_HEADER_Z_INDEX = 70;
@@ -23,43 +24,14 @@ function actorLabel(row) {
   return name || "Someone";
 }
 
-/** Goal `id` values from `ProfileTab.jsx` `GOAL_OPTIONS` / `member_profiles.goals` (case-insensitive). */
-const GOAL_PRIMARY_EMOJI = {
-  general_health: "💚",
-  longevity: "🧬",
-  performance: "🏆",
-  shred: "🔥",
-  bulk: "💪",
-  recomp: "⚖️",
-  optimize: "🎯",
-  mental_elevate: "🧠",
-  mental: "🧠",
-};
-
-/** @param {unknown} userGoals — string (CSV), string[], or JSON array from `member_profiles.goals` */
-function normalizeGoalIdList(userGoals) {
-  if (Array.isArray(userGoals)) {
-    return userGoals.map((x) => String(x ?? "").trim()).filter(Boolean);
-  }
-  if (typeof userGoals === "string") {
-    return userGoals.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  return [];
-}
-
-/** First selected goal → emoji; otherwise 🔔 (same keys as `GOAL_OPTIONS` in ProfileTab.jsx). */
-function primaryGoalNotificationEmoji(userGoals) {
-  for (const raw of normalizeGoalIdList(userGoals)) {
-    const key = raw.toLowerCase();
-    if (GOAL_PRIMARY_EMOJI[key]) return GOAL_PRIMARY_EMOJI[key];
-  }
-  return "🔔";
-}
-
 /** @param {unknown} type */
 function notificationBodyFromType(type) {
   const t = String(type ?? "").toLowerCase();
   if (t === "new_follower" || t === "follow") return "started following you";
+  if (t === "post_like") return "liked your post";
+  if (t === "post_comment") return "commented on your post";
+  if (t === "comment_reply") return "replied to your comment";
+  if (t === "comment_like") return "liked your comment";
   if (t.includes("like") && t.includes("comment")) return "engaged with your post";
   if (t.includes("like") || t === "like") return "liked your post";
   if (t.includes("comment") || t === "comment") return "commented on your post";
@@ -218,6 +190,23 @@ export function NotificationsBell({ userId, userGoals }) {
         const isEngagement =
           type.includes("like") || type.includes("comment") || type === "like" || type === "comment";
         if (isEngagement) {
+          const targetHandle = normalizeHandleInput(row.target_handle ?? "");
+          const targetPostId = typeof row.target_post_id === "string" ? row.target_post_id.trim() : "";
+          const targetCommentId =
+            typeof row.target_comment_id === "string" ? row.target_comment_id.trim() : "";
+          if (targetHandle && targetPostId) {
+            await markIfNeeded();
+            window.dispatchEvent(
+              new CustomEvent("pepguide:open-post", {
+                detail: {
+                  handle: targetHandle,
+                  postId: targetPostId,
+                  commentId: targetCommentId || null,
+                },
+              })
+            );
+            return;
+          }
           const share = typeof row.target_share_id === "string" ? row.target_share_id.trim() : "";
           if (share) {
             await markIfNeeded();
@@ -251,7 +240,7 @@ export function NotificationsBell({ userId, userGoals }) {
 
   if (!userId || !isSupabaseConfigured()) return null;
 
-  const bellEmoji = primaryGoalNotificationEmoji(userGoals);
+  const bellEmoji = primaryGoalEmoji(userGoals, "🔔");
 
   const maxPanelH =
     panelPlacement && typeof window !== "undefined"

@@ -1266,7 +1266,7 @@ export async function fetchNetworkMediaPosts() {
     .from("posts")
     .select(
       `
-      id, content, media_url, media_type, created_at, profile_id,
+      id, content, media_url, media_type, created_at, profile_id, like_count, comment_count,
       member_profiles!posts_profile_id_fkey(
         handle, display_handle, display_name, avatar_r2_key, user_id
       )
@@ -1829,7 +1829,7 @@ export async function fetchNotificationsRecent(limit = 10) {
   const { data, error } = await supabase
     .from("notifications")
     .select(
-      "id, actor_id, type, read, created_at, actor_handle, actor_display_handle, actor_display_name, target_share_id, target_network_post_id"
+      "id, actor_id, type, read, created_at, actor_handle, actor_display_handle, actor_display_name, target_share_id, target_network_post_id, target_post_id, target_comment_id, target_handle"
     )
     .order("created_at", { ascending: false })
     .limit(Math.min(50, Math.max(1, limit)));

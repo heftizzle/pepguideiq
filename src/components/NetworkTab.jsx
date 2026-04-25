@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
 import { NETWORK_TAB_EMOJI } from "../context/TutorialContext.jsx";
-import { fetchNetworkFeed, fetchNetworkMediaPosts, fetchPublicNetworkDoseFeed } from "../lib/supabase.js";
+import { ProfileCtx } from "../context/ProfileContext.jsx";
+import { fetchNetworkFeed, fetchNetworkMediaPosts, fetchPublicNetworkDoseFeed, supabase } from "../lib/supabase.js";
 import { API_WORKER_URL, isSupabaseConfigured } from "../lib/config.js";
 import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
@@ -10,6 +11,12 @@ import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
 import { formatTimeAgo } from "../lib/formatTime.js";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
+import LikeButton from "./Likes/LikeButton.jsx";
+import LikersRow from "./Likes/LikersRow.jsx";
+import LikersModal from "./Likes/LikersModal.jsx";
+import CommentsSection from "./Comments/CommentsSection.jsx";
+import PostMenuButton from "./Posts/PostMenuButton.jsx";
+import { dispatchDeferredDelete } from "./DeleteUndoToast.jsx";
 
 const AVATAR_BASE = `${String(API_WORKER_URL || "").replace(/\/$/, "")}/avatars`;
 
@@ -343,7 +350,7 @@ function DoseFeedSkeleton() {
 /**
  * @param {{ row: Record<string, unknown> }} p
  */
-function MediaPostCard({ row }) {
+function MediaPostCard({ row, onDeferredDelete }) {
   const profile = row.member_profiles != null && typeof row.member_profiles === "object" ? row.member_profiles : {};
   const handle = typeof profile.handle === "string" ? profile.handle.trim() : "";
   const displayHandle = typeof profile.display_handle === "string" ? profile.display_handle.trim() : "";
@@ -357,6 +364,15 @@ function MediaPostCard({ row }) {
     : null;
   const content = typeof row.content === "string" ? row.content.trim() : "";
   const createdAt = typeof row.created_at === "string" ? row.created_at : "";
+  const postId = typeof row.id === "string" ? row.id : "";
+
+  const profileCtx = useContext(ProfileCtx);
+  const activeProfileId = profileCtx?.activeProfileId ?? null;
+  const activeProfile = profileCtx?.activeProfile ?? null;
+  const currentUserId = typeof activeProfile?.user_id === "string" ? activeProfile.user_id : null;
+  const currentProfileGoals = activeProfile?.goals ?? null;
+
+  const [likersOpen, setLikersOpen] = useState(false);
 
   return (
     <div
@@ -401,6 +417,16 @@ function MediaPostCard({ row }) {
             {formatTimeAgo(createdAt)}
           </span>
         ) : null}
+        {postId && currentUserId && profileUserId && currentUserId === profileUserId ? (
+          <PostMenuButton
+            postId={postId}
+            ownerUserId={profileUserId}
+            currentUserId={currentUserId}
+            onDeferredDelete={() => {
+              if (typeof onDeferredDelete === "function") onDeferredDelete(postId);
+            }}
+          />
+        ) : null}
       </div>
 
       {mediaUrl ? (
@@ -415,6 +441,46 @@ function MediaPostCard({ row }) {
             background: "var(--color-bg-sunken)",
             maxHeight: 600,
           }}
+        />
+      ) : null}
+
+      {postId ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            padding: "10px 14px 0",
+            flexWrap: "wrap",
+          }}
+        >
+          <LikeButton
+            entityType="post"
+            entityId={postId}
+            currentUserId={currentUserId}
+            currentProfileId={activeProfileId}
+            currentProfileGoals={currentProfileGoals}
+            ownerUserId={profileUserId || null}
+          />
+          <LikersRow
+            entityType="post"
+            entityId={postId}
+            currentUserId={currentUserId}
+            currentProfileId={activeProfileId}
+            currentProfileGoals={currentProfileGoals}
+            onOpenModal={() => setLikersOpen(true)}
+          />
+        </div>
+      ) : null}
+
+      {postId ? (
+        <CommentsSection
+          postId={postId}
+          postCommentCount={typeof row.comment_count === "number" ? row.comment_count : 0}
+          currentUserId={currentUserId}
+          currentProfileId={activeProfileId}
+          currentProfile={activeProfile}
+          currentProfileGoals={currentProfileGoals}
         />
       ) : null}
 
@@ -440,6 +506,15 @@ function MediaPostCard({ row }) {
           📸 POST
         </span>
       </div>
+
+      {postId ? (
+        <LikersModal
+          isOpen={likersOpen}
+          onClose={() => setLikersOpen(false)}
+          entityType="post"
+          entityId={postId}
+        />
+      ) : null}
     </div>
   );
 }
@@ -576,6 +651,44 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   const headerBusy = useMemo(
     () => stackLoading || doseLoading || mediaPostLoading,
     [stackLoading, doseLoading, mediaPostLoading]
+  );
+
+  const onDeferredDeleteMediaPost = useCallback(
+    (postId) => {
+      if (!postId || !supabase) return;
+      let removedRow = null;
+      let removedIndex = -1;
+      setMediaPostItems((prev) => {
+        const idx = prev.findIndex((r) => r && r.id === postId);
+        if (idx < 0) return prev;
+        removedRow = prev[idx];
+        removedIndex = idx;
+        return prev.filter((_, i) => i !== idx);
+      });
+      if (!removedRow || removedIndex < 0) return;
+      dispatchDeferredDelete({
+        label: "Post deleted",
+        onCommit: async () => {
+          try {
+            await supabase.from("posts").delete().eq("id", postId);
+          } catch {
+            /* ignore — UI already optimistic; a refetch will reconcile */
+          }
+        },
+        onUndo: () => {
+          const restoreRow = removedRow;
+          const restoreIdx = removedIndex;
+          setMediaPostItems((prev) => {
+            if (prev.some((r) => r && r.id === postId)) return prev;
+            const next = prev.slice();
+            const at = Math.max(0, Math.min(restoreIdx, next.length));
+            next.splice(at, 0, restoreRow);
+            return next;
+          });
+        },
+      });
+    },
+    []
   );
 
   if (!userId) {
@@ -853,6 +966,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             <MediaPostCard
               key={typeof row.id === "string" && row.id ? row.id : `post-${idx}`}
               row={row}
+              onDeferredDelete={onDeferredDeleteMediaPost}
             />
           ))}
         </div>

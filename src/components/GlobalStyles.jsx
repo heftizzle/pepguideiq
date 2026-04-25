@@ -367,6 +367,43 @@ export function GlobalStyles() {
         animation:pepv-notifications-bell-glow 1.5s ease-in-out infinite;
       }
 
+      /* ---- LikeButton (goal-emoji engagement primitives) ---- */
+      .pepv-like-btn{
+        position:relative;
+        display:inline-flex;align-items:center;justify-content:center;
+        padding:0;margin:0;border:none;background:transparent;cursor:pointer;
+        line-height:1;-webkit-tap-highlight-color:transparent;
+        transition:transform .2s cubic-bezier(.34,1.56,.64,1),opacity .15s ease,filter .15s ease;
+      }
+      .pepv-like-btn[disabled]{cursor:default}
+      .pepv-like-btn--off{opacity:.6;filter:grayscale(1)}
+      .pepv-like-btn--on{opacity:1;filter:none;transform:scale(1.05)}
+      .pepv-like-btn--tap{animation:pepvLikeTap .2s cubic-bezier(.34,1.56,.64,1)}
+      @keyframes pepvLikeTap{
+        0%{transform:scale(1)}
+        50%{transform:scale(1.3)}
+        100%{transform:scale(1.05)}
+      }
+      .pepv-like-burst{
+        position:absolute;inset:0;pointer-events:none;overflow:visible;
+      }
+      .pepv-like-burst-particle{
+        position:absolute;top:50%;left:50%;
+        font-size:14px;line-height:1;
+        transform:translate(-50%,-50%) scale(0);
+        opacity:0;
+        animation:pepvLikeBurst .7s cubic-bezier(.22,.61,.36,1) forwards;
+      }
+      @keyframes pepvLikeBurst{
+        0%{transform:translate(-50%,-50%) scale(0) rotate(0deg);opacity:0}
+        15%{opacity:1}
+        60%{opacity:1}
+        100%{
+          transform:translate(calc(-50% + var(--pepv-like-dx,0px)),calc(-50% + var(--pepv-like-dy,0px))) scale(1) rotate(var(--pepv-like-rot,0deg));
+          opacity:0;
+        }
+      }
+
       /* Header: AI Atlas / tier / profile pills — desktop may wrap; mobile = one scrollable row */
       .pepv-nav-account-pill-row{
         display:flex;

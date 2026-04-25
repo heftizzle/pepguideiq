@@ -3,7 +3,7 @@ import { GlobalStyles } from "./GlobalStyles.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { fetchPublicMemberProfileByHandle } from "../lib/publicMemberProfile.js";
 import { fetchMemberProfiles, getCurrentUser, getSessionAccessToken } from "../lib/supabase.js";
-import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
 import { formatCompactNumber } from "../lib/format.js";
 import { formatMemberProfileLocation, formatShiftScheduleLabel } from "../lib/memberProfileMeta.js";
 import { publicProfileGoalLabel } from "../data/publicProfileGoalLabels.js";
@@ -39,6 +39,19 @@ function parseGoalIds(goals) {
   return [];
 }
 
+/** @returns {{ postId: string | null; commentId: string | null }} */
+function readPostQueryFromWindow() {
+  if (typeof window === "undefined") return { postId: null, commentId: null };
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const p = (qs.get("post") || "").trim();
+    const c = (qs.get("comment") || "").trim();
+    return { postId: p || null, commentId: c || null };
+  } catch {
+    return { postId: null, commentId: null };
+  }
+}
+
 /**
  * Read-only public profile for `/profile/:handle` (standalone or in-app overlay).
  * @param {{
@@ -69,6 +82,13 @@ export function PublicMemberProfilePage({
   /** Cold `/profile/:handle` (main.jsx): recover session when parent did not pass viewer props. */
   const [bootstrapProfileId, setBootstrapProfileId] = useState(/** @type {string | null} */ (null));
   const [bootstrapToken, setBootstrapToken] = useState(/** @type {string | null} */ (null));
+  /** `/profile/:handle?post=<id>&comment=<cid>` deep-link into the photo-grid lightbox. */
+  const [initialPostId, setInitialPostId] = useState(
+    /** @type {string | null} */ (() => readPostQueryFromWindow().postId)
+  );
+  const [initialCommentId, setInitialCommentId] = useState(
+    /** @type {string | null} */ (() => readPostQueryFromWindow().commentId)
+  );
 
   const effectiveViewerProfileId =
     typeof viewerActiveProfileId === "string" && viewerActiveProfileId.trim()
@@ -157,6 +177,36 @@ export function PublicMemberProfilePage({
       cancelled = true;
     };
   }, [effectiveViewerProfileId, effectiveViewerToken, profile?.id, workerUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const normalizedHandle = normalizeHandleInput(handle ?? "");
+    const syncFromWindow = () => {
+      const { postId, commentId } = readPostQueryFromWindow();
+      setInitialPostId(postId);
+      setInitialCommentId(commentId);
+    };
+    syncFromWindow();
+    const onPopState = () => syncFromWindow();
+    const onOpenPost = (
+      /** @type {CustomEvent<{ handle?: string; postId?: string; commentId?: string | null }>} */ event
+    ) => {
+      const evHandle = normalizeHandleInput(event?.detail?.handle ?? "");
+      if (!normalizedHandle || evHandle !== normalizedHandle) return;
+      const pid = typeof event?.detail?.postId === "string" ? event.detail.postId.trim() : "";
+      const cidRaw = event?.detail?.commentId;
+      const cid = typeof cidRaw === "string" ? cidRaw.trim() : "";
+      if (!pid) return;
+      setInitialPostId(pid);
+      setInitialCommentId(cid || null);
+    };
+    window.addEventListener("popstate", onPopState);
+    window.addEventListener("pepguide:open-post", onOpenPost);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("pepguide:open-post", onOpenPost);
+    };
+  }, [handle]);
 
   useEffect(() => {
     if (!profile?.id || typeof window === "undefined") return;
@@ -494,7 +544,13 @@ export function PublicMemberProfilePage({
               >
                 📸 Uploaded
               </div>
-              <PublicProfilePhotoGrid profileId={String(profile.id)} workerBaseUrl={workerUrl} />
+              <PublicProfilePhotoGrid
+                profileId={String(profile.id)}
+                workerBaseUrl={workerUrl}
+                ownerUserId={typeof profile.user_id === "string" ? profile.user_id : null}
+                initialPostId={initialPostId}
+                initialCommentId={initialCommentId}
+              />
             </>
           ) : null}
           <FollowersModal
