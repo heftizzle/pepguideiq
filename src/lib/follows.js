@@ -10,6 +10,14 @@ async function parseWorkerJson(res, fallbackMessage) {
   return data;
 }
 
+/**
+ * @param {{ followerProfileId: string, followingProfileId: string, isFollowing: boolean }} detail
+ */
+function dispatchFollowsChanged(detail) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("pepguide:follows-changed", { detail }));
+}
+
 export async function searchMemberProfiles(query, workerUrl, token) {
   const n = normalizeHandleInput(query);
   const q = encodeURIComponent(n);
@@ -29,7 +37,9 @@ export async function followMemberProfile(followerProfileId, followingProfileId,
       following_profile_id: followingProfileId,
     }),
   });
-  return parseWorkerJson(res, "Could not follow this profile.");
+  const data = await parseWorkerJson(res, "Could not follow this profile.");
+  dispatchFollowsChanged({ followerProfileId, followingProfileId, isFollowing: true });
+  return data;
 }
 
 export async function unfollowMemberProfile(followerProfileId, followingProfileId, workerUrl, token) {
@@ -41,7 +51,9 @@ export async function unfollowMemberProfile(followerProfileId, followingProfileI
       following_profile_id: followingProfileId,
     }),
   });
-  return parseWorkerJson(res, "Could not unfollow this profile.");
+  const data = await parseWorkerJson(res, "Could not unfollow this profile.");
+  dispatchFollowsChanged({ followerProfileId, followingProfileId, isFollowing: false });
+  return data;
 }
 
 export async function getMyFollowing(profileId, workerUrl, token) {
