@@ -5,7 +5,6 @@ returns table (
   id uuid,
   handle text,
   display_name text,
-  avatar_url text,
   avatar_r2_key text,
   plan text,
   is_following_by_me boolean
@@ -19,9 +18,8 @@ as $$
     mp.id,
     mp.handle,
     mp.display_name,
-    mp.avatar_url,
     mp.avatar_r2_key,
-    mp.plan,
+    p.plan,
     exists (
       select 1
       from public.member_follows mef
@@ -32,6 +30,7 @@ as $$
   from public.member_follows mf
   join public.member_profiles mp
     on mp.id = mf.follower_id
+  join public.profiles p on p.id = mp.user_id
   where mf.following_id = target_profile_id
   order by mf.created_at desc;
 $$;
@@ -43,7 +42,6 @@ returns table (
   id uuid,
   handle text,
   display_name text,
-  avatar_url text,
   avatar_r2_key text,
   plan text,
   is_following_by_me boolean
@@ -57,9 +55,8 @@ as $$
     mp.id,
     mp.handle,
     mp.display_name,
-    mp.avatar_url,
     mp.avatar_r2_key,
-    mp.plan,
+    p.plan,
     exists (
       select 1
       from public.member_follows mef
@@ -70,6 +67,7 @@ as $$
   from public.member_follows mf
   join public.member_profiles mp
     on mp.id = mf.following_id
+  join public.profiles p on p.id = mp.user_id
   where mf.follower_id = target_profile_id
   order by mf.created_at desc;
 $$;

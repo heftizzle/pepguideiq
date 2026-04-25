@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchFollowers, fetchFollowing, getSessionAccessToken } from "../lib/supabase.js";
 import { followMemberProfile, unfollowMemberProfile } from "../lib/follows.js";
-import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
+import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 import { getTier } from "../lib/tiers.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
@@ -234,10 +234,7 @@ export default function FollowersModal({
                 const handle = typeof row?.handle === "string" ? row.handle : "";
                 const displayName = typeof row?.display_name === "string" ? row.display_name.trim() : "";
                 const avatarKey = typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
-                const avatarLegacy = typeof row?.avatar_url === "string" ? row.avatar_url.trim() : "";
-                const avatar = avatarKey
-                  ? resolveMemberAvatarDisplayUrlFromKey(avatarKey)
-                  : resolveMemberAvatarDisplayUrl(avatarLegacy);
+                const avatar = avatarKey ? resolveMemberAvatarDisplayUrlFromKey(avatarKey) : "";
                 const tier = getTier(typeof row?.plan === "string" ? row.plan.trim().toLowerCase() : "entry");
                 const busy = pendingIds.has(profileId);
                 const iFollow = Boolean(row?.is_following_by_me);

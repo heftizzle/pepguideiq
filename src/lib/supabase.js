@@ -1177,7 +1177,7 @@ export async function fetchSuggestedProfiles(profileId) {
 /**
  * Followers list for a target member profile via SECURITY DEFINER RPC.
  * @param {string} profileId
- * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_url: string | null, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
+ * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
  */
 export async function fetchFollowers(profileId) {
   if (!supabase) return { rows: [], error: notConfiguredError() };
@@ -1191,7 +1191,6 @@ export async function fetchFollowers(profileId) {
           id: typeof row?.id === "string" ? row.id : "",
           handle: typeof row?.handle === "string" ? row.handle : "",
           display_name: typeof row?.display_name === "string" ? row.display_name : "",
-          avatar_url: typeof row?.avatar_url === "string" ? row.avatar_url : null,
           avatar_r2_key: typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key : null,
           plan: typeof row?.plan === "string" ? row.plan : "entry",
           is_following_by_me: Boolean(row?.is_following_by_me),
@@ -1206,7 +1205,7 @@ export async function fetchFollowers(profileId) {
 /**
  * Following list for a target member profile via SECURITY DEFINER RPC.
  * @param {string} profileId
- * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_url: string | null, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
+ * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
  */
 export async function fetchFollowing(profileId) {
   if (!supabase) return { rows: [], error: notConfiguredError() };
@@ -1220,7 +1219,6 @@ export async function fetchFollowing(profileId) {
           id: typeof row?.id === "string" ? row.id : "",
           handle: typeof row?.handle === "string" ? row.handle : "",
           display_name: typeof row?.display_name === "string" ? row.display_name : "",
-          avatar_url: typeof row?.avatar_url === "string" ? row.avatar_url : null,
           avatar_r2_key: typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key : null,
           plan: typeof row?.plan === "string" ? row.plan : "entry",
           is_following_by_me: Boolean(row?.is_following_by_me),
