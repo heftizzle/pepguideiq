@@ -41,6 +41,8 @@ import {
 } from "./context/TutorialContext.jsx";
 import { TutorialBar, TutorialHelpButton } from "./components/TutorialChrome.jsx";
 import TutorialSpotlight from "./components/TutorialSpotlight.jsx";
+import GuideSpotlight from "./components/GuideSpotlight.jsx";
+import { useSpotlightMeasure } from "./lib/useSpotlightMeasure.js";
 import { DeferredCoreTutorialLauncher } from "./components/DeferredCoreTutorialLauncher.jsx";
 import { canAddStackRow, getNextTierId, getSavedStackRowLimit, TIER_ORDER } from "./lib/tiers.js";
 import { getSuggestedUpgradeTier } from "./lib/upgradeGateCopy.js";
@@ -378,9 +380,15 @@ const PEPV_VALID_TABS = new Set([
 ]);
 
 function TutorialSpotlightGate() {
-  const { currentStep, highlightTarget } = useTutorial();
+  const { currentStep, highlightTarget, stepIndex } = useTutorial();
+  const { rect, bottomNavReserve } = useSpotlightMeasure(highlightTarget, stepIndex);
   if (!currentStep || !highlightTarget) return null;
-  return <TutorialSpotlight />;
+  return (
+    <>
+      <TutorialSpotlight rect={rect} bottomNavReserve={bottomNavReserve} />
+      <GuideSpotlight rect={rect} bottomNavReserve={bottomNavReserve} />
+    </>
+  );
 }
 
 function readInitialActiveTab() {

@@ -2,15 +2,15 @@ import { createPortal } from "react-dom";
 import { useTutorial } from "../context/TutorialContext.jsx";
 import { CARD_WIDTH, OVERLAY_Z, buildClipPath, computeCardPosition } from "../lib/spotlightUtils.js";
 
-const OVERLAY_DIM = "rgba(0,0,0,0.82)";
+const OVERLAY_DIM = "rgba(0,0,0,0.45)";
 
 /**
  * @param {{ rect: DOMRect | null, bottomNavReserve: number }} props
  */
-function TutorialSpotlightInner({ rect, bottomNavReserve }) {
-  const { currentStep, steps, stepIndex, goNext, highlightTarget, forced } = useTutorial();
+function GuideSpotlightInner({ rect, bottomNavReserve }) {
+  const { currentStep, steps, stepIndex, goNext, goPrev, clearFlow, highlightTarget, forced } = useTutorial();
 
-  if (!forced || !currentStep || !highlightTarget || !rect || typeof document === "undefined") return null;
+  if (forced || !currentStep || !highlightTarget || !rect || typeof document === "undefined") return null;
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -21,6 +21,8 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
 
   const total = steps.length;
   const idx = stepIndex + 1;
+  const isFirst = stepIndex === 0;
+  const isLast = stepIndex >= total - 1;
 
   return createPortal(
     <div
@@ -36,6 +38,7 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
       aria-hidden={false}
     >
       <div
+        onClick={() => clearFlow()}
         style={{
           position: "absolute",
           top: 0,
@@ -46,6 +49,7 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
           clipPath,
           WebkitClipPath: clipPath,
           pointerEvents: "all",
+          cursor: "pointer",
         }}
       />
       <div
@@ -93,14 +97,26 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
           <span className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Step {idx} of {total}
           </span>
-          <button
-            type="button"
-            className="btn-teal"
-            onClick={() => goNext()}
-            style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", marginLeft: "auto" }}
-          >
-            {stepIndex >= total - 1 ? "Done" : "Next →"}
-          </button>
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+            {!isFirst && (
+              <button
+                type="button"
+                className="btn-teal"
+                onClick={() => goPrev()}
+                style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", opacity: 0.8 }}
+              >
+                ← Back
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-teal"
+              onClick={() => goNext()}
+              style={{ fontSize: 13, minHeight: 40, padding: "8px 14px" }}
+            >
+              {isLast ? "Done" : "Next →"}
+            </button>
+          </div>
         </div>
       </div>
     </div>,
@@ -111,6 +127,6 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
 /**
  * @param {{ rect: DOMRect | null, bottomNavReserve: number }} props
  */
-export default function TutorialSpotlight({ rect, bottomNavReserve }) {
-  return <TutorialSpotlightInner rect={rect} bottomNavReserve={bottomNavReserve} />;
+export default function GuideSpotlight({ rect, bottomNavReserve }) {
+  return <GuideSpotlightInner rect={rect} bottomNavReserve={bottomNavReserve} />;
 }
