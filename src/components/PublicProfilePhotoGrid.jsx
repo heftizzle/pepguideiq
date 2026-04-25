@@ -250,7 +250,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                     width: "min(640px, 96vw)",
                     padding: "12px 16px",
                     background: "rgba(0, 0, 0, 0.6)",
-                    color: "var(--color-text-primary)",
+                    color: "rgba(255, 255, 255, 0.95)",
                     fontSize: 14,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
@@ -267,7 +267,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                         fontSize: 11,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        color: "var(--color-text-secondary)",
+                        color: "rgba(255, 255, 255, 0.65)",
                       }}
                     >
                       {formatRelativeTime(lightboxRow.created_at)}
