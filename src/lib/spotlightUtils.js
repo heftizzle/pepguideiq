@@ -6,7 +6,7 @@
 export const OVERLAY_Z = 9999;
 export const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 export const CARD_WIDTH = 320;
-export const CARD_ESTIMATED_HEIGHT = 140;
+export const CARD_ESTIMATED_HEIGHT = 220;
 export const CARD_MARGIN = 12;
 export const TAIL_HEIGHT = 9;
 export const TAIL_HALF_WIDTH = 9;
@@ -25,24 +25,24 @@ export function getBottomNavReservePx() {
 }
 
 /**
- * Simple above/below rule — restored from 46de739 baseline.
- * No quadrant branching. Card goes below if it fits, above otherwise.
- * Horizontally centers the card on the target, then clamps to the viewport.
+ * Card below target if estimated height fits above bottom nav; else above target.
+ * "Above" uses CSS `bottom` so the card grows upward without overlapping the target.
  *
- * @param {{ rect: DOMRect, vw: number, overlayBottom: number }}
- * @returns {{ top: number, left: number, w: number, h: number, cardTop: number, cardLeft: number, placement: "below" | "above", tailLeft: number }}
+ * @param {{ rect: DOMRect, vw: number, vh: number, overlayBottom: number }}
+ * @returns {{ top: number, left: number, w: number, h: number, cardTop: number | null, cardBottom: number | null, cardLeft: number, placement: "below" | "above", tailLeft: number }}
  */
-export function computeCardPosition({ rect, vw, overlayBottom }) {
+export function computeCardPosition({ rect, vw, vh, overlayBottom }) {
   const top = rect.top - CUTOUT_PAD;
   const left = rect.left - CUTOUT_PAD;
   const w = rect.width + CUTOUT_PAD * 2;
   const h = rect.height + CUTOUT_PAD * 2;
 
   const cardBelowTop = rect.bottom + CARD_MARGIN;
-  const cardAboveTop = top - CARD_ESTIMATED_HEIGHT - CARD_MARGIN;
   const fitsBelow = cardBelowTop + CARD_ESTIMATED_HEIGHT <= overlayBottom - CARD_MARGIN;
-  const cardTop = fitsBelow ? cardBelowTop : Math.max(CARD_MARGIN, cardAboveTop);
   const placement = fitsBelow ? "below" : "above";
+
+  const cardTop = fitsBelow ? cardBelowTop : null;
+  const cardBottom = fitsBelow ? null : Math.max(CARD_MARGIN, vh - rect.top + CARD_MARGIN);
 
   const targetCenterX = rect.left + rect.width / 2;
   const idealLeft = targetCenterX - CARD_WIDTH / 2;
@@ -51,7 +51,7 @@ export function computeCardPosition({ rect, vw, overlayBottom }) {
   const rawTailLeft = targetCenterX - cardLeft;
   const tailLeft = Math.max(TAIL_EDGE_PAD, Math.min(rawTailLeft, CARD_WIDTH - TAIL_EDGE_PAD));
 
-  return { top, left, w, h, cardTop, cardLeft, placement, tailLeft };
+  return { top, left, w, h, cardTop, cardBottom, cardLeft, placement, tailLeft };
 }
 
 /**

@@ -24,9 +24,10 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
   const vh = window.innerHeight;
   const overlayBottom = Math.max(0, vh - bottomNavReserve);
 
-  const { top, left, w, h, cardTop, cardLeft, placement, tailLeft } = computeCardPosition({
+  const { top, left, w, h, cardTop, cardBottom, cardLeft, placement, tailLeft } = computeCardPosition({
     rect,
     vw,
+    vh,
     overlayBottom,
   });
   const clipPath = buildClipPath({ top, left, w, h, vw, overlayBottom });
@@ -75,7 +76,7 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
       <div
         style={{
           position: "fixed",
-          top: cardTop,
+          ...(placement === "below" ? { top: cardTop } : { bottom: cardBottom }),
           left: cardLeft,
           width: CARD_WIDTH,
           background: "var(--color-bg-elevated)",
