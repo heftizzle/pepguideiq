@@ -1,5 +1,5 @@
 ---
-description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 32 routes. Model routing, rate limits, security invariants.
+description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 34 routes. Model routing, rate limits, security invariants.
 globs: workers/**/*
 alwaysApply: false
 ---
@@ -8,7 +8,7 @@ alwaysApply: false
 
 Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain near the bottom of the file. **There is no framework** (no Hono, no itty-router) — raw `fetch` event handlers.
 
-## Routes (exactly 32 — do not invent)
+## Routes (exactly 34 — do not invent)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`.
@@ -50,6 +50,8 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `POST /upload-post-media` — profile post image upload (`kind=post` + `member_profile_id`); same multipart handler as stack-photo
 - `POST /upload-stack-photo` — alias
 - `GET /stack-photo?key=…` — authenticated private read (caller's prefix only)
+- `GET /post-media/{urlEncodedR2Key}` — **anon** `<img>` read, DB-gated on `posts.visible_network = true` (service role)
+- `GET /public-post-media?key=…` — **anon** `<img>` read, DB-gated on `posts.visible_profile = true` (service role); `Cache-Control: public, max-age=86400, immutable`
 - `GET /avatars/{key}` — **public** read, no auth, no rate limit. Never rate-limit these.
 - `POST /avatars` / `PUT /avatars`
 

@@ -3377,6 +3377,71 @@ async function handleGetPostMedia(request, env, cors) {
 }
 
 /**
+ * Profile-visible post images under `{userId}/member-profiles/{profileId}/posts/{sha}.jpg`.
+ * Served via GET /public-post-media?key=… for anonymous viewers of `/profile/:handle`.
+ * Gate: `posts.visible_profile = true` + `media_url = :key` (service role).
+ * Keys are content-hashed, so `Cache-Control: public, max-age=86400, immutable` is safe.
+ */
+async function handleGetPublicPostMedia(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return new Response("Service unavailable", { status: 503, headers: cors });
+  }
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return new Response("Not configured", { status: 503, headers: cors });
+  }
+
+  const reqUrl = new URL(request.url);
+  let key = "";
+  try {
+    key = decodeURIComponent(reqUrl.searchParams.get("key") ?? "");
+  } catch {
+    return new Response("Bad request", { status: 400, headers: cors });
+  }
+  if (!key || key.includes("..") || !POST_MEDIA_R2_KEY_RE.test(key)) {
+    return new Response("Bad request", { status: 400, headers: cors });
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/posts?media_url=eq.${encodeURIComponent(key)}&visible_profile=eq.true&select=id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const rows = await pr.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+
+  try {
+    const obj = await bucket.get(key);
+    if (!obj) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+    const ct =
+      (obj.httpMetadata && typeof obj.httpMetadata.contentType === "string" && obj.httpMetadata.contentType) ||
+      contentTypeFromKey(key);
+    const isHead = request.method === "HEAD";
+    return new Response(isHead ? null : obj.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": ct,
+        "Cache-Control": "public, max-age=86400, immutable",
+      },
+    });
+  } catch (e) {
+    log(env, "error", "r2_public_post_media_get_failed", { message: String(e) });
+    return new Response("Storage error", { status: 502, headers: cors });
+  }
+}
+
+/**
  * @param {Request} request
  * @param {string} key
  */
@@ -5514,10 +5579,11 @@ async function handleRequest(request, env) {
       ((pathname === "/avatars" || pathname === "/avatars/") &&
         (method === "POST" || method === "PUT"));
 
-    /** Authed private reads + network post media (DB-gated): GET /stack-photo, GET /post-media/… */
+    /** Authed private reads + network post media + anon profile-visible post media (DB-gated): GET /stack-photo, GET /post-media/…, GET /public-post-media */
     const isR2Read =
       (pathname === "/stack-photo" && (method === "GET" || method === "HEAD")) ||
-      (pathname.startsWith("/post-media/") && (method === "GET" || method === "HEAD"));
+      (pathname.startsWith("/post-media/") && (method === "GET" || method === "HEAD")) ||
+      (pathname === "/public-post-media" && (method === "GET" || method === "HEAD"));
 
     if (!skipRateLimitPublicAvatar && !skipAuthWorkerTurnstileRoutes) {
       let rlType;
@@ -5785,6 +5851,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname.startsWith("/post-media/") && (request.method === "GET" || request.method === "HEAD")) {
       return handleGetPostMedia(request, env, cors);
+    }
+
+    if (url.pathname === "/public-post-media" && (request.method === "GET" || request.method === "HEAD")) {
+      return handleGetPublicPostMedia(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {

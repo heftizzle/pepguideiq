@@ -13,6 +13,7 @@ import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } f
 import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
 import FollowersModal from "./FollowersModal.jsx";
+import PublicProfilePhotoGrid from "./PublicProfilePhotoGrid.jsx";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
 function tierEmoji(t) {
@@ -477,6 +478,24 @@ export function PublicMemberProfilePage({
                 Sign in to follow
               </button>
             </div>
+          ) : null}
+          {profile?.id ? (
+            <>
+              <div
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  color: "var(--color-text-secondary)",
+                  letterSpacing: "0.12em",
+                  marginTop: 8,
+                  marginBottom: 12,
+                  textTransform: "uppercase",
+                }}
+              >
+                📸 Uploaded
+              </div>
+              <PublicProfilePhotoGrid profileId={String(profile.id)} workerBaseUrl={workerUrl} />
+            </>
           ) : null}
           <FollowersModal
             isOpen={followersModalOpen}
