@@ -2127,100 +2127,9 @@ export function ProfileTab({
                 </div>
               ) : null}
             </div>
-            <div ref={setFieldRef("bio")} style={{ marginBottom: 14 }}>
-              <div
-                className="mono"
-                style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}
-              >
-                BIO
-              </div>
-              <textarea
-                className="form-input"
-                style={{
-                  fontSize: 13,
-                  width: "100%",
-                  boxSizing: "border-box",
-                  minHeight: 72,
-                  resize: "vertical",
-                  lineHeight: 1.45,
-                }}
-                value={bioDraft}
-                onChange={(e) => setBioDraft(e.target.value.slice(0, 500))}
-                onBlur={() => void commitBio()}
-                placeholder="Tell the community about your protocol..."
-                maxLength={500}
-                rows={3}
-                aria-label="Bio"
-              />
-              <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 4, textAlign: "right" }}>
-                {bioDraft.length}/500
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <div
-                className="mono"
-                style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}
-              >
-                SOCIAL LINKS
-              </div>
-              <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 10, lineHeight: 1.45 }}>
-                Optional — username or handle only (links are built on your public profile). Paste a profile URL if
-                easier; we keep the handle.
-              </div>
-              {SOCIAL_EDIT_FIELDS.map((field) => (
-                <div key={field.key} style={{ marginBottom: 10 }}>
-                  <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
-                    {field.label.toUpperCase()}
-                  </div>
-                  <input
-                    className="form-input"
-                    style={{
-                      fontSize: 13,
-                      width: "100%",
-                      boxSizing: "border-box",
-                      fontFamily: "'JetBrains Mono', monospace",
-                    }}
-                    value={socialDrafts[field.key] ?? ""}
-                    onChange={(e) =>
-                      setSocialDrafts((prev) => ({
-                        ...prev,
-                        [field.key]: e.target.value.slice(0, Math.max(200, SOCIAL_HANDLE_MAX_LEN * 3)),
-                      }))
-                    }
-                    onBlur={() => void commitSocialField(field.key)}
-                    placeholder={field.placeholder}
-                    maxLength={200}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    aria-label={field.label}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span className="pill" style={tierPillStyle(user.plan)}>
-                {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
-              </span>
-              <span
-                style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.4 }}
-                title="Consecutive days with any dose, post, metric, fast, scan, or stack edit — in your local time."
-              >
-                {streakCount <= 0
-                  ? "Beginner — log activity to start your active streak"
-                  : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} active streak`}
-              </span>
-            </div>
           </div>
         </div>
       </Card>
-
-      <PepguideStatsSectionHeading stats={stats} />
-      <PepguideStatsStrip
-        stats={stats}
-        tutorialHighlightProps={tutorialHighlightProps}
-        tutorialHighlighted={Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_score))}
-      />
 
       <div style={SECTION}>Measurement hub</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
@@ -2360,6 +2269,101 @@ export function ProfileTab({
           </div>
         </button>
       </div>
+
+      <PepguideStatsSectionHeading stats={stats} />
+      <PepguideStatsStrip
+        stats={stats}
+        tutorialHighlightProps={tutorialHighlightProps}
+        tutorialHighlighted={Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.profile_score))}
+      />
+
+      <div style={SECTION}>Account</div>
+      <Card>
+        <div ref={setFieldRef("bio")} style={{ marginBottom: 14 }}>
+          <div
+            className="mono"
+            style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}
+          >
+            BIO
+          </div>
+          <textarea
+            className="form-input"
+            style={{
+              fontSize: 13,
+              width: "100%",
+              boxSizing: "border-box",
+              minHeight: 72,
+              resize: "vertical",
+              lineHeight: 1.45,
+            }}
+            value={bioDraft}
+            onChange={(e) => setBioDraft(e.target.value.slice(0, 500))}
+            onBlur={() => void commitBio()}
+            placeholder="Tell the community about your protocol..."
+            maxLength={500}
+            rows={3}
+            aria-label="Bio"
+          />
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 4, textAlign: "right" }}>
+            {bioDraft.length}/500
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div
+            className="mono"
+            style={{ fontSize: 11, color: "var(--color-accent)", marginBottom: 6, letterSpacing: "0.08em" }}
+          >
+            SOCIAL LINKS
+          </div>
+          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 10, lineHeight: 1.45 }}>
+            Optional — username or handle only (links are built on your public profile). Paste a profile URL if
+            easier; we keep the handle.
+          </div>
+          {SOCIAL_EDIT_FIELDS.map((field) => (
+            <div key={field.key} style={{ marginBottom: 10 }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginBottom: 4 }}>
+                {field.label.toUpperCase()}
+              </div>
+              <input
+                className="form-input"
+                style={{
+                  fontSize: 13,
+                  width: "100%",
+                  boxSizing: "border-box",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+                value={socialDrafts[field.key] ?? ""}
+                onChange={(e) =>
+                  setSocialDrafts((prev) => ({
+                    ...prev,
+                    [field.key]: e.target.value.slice(0, Math.max(200, SOCIAL_HANDLE_MAX_LEN * 3)),
+                  }))
+                }
+                onBlur={() => void commitSocialField(field.key)}
+                placeholder={field.placeholder}
+                maxLength={200}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label={field.label}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span className="pill" style={tierPillStyle(user.plan)}>
+            {user.plan === "entry" ? "Free" : formatPlan(user.plan)}
+          </span>
+          <span
+            style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.4 }}
+            title="Consecutive days with any dose, post, metric, fast, scan, or stack edit — in your local time."
+          >
+            {streakCount <= 0
+              ? "Beginner — log activity to start your active streak"
+              : `🔥 ${streakCount} day${streakCount === 1 ? "" : "s"} active streak`}
+          </span>
+        </div>
+      </Card>
 
       <div style={SECTION}>Body metrics</div>
       <Card>
