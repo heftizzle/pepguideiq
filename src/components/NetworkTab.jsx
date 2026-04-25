@@ -8,6 +8,7 @@ import { buildStackShareUrl } from "../lib/stackShare.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { formatDoseAmountFromMcg } from "../lib/doseLogDisplay.js";
+import { formatTimeAgo } from "../lib/formatTime.js";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
 const AVATAR_BASE = `${String(API_WORKER_URL || "").replace(/\/$/, "")}/avatars`;
@@ -58,23 +59,6 @@ function NetworkAvatar({ userId, r2Key }) {
 function networkTierEmoji(tier) {
   const t = typeof tier === "string" ? tier.trim().toLowerCase() : "entry";
   return (TIERS[t] ?? TIERS.entry).emoji;
-}
-
-function formatTimeAgo(iso) {
-  if (typeof iso !== "string" || !iso) return "";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  const sec = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (sec < 60) return "just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 48) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 14) return `${day}d ago`;
-  const wk = Math.floor(day / 7);
-  if (wk < 8) return `${wk}w ago`;
-  return `${Math.floor(day / 30)}mo ago`;
 }
 
 /** @param {string | null | undefined} route */

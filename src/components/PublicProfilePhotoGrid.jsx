@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../lib/supabase.js";
+import { formatRelativeTime } from "../lib/formatTime.js";
 
 /**
  * Instagram-style photo wall of `public.posts` rows where `visible_profile = true`.
@@ -8,8 +9,9 @@ import { supabase } from "../lib/supabase.js";
  * images from `GET /public-post-media?key=…` which re-validates `visible_profile`
  * server-side via service role.
  *
- * Intentionally minimal: no captions, no timestamps, no like counts. Tap a cell to
- * open a full-screen lightbox; tap outside / X / Escape to close.
+ * Grid cells show photos only. Tap a cell to open a full-screen lightbox which
+ * surfaces the post's caption + relative timestamp below the image.
+ * Close via backdrop tap, × button, or Escape.
  *
  * @param {{
  *   profileId: string,
@@ -18,9 +20,15 @@ import { supabase } from "../lib/supabase.js";
  */
 export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
   const [rows, setRows] = useState(
-    /** @type {Array<{ id: string, media_url: string, media_type: string | null, created_at: string }> | null} */ (null)
+    /** @type {Array<{ id: string, media_url: string, media_type: string | null, content: string | null, created_at: string }> | null} */ (
+      null
+    )
   );
-  const [lightboxKey, setLightboxKey] = useState(/** @type {string | null} */ (null));
+  const [lightboxRow, setLightboxRow] = useState(
+    /** @type {{ id: string, media_url: string, media_type: string | null, content: string | null, created_at: string } | null} */ (
+      null
+    )
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +43,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
       try {
         const { data, error } = await supabase
           .from("posts")
-          .select("id, media_url, media_type, created_at")
+          .select("id, media_url, media_type, content, created_at")
           .eq("profile_id", profileId)
           .eq("visible_profile", true)
           .not("media_url", "is", null)
@@ -54,10 +62,18 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                   typeof row?.media_url === "string" ? row.media_url.trim() : "";
                 const mediaType =
                   typeof row?.media_type === "string" ? row.media_type : null;
+                const content =
+                  typeof row?.content === "string" ? row.content : null;
                 const createdAt =
                   typeof row?.created_at === "string" ? row.created_at : "";
                 if (!id || !mediaUrl) return null;
-                return { id, media_url: mediaUrl, media_type: mediaType, created_at: createdAt };
+                return {
+                  id,
+                  media_url: mediaUrl,
+                  media_type: mediaType,
+                  content,
+                  created_at: createdAt,
+                };
               })
               .filter(Boolean)
           : [];
@@ -72,15 +88,15 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
   }, [profileId]);
 
   useEffect(() => {
-    if (!lightboxKey) return;
+    if (!lightboxRow) return;
     const onKey = (e) => {
-      if (e.key === "Escape") setLightboxKey(null);
+      if (e.key === "Escape") setLightboxRow(null);
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [lightboxKey]);
+  }, [lightboxRow]);
 
   const base = typeof workerBaseUrl === "string" ? workerBaseUrl.replace(/\/$/, "") : "";
   const srcFor = (key) => `${base}/public-post-media?key=${encodeURIComponent(key)}`;
@@ -141,7 +157,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
           <button
             key={row.id}
             type="button"
-            onClick={() => setLightboxKey(row.media_url)}
+            onClick={() => setLightboxRow(row)}
             style={{ ...cellBase, cursor: "pointer" }}
             aria-label="Open post photo"
           >
@@ -163,13 +179,13 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
   }
 
   const lightbox =
-    lightboxKey && typeof document !== "undefined"
+    lightboxRow && typeof document !== "undefined"
       ? createPortal(
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Post photo"
-            onClick={() => setLightboxKey(null)}
+            onClick={() => setLightboxRow(null)}
             style={{
               position: "fixed",
               inset: 0,
@@ -185,7 +201,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setLightboxKey(null);
+                setLightboxRow(null);
               }}
               aria-label="Close"
               style={{
@@ -206,18 +222,60 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
             >
               ×
             </button>
-            <img
-              alt=""
-              src={srcFor(lightboxKey)}
+            <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                maxWidth: "96vw",
-                maxHeight: "92vh",
-                objectFit: "contain",
-                display: "block",
-                borderRadius: 4,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 16,
+                maxHeight: "96vh",
+                overflowY: "auto",
               }}
-            />
+            >
+              <img
+                alt=""
+                src={srcFor(lightboxRow.media_url)}
+                style={{
+                  maxWidth: "96vw",
+                  maxHeight: "92vh",
+                  objectFit: "contain",
+                  display: "block",
+                  borderRadius: 4,
+                }}
+              />
+              {(lightboxRow.content || lightboxRow.created_at) && (
+                <div
+                  style={{
+                    width: "min(640px, 96vw)",
+                    padding: "12px 16px",
+                    background: "rgba(0, 0, 0, 0.6)",
+                    color: "var(--color-text-primary)",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    borderRadius: 4,
+                  }}
+                >
+                  {lightboxRow.content && <div>{lightboxRow.content}</div>}
+                  {lightboxRow.created_at && (
+                    <div
+                      className="mono"
+                      style={{
+                        marginTop: lightboxRow.content ? 8 : 0,
+                        fontSize: 11,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {formatRelativeTime(lightboxRow.created_at)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>,
           document.body
         )

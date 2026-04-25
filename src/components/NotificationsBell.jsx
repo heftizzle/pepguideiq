@@ -9,27 +9,11 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../lib/supabase.js";
+import { formatTimeAgo } from "../lib/formatTime.js";
 
 /** Keep in sync with `App.jsx` top header strip (`.grid-bg`) `zIndex`. */
 const PEPV_TOP_HEADER_Z_INDEX = 70;
 const NOTIFICATIONS_DROPDOWN_Z_INDEX = PEPV_TOP_HEADER_Z_INDEX + 10;
-
-function formatTimeAgo(iso) {
-  if (typeof iso !== "string" || !iso) return "";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  const sec = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (sec < 60) return "just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 48) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 14) return `${day}d ago`;
-  const wk = Math.floor(day / 7);
-  if (wk < 8) return `${wk}w ago`;
-  return `${Math.floor(day / 30)}mo ago`;
-}
 
 /** @param {Record<string, unknown>} row */
 function actorLabel(row) {
