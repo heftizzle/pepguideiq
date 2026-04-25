@@ -8,7 +8,7 @@ import { Modal } from "./Modal.jsx";
  */
 export default function SupportModal({ isOpen, onClose }) {
   const [user, setUser] = useState(/** @type {{ id?: string | null; email?: string | null } | null} */ (null));
-  const [form, setForm] = useState({ email: "", phone: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
   const [status, setStatus] = useState(/** @type {"idle" | "loading" | "success" | "error"} */ ("idle"));
   const [errorText, setErrorText] = useState("");
 
@@ -21,9 +21,11 @@ export default function SupportModal({ isOpen, onClose }) {
       const u = await getCurrentUser().catch(() => null);
       if (!active) return;
       setUser(u);
-      if (u?.email) {
-        setForm((prev) => ({ ...prev, email: prev.email || String(u.email) }));
-      }
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name || String(u?.displayName || u?.name || "").trim(),
+        email: prev.email || String(u?.email || "").trim(),
+      }));
     })();
     return () => {
       active = false;
@@ -34,6 +36,7 @@ export default function SupportModal({ isOpen, onClose }) {
 
   const handleSubmit = async () => {
     const email = form.email.trim();
+    const name = form.name.trim();
     const message = form.message.trim();
     const phone = form.phone.trim();
     if (!email || !message) {
@@ -58,6 +61,7 @@ export default function SupportModal({ isOpen, onClose }) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
+          name: name || null,
           email,
           phone: phone || null,
           message,
@@ -85,6 +89,13 @@ export default function SupportModal({ isOpen, onClose }) {
       </p>
 
       <div style={{ display: "grid", gap: 10 }}>
+        <input
+          type="text"
+          className="form-input"
+          placeholder="Name"
+          value={form.name}
+          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+        />
         <input
           type="email"
           className="form-input"

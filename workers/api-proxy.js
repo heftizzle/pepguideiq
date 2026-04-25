@@ -3069,6 +3069,7 @@ async function handleSupportRequest(request, env, cors) {
   }
 
   const email = typeof body.email === "string" ? body.email.trim() : "";
+  const name = typeof body.name === "string" ? body.name.trim() : "";
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (!email || !message) {
@@ -3113,9 +3114,21 @@ async function handleSupportRequest(request, env, cors) {
     to: "hello@pepguideiq.com",
     subject: `New Support Request — ${email}`,
     html: `<p><strong>Email:</strong> ${safeEmail}</p>
+<p><strong>Name:</strong> ${escapeHtml(name || "Not provided")}</p>
 <p><strong>Phone:</strong> ${safePhone}</p>
 <p><strong>Message:</strong><br/>${safeMessageHtml}</p>`,
-    text: `Email: ${email}\nPhone: ${phone || "Not provided"}\n\nMessage:\n${safeMessageText}`,
+    text: `Email: ${email}\nName: ${name || "Not provided"}\nPhone: ${phone || "Not provided"}\n\nMessage:\n${safeMessageText}`,
+  });
+
+  const safeName = escapeHtml(name);
+  await resendSendEmail(env, {
+    to: email,
+    subject: "We got your message 💊",
+    html: `<p>Hey${safeName ? ` ${safeName}` : ""},</p>
+<p>Thanks for reaching out — we received your message and will get back to you shortly.</p>
+<p><strong>Your message:</strong><br/>${safeMessageHtml}</p>
+<p>— The PepGuideIQ Team</p>`,
+    text: `Hey${name ? ` ${name}` : ""},\n\nThanks for reaching out — we received your message and will get back to you shortly.\n\nYour message:\n${safeMessageText}\n\n— The PepGuideIQ Team`,
   });
 
   return jsonResponse({ success: true }, 200, cors);
