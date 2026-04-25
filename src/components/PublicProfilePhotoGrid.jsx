@@ -251,7 +251,8 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                   style={{
                     width: "min(640px, 96vw)",
                     padding: "12px 16px",
-                    background: isDark ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.85)",
+                    background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+                    border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)"}`,
                     color: "var(--color-text-primary)",
                     fontSize: 14,
                     lineHeight: 1.5,
