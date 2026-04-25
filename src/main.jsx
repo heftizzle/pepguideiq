@@ -7,6 +7,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
 import { PublicStackView } from "./components/PublicStackView.jsx";
 import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import PricingPage from "./pages/PricingPage.jsx";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
@@ -81,7 +82,9 @@ const app =
   ) : shareIdFromPath != null && shareIdFromPath !== "" ? (
     <PublicStackViewWithAgeGate shareId={shareIdFromPath} />
   ) : profileHandleFromPath.length >= 3 ? (
-    <PublicMemberProfileWithAgeGate handle={profileHandleFromPath} />
+    <ThemeProvider>
+      <PublicMemberProfileWithAgeGate handle={profileHandleFromPath} />
+    </ThemeProvider>
   ) : (
     <AppErrorBoundary>
       <App />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useThemeContext } from "../context/ThemeContext.jsx";
 import { supabase } from "../lib/supabase.js";
 import { formatRelativeTime } from "../lib/formatTime.js";
 
@@ -19,6 +20,7 @@ import { formatRelativeTime } from "../lib/formatTime.js";
  * }} props
  */
 export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
+  const { isDark } = useThemeContext();
   const [rows, setRows] = useState(
     /** @type {Array<{ id: string, media_url: string, media_type: string | null, content: string | null, created_at: string }> | null} */ (
       null
@@ -189,7 +191,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(0,0,0,0.92)",
+              background: isDark ? "rgba(0, 0, 0, 0.92)" : "rgba(255, 255, 255, 0.94)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -211,9 +213,9 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                 width: 40,
                 height: 40,
                 borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,0.35)",
-                background: "rgba(0,0,0,0.55)",
-                color: "#fff",
+                border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.35)" : "rgba(0, 0, 0, 0.25)"}`,
+                background: isDark ? "rgba(0, 0, 0, 0.55)" : "rgba(255, 255, 255, 0.85)",
+                color: "var(--color-text-primary)",
                 fontSize: 22,
                 lineHeight: 1,
                 cursor: "pointer",
@@ -249,8 +251,8 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                   style={{
                     width: "min(640px, 96vw)",
                     padding: "12px 16px",
-                    background: "rgba(0, 0, 0, 0.6)",
-                    color: "rgba(255, 255, 255, 0.95)",
+                    background: isDark ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.85)",
+                    color: "var(--color-text-primary)",
                     fontSize: 14,
                     lineHeight: 1.5,
                     whiteSpace: "pre-wrap",
@@ -267,7 +269,7 @@ export default function PublicProfilePhotoGrid({ profileId, workerBaseUrl }) {
                         fontSize: 11,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        color: "rgba(255, 255, 255, 0.65)",
+                        color: "var(--color-text-secondary)",
                       }}
                     >
                       {formatRelativeTime(lightboxRow.created_at)}
