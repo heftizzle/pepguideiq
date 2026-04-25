@@ -94,7 +94,10 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
           </p>
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          <span
+            className="mono"
+            style={{ fontSize: 13, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}
+          >
             Step {idx} of {total}
           </span>
           <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
@@ -103,7 +106,7 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
                 type="button"
                 className="btn-teal"
                 onClick={() => goPrev()}
-                style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", opacity: 0.8 }}
+                style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", opacity: 0.8, whiteSpace: "nowrap" }}
               >
                 ← Back
               </button>
@@ -112,7 +115,7 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
               type="button"
               className="btn-teal"
               onClick={() => goNext()}
-              style={{ fontSize: 13, minHeight: 40, padding: "8px 14px" }}
+              style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", whiteSpace: "nowrap" }}
             >
               {isLast ? "Done" : "Next →"}
             </button>

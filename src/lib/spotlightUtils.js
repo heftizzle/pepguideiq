@@ -5,7 +5,7 @@
 
 export const OVERLAY_Z = 9999;
 export const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
-export const CARD_WIDTH = 260;
+export const CARD_WIDTH = 320;
 export const CARD_ESTIMATED_HEIGHT = 140;
 export const CARD_MARGIN = 12;
 export const CUTOUT_PAD = 6;

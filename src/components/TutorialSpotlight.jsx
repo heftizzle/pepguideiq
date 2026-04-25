@@ -90,14 +90,23 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
           </p>
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          <span
+            className="mono"
+            style={{ fontSize: 13, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}
+          >
             Step {idx} of {total}
           </span>
           <button
             type="button"
             className="btn-teal"
             onClick={() => goNext()}
-            style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", marginLeft: "auto" }}
+            style={{
+              fontSize: 13,
+              minHeight: 40,
+              padding: "8px 14px",
+              marginLeft: "auto",
+              whiteSpace: "nowrap",
+            }}
           >
             {stepIndex >= total - 1 ? "Done" : "Next →"}
           </button>
