@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+# NOTE: removed `set -e` — we want continue-on-error per stage,
+# with explicit reporting at the end.
 
 cd "$(dirname "$0")"
 
@@ -39,13 +40,44 @@ pepv_pnpm() {
 
 unset _pepv_d _pepv_shim _pepv_bd 2>/dev/null || true
 
-echo "Building app..."
-pepv_pnpm run build
+echo "▶ Building app..."
+if ! pepv_pnpm run build; then
+  echo "✗ Build failed. Aborting (no point deploying broken code)."
+  exit 1
+fi
+echo "✓ Build complete"
 
-echo "Deploying Worker..."
-pepv_pnpm exec wrangler deploy --config wrangler.worker.toml
+PAGES_OK=0
+WORKER_OK=0
 
-echo "Deploying Pages..."
-pepv_pnpm exec wrangler pages deploy dist --project-name pepguideiq --branch main
+# Pages first — this is what users see.
+echo "▶ Deploying Pages..."
+if pepv_pnpm exec wrangler pages deploy dist --project-name pepguideiq --branch main; then
+  echo "✓ Pages deployed"
+  PAGES_OK=1
+else
+  echo "✗ Pages deploy failed"
+  PAGES_OK=0
+fi
 
-echo "Done. Worker + Pages deployed."
+# Worker second — independent. Skip if no Worker changes since last commit.
+echo "▶ Checking for Worker changes..."
+if git diff --quiet HEAD~1 HEAD -- workers/ wrangler.worker.toml; then
+  echo "○ No Worker changes since last commit — skipping Worker deploy"
+  WORKER_OK=1
+else
+  echo "▶ Deploying Worker..."
+  if pepv_pnpm exec wrangler deploy --config wrangler.worker.toml; then
+    echo "✓ Worker deployed"
+    WORKER_OK=1
+  else
+    echo "✗ Worker deploy failed"
+    WORKER_OK=0
+  fi
+fi
+
+echo ""
+echo "═══ DEPLOY SUMMARY ═══"
+[ "$PAGES_OK" = "1" ] && echo "✓ Pages" || echo "✗ Pages  (frontend NOT updated)"
+[ "$WORKER_OK" = "1" ] && echo "✓ Worker" || echo "✗ Worker (API NOT updated)"
+[ "$PAGES_OK" = "1" ] && [ "$WORKER_OK" = "1" ] && exit 0 || exit 1
