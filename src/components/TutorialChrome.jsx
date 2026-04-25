@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NETWORK_TAB_EMOJI, TUTORIAL_TARGET, useTutorial } from "../context/TutorialContext.jsx";
+import SupportModal from "./SupportModal.jsx";
 
 const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
@@ -32,15 +33,12 @@ const HELP_MENU_ROW = {
   boxSizing: "border-box",
 };
 
-/** No in-app `/support` route yet — use mailto until one exists. */
-const SUPPORT_HREF =
-  "mailto:hello@pepguideiq.com?subject=" + encodeURIComponent("pepguideIQ Support");
-
 export function TutorialHelpButton() {
   const { helpMenuOpen, setHelpMenuOpen, startFlow, HELP_SECTIONS: sections, currentStep, highlightTarget } = useTutorial();
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [menuRect, setMenuRect] = useState(/** @type {{ top: number; left: number; width: number } | null} */ (null));
+  const [showSupport, setShowSupport] = useState(false);
 
   useLayoutEffect(() => {
     if (!helpMenuOpen) {
@@ -130,17 +128,20 @@ export function TutorialHelpButton() {
             padding: 0,
           }}
         />
-        <a
-          href={SUPPORT_HREF}
+        <button
+          type="button"
           role="menuitem"
-          onClick={() => setHelpMenuOpen(false)}
+          onClick={() => {
+            setHelpMenuOpen(false);
+            setShowSupport(true);
+          }}
           style={HELP_MENU_ROW}
         >
           <span aria-hidden style={{ color: "var(--color-accent-subtle-50)", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>
             ✉
           </span>
           <span>Support</span>
-        </a>
+        </button>
       </div>,
       document.body
     );
@@ -165,6 +166,7 @@ export function TutorialHelpButton() {
         </button>
       </div>
       {menuPortal}
+      <SupportModal isOpen={showSupport} onClose={() => setShowSupport(false)} />
     </>
   );
 }

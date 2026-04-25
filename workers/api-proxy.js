@@ -3051,6 +3051,76 @@ async function handleApiReactivateSubscription(request, env, cors) {
   );
 }
 
+/**
+ * POST /support-request
+ * Stores inbound support messages and sends a support inbox email via Resend.
+ * Auth is optional; when a valid bearer token is present, user_id is resolved from session.
+ */
+async function handleSupportRequest(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+
+  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!email || !message) {
+    return jsonResponse({ error: "Email and message required" }, 400, cors);
+  }
+
+  let userId = null;
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader) {
+    const { data: user, error } = await getSessionUser(env, authHeader);
+    if (!error && user?.sub) userId = user.sub;
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const sbRes = await fetch(`${supabaseUrl}/rest/v1/support_requests`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      email,
+      phone: phone || null,
+      message,
+      user_id: userId,
+    }),
+  });
+  if (!sbRes.ok) {
+    const t = await sbRes.text().catch(() => "");
+    log(env, "warn", "support_request_insert_failed", { status: sbRes.status, body: t.slice(0, 400) });
+    return jsonResponse({ error: "Could not save support request" }, 502, cors);
+  }
+
+  const safeEmail = escapeHtml(email);
+  const safePhone = escapeHtml(phone || "Not provided");
+  const safeMessageHtml = escapeHtml(message).replace(/\n/g, "<br/>");
+  const safeMessageText = message;
+  await resendSendEmail(env, {
+    to: "hello@pepguideiq.com",
+    subject: `New Support Request — ${email}`,
+    html: `<p><strong>Email:</strong> ${safeEmail}</p>
+<p><strong>Phone:</strong> ${safePhone}</p>
+<p><strong>Message:</strong><br/>${safeMessageHtml}</p>`,
+    text: `Email: ${email}\nPhone: ${phone || "Not provided"}\n\nMessage:\n${safeMessageText}`,
+  });
+
+  return jsonResponse({ success: true }, 200, cors);
+}
+
 async function handleUploadStackPhoto(request, env, cors) {
   if (!supabaseAuthReady(env)) {
     return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
@@ -5609,6 +5679,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/api/reactivate-subscription" && request.method === "POST") {
       return handleApiReactivateSubscription(request, env, cors);
+    }
+
+    if (url.pathname === "/support-request" && request.method === "POST") {
+      return handleSupportRequest(request, env, cors);
     }
 
     if (url.pathname === "/stripe/create-customer" && request.method === "POST") {
