@@ -1175,6 +1175,64 @@ export async function fetchSuggestedProfiles(profileId) {
 }
 
 /**
+ * Followers list for a target member profile via SECURITY DEFINER RPC.
+ * @param {string} profileId
+ * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_url: string | null, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
+ */
+export async function fetchFollowers(profileId) {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { rows: [], error: new Error("Missing profile") };
+  try {
+    const { data, error } = await supabase.rpc("get_followers", { target_profile_id: pid });
+    if (error) return { rows: [], error };
+    const rows = Array.isArray(data)
+      ? data.map((row) => ({
+          id: typeof row?.id === "string" ? row.id : "",
+          handle: typeof row?.handle === "string" ? row.handle : "",
+          display_name: typeof row?.display_name === "string" ? row.display_name : "",
+          avatar_url: typeof row?.avatar_url === "string" ? row.avatar_url : null,
+          avatar_r2_key: typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key : null,
+          plan: typeof row?.plan === "string" ? row.plan : "entry",
+          is_following_by_me: Boolean(row?.is_following_by_me),
+        }))
+      : [];
+    return { rows: rows.filter((r) => r.id), error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load followers.") };
+  }
+}
+
+/**
+ * Following list for a target member profile via SECURITY DEFINER RPC.
+ * @param {string} profileId
+ * @returns {Promise<{ rows: Array<{ id: string, handle: string, display_name: string, avatar_url: string | null, avatar_r2_key: string | null, plan: string, is_following_by_me: boolean }>, error: Error | null }>}
+ */
+export async function fetchFollowing(profileId) {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { rows: [], error: new Error("Missing profile") };
+  try {
+    const { data, error } = await supabase.rpc("get_following", { target_profile_id: pid });
+    if (error) return { rows: [], error };
+    const rows = Array.isArray(data)
+      ? data.map((row) => ({
+          id: typeof row?.id === "string" ? row.id : "",
+          handle: typeof row?.handle === "string" ? row.handle : "",
+          display_name: typeof row?.display_name === "string" ? row.display_name : "",
+          avatar_url: typeof row?.avatar_url === "string" ? row.avatar_url : null,
+          avatar_r2_key: typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key : null,
+          plan: typeof row?.plan === "string" ? row.plan : "entry",
+          is_following_by_me: Boolean(row?.is_following_by_me),
+        }))
+      : [];
+    return { rows: rows.filter((r) => r.id), error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load following.") };
+  }
+}
+
+/**
  * Live dose posts (non-expired), enriched via RPC — max 50, newest first.
  * @returns {Promise<{ rows: object[], error: Error | null }>}
  */

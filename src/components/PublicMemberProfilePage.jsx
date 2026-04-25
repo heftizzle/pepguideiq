@@ -4,6 +4,7 @@ import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../
 import { fetchPublicMemberProfileByHandle } from "../lib/publicMemberProfile.js";
 import { fetchMemberProfiles, getCurrentUser, getSessionAccessToken } from "../lib/supabase.js";
 import { formatHandleDisplay } from "../lib/memberProfileHandle.js";
+import { formatCompactNumber } from "../lib/format.js";
 import { formatMemberProfileLocation, formatShiftScheduleLabel } from "../lib/memberProfileMeta.js";
 import { publicProfileGoalLabel } from "../data/publicProfileGoalLabels.js";
 import { followMemberProfile, getMyFollowing, unfollowMemberProfile } from "../lib/follows.js";
@@ -11,6 +12,7 @@ import { buildStackShareUrl } from "../lib/stackShare.js";
 import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
+import FollowersModal from "./FollowersModal.jsx";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
 function tierEmoji(t) {
@@ -59,6 +61,10 @@ export function PublicMemberProfilePage({
   const [profile, setProfile] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [following, setFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followersModalOpen, setFollowersModalOpen] = useState(false);
+  const [followersModalTab, setFollowersModalTab] = useState(/** @type {"followers" | "following"} */ ("followers"));
   /** Cold `/profile/:handle` (main.jsx): recover session when parent did not pass viewer props. */
   const [bootstrapProfileId, setBootstrapProfileId] = useState(/** @type {string | null} */ (null));
   const [bootstrapToken, setBootstrapToken] = useState(/** @type {string | null} */ (null));
@@ -125,6 +131,8 @@ export function PublicMemberProfilePage({
         return;
       }
       setProfile(p);
+      setFollowerCount(Number.isFinite(Number(p?.follower_count)) ? Number(p.follower_count) : 0);
+      setFollowingCount(Number.isFinite(Number(p?.following_count)) ? Number(p.following_count) : 0);
       setLoading(false);
     })();
     return () => {
@@ -148,6 +156,27 @@ export function PublicMemberProfilePage({
       cancelled = true;
     };
   }, [effectiveViewerProfileId, effectiveViewerToken, profile?.id, workerUrl]);
+
+  useEffect(() => {
+    if (!profile?.id || typeof window === "undefined") return;
+    const profileId = String(profile.id);
+    const onFollowsChanged = (event) => {
+      const detail = event?.detail ?? {};
+      const followerProfileId = typeof detail.followerProfileId === "string" ? detail.followerProfileId : "";
+      const followingProfileId = typeof detail.followingProfileId === "string" ? detail.followingProfileId : "";
+      const isFollowing = Boolean(detail.isFollowing);
+      if (followingProfileId === profileId) {
+        setFollowerCount((prev) => Math.max(0, prev + (isFollowing ? 1 : -1)));
+      }
+      if (followerProfileId === profileId) {
+        setFollowingCount((prev) => Math.max(0, prev + (isFollowing ? 1 : -1)));
+      }
+    };
+    window.addEventListener("pepguide:follows-changed", onFollowsChanged);
+    return () => {
+      window.removeEventListener("pepguide:follows-changed", onFollowsChanged);
+    };
+  }, [profile?.id]);
 
   const toggleFollow = useCallback(async () => {
     if (!profile?.id || !effectiveViewerProfileId || !effectiveViewerToken || !workerUrl) return;
@@ -180,8 +209,6 @@ export function PublicMemberProfilePage({
   const av = avKey ? resolveMemberAvatarDisplayUrlFromKey(avKey) : resolveMemberAvatarDisplayUrl(avLegacy);
   const plan = typeof profile?.plan === "string" ? profile.plan.trim().toLowerCase() : "entry";
   const locationLine = formatMemberProfileLocation(profile);
-  const followerCount = Number.isFinite(Number(profile?.follower_count)) ? Number(profile.follower_count) : 0;
-  const followingCount = Number.isFinite(Number(profile?.following_count)) ? Number(profile.following_count) : 0;
   const shiftLabel = formatShiftScheduleLabel(profile?.shift_schedule);
   const publicStackShareId =
     typeof profile?.public_stack_share_id === "string" && profile.public_stack_share_id.trim()
@@ -295,27 +322,6 @@ export function PublicMemberProfilePage({
             </div>
           </div>
 
-          {(followerCount > 0 || followingCount > 0) ? (
-            <div
-              className="mono"
-              style={{
-                fontSize: 12,
-                color: "var(--color-text-secondary)",
-                marginBottom: 14,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "6px 14px",
-              }}
-            >
-              <span>
-                <span style={{ color: "var(--color-text-primary)" }}>{followerCount}</span> follower{followerCount === 1 ? "" : "s"}
-              </span>
-              <span>
-                <span style={{ color: "var(--color-text-primary)" }}>{followingCount}</span> following
-              </span>
-            </div>
-          ) : null}
-
           {exp ? (
             <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 12 }}>
               Experience: <span style={{ color: "var(--color-text-primary)" }}>{exp.replace(/_/g, " ")}</span>
@@ -362,6 +368,52 @@ export function PublicMemberProfilePage({
               No bio yet.
             </div>
           )}
+
+          <div
+            className="mono"
+            style={{
+              fontSize: 12,
+              color: "var(--color-text-secondary)",
+              marginBottom: 14,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 14px",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setFollowersModalTab("followers");
+                setFollowersModalOpen(true);
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "inherit",
+                padding: 0,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ color: "var(--color-text-primary)" }}>{formatCompactNumber(followerCount)}</span> Followers
+            </button>
+            <span aria-hidden>·</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFollowersModalTab("following");
+                setFollowersModalOpen(true);
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "inherit",
+                padding: 0,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ color: "var(--color-text-primary)" }}>{formatCompactNumber(followingCount)}</span> Following
+            </button>
+          </div>
 
           {showFollow ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
@@ -426,6 +478,17 @@ export function PublicMemberProfilePage({
               </button>
             </div>
           ) : null}
+          <FollowersModal
+            isOpen={followersModalOpen}
+            onClose={() => setFollowersModalOpen(false)}
+            targetProfileId={profile?.id ? String(profile.id) : null}
+            viewerProfileId={effectiveViewerProfileId}
+            initialTab={followersModalTab}
+            onCountsChange={(next) => {
+              if (typeof next.followerCount === "number") setFollowerCount(Math.max(0, next.followerCount));
+              if (typeof next.followingCount === "number") setFollowingCount(Math.max(0, next.followingCount));
+            }}
+          />
         </>
       ) : null}
     </div>
