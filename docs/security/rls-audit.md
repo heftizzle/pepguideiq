@@ -88,12 +88,14 @@ A live Supabase project may add grants or policies outside this repo; confirm wi
 
 ### posts
 
-- RLS enabled: yes (`065_posts_media_visibility.sql`)
-- anon SELECT: denied
+- RLS enabled: yes (`065_posts_media_visibility.sql`, extended by `070_posts_public_profile_select.sql`)
+- anon SELECT: allowed **only** for rows where `visible_profile = true` (`posts: select public profile` — `070`); `GRANT SELECT ON public.posts TO anon` (`070`)
 - anon INSERT: denied
-- authenticated: `posts: insert own profile` / `posts: select own profile` — `profile_id` must belong to `auth.uid()` via `member_profiles`; `GRANT SELECT, INSERT ON public.posts TO authenticated`
-- Status: ✅ OK
-- Notes: `media_url` stores the R2 object key (no cache-bust query params). Network/profile visibility flags are `visible_network` / `visible_profile`.
+- anon UPDATE: denied
+- anon DELETE: denied
+- authenticated: `posts: insert own profile` / `posts: select own profile` — `profile_id` must belong to `auth.uid()` via `member_profiles`; `posts: select visible_network` — any authenticated user can read rows with `visible_network = true`; `posts: select public profile` — any authenticated user can read rows with `visible_profile = true`; `GRANT SELECT, INSERT ON public.posts TO authenticated`
+- Status: ⚠️ REVIEW
+- Notes: `media_url` stores the R2 object key (no cache-bust query params). `visible_network` / `visible_profile` are author-controlled visibility flags; the public-profile policy intentionally exposes rows the author opted into sharing on their `/profile/:handle` page. The Worker route `GET /public-post-media?key=…` re-validates `visible_profile = true` before streaming R2 bytes, so private/network-only post images are never reachable via that endpoint even if a key leaks.
 
 ---
 
@@ -143,12 +145,14 @@ These are not RLS policies on tables but affect what **anon** can read.
 |----------|------|
 | 🔴 CRITICAL | **None** — every table defined in migrations has `ENABLE ROW LEVEL SECURITY`. |
 | ⚠️ REVIEW | **`user_stacks`**: `user_stacks: select network feed` allows any **authenticated** user to SELECT rows with `feed_visible = true` (cross-user visibility by design). |
+| ⚠️ REVIEW | **`posts`** (`070`): `posts: select public profile` allows **anon** + **authenticated** to SELECT rows with `visible_profile = true` (author-opted public posts on `/profile/:handle`). Worker route `GET /public-post-media` re-validates the flag before streaming R2 bytes. |
 | ⚠️ RISK | **`get_shared_stack(TEXT)`** for **anon**: intentional public read of one stack by `share_id`; ensure `share_id` is unguessable and rate-limit at the edge if needed. |
 
 ---
 
 ## Changes Applied
 
+- **`070_posts_public_profile_select.sql`**: `public.posts` — adds `posts: select public profile` policy for `anon, authenticated` with `USING (visible_profile = true)` and `GRANT SELECT ON public.posts TO anon`. Enables anonymous viewers to load the author's profile-visible posts on `/profile/:handle`. Network-only rows stay private. Worker route `GET /public-post-media` re-validates the flag server-side before streaming R2 bytes.
 - **`065_posts_media_visibility.sql`**: `public.posts` — member-authored image posts; RLS insert/select scoped to the caller’s `member_profiles` rows.
 - **`055_inbody_scan_history.sql`**: `public.inbody_scan_history` — RLS enabled; `authenticated` **SELECT** + **INSERT**; policies require `auth.uid() = user_id` and a matching `member_profiles` row for `profile_id`.
 - **`057_inbody_scan_history_delete_scoped.sql`**: adds **DELETE** for the same ownership scope (replace-within–scan-date window in the client).

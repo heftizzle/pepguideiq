@@ -113,7 +113,7 @@ Worker vars (non-secret, Cloudflare dashboard or `[vars]` in toml):
 
 - Do not `import` a library not in `package.json`.
 - Do not set `profiles.plan` from the client. Use `update_user_plan` RPC from the Worker only.
-- Do not invent Worker routes. There are exactly 32 — see `workers/CLAUDE.md`.
+- Do not invent Worker routes. There are exactly 34 — see `workers/CLAUDE.md`.
 - Do not invent tab IDs, session IDs, or tier IDs.
 - Do not introduce a CSS framework. Use inline styles and existing `GlobalStyles.jsx` classes.
 - Do not persist R2 URLs with cache-bust params (`?v=…`). Store the key; apply busting at render time only.
