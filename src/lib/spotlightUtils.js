@@ -8,6 +8,10 @@ export const DEFAULT_BOTTOM_NAV_RESERVE_PX = 64;
 export const CARD_WIDTH = 320;
 export const CARD_ESTIMATED_HEIGHT = 140;
 export const CARD_MARGIN = 12;
+export const TAIL_HEIGHT = 9;
+export const TAIL_HALF_WIDTH = 9;
+/** Keep tail this far from the card's left/right corners so it never overlaps border-radius (12px). */
+export const TAIL_EDGE_PAD = 18;
 export const CUTOUT_PAD = 6;
 export const MEASURE_RETRY_MS = 250;
 export const MEASURE_MAX_ATTEMPTS = 10;
@@ -23,10 +27,10 @@ export function getBottomNavReservePx() {
 /**
  * Simple above/below rule — restored from 46de739 baseline.
  * No quadrant branching. Card goes below if it fits, above otherwise.
- * cardLeft is horizontal-clamp only.
+ * Horizontally centers the card on the target, then clamps to the viewport.
  *
  * @param {{ rect: DOMRect, vw: number, overlayBottom: number }}
- * @returns {{ top: number, left: number, w: number, h: number, cardTop: number, cardLeft: number }}
+ * @returns {{ top: number, left: number, w: number, h: number, cardTop: number, cardLeft: number, placement: "below" | "above", tailLeft: number }}
  */
 export function computeCardPosition({ rect, vw, overlayBottom }) {
   const top = rect.top - CUTOUT_PAD;
@@ -36,12 +40,18 @@ export function computeCardPosition({ rect, vw, overlayBottom }) {
 
   const cardBelowTop = rect.bottom + CARD_MARGIN;
   const cardAboveTop = top - CARD_ESTIMATED_HEIGHT - CARD_MARGIN;
-
   const fitsBelow = cardBelowTop + CARD_ESTIMATED_HEIGHT <= overlayBottom - CARD_MARGIN;
   const cardTop = fitsBelow ? cardBelowTop : Math.max(CARD_MARGIN, cardAboveTop);
-  const cardLeft = Math.max(CARD_MARGIN, Math.min(left, vw - CARD_WIDTH - CARD_MARGIN));
+  const placement = fitsBelow ? "below" : "above";
 
-  return { top, left, w, h, cardTop, cardLeft };
+  const targetCenterX = rect.left + rect.width / 2;
+  const idealLeft = targetCenterX - CARD_WIDTH / 2;
+  const cardLeft = Math.max(CARD_MARGIN, Math.min(idealLeft, vw - CARD_WIDTH - CARD_MARGIN));
+
+  const rawTailLeft = targetCenterX - cardLeft;
+  const tailLeft = Math.max(TAIL_EDGE_PAD, Math.min(rawTailLeft, CARD_WIDTH - TAIL_EDGE_PAD));
+
+  return { top, left, w, h, cardTop, cardLeft, placement, tailLeft };
 }
 
 /**

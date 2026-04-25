@@ -1,6 +1,14 @@
 import { createPortal } from "react-dom";
 import { useTutorial } from "../context/TutorialContext.jsx";
-import { CARD_WIDTH, OVERLAY_Z, buildClipPath, computeCardPosition } from "../lib/spotlightUtils.js";
+import {
+  CARD_WIDTH,
+  OVERLAY_Z,
+  TAIL_EDGE_PAD,
+  TAIL_HALF_WIDTH,
+  TAIL_HEIGHT,
+  buildClipPath,
+  computeCardPosition,
+} from "../lib/spotlightUtils.js";
 
 const OVERLAY_DIM = "rgba(0,0,0,0.45)";
 
@@ -16,7 +24,11 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
   const vh = window.innerHeight;
   const overlayBottom = Math.max(0, vh - bottomNavReserve);
 
-  const { top, left, w, h, cardTop, cardLeft } = computeCardPosition({ rect, vw, overlayBottom });
+  const { top, left, w, h, cardTop, cardLeft, placement, tailLeft } = computeCardPosition({
+    rect,
+    vw,
+    overlayBottom,
+  });
   const clipPath = buildClipPath({ top, left, w, h, vw, overlayBottom });
 
   const total = steps.length;
@@ -80,6 +92,34 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
           fontFamily: "var(--font-sans)",
         }}
       >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            [placement === "below" ? "top" : "bottom"]: -TAIL_HEIGHT,
+            left: tailLeft - TAIL_HALF_WIDTH,
+            width: 0,
+            height: 0,
+            borderLeft: `${TAIL_HALF_WIDTH}px solid transparent`,
+            borderRight: `${TAIL_HALF_WIDTH}px solid transparent`,
+            [placement === "below" ? "borderBottom" : "borderTop"]: `${TAIL_HEIGHT}px solid var(--color-border-default)`,
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            [placement === "below" ? "top" : "bottom"]: -(TAIL_HEIGHT - 1),
+            left: tailLeft - (TAIL_HALF_WIDTH - 1),
+            width: 0,
+            height: 0,
+            borderLeft: `${TAIL_HALF_WIDTH - 1}px solid transparent`,
+            borderRight: `${TAIL_HALF_WIDTH - 1}px solid transparent`,
+            [placement === "below" ? "borderBottom" : "borderTop"]: `${TAIL_HEIGHT - 1}px solid var(--color-bg-elevated)`,
+            pointerEvents: "none",
+          }}
+        />
         {(currentStep.tooltip || currentStep.text) && (
           <p
             style={{
