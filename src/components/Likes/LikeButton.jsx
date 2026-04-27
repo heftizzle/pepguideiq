@@ -11,10 +11,10 @@ import { useLikes } from "../../hooks/useLikes.js";
  * fires a 6-particle radial burst via pure CSS keyframes defined in
  * `GlobalStyles.jsx` (`pepvLikeBurst`) — no animation library.
  *
- * Self-likes are hidden at the UI level (button doesn't render when the
- * viewer owns the entity). RLS at the DB does not forbid self-likes,
- * but the notification trigger no-ops when owner === liker so the UX is
- * consistent either way.
+ * Self-likes are permitted in the UI — the viewer's primary goal emoji
+ * can stack on their own posts. The 071 notification trigger still
+ * no-ops when actor === recipient so users don't get notified about
+ * their own likes, which would be spam.
  *
  * @param {{
  *   entityType: 'post' | 'comment',
@@ -88,8 +88,6 @@ export default function LikeButton({
     void toggle();
   }, [loading, currentUserId, currentProfileId, toggle]);
 
-  const isSelf = !!ownerUserId && !!currentUserId && ownerUserId === currentUserId;
-  if (isSelf) return null;
   if (!currentUserId || !currentProfileId) return null;
 
   const className = [
