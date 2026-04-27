@@ -520,6 +520,164 @@ function MediaPostCard({ row, onDeferredDelete }) {
 }
 
 /**
+ * Shared stack row from get_network_feed; post_id / like_count / comment_count (073+).
+ * @param {{ row: Record<string, unknown> }} p
+ */
+function StackShareCard({ row }) {
+  const shareId = typeof row.share_id === "string" ? row.share_id.trim() : "";
+  const postId = typeof row.post_id === "string" ? row.post_id : "";
+  const handle = typeof row.handle === "string" ? row.handle.trim() : "";
+  const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "—";
+  const tier = typeof row.tier === "string" ? row.tier : "entry";
+  const compoundCount =
+    typeof row.compound_count === "number" ? row.compound_count : Number(row.compound_count) || 0;
+  const score =
+    typeof row.pepguideiq_score === "number"
+      ? row.pepguideiq_score
+      : Number(row.pepguideiq_score) || 0;
+  const updatedAt = typeof row.updated_at === "string" ? row.updated_at : "";
+  const tierEmoji = networkTierEmoji(tier);
+  const url = shareId ? buildStackShareUrl(shareId) : "";
+  const compoundLabel = `${compoundCount} compound${compoundCount === 1 ? "" : "s"}`;
+  const stackUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+  const stackAvatarKey = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
+
+  const profileCtx = useContext(ProfileCtx);
+  const activeProfileId = profileCtx?.activeProfileId ?? null;
+  const activeProfile = profileCtx?.activeProfile ?? null;
+  const currentUserId = typeof activeProfile?.user_id === "string" ? activeProfile.user_id : null;
+  const currentProfileGoals = activeProfile?.goals ?? null;
+  const [likersOpen, setLikersOpen] = useState(false);
+
+  return (
+    <div
+      className="pcard"
+      role="button"
+      tabIndex={shareId ? 0 : -1}
+      onClick={() => {
+        if (!shareId) return;
+        window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
+      }}
+      onKeyDown={(e) => {
+        if (!shareId) return;
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
+      }}
+      style={{
+        textAlign: "left",
+        cursor: url ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        fontFamily: "'Outfit', sans-serif",
+        color: "var(--color-text-primary)",
+        borderLeft: `3px solid ${tierAccentCssVar(tier)}`,
+        paddingLeft: 12,
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+          <NetworkAvatar userId={stackUserId} r2Key={stackAvatarKey} />
+          <div style={{ minWidth: 0 }}>
+            {handle ? (
+              <button
+                type="button"
+                className="mono"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPublicMemberProfile(handle);
+                }}
+                style={{
+                  fontSize: 14,
+                  color: "var(--color-accent)",
+                  marginBottom: 6,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  textDecoration: "underline",
+                  textDecorationColor: "var(--color-accent-subtle-50)",
+                  textUnderlineOffset: 3,
+                }}
+              >
+                {formatHandleDisplay(handle)}
+              </button>
+            ) : (
+              <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 0 }}>
+                {displayName}
+              </div>
+            )}
+            {handle ? (
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{displayName}</div>
+            ) : null}
+          </div>
+        </div>
+        <span className="pepv-emoji" style={{ fontSize: 22, flexShrink: 0 }} title={tier} aria-hidden>
+          {tierEmoji}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "center" }}>
+        <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          {compoundLabel}
+        </span>
+        <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          pepguideIQ{" "}
+          <span style={{ color: "var(--color-accent)", fontWeight: 700 }}>{score}</span>
+        </span>
+        {updatedAt ? (
+          <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+            {formatTimeAgo(updatedAt)}
+          </span>
+        ) : null}
+      </div>
+      {postId ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 4 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 6, flexWrap: "wrap" }}>
+            <LikeButton
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              ownerUserId={stackUserId || null}
+            />
+            <LikersRow
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              onOpenModal={() => setLikersOpen(true)}
+            />
+          </div>
+          <CommentsSection
+            postId={postId}
+            postCommentCount={typeof row.comment_count === "number" ? row.comment_count : 0}
+            currentUserId={currentUserId}
+            currentProfileId={activeProfileId}
+            currentProfile={activeProfile}
+            currentProfileGoals={currentProfileGoals}
+          />
+          <LikersModal
+            isOpen={likersOpen}
+            onClose={() => setLikersOpen(false)}
+            entityType="post"
+            entityId={postId}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * @param {unknown} raw
  * @returns {object[]}
  */
@@ -1030,109 +1188,8 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {stackItems.map((row, idx) => {
             const shareId = typeof row.share_id === "string" ? row.share_id.trim() : "";
-            const handle = typeof row.handle === "string" ? row.handle.trim() : "";
-            const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "—";
-            const tier = typeof row.tier === "string" ? row.tier : "entry";
-            const compoundCount =
-              typeof row.compound_count === "number" ? row.compound_count : Number(row.compound_count) || 0;
-            const score =
-              typeof row.pepguideiq_score === "number"
-                ? row.pepguideiq_score
-                : Number(row.pepguideiq_score) || 0;
-            const updatedAt = typeof row.updated_at === "string" ? row.updated_at : "";
-            const tierEmoji = networkTierEmoji(tier);
-            const url = shareId ? buildStackShareUrl(shareId) : "";
-            const compoundLabel = `${compoundCount} compound${compoundCount === 1 ? "" : "s"}`;
-            const stackUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
-            const stackAvatarKey = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
-
-            return (
-              <div
-                key={`${shareId || idx}`}
-                className="pcard"
-                role="button"
-                tabIndex={shareId ? 0 : -1}
-                onClick={() => {
-                  if (!shareId) return;
-                  window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
-                }}
-                onKeyDown={(e) => {
-                  if (!shareId) return;
-                  if (e.key !== "Enter" && e.key !== " ") return;
-                  e.preventDefault();
-                  window.location.assign(`/stack/${encodeURIComponent(shareId)}`);
-                }}
-                style={{
-                  textAlign: "left",
-                  cursor: url ? "pointer" : "default",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  fontFamily: "'Outfit', sans-serif",
-                  color: "var(--color-text-primary)",
-                  borderLeft: `3px solid ${tierAccentCssVar(tier)}`,
-                  paddingLeft: 12,
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
-                    <NetworkAvatar userId={stackUserId} r2Key={stackAvatarKey} />
-                    <div style={{ minWidth: 0 }}>
-                      {handle ? (
-                        <button
-                          type="button"
-                          className="mono"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openPublicMemberProfile(handle);
-                          }}
-                          style={{
-                            fontSize: 14,
-                            color: "var(--color-accent)",
-                            marginBottom: 6,
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                            textAlign: "left",
-                            textDecoration: "underline",
-                            textDecorationColor: "var(--color-accent-subtle-50)",
-                            textUnderlineOffset: 3,
-                          }}
-                        >
-                          {formatHandleDisplay(handle)}
-                        </button>
-                      ) : (
-                        <div className="mono" style={{ fontSize: 14, color: "var(--color-accent)", marginBottom: 0 }}>
-                          {displayName}
-                        </div>
-                      )}
-                      {handle ? (
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{displayName}</div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <span className="pepv-emoji" style={{ fontSize: 22, flexShrink: 0 }} title={tier} aria-hidden>
-                    {tierEmoji}
-                  </span>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "center" }}>
-                  <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                    {compoundLabel}
-                  </span>
-                  <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-                    pepguideIQ{" "}
-                    <span style={{ color: "var(--color-accent)", fontWeight: 700 }}>{score}</span>
-                  </span>
-                  {updatedAt ? (
-                    <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                      {formatTimeAgo(updatedAt)}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            );
+            const postIdKey = typeof row.post_id === "string" ? row.post_id : "";
+            return <StackShareCard key={postIdKey || shareId || `stack-${idx}`} row={row} />;
           })}
         </div>
       )}

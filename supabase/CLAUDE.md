@@ -27,7 +27,7 @@
 |---|---|
 | `update_user_plan(uuid, text)` | **The only way to change `profiles.plan`.** Sets `app.allow_plan_change` session flag, updates column, mirrors to `auth.users.raw_user_meta_data`. Revoked from PUBLIC, granted to `service_role`. |
 | `get_daily_ai_count(uuid)` | Legacy; KV is the primary rate limit now. |
-| `get_network_feed()` | Feed joined with `member_profiles` + `user_stacks` for the caller. Filtered by ownership + follow graph. |
+| `get_network_feed()` | Feed joined with `member_profiles` + `user_stacks` for the caller. As of 073, INNER JOINs `public.posts` on `source_kind='stack' AND source_id=user_stacks.id AND visible_network=true`; emits `post_id`, `like_count`, `comment_count` per row for Network tab LikeButton / CommentsSection. |
 | `get_public_network_dose_feed()` | Public dose feed (no auth). Filtered by `public_visible = true AND expires_at > now()`. |
 | `get_shared_stack(text)` | Public read of a stack by share id. |
 | `get_follow_counts(uuid)` | Follower + following counts for a profile. |
@@ -77,7 +77,7 @@ See `docs/security/rls-audit.md` before touching policies.
 
 Re-share is idempotent: partial unique index `posts_one_per_source_idx` on `(profile_id, source_kind, source_id) WHERE source_kind <> 'media'`. Hydration index: `posts_source_idx` on `(source_kind, source_id) WHERE source_kind <> 'media'`.
 
-**Phase 1 = DB only.** The Saved Stacks UI still writes `feed_visible` through `updateStack` in the client (`user_stacks` is source of truth). **Phase 2** switches the toggle to `rpc('set_stack_feed_visible', { p_stack_id, p_visible })` so `posts` stays in sync. **Phase 3** updates `get_network_feed` to join through `posts.source_id → user_stacks.id`.
+**Phase 1 = DB only.** The Saved Stacks UI still writes `feed_visible` through `updateStack` in the client (`user_stacks` is source of truth). **Phase 2** switches the toggle to `rpc('set_stack_feed_visible', { p_stack_id, p_visible })` so `posts` stays in sync. **Phase 3 (073)** wires `get_network_feed()` to JOIN `posts` and emit `post_id` / `like_count` / `comment_count` so the Network tab can render likes and comments on stack-share cards.
 
 ## Critical migrations to read before editing
 
