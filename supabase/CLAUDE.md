@@ -37,6 +37,8 @@
 | `member_profile_public_by_handle_lookup(text)` | Case-insensitive handle resolver. |
 | `handle_new_user()` | Trigger function: seeds `profiles` + empty `user_stacks` on signup. |
 | `set_stack_feed_visible(uuid, boolean)` | Owner-scoped toggle for `user_stacks.feed_visible`. Mirrors into `public.posts` via partial unique index `posts_one_per_source_idx` (`source_kind = 'stack'`, `source_id` = stack id). Verifies `auth.uid() = user_stacks.user_id`; raises `42501` otherwise, `P0002` if missing. `SECURITY DEFINER`; `search_path = public`; granted to `authenticated` only. |
+| `get_post_likers(uuid)` | Returns flat liker rows (`like_id, profile_id, handle, display_handle, display_name, avatar_r2_key, liker_goal_emoji, created_at`) for a post, bypassing `member_profiles` RLS. Parent post must be `visible_profile` or `visible_network` or owned by the caller. `SECURITY DEFINER`; `search_path = public`; granted to `anon, authenticated`. (074) |
+| `get_comment_likers(uuid)` | Same row shape; visibility gated on the parent post via `comments` → `posts`. (074) |
 | `set_updated_at()` | Generic updated_at trigger function. |
 | `notify_new_follower_from_follow()` | Inserts into `notifications` on new follow. |
 | `dose_logs_touch_member_streak()` | Calls streak recalculation. |
@@ -50,6 +52,7 @@
 - `dose_logs_recalc_member_streak` on `dose_logs` AFTER INSERT/UPDATE/DELETE — calls `recalculate_member_profile_streak`.
 - `trg_cleanup_post_on_stack_delete` on `user_stacks` AFTER DELETE — removes the matching `posts` row (`source_kind = 'stack'`, `source_id = OLD.id`); `post_likes` / `comments` / `comment_likes` and `notifications.target_post_id` cascade via 071 FKs.
 - `member_follows_notify_followee` on `member_follows` AFTER INSERT — inserts `notifications` row.
+- Engagement denorm sync (`sync_post_like_count`, `sync_post_comment_count`, `sync_comment_like_count` from 071; recreated `SECURITY DEFINER` in 075): triggers must bump `posts`/`comments` counters despite RLS — `posts` and `comments` have no `UPDATE` policy, so without `SECURITY DEFINER` the trigger `UPDATE`s were silently filtered to zero rows and counts stayed wrong until backfill (075). This pattern — `SECURITY DEFINER` on triggers that need to write through RLS-enabled tables without `UPDATE` policies — should be the default for any future denorm-sync trigger on tables that are read-public but not write-public (e.g. Phase 4 vial counters / `cleanup_post_on_vial_delete`-adjacent work).
 
 ## RLS model
 
@@ -78,6 +81,8 @@ See `docs/security/rls-audit.md` before touching policies.
 Re-share is idempotent: partial unique index `posts_one_per_source_idx` on `(profile_id, source_kind, source_id) WHERE source_kind <> 'media'`. Hydration index: `posts_source_idx` on `(source_kind, source_id) WHERE source_kind <> 'media'`.
 
 **Phase 1 = DB only.** The Saved Stacks UI still writes `feed_visible` through `updateStack` in the client (`user_stacks` is source of truth). **Phase 2** switches the toggle to `rpc('set_stack_feed_visible', { p_stack_id, p_visible })` so `posts` stays in sync. **Phase 3 (073)** wires `get_network_feed()` to JOIN `posts` and emit `post_id` / `like_count` / `comment_count` so the Network tab can render likes and comments on stack-share cards.
+
+**Migration 074** adds `get_post_likers` / `get_comment_likers` RPCs so `LikersModal` no longer relies on PostgREST `member_profiles!inner(...)` (that embed dropped likers whose profile rows were hidden by RLS). **Migration 075** fixes denormalized counters (`posts.like_count`, `posts.comment_count`, `comments.like_count`, `comments.reply_count`) by making the 071 sync trigger functions `SECURITY DEFINER` (same root cause as invisible updates under RLS without `UPDATE` policies) and backfills counts from actual rows.
 
 ## Critical migrations to read before editing
 
