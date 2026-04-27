@@ -74,7 +74,7 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
         retryRef.current = null;
       }
     };
-  }, [highlightTarget, stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [highlightTarget, stepIndex]);
 
   useLayoutEffect(() => {
     if (typeof document === "undefined" || !highlightTarget || !targetLayoutReady) return;

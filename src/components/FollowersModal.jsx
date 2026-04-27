@@ -97,7 +97,6 @@ export default function FollowersModal({
   useEffect(() => {
     if (!isOpen || !targetProfileId) return;
     void loadTab(activeTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, targetProfileId, activeTab]);
 
   const activeRows = rowsByTab[activeTab] ?? [];
@@ -114,7 +113,7 @@ export default function FollowersModal({
     if (!profileId || profileId === viewerProfileId) return;
     if (pendingIds.has(profileId)) return;
 
-    const next = !Boolean(row.is_following_by_me);
+    const next = !row.is_following_by_me;
     setPendingIds((prev) => new Set(prev).add(profileId));
     setRowsByTab((prev) => ({
       ...prev,
