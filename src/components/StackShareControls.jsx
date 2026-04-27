@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ensureUserStackShareId, updateStack } from "../lib/supabase.js";
+import { ensureUserStackShareId, supabase } from "../lib/supabase.js";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { buildStackShareSmsUrl, buildStackShareUrl } from "../lib/stackShare.js";
 
@@ -12,6 +12,7 @@ function canUseWebShare() {
  * @param {{
  *   userId: string | undefined,
  *   profileId: string | undefined,
+ *   stackId: string | undefined,
  *   stackName?: string,
  *   initialShareId: string | null,
  *   onShareIdChange: (shareId: string) => void,
@@ -23,6 +24,7 @@ function canUseWebShare() {
 export function StackShareControls({
   userId,
   profileId,
+  stackId,
   stackName = "",
   initialShareId,
   onShareIdChange,
@@ -100,16 +102,28 @@ export function StackShareControls({
   }
 
   async function toggleNetworkFeed() {
-    if (disabled || !userId || !profileId || feedBusy) return;
+    if (disabled || !userId || !profileId || !stackId || feedBusy) return;
+    if (!supabase) return;
     const sid = shareId ?? initialShareId ?? null;
     if (!sid || !String(sid).trim()) return;
     const next = !feedVisible;
     setFeedBusy(true);
     setErr(null);
     try {
-      const { error } = await updateStack(userId, profileId, { feed_visible: next });
+      const { error } = await supabase.rpc("set_stack_feed_visible", {
+        p_stack_id: stackId,
+        p_visible: next,
+      });
       if (error) {
-        setErr(typeof error.message === "string" ? error.message : "Could not update Network");
+        const code = error.code ?? "";
+        if (code === "42501") {
+          setErr("You don't own this stack.");
+          console.error("[set_stack_feed_visible] 42501 — caller is not stack owner", error);
+        } else if (code === "P0002") {
+          setErr("Stack not found. Try refreshing.");
+        } else {
+          setErr(typeof error.message === "string" ? error.message : "Could not update Network");
+        }
         return;
       }
       onFeedVisibleChange?.(next);

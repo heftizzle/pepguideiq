@@ -56,6 +56,7 @@ import {
   getCurrentUser,
   getCurrentUserFreshAfterCheckout,
   getSessionAccessToken,
+  getUserStackRowId,
   loadStack,
   onAuthStateChange,
   saveStack,
@@ -444,6 +445,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [buildCycleWeeks, setBuildCycleWeeks] = useState(8);
   const [stackShareId, setStackShareId] = useState(null);
   const [stackFeedVisible, setStackFeedVisible] = useState(false);
+  const [stackRowId, setStackRowId] = useState(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [addTarget, setAddTarget] = useState(null);
   /** False until `user_stacks` for `activeProfileId` has been loaded (avoids stale row counts + load races). */
@@ -606,6 +608,7 @@ function PepGuideIQApp({ user, setUser }) {
     if (!user?.id) {
       setStackShareId(null);
       setStackFeedVisible(false);
+      setStackRowId(null);
     }
   }, [user?.id]);
 
@@ -646,11 +649,13 @@ function PepGuideIQApp({ user, setUser }) {
       return;
     }
     if (!isSupabaseConfigured()) {
+      setStackRowId(null);
       stackHydrated.current = true;
       setStackListReady(true);
       return;
     }
     let ignore = false;
+    setStackRowId(null);
     loadStack(user.id, activeProfileId)
       .then((s) => {
         if (ignore) return;
@@ -687,6 +692,13 @@ function PepGuideIQApp({ user, setUser }) {
         setStackFeedVisible(
           Boolean(s && typeof s === "object" && !Array.isArray(s) && s.feedVisible === true)
         );
+        getUserStackRowId(user.id, activeProfileId).then(({ stackRowId: rid, error }) => {
+          if (ignore) return;
+          if (error) {
+            console.warn("[getUserStackRowId]", error);
+          }
+          setStackRowId(typeof rid === "string" && rid.trim() ? rid.trim() : null);
+        });
         stackHydrated.current = true;
         setStackListReady(true);
       })
@@ -699,6 +711,7 @@ function PepGuideIQApp({ user, setUser }) {
         setBuildVialOverrides({});
         setStackShareId(null);
         setStackFeedVisible(false);
+        setStackRowId(null);
         stackHydrated.current = true;
         setStackListReady(true);
       });
@@ -1138,6 +1151,8 @@ function PepGuideIQApp({ user, setUser }) {
     setStackShareId,
     stackFeedVisible,
     setStackFeedVisible,
+    stackRowId,
+    setStackRowId,
     showAdd,
     setShowAdd,
     addTarget,
@@ -1318,6 +1333,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setStackShareId,
     stackFeedVisible,
     setStackFeedVisible,
+    stackRowId,
+    setStackRowId,
     showAdd,
     setShowAdd,
     addTarget,
@@ -1894,12 +1911,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       <StackShareControls
                         userId={user.id}
                         profileId={activeProfileId}
+                        stackId={stackRowId}
                         stackName={stackName}
                         initialShareId={stackShareId}
                         onShareIdChange={setStackShareId}
                         feedVisible={stackFeedVisible}
                         onFeedVisibleChange={setStackFeedVisible}
-                        disabled={!isSupabaseConfigured()}
+                        disabled={!isSupabaseConfigured() || !stackRowId}
                       />
                     )}
                   </div>
