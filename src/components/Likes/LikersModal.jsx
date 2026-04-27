@@ -7,20 +7,15 @@ import { Modal } from "../Modal.jsx";
 import { DEFAULT_LIKE_EMOJI } from "../../lib/goalEmoji.js";
 
 /**
- * Modal showing everyone who liked a post or comment, grouped by goal emoji
- * (tribe-based social proof: 🧬 Longevity · 6, 🔥 Shred · 3, ...).
+ * Modal showing everyone who liked a post or comment, grouped by goal emoji.
  *
- * Grouped view lists each emoji as a section header with the goal's likers
- * underneath; handles are clickable and navigate to the public profile.
- *
- * NOTE on visibility: the `post_likes` / `comment_likes` table has a
- * cascading-EXISTS SELECT policy through `posts`, so anon + authenticated
- * both read the `liker_goal_emoji` and count. The embedded `member_profiles`
- * row, however, depends on that liker's RLS coverage (own-profile or
- * visible-network-post-author). When the embed is null we fall back to a
- * generic "Member" row — the grouped emoji strip still conveys the social
- * proof. A follow-up Phase 2/3 migration could replace this with a
- * `SECURITY DEFINER` RPC that always resolves display fields.
+ * Data is loaded via the get_post_likers / get_comment_likers RPCs
+ * (migration 074), which are SECURITY DEFINER and bypass member_profiles
+ * RLS. Visibility is gated on the parent post inside the function body —
+ * the post must be visible_profile=true, visible_network=true, or owned
+ * by the caller. This replaces the prior `member_profiles!inner(...)`
+ * embed that silently dropped likers whose member_profiles rows were
+ * hidden by RLS.
  *
  * @param {{
  *   isOpen: boolean,
@@ -34,39 +29,22 @@ export default function LikersModal({ isOpen, onClose, entityType, entityId }) {
   const [status, setStatus] = useState(/** @type {"idle"|"loading"|"success"|"error"} */ ("idle"));
   const [error, setError] = useState("");
 
-  const table = entityType === "post" ? "post_likes" : "comment_likes";
-  const fkColumn = entityType === "post" ? "post_id" : "comment_id";
-
   useEffect(() => {
     if (!isOpen || !entityId || !supabase) return;
     let cancelled = false;
     setStatus("loading");
     setError("");
     void (async () => {
-      const { data, error: err } = await supabase
-        .from(table)
-        .select(
-          "id, liker_goal_emoji, created_at, profile_id, member_profiles!inner(handle, display_handle, display_name, avatar_r2_key)"
-        )
-        .eq(fkColumn, entityId)
-        .order("created_at", { ascending: false })
-        .limit(200);
+      const rpcName = entityType === "post" ? "get_post_likers" : "get_comment_likers";
+      const paramKey = entityType === "post" ? "p_post_id" : "p_comment_id";
+
+      const { data, error: err } = await supabase.rpc(rpcName, {
+        [paramKey]: entityId,
+      });
       if (cancelled) return;
       if (err) {
-        const { data: bareData, error: bareErr } = await supabase
-          .from(table)
-          .select("id, liker_goal_emoji, created_at, profile_id")
-          .eq(fkColumn, entityId)
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (cancelled) return;
-        if (bareErr) {
-          setStatus("error");
-          setError(bareErr.message || "Could not load likers.");
-          return;
-        }
-        setRows(Array.isArray(bareData) ? bareData : []);
-        setStatus("success");
+        setStatus("error");
+        setError(err.message || "Could not load likers.");
         return;
       }
       setRows(Array.isArray(data) ? data : []);
@@ -75,7 +53,7 @@ export default function LikersModal({ isOpen, onClose, entityType, entityId }) {
     return () => {
       cancelled = true;
     };
-  }, [isOpen, entityId, table, fkColumn]);
+  }, [isOpen, entityId, entityType]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -146,15 +124,14 @@ export default function LikersModal({ isOpen, onClose, entityType, entityId }) {
                   </span>
                 </div>
                 {groupRows.map((row) => {
-                  const mp = row?.member_profiles ?? null;
-                  const handle = typeof mp?.handle === "string" ? mp.handle : "";
-                  const displayName = typeof mp?.display_name === "string" ? mp.display_name.trim() : "";
-                  const avatarKey = typeof mp?.avatar_r2_key === "string" ? mp.avatar_r2_key.trim() : "";
+                  const handle = typeof row?.handle === "string" ? row.handle : "";
+                  const displayName = typeof row?.display_name === "string" ? row.display_name.trim() : "";
+                  const avatarKey = typeof row?.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
                   const avatar = avatarKey ? resolveMemberAvatarDisplayUrlFromKey(avatarKey) : "";
                   const canClick = Boolean(handle);
                   return (
                     <div
-                      key={row.id}
+                      key={row.like_id}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "32px 1fr",
@@ -211,7 +188,7 @@ export default function LikersModal({ isOpen, onClose, entityType, entityId }) {
                         </div>
                         {handle ? (
                           <div className="mono" style={{ color: "var(--color-accent)", fontSize: 12 }}>
-                            {formatHandleDisplay(handle, mp?.display_handle)}
+                            {formatHandleDisplay(handle, row?.display_handle)}
                           </div>
                         ) : null}
                       </button>
