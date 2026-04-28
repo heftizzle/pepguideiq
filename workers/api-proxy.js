@@ -582,7 +582,7 @@ const RATE_LIMITS = {
   password_reset: { windowMs: 3_600_000, max: 5 },
   /** Authed image uploads (POST/PUT): 20/min per IP. */
   r2_write: { windowMs: 60_000, max: 20 },
-  /** Private stack reads + network post media reads (GET /stack-photo, GET /post-media/…): 500/min per IP. Public /avatars/ is unrate-limited. */
+  /** Private stack reads + network media (GET /stack-photo, GET /vial-photo, GET /post-media/…): 500/min per IP. Public /avatars/ is unrate-limited. */
   r2_read: { windowMs: 60_000, max: 500 },
 };
 
@@ -3309,6 +3309,12 @@ const POST_MEDIA_R2_KEY_RE = new RegExp(
   "i"
 );
 
+/** Vial Tracker photos: `{userId}/vials/{vialId}-{sha6}.jpg` (same bucket as stack photos). */
+const VIAL_PHOTO_R2_KEY_RE = new RegExp(
+  `^${UUID_RE.source.slice(1, -1)}/vials/${UUID_RE.source.slice(1, -1)}-[0-9a-f]{6}\\.jpg$`,
+  "i"
+);
+
 /**
  * Network-visible post images under `{userId}/member-profiles/{profileId}/posts/{sha}.jpg`.
  * Served via GET /post-media/… after `posts.visible_network` + `media_url` gate (no Bearer; safe for `<img src>`).
@@ -3372,6 +3378,83 @@ async function handleGetPostMedia(request, env, cors) {
     });
   } catch (e) {
     log(env, "error", "r2_post_media_get_failed", { message: String(e) });
+    return new Response("Storage error", { status: 502, headers: cors });
+  }
+}
+
+/**
+ * Network-visible vial photos `{userId}/vials/{vialId}-{sha}.jpg`.
+ * GET /vial-photo?key=… — gates on `user_vials.vial_photo_r2_key` + posts mirror (`source_kind=vial`, `visible_network`).
+ * No Authorization header (safe for cross-origin `<img src>`).
+ */
+async function handleGetVialPhoto(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return new Response("Service unavailable", { status: 503, headers: cors });
+  }
+  const bucket = env.STACK_PHOTOS;
+  if (!bucket) {
+    return new Response("Not configured", { status: 503, headers: cors });
+  }
+
+  const reqUrl = new URL(request.url);
+  const keyParam = reqUrl.searchParams.get("key");
+  const key = keyParam != null ? String(keyParam).trim() : "";
+  if (!key || key.includes("..") || !VIAL_PHOTO_R2_KEY_RE.test(key)) {
+    return new Response("Forbidden", { status: 403, headers: cors });
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+  const vr = await fetch(
+    `${supabaseUrl}/rest/v1/user_vials?vial_photo_r2_key=eq.${encodeURIComponent(key)}&archived_at=is.null&select=id`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const vrows = await vr.json().catch(() => []);
+  const vialRow = Array.isArray(vrows) && vrows[0] ? vrows[0] : null;
+  const vialIdResolved = vialRow && typeof vialRow.id === "string" ? vialRow.id.trim() : "";
+  if (!vialIdResolved) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+
+  const pr = await fetch(
+    `${supabaseUrl}/rest/v1/posts?source_kind=eq.vial&source_id=eq.${encodeURIComponent(vialIdResolved)}&visible_network=eq.true&select=id&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    }
+  );
+  const posts = await pr.json().catch(() => []);
+  if (!Array.isArray(posts) || posts.length === 0) {
+    return new Response("Not found", { status: 404, headers: cors });
+  }
+
+  try {
+    const obj = await bucket.get(key);
+    if (!obj) {
+      return new Response("Not found", { status: 404, headers: cors });
+    }
+    const ct =
+      (obj.httpMetadata && typeof obj.httpMetadata.contentType === "string" && obj.httpMetadata.contentType) ||
+      contentTypeFromKey(key);
+    const isHead = request.method === "HEAD";
+    return new Response(isHead ? null : obj.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": ct,
+        "Cache-Control": "private, max-age=120",
+      },
+    });
+  } catch (e) {
+    log(env, "error", "r2_vial_photo_get_failed", { message: String(e) });
     return new Response("Storage error", { status: 502, headers: cors });
   }
 }
@@ -5579,9 +5662,10 @@ async function handleRequest(request, env) {
       ((pathname === "/avatars" || pathname === "/avatars/") &&
         (method === "POST" || method === "PUT"));
 
-    /** Authed private reads + network post media + anon profile-visible post media (DB-gated): GET /stack-photo, GET /post-media/…, GET /public-post-media */
+    /** Authed private reads + network post media + vial photo (DB-gated, no Bearer) + anon profile-visible post media */
     const isR2Read =
       (pathname === "/stack-photo" && (method === "GET" || method === "HEAD")) ||
+      (pathname === "/vial-photo" && (method === "GET" || method === "HEAD")) ||
       (pathname.startsWith("/post-media/") && (method === "GET" || method === "HEAD")) ||
       (pathname === "/public-post-media" && (method === "GET" || method === "HEAD"));
 
@@ -5855,6 +5939,10 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/public-post-media" && (request.method === "GET" || request.method === "HEAD")) {
       return handleGetPublicPostMedia(request, env, cors);
+    }
+
+    if (url.pathname === "/vial-photo" && (request.method === "GET" || request.method === "HEAD")) {
+      return handleGetVialPhoto(request, env, cors);
     }
 
     if (url.pathname === "/stack-photo" && request.method === "POST") {

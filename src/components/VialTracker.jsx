@@ -1294,24 +1294,62 @@ function VialRow({
         </div>
           </div>
 
-          {canMutate && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center" }}>
-              <VialShareToggleButton
-                vialId={vial.id}
-                archivedAt={vial.archived_at ?? null}
-                isShared={Boolean(isShared)}
-                onSharedChange={onSharedChange}
-                disabled={!isSupabaseConfigured() || !profileId}
-              />
-              <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} disabled={depleted} onClick={() => void markDepleted()}>
-                Mark as Depleted
-              </button>
-              <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
-              <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
-                Delete Vial
-              </button>
-            </div>
-          )}
+          {canMutate &&
+            (isShared ? (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <VialShareToggleButton
+                    vialId={vial.id}
+                    archivedAt={vial.archived_at ?? null}
+                    isShared={Boolean(isShared)}
+                    onSharedChange={onSharedChange}
+                    disabled={!isSupabaseConfigured() || !profileId}
+                  />
+                  <VialNotesShareToggle
+                    vialId={vial.id}
+                    userId={userId}
+                    profileId={profileId}
+                    currentUserId={userId}
+                    ownerUserId={vial.user_id}
+                    isShared={Boolean(isShared)}
+                    currentValue={Boolean(vial.share_notes_to_network)}
+                    onChange={() => onReload()}
+                  />
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="btn-teal"
+                    style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                    disabled={depleted}
+                    onClick={() => void markDepleted()}
+                  >
+                    Mark as Depleted
+                  </button>
+                  <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
+                  <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
+                    Delete Vial
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center" }}>
+                <VialShareToggleButton
+                  vialId={vial.id}
+                  archivedAt={vial.archived_at ?? null}
+                  isShared={Boolean(isShared)}
+                  onSharedChange={onSharedChange}
+                  disabled={!isSupabaseConfigured() || !profileId}
+                />
+                <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} disabled={depleted} onClick={() => void markDepleted()}>
+                  Mark as Depleted
+                </button>
+                <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
+                <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
+                  Delete Vial
+                </button>
+              </div>
+            ))}
 
           {showArchivePrompt && canMutate ? (
             <div
@@ -1351,21 +1389,6 @@ function VialRow({
                   Not now
                 </button>
               </div>
-            </div>
-          ) : null}
-
-          {canMutate && isShared && typeof userId === "string" && userId === vial.user_id ? (
-            <div style={{ marginTop: 10 }}>
-              <VialNotesShareToggle
-                vialId={vial.id}
-                userId={userId}
-                profileId={profileId}
-                currentUserId={userId}
-                ownerUserId={vial.user_id}
-                isShared={Boolean(isShared)}
-                currentValue={Boolean(vial.share_notes_to_network)}
-                onChange={() => onReload()}
-              />
             </div>
           ) : null}
 

@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { PEPTIDES } from "../../data/catalog.js";
 import { ProfileCtx } from "../../context/ProfileContext.jsx";
 import { API_WORKER_URL } from "../../lib/config.js";
@@ -72,12 +72,22 @@ export default function VialShareCard({ row, onNotesChanged }) {
   const currentUserId = typeof activeProfile?.user_id === "string" ? activeProfile.user_id : null;
   const currentProfileGoals = activeProfile?.goals ?? null;
   const [likersOpen, setLikersOpen] = useState(false);
+  const vialPhotoImgRef = useRef(/** @type {HTMLImageElement | null} */ (null));
 
   const avatarSrc = buildAvatarUrl(ownerUserId, avatarKey);
   const vialPhotoSrc =
     photoKey && API_WORKER_URL
-      ? `${String(API_WORKER_URL).replace(/\/$/, "")}/stack-photo?key=${encodeURIComponent(photoKey)}`
+      ? `${String(API_WORKER_URL).replace(/\/$/, "")}/vial-photo?key=${encodeURIComponent(photoKey)}`
       : null;
+
+  useEffect(() => {
+    if (!vialPhotoSrc) return;
+    const timer = setTimeout(() => {
+      const img = vialPhotoImgRef.current;
+      if (img && !img.complete) img.style.display = "none";
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [vialPhotoSrc]);
 
   const mgStr = Number.isFinite(Number(vmg)) ? String(vmg) : "—";
   const mlStr = Number.isFinite(Number(bml)) ? String(bml) : "—";
@@ -179,6 +189,7 @@ export default function VialShareCard({ row, onNotesChanged }) {
 
       {vialPhotoSrc ? (
         <img
+          ref={vialPhotoImgRef}
           src={vialPhotoSrc}
           alt=""
           loading="lazy"
