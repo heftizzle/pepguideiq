@@ -2,8 +2,7 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabase.js";
 
 /**
- * Toggle Network visibility for a vial (set_vial_feed_visible RPC).
- * ON = filled accent + inverse text; OFF = outlined secondary (matches app toggle pattern).
+ * Matches StackShareControls + Saved Stacks "Post to Network": single `btn-teal`, affordance is text-only (OFF vs ON label).
  *
  * @param {{
  *   vialId: string,
@@ -17,35 +16,6 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(/** @type {string | null} */ (null));
   const archived = archivedAt != null && String(archivedAt).trim() !== "";
-  /** Match action-row buttons; allow label wrap so width stays ~110–130px. */
-  const sizeStyle = {
-    minHeight: 44,
-    boxSizing: "border-box",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "'Outfit', sans-serif",
-    fontWeight: 500,
-    lineHeight: 1.2,
-    fontSize: 13,
-    padding: "4px 10px",
-    borderRadius: 12,
-    maxWidth: 120,
-    whiteSpace: "normal",
-    textAlign: "center",
-  };
-  const inactiveStyle = {
-    ...sizeStyle,
-    color: "var(--color-text-secondary)",
-    border: "1px solid var(--color-border-default)",
-    background: "transparent",
-  };
-  const activeStyle = {
-    ...sizeStyle,
-    color: "var(--color-text-inverse)",
-    border: "1px solid var(--color-accent)",
-    background: "var(--color-accent)",
-  };
 
   async function onClick() {
     if (disabled || busy || archived || !vialId) return;
@@ -77,18 +47,19 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
 
   const mergedDisabled = disabled || archived || busy;
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4, maxWidth: 120 }}>
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4, maxWidth: 140 }}>
       <button
         type="button"
+        className="btn-teal"
         title={
           archived ? "Archived vials cannot be shared to Network." : isShared ? "Shared to Network" : "Share to Network"
         }
         disabled={mergedDisabled}
         onClick={() => void onClick()}
         style={{
-          cursor: mergedDisabled ? "not-allowed" : "pointer",
-          opacity: archived ? 0.5 : 1,
-          ...(isShared ? activeStyle : inactiveStyle),
+          whiteSpace: "normal",
+          textAlign: "center",
+          lineHeight: 1.25,
         }}
       >
         {busy ? "…" : isShared ? "Shared to Network ✓" : "Share to Network"}

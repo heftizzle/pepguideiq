@@ -2112,19 +2112,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         })}
                         <button
                           type="button"
-                          className="form-input"
+                          className="btn-teal"
                           disabled={archivedCount === 0}
                           onClick={() => setArchivedModalOpen(true)}
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: 12,
-                            fontSize: 14,
-                            cursor: archivedCount === 0 ? "not-allowed" : "pointer",
-                            color: "var(--color-text-primary)",
-                            border: "1px solid var(--color-border-default)",
-                            background: "var(--color-bg-hover)",
-                          }}
+                          style={{ alignSelf: "flex-start" }}
                         >
                           Archived Vials ({archivedCount})
                           {archivedCount === 0 ? " — none yet" : ""}

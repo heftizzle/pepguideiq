@@ -166,6 +166,9 @@ export function GlobalStyles() {
       .btn-green{background:var(--color-btn-green-fill);border:1px solid var(--color-btn-green);color:var(--color-btn-green);padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500}
       .btn-red{background:transparent;border:1px solid var(--color-danger);color:var(--color-danger);padding:10px 14px;border-radius:8px;min-height:44px;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s}
       .btn-red:hover{background:var(--color-danger-soft-bg)}
+      .btn-amber{background:transparent;border:1px solid var(--color-warning);color:var(--color-warning);padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;transition:all .2s}
+      .btn-amber:hover{background:var(--tier-elite-dim)}
+      .btn-amber:disabled{opacity:.4;cursor:not-allowed}
       .cat-btn{background:transparent;border:1px solid var(--color-border-default);color:var(--color-text-secondary);padding:7px 16px;border-radius:20px;cursor:pointer;font-size:13px;white-space:nowrap;transition:all .2s;font-family:'Outfit',sans-serif}
       .cat-btn.active{border-color:var(--color-accent);color:var(--color-accent);background:var(--color-accent-subtle-10)}
       .cat-btn:hover:not(.active){border-color:var(--color-border-emphasis);color:var(--color-text-secondary)}

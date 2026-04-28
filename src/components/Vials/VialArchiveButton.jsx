@@ -2,7 +2,7 @@ import { useState } from "react";
 import { updateUserVial } from "../../lib/supabase.js";
 
 /**
- * Outlined amber — matches other row actions (not filled tier-dim).
+ * Outlined amber — `.btn-amber` in GlobalStyles (same footprint as `.btn-teal` / `.btn-red`).
  *
  * @param {{
  *   vialId: string,
@@ -37,29 +37,7 @@ export function VialArchiveButton({ vialId, userId, profileId, onArchived, disab
   }
 
   return (
-    <button
-      type="button"
-      disabled={disabled || busy}
-      onClick={() => void onArchive()}
-      style={{
-        minHeight: 44,
-        boxSizing: "border-box",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "'Outfit', sans-serif",
-        fontWeight: 500,
-        lineHeight: 1.25,
-        fontSize: 13,
-        padding: "4px 10px",
-        borderRadius: 12,
-        cursor: disabled || busy ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        color: "var(--color-warning)",
-        background: "transparent",
-        border: "1px solid var(--color-warning)",
-      }}
-    >
+    <button type="button" className="btn-amber" disabled={disabled || busy} onClick={() => void onArchive()}>
       {busy ? "…" : "Archive"}
     </button>
   );
