@@ -37,7 +37,18 @@ export function VialArchiveButton({ vialId, userId, profileId, onArchived, disab
   }
 
   return (
-    <button type="button" className="btn-amber" disabled={disabled || busy} onClick={() => void onArchive()}>
+    <button
+      type="button"
+      className="btn-amber"
+      disabled={disabled || busy}
+      onClick={() => void onArchive()}
+      style={{
+        padding: "4px 10px",
+        borderRadius: 12,
+        fontSize: 13,
+        minHeight: 44,
+      }}
+    >
       {busy ? "…" : "Archive"}
     </button>
   );

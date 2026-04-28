@@ -57,6 +57,10 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
         disabled={mergedDisabled}
         onClick={() => void onClick()}
         style={{
+          padding: "4px 10px",
+          borderRadius: 12,
+          fontSize: 13,
+          minHeight: 44,
           whiteSpace: "normal",
           textAlign: "center",
           lineHeight: 1.25,

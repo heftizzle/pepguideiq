@@ -53,7 +53,18 @@ export function VialNotesShareToggle({
   }
 
   return (
-    <button type="button" className="btn-teal" disabled={busy} onClick={() => void toggle()}>
+    <button
+      type="button"
+      className="btn-teal"
+      disabled={busy}
+      onClick={() => void toggle()}
+      style={{
+        padding: "4px 10px",
+        borderRadius: 12,
+        fontSize: 13,
+        minHeight: 44,
+      }}
+    >
       {busy ? "…" : shown ? "Hide notes from shared card" : "Show notes on shared card"}
     </button>
   );
