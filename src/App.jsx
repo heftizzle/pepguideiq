@@ -2115,7 +2115,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           className="btn-teal"
                           disabled={archivedCount === 0}
                           onClick={() => setArchivedModalOpen(true)}
-                          style={{ alignSelf: "flex-start" }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 12,
+                            fontSize: 13,
+                            minHeight: 44,
+                            alignSelf: "flex-start",
+                          }}
                         >
                           Archived Vials ({archivedCount})
                           {archivedCount === 0 ? " — none yet" : ""}

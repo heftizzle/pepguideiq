@@ -45,8 +45,6 @@ export default function VialShareCard({ row, onNotesChanged }) {
   const handle = typeof row.handle === "string" ? row.handle.trim() : "";
   const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "—";
   const tier = typeof row.tier === "string" ? row.tier : "entry";
-  const score =
-    typeof row.pepguideiq_score === "number" ? row.pepguideiq_score : Number(row.pepguideiq_score) || 0;
   const updatedAt = typeof row.updated_at === "string" ? row.updated_at : "";
   const ownerUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
   const avatarKey = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
@@ -161,10 +159,6 @@ export default function VialShareCard({ row, onNotesChanged }) {
         <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
           Shared vial
         </span>
-        <span className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-          pepguideIQ{" "}
-          <span style={{ color: "var(--color-accent)", fontWeight: 700 }}>{score}</span>
-        </span>
         {updatedAt ? (
           <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
             {formatTimeAgo(updatedAt)}
@@ -188,7 +182,18 @@ export default function VialShareCard({ row, onNotesChanged }) {
           src={vialPhotoSrc}
           alt=""
           loading="lazy"
-          style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, border: "1px solid var(--color-border-default)" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+          style={{
+            width: "100%",
+            maxHeight: 360,
+            objectFit: "cover",
+            objectPosition: "50% 50%",
+            borderRadius: 8,
+            display: "block",
+            border: "1px solid var(--color-border-default)",
+          }}
         />
       ) : null}
 
@@ -234,7 +239,7 @@ export default function VialShareCard({ row, onNotesChanged }) {
       ) : null}
 
       <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
-        Educational logging only — not medical advice. Your peptide choices are yours alone.
+        Personal log only. For research only. Not vendor endorsement, not medical advice.
       </div>
 
       {postId ? (
