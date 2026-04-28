@@ -66,7 +66,7 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
           lineHeight: 1.25,
         }}
       >
-        {busy ? "…" : isShared ? "Shared to Network ✓" : "Share to Network"}
+        {busy ? "…" : isShared ? "Shared to Network\u00A0✓" : "Share to Network"}
       </button>
       {err ? (
         <span className="mono" style={{ fontSize: 11, color: "var(--color-danger)", maxWidth: 220, lineHeight: 1.35 }}>
