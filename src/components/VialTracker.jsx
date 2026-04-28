@@ -203,7 +203,7 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
     <div
       style={{
         flexShrink: 0,
-        width: 64,
+        width: 63,
         display: "flex",
         flexDirection: "column",
         gap: 4,
@@ -223,8 +223,8 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
         disabled={uploading}
         title={showImage ? "Replace photo" : "Add photo"}
         style={{
-          width: 64,
-          height: 64,
+          width: 63,
+          height: 84,
           borderRadius: 12,
           border: showImage ? "1px solid var(--color-border-default)" : "1px dashed var(--color-border-default)",
           background: "var(--color-bg-card)",
@@ -241,7 +241,13 @@ function VialPhotoThumb({ vialId, profileId, r2Key, workerConfigured, canMutate,
           <img
             src={imgUrl}
             alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "50% 50%",
+              display: "block",
+            }}
           />
         ) : key ? (
           <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)" }}>
