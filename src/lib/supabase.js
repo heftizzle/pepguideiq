@@ -1147,6 +1147,74 @@ export async function fetchNetworkFeed() {
 }
 
 /**
+ * Archived vials for the profile (exclude active rows).
+ * @param {string} userId
+ * @param {string} profileId
+ * @returns {Promise<{ vials: object[], error: Error | null }>}
+ */
+export async function fetchArchivedVialsForProfile(userId, profileId) {
+  if (!supabase || !profileId) return { vials: [], error: notConfiguredError() };
+  try {
+    const { data, error } = await supabase
+      .from("user_vials")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("profile_id", profileId)
+      .not("archived_at", "is", null)
+      .order("archived_at", { ascending: false });
+    if (error) return { vials: [], error };
+    return { vials: Array.isArray(data) ? data : [], error: null };
+  } catch (error) {
+    return { vials: [], error: error instanceof Error ? error : new Error("Could not load archived vials.") };
+  }
+}
+
+/**
+ * Which vial IDs currently have a visible Network post row for this profile.
+ * @param {string} profileId — member_profiles.id
+ * @param {string[]} vialIds
+ * @returns {Promise<{ ids: Set<string>, error: Error | null }>}
+ */
+export async function fetchSharedVialIdsForVials(profileId, vialIds) {
+  if (!supabase || !profileId) return { ids: new Set(), error: notConfiguredError() };
+  const ids = [...new Set((vialIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (ids.length === 0) return { ids: new Set(), error: null };
+  try {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("source_id")
+      .eq("profile_id", profileId)
+      .eq("source_kind", "vial")
+      .eq("visible_network", true)
+      .in("source_id", ids);
+    if (error) return { ids: new Set(), error };
+    const out = new Set();
+    for (const row of data ?? []) {
+      const sid = typeof row?.source_id === "string" ? row.source_id.trim() : "";
+      if (sid) out.add(sid);
+    }
+    return { ids: out, error: null };
+  } catch (error) {
+    return { ids: new Set(), error: error instanceof Error ? error : new Error("Could not load shared vials.") };
+  }
+}
+
+/**
+ * Network tab: shared vials with engagement ids (RPC get_network_vial_feed).
+ * @returns {Promise<{ rows: object[], error: Error | null }>}
+ */
+export async function fetchNetworkVialFeed() {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  try {
+    const { data, error } = await supabase.rpc("get_network_vial_feed", {});
+    if (error) return { rows: [], error };
+    return { rows: Array.isArray(data) ? data : [], error: null };
+  } catch (error) {
+    return { rows: [], error: error instanceof Error ? error : new Error("Could not load shared vials feed.") };
+  }
+}
+
+/**
  * Find People: suggested profiles (graph + public stack overlap), RPC get_suggested_profiles.
  * @param {string} profileId — member_profiles.id (caller's default profile)
  * @returns {Promise<{ rows: object[], error: Error | null }>}
@@ -1404,7 +1472,8 @@ export async function listVialsForPeptideIds(userId, profileId, peptideIds) {
     .from("user_vials")
     .select("*")
     .eq("user_id", userId)
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .is("archived_at", null);
   q = ids.length === 1 ? q.eq("peptide_id", ids[0]) : q.in("peptide_id", ids);
   const { data, error } = await q.order("created_at", { ascending: true });
   return { vials: data ?? [], error: error ?? null };

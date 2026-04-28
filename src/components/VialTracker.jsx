@@ -5,6 +5,7 @@ import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../
 import {
   deleteDoseLog,
   deleteUserVial,
+  fetchSharedVialIdsForVials,
   getEarliestDosedAtForPeptideIds,
   getSessionAccessToken,
   insertUserVial,
@@ -14,6 +15,9 @@ import {
   listVialsForPeptideIds,
   updateUserVial,
 } from "../lib/supabase.js";
+import { VialArchiveButton } from "./Vials/VialArchiveButton.jsx";
+import { VialNotesShareToggle } from "./Vials/VialNotesShareToggle.jsx";
+import { VialShareToggleButton } from "./Vials/VialShareToggleButton.jsx";
 import {
   R2_UPLOAD_ACCEPT_ATTR,
   R2_UPLOAD_ALLOWED_TYPES,
@@ -990,6 +994,8 @@ function VialRow({
   catalogBlendComponents,
   catalogBlendBacRefMl = 2,
   catalogEntry,
+  isShared = false,
+  onSharedChange = () => {},
 }) {
   const [label, setLabel] = useState(vial.label ?? "Vial 1");
   const [savingLabel, setSavingLabel] = useState(false);
@@ -1000,10 +1006,15 @@ function VialRow({
   const [editMl, setEditMl] = useState("");
   const [recipeErr, setRecipeErr] = useState(/** @type {string | null} */ (null));
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [showArchivePrompt, setShowArchivePrompt] = useState(false);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
   }, [vial.id, vial.label]);
+
+  useEffect(() => {
+    setShowArchivePrompt(false);
+  }, [vial.id]);
 
   useEffect(() => {
     if (!expiryDetailOpen) return;
@@ -1056,7 +1067,25 @@ function VialRow({
 
   async function markDepleted() {
     if (!canMutate) return;
-    await updateUserVial(vial.id, userId, profileId, { status: "depleted" });
+    const { error } = await updateUserVial(vial.id, userId, profileId, { status: "depleted" });
+    if (error) {
+      window.alert(typeof error.message === "string" ? error.message : "Could not update vial.");
+      return;
+    }
+    setShowArchivePrompt(true);
+    onReload();
+  }
+
+  async function archiveFromPrompt() {
+    if (!canMutate) return;
+    const { error } = await updateUserVial(vial.id, userId, profileId, {
+      archived_at: new Date().toISOString(),
+    });
+    setShowArchivePrompt(false);
+    if (error) {
+      window.alert(typeof error.message === "string" ? error.message : "Could not archive.");
+      return;
+    }
     onReload();
   }
 
@@ -1266,15 +1295,79 @@ function VialRow({
           </div>
 
           {canMutate && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center" }}>
+              <VialShareToggleButton
+                vialId={vial.id}
+                archivedAt={vial.archived_at ?? null}
+                isShared={Boolean(isShared)}
+                onSharedChange={onSharedChange}
+                disabled={!isSupabaseConfigured() || !profileId}
+              />
               <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} disabled={depleted} onClick={() => void markDepleted()}>
                 Mark as Depleted
               </button>
+              <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
               <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
-                Delete vial
+                Delete Vial
               </button>
             </div>
           )}
+
+          {showArchivePrompt && canMutate ? (
+            <div
+              style={{
+                marginTop: 10,
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--color-border-default)",
+                background: "var(--color-bg-sunken)",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: 10, lineHeight: 1.45 }}>
+                Mark this vial as archived too? Keeps the dose history but clears it from your active list.
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => void archiveFromPrompt()}
+                  style={{
+                    fontSize: 13,
+                    padding: "6px 12px",
+                    borderRadius: 12,
+                    color: "var(--color-warning)",
+                    background: "var(--tier-elite-dim)",
+                    border: "1px solid var(--tier-elite-border)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Yes, archive
+                </button>
+                <button
+                  type="button"
+                  className="form-input"
+                  onClick={() => setShowArchivePrompt(false)}
+                  style={{ fontSize: 13, padding: "6px 12px", borderRadius: 12, cursor: "pointer" }}
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {canMutate && isShared && typeof userId === "string" && userId === vial.user_id ? (
+            <div style={{ marginTop: 10 }}>
+              <VialNotesShareToggle
+                vialId={vial.id}
+                userId={userId}
+                profileId={profileId}
+                currentUserId={userId}
+                ownerUserId={vial.user_id}
+                isShared={Boolean(isShared)}
+                currentValue={Boolean(vial.share_notes_to_network)}
+                onChange={() => onReload()}
+              />
+            </div>
+          ) : null}
 
           {canMutate && !depleted && !expired ? (
             <div style={{ marginTop: 10 }}>
@@ -1402,6 +1495,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     [peptideNameById, compoundName]
   );
   const [vials, setVials] = useState([]);
+  const [sharedVialIds, setSharedVialIds] = useState(() => new Set());
   const [dosesByVial, setDosesByVial] = useState({});
   const [calendarDoses, setCalendarDoses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1572,6 +1666,10 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     const { vials: v } = await listVialsForPeptideIds(userId, profileId, vialLookupIds);
     if (gen !== reloadGen.current) return;
     setVials(v);
+    const vidList = (v ?? []).map((row) => row.id).filter((x) => typeof x === "string" && String(x).trim());
+    const { ids: sharedIds, error: sharedErr } = await fetchSharedVialIdsForVials(profileId, vidList);
+    if (gen !== reloadGen.current) return;
+    setSharedVialIds(sharedErr ? new Set() : sharedIds ?? new Set());
     const nextMap = {};
     await Promise.all(
       (v ?? []).map(async (row) => {
@@ -2194,6 +2292,15 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
             catalogBlendComponents={blendComponents ?? undefined}
             catalogBlendBacRefMl={blendCatalogBacRefMl}
             catalogEntry={catalogEntry}
+            isShared={sharedVialIds.has(v.id)}
+            onSharedChange={(next) => {
+              setSharedVialIds((prev) => {
+                const n = new Set(prev);
+                if (next) n.add(v.id);
+                else n.delete(v.id);
+                return n;
+              });
+            }}
           />
         ))}
     </div>

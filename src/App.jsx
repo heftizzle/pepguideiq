@@ -14,6 +14,7 @@ import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
 import { UpgradePlanModal } from "./components/UpgradePlanModal.jsx";
 import { StackPhotoUpload } from "./components/StackPhotoUpload.jsx";
 import { VialTracker } from "./components/VialTracker.jsx";
+import { ArchivedVialsModal } from "./components/Vials/ArchivedVialsModal.jsx";
 import { StackProfileShots } from "./components/StackProfileShots.jsx";
 import { StackProtocolQuickLog } from "./components/StackProtocolQuickLog.jsx";
 import { NetworkTab } from "./components/NetworkTab.jsx";
@@ -53,6 +54,7 @@ import { hasInjectableRoute } from "./lib/doseRouteKind.js";
 import { findCatalogPeptideForStackRow } from "./lib/resolveStackCatalogPeptide.js";
 import {
   exchangeSupabaseAuthCodeFromUrlIfNeeded,
+  fetchArchivedVialsForProfile,
   getCurrentUser,
   getCurrentUserFreshAfterCheckout,
   getSessionAccessToken,
@@ -446,6 +448,9 @@ function PepGuideIQApp({ user, setUser }) {
   const [stackShareId, setStackShareId] = useState(null);
   const [stackFeedVisible, setStackFeedVisible] = useState(false);
   const [stackRowId, setStackRowId] = useState(null);
+  const [archivedModalOpen, setArchivedModalOpen] = useState(false);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [vialReloadKey, setVialReloadKey] = useState(0);
   const [showAdd, setShowAdd]     = useState(false);
   const [addTarget, setAddTarget] = useState(null);
   /** False until `user_stacks` for `activeProfileId` has been loaded (avoids stale row counts + load races). */
@@ -793,6 +798,19 @@ function PepGuideIQApp({ user, setUser }) {
   const canAI = Boolean(user?.id);
   const canUploadStackPhoto = Boolean(user?.id);
   const canVialTracker = Boolean(user?.id);
+
+  const refreshArchivedCount = useCallback(async () => {
+    if (!user?.id || !activeProfileId || !isSupabaseConfigured()) {
+      setArchivedCount(0);
+      return;
+    }
+    const { vials } = await fetchArchivedVialsForProfile(user.id, activeProfileId);
+    setArchivedCount(Array.isArray(vials) ? vials.length : 0);
+  }, [user?.id, activeProfileId]);
+
+  useEffect(() => {
+    void refreshArchivedCount();
+  }, [refreshArchivedCount, vialReloadKey]);
 
   const protocolRows = useMemo(
     () => myStack.map((p) => ({ peptideId: p.id, name: p.name })),
@@ -1153,6 +1171,12 @@ function PepGuideIQApp({ user, setUser }) {
     setStackFeedVisible,
     stackRowId,
     setStackRowId,
+    archivedModalOpen,
+    setArchivedModalOpen,
+    archivedCount,
+    vialReloadKey,
+    setVialReloadKey,
+    refreshArchivedCount,
     showAdd,
     setShowAdd,
     addTarget,
@@ -1335,6 +1359,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setStackFeedVisible,
     stackRowId,
     setStackRowId,
+    archivedModalOpen,
+    setArchivedModalOpen,
+    archivedCount,
+    vialReloadKey,
+    setVialReloadKey,
+    refreshArchivedCount,
     showAdd,
     setShowAdd,
     addTarget,
@@ -2050,34 +2080,67 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       );
                     }
                     if (!user?.id || !activeProfileId) return null;
-                    return injectableRows.map((p, vialIdx) => {
-                      const catalogPeptide = findCatalogPeptideForStackRow(p);
-                      const stab = resolveStability(catalogPeptide ?? p);
-                      return (
-                        <VialTracker
-                          key={getStackRowListKey(p)}
+                    return (
+                      <>
+                        {injectableRows.map((p, vialIdx) => {
+                          const catalogPeptide = findCatalogPeptideForStackRow(p);
+                          const stab = resolveStability(catalogPeptide ?? p);
+                          return (
+                            <VialTracker
+                              key={`${getStackRowListKey(p)}-${vialReloadKey}`}
+                              userId={user.id}
+                              profileId={activeProfileId}
+                              peptideId={p.id}
+                              catalogEntry={
+                                catalogPeptide
+                                  ? {
+                                      ...catalogPeptide,
+                                      stabilityDays: stab.stabilityDays,
+                                      stabilityNote: stab.stabilityNote,
+                                    }
+                                  : {
+                                      name: p.name,
+                                      stabilityDays: stab.stabilityDays,
+                                      stabilityNote: stab.stabilityNote,
+                                    }
+                              }
+                              canUse={canVialTracker}
+                              onUpgrade={openUpgradeModal}
+                              tutorialAnchorFirst={vialIdx === 0}
+                            />
+                          );
+                        })}
+                        <button
+                          type="button"
+                          className="form-input"
+                          disabled={archivedCount === 0}
+                          onClick={() => setArchivedModalOpen(true)}
+                          style={{
+                            width: "100%",
+                            padding: "12px 14px",
+                            borderRadius: 12,
+                            fontSize: 14,
+                            cursor: archivedCount === 0 ? "not-allowed" : "pointer",
+                            color: "var(--color-text-primary)",
+                            border: "1px solid var(--color-border-default)",
+                            background: "var(--color-bg-hover)",
+                          }}
+                        >
+                          Archived Vials ({archivedCount})
+                          {archivedCount === 0 ? " — none yet" : ""}
+                        </button>
+                        <ArchivedVialsModal
+                          isOpen={archivedModalOpen}
+                          onClose={() => setArchivedModalOpen(false)}
                           userId={user.id}
                           profileId={activeProfileId}
-                          peptideId={p.id}
-                          catalogEntry={
-                            catalogPeptide
-                              ? {
-                                  ...catalogPeptide,
-                                  stabilityDays: stab.stabilityDays,
-                                  stabilityNote: stab.stabilityNote,
-                                }
-                              : {
-                                  name: p.name,
-                                  stabilityDays: stab.stabilityDays,
-                                  stabilityNote: stab.stabilityNote,
-                                }
-                          }
-                          canUse={canVialTracker}
-                          onUpgrade={openUpgradeModal}
-                          tutorialAnchorFirst={vialIdx === 0}
+                          onChanged={() => {
+                            setVialReloadKey((k) => k + 1);
+                            void refreshArchivedCount();
+                          }}
                         />
-                      );
-                    });
+                      </>
+                    );
                   })()}
                 </div>
               )}
