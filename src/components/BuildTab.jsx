@@ -891,7 +891,7 @@ export function BuildTab({
               AI Atlas
             </div>
             <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", letterSpacing: "0.12em" }}>
-              BETA
+              Pep Guide
             </span>
           </div>
           <div style={{ height: 1, background: "var(--color-accent-subtle-30)", marginBottom: 12 }} />

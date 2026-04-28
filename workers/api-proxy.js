@@ -36,10 +36,10 @@ const DAILY_QUERY_LIMIT = {
 };
 
 const DAILY_ADVISOR_LIMIT = {
-  entry: 5,
-  pro: 20,
-  elite: 30,
-  goat: 40,
+  entry: 3,
+  pro: 10,
+  elite: 20,
+  goat: 30,
 };
 
 const MODEL_ENTRY_PRO = "claude-haiku-4-5-20251001";

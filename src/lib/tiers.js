@@ -15,7 +15,7 @@ export const TIERS = {
     price: 0,
     label: "Free",
     ai_guide_calls_per_day: 2,
-    stack_advisor_calls_per_day: 5,
+    stack_advisor_calls_per_day: 3,
     /** One front/side/back cycle; numeric cap for messaging (not historical versioning). */
     progress_photo_sets: 1,
     profiles: 1,
@@ -38,7 +38,7 @@ export const TIERS = {
     price: 8.99,
     label: "$8.99/mo",
     ai_guide_calls_per_day: 4,
-    stack_advisor_calls_per_day: 20,
+    stack_advisor_calls_per_day: 10,
     progress_photo_sets: 4,
     profiles: 1,
     ai_guide_model: /** @type {AiGuideModelId} */ ("haiku"),
@@ -60,7 +60,7 @@ export const TIERS = {
     price: 16.99,
     label: "$16.99/mo",
     ai_guide_calls_per_day: 8,
-    stack_advisor_calls_per_day: 30,
+    stack_advisor_calls_per_day: 20,
     progress_photo_sets: Number.POSITIVE_INFINITY,
     profiles: 2,
     ai_guide_model: /** @type {AiGuideModelId} */ ("sonnet"),
@@ -69,7 +69,7 @@ export const TIERS = {
     shift_schedule: true,
     founding_member: false,
     early_access: false,
-    stackLimit: 25,
+    stackLimit: 20,
     reconLimit: Number.POSITIVE_INFINITY,
     aiQueriesPerDay: 8,
   },
@@ -79,10 +79,10 @@ export const TIERS = {
     /** GOAT = purple (matches `--tier-goat` in themes). */
     cardAccent: "#a855f7",
     modalGlowHex: "#a855f7",
-    price: 22.99,
-    label: "$22.99/mo",
+    price: 23.99,
+    label: "$23.99/mo",
     ai_guide_calls_per_day: 16,
-    stack_advisor_calls_per_day: 40,
+    stack_advisor_calls_per_day: 30,
     progress_photo_sets: Number.POSITIVE_INFINITY,
     profiles: 4,
     ai_guide_model: /** @type {AiGuideModelId} */ ("sonnet"),
@@ -91,7 +91,7 @@ export const TIERS = {
     shift_schedule: true,
     founding_member: true,
     early_access: true,
-    stackLimit: 50,
+    stackLimit: 40,
     reconLimit: Number.POSITIVE_INFINITY,
     aiQueriesPerDay: 16,
   },
@@ -152,7 +152,7 @@ export function getTierPlanCardBullets(id, catalogCount) {
   const lim = typeof t.stackLimit === "number" && Number.isFinite(t.stackLimit) ? t.stackLimit : 2;
   const track = `Track up to ${lim} compounds`;
   const ai = `AI Atlas: ${t.ai_guide_calls_per_day}/day (${aiModelDisplayNameForPlanCard(id)})`;
-  const sa = `Stack Advisor: ${t.stack_advisor_calls_per_day}/day`;
+  const sa = `AI Atlas Pep Guide: ${t.stack_advisor_calls_per_day}/day`;
   const prof = profileLineForPlanCard(id);
   const photo = progressPhotosLineForPlanCard(id);
 
