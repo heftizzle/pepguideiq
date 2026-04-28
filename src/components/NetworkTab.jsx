@@ -2,7 +2,13 @@ import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
 import { NETWORK_TAB_EMOJI } from "../context/TutorialContext.jsx";
 import { ProfileCtx } from "../context/ProfileContext.jsx";
-import { fetchNetworkFeed, fetchNetworkMediaPosts, fetchPublicNetworkDoseFeed, supabase } from "../lib/supabase.js";
+import {
+  fetchNetworkFeed,
+  fetchNetworkMediaPosts,
+  fetchNetworkVialFeed,
+  fetchPublicNetworkDoseFeed,
+  supabase,
+} from "../lib/supabase.js";
 import { API_WORKER_URL, isSupabaseConfigured } from "../lib/config.js";
 import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { buildStackShareUrl } from "../lib/stackShare.js";
@@ -16,6 +22,7 @@ import LikersRow from "./Likes/LikersRow.jsx";
 import LikersModal from "./Likes/LikersModal.jsx";
 import CommentsSection from "./Comments/CommentsSection.jsx";
 import PostMenuButton from "./Posts/PostMenuButton.jsx";
+import VialShareCard from "./Network/VialShareCard.jsx";
 import { dispatchDeferredDelete } from "./DeleteUndoToast.jsx";
 
 const AVATAR_BASE = `${String(API_WORKER_URL || "").replace(/\/$/, "")}/avatars`;
@@ -692,12 +699,15 @@ function normalizeDoseRpcRows(raw) {
  */
 export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePostScrollTarget }) {
   const [stackItems, setStackItems] = useState(/** @type {object[]} */ ([]));
+  const [vialItems, setVialItems] = useState(/** @type {object[]} */ ([]));
   const [doseItems, setDoseItems] = useState(/** @type {object[]} */ ([]));
   const [mediaPostItems, setMediaPostItems] = useState(/** @type {object[]} */ ([]));
   const [stackLoading, setStackLoading] = useState(true);
+  const [vialLoading, setVialLoading] = useState(true);
   const [doseLoading, setDoseLoading] = useState(true);
   const [mediaPostLoading, setMediaPostLoading] = useState(true);
   const [stackError, setStackError] = useState(/** @type {string | null} */ (null));
+  const [vialError, setVialError] = useState(/** @type {string | null} */ (null));
   const [doseError, setDoseError] = useState(/** @type {string | null} */ (null));
   const [mediaPostError, setMediaPostError] = useState(/** @type {string | null} */ (null));
 
@@ -717,6 +727,24 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       setStackError(null);
     }
     setStackLoading(false);
+  }, [userId]);
+
+  const loadVialFeed = useCallback(async () => {
+    if (!isSupabaseConfigured() || !userId) {
+      setVialItems([]);
+      setVialError(null);
+      setVialLoading(false);
+      return;
+    }
+    setVialLoading(true);
+    const { rows, error } = await fetchNetworkVialFeed();
+    if (error) {
+      setVialError(error.message || "Could not load shared vials.");
+    } else {
+      setVialItems(rows);
+      setVialError(null);
+    }
+    setVialLoading(false);
   }, [userId]);
 
   const loadDoseFeed = useCallback(async () => {
@@ -757,13 +785,18 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
 
   const refreshAll = useCallback(() => {
     void loadStackFeed();
+    void loadVialFeed();
     void loadDoseFeed();
     void loadMediaPostFeed();
-  }, [loadStackFeed, loadDoseFeed, loadMediaPostFeed]);
+  }, [loadStackFeed, loadVialFeed, loadDoseFeed, loadMediaPostFeed]);
 
   useEffect(() => {
     void loadStackFeed();
   }, [loadStackFeed]);
+
+  useEffect(() => {
+    void loadVialFeed();
+  }, [loadVialFeed]);
 
   useEffect(() => {
     void loadDoseFeed();
@@ -778,11 +811,13 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
     const id = window.setInterval(() => {
       void loadDoseFeed();
       void loadMediaPostFeed();
+      void loadVialFeed();
     }, 60_000);
     const onVis = () => {
       if (document.visibilityState === "visible") {
         void loadDoseFeed();
         void loadStackFeed();
+        void loadVialFeed();
         void loadMediaPostFeed();
       }
     };
@@ -791,7 +826,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [userId, loadDoseFeed, loadStackFeed, loadMediaPostFeed]);
+  }, [userId, loadDoseFeed, loadStackFeed, loadVialFeed, loadMediaPostFeed]);
 
   useEffect(() => {
     const pid = typeof scrollToDosePostId === "string" ? scrollToDosePostId.trim() : "";
@@ -807,8 +842,8 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
   }, [scrollToDosePostId, doseLoading, doseItems, onConsumedDosePostScrollTarget]);
 
   const headerBusy = useMemo(
-    () => stackLoading || doseLoading || mediaPostLoading,
-    [stackLoading, doseLoading, mediaPostLoading]
+    () => stackLoading || vialLoading || doseLoading || mediaPostLoading,
+    [stackLoading, vialLoading, doseLoading, mediaPostLoading]
   );
 
   const onDeferredDeleteMediaPost = useCallback(
@@ -1190,6 +1225,76 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             const shareId = typeof row.share_id === "string" ? row.share_id.trim() : "";
             const postIdKey = typeof row.post_id === "string" ? row.post_id : "";
             return <StackShareCard key={postIdKey || shareId || `stack-${idx}`} row={row} />;
+          })}
+        </div>
+      )}
+
+      <div
+        className="mono"
+        style={{ fontSize: 12, color: "var(--color-text-secondary)", letterSpacing: "0.1em", marginBottom: 10, marginTop: 28 }}
+      >
+        SHARED VIALS
+      </div>
+      {vialError ? (
+        <div
+          className="mono"
+          style={{
+            fontSize: 12,
+            color: "var(--color-warning)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 12,
+            background: "rgba(245, 158, 11, 0.08)",
+          }}
+        >
+          {vialItems.length > 0 ? `Could not refresh shared vials: ${vialError}` : `Shared vials are unavailable: ${vialError}`}
+        </div>
+      ) : null}
+      {vialLoading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <NetworkFeedSkeleton />
+          <NetworkFeedSkeleton />
+        </div>
+      ) : vialError && vialItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed rgba(245, 158, 11, 0.4)",
+            borderRadius: 12,
+            padding: "56px 20px",
+            textAlign: "center",
+            background: "var(--color-bg-card)",
+          }}
+        >
+          <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
+            Shared vials could not be loaded right now. Try refresh in a moment.
+          </div>
+        </div>
+      ) : vialItems.length === 0 ? (
+        <div
+          style={{
+            border: "1px dashed var(--color-border-default)",
+            borderRadius: 12,
+            padding: "56px 20px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55, maxWidth: 360, margin: "0 auto" }}>
+            No vials shared yet — open Vial Tracker and tap Share to Network on a vial.
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {vialItems.map((row, idx) => {
+            const postIdKey = typeof row.post_id === "string" ? row.post_id : "";
+            const vid = typeof row.vial_id === "string" ? row.vial_id : "";
+            return (
+              <VialShareCard
+                key={postIdKey || vid || `vial-${idx}`}
+                row={row}
+                onNotesChanged={() => void loadVialFeed()}
+              />
+            );
           })}
         </div>
       )}
