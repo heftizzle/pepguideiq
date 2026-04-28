@@ -39,6 +39,9 @@
 | `set_stack_feed_visible(uuid, boolean)` | Owner-scoped toggle for `user_stacks.feed_visible`. Mirrors into `public.posts` via partial unique index `posts_one_per_source_idx` (`source_kind = 'stack'`, `source_id` = stack id). Verifies `auth.uid() = user_stacks.user_id`; raises `42501` otherwise, `P0002` if missing. `SECURITY DEFINER`; `search_path = public`; granted to `authenticated` only. |
 | `get_post_likers(uuid)` | Returns flat liker rows (`like_id, profile_id, handle, display_handle, display_name, avatar_r2_key, liker_goal_emoji, created_at`) for a post, bypassing `member_profiles` RLS. Parent post must be `visible_profile` or `visible_network` or owned by the caller. `SECURITY DEFINER`; `search_path = public`; granted to `anon, authenticated`. (074) |
 | `get_comment_likers(uuid)` | Same row shape; visibility gated on the parent post via `comments` → `posts`. (074) |
+| `set_vial_feed_visible(uuid, boolean)` | Owner toggles Network visibility for a vial; UPSERT into `posts` (`source_kind='vial'`, `source_id=user_vials.id`). Raises `22023` if `user_vials.archived_at` is set, `42501` if not owner, `P0002` if missing. `SECURITY DEFINER`; granted to `authenticated`. (077) |
+| `get_network_vial_feed()` | Network shared vials (max 50): INNER JOIN `posts` on `source_kind='vial'` + `visible_network=true`, excludes archived vials; emits engagement ids (`post_id`, `like_count`, `comment_count`) plus vial JSON fields. `SECURITY DEFINER`; granted to `authenticated`. (078) |
+| `cleanup_post_on_vial_delete()` / `cleanup_post_on_vial_archive()` | `SECURITY DEFINER` trigger helpers: delete mirrored `posts` row when a vial row is deleted or first archived (`archived_at` set from null). (077) |
 | `set_updated_at()` | Generic updated_at trigger function. |
 | `notify_new_follower_from_follow()` | Inserts into `notifications` on new follow. |
 | `dose_logs_touch_member_streak()` | Calls streak recalculation. |
@@ -51,6 +54,8 @@
 - `profiles_updated_at`, `user_stacks_updated_at`, `shopping_lists_updated_at`, `body_metrics_updated_at`, `member_fasts_updated_at`, `notifications_updated_at`, `member_follows_updated_at`, `network_feed_updated_at` — all BEFORE UPDATE, call `set_updated_at()`.
 - `dose_logs_recalc_member_streak` on `dose_logs` AFTER INSERT/UPDATE/DELETE — calls `recalculate_member_profile_streak`.
 - `trg_cleanup_post_on_stack_delete` on `user_stacks` AFTER DELETE — removes the matching `posts` row (`source_kind = 'stack'`, `source_id = OLD.id`); `post_likes` / `comments` / `comment_likes` and `notifications.target_post_id` cascade via 071 FKs.
+- `trg_cleanup_post_on_vial_delete` on `user_vials` AFTER DELETE — removes `posts` where `source_kind = 'vial'` and `source_id = OLD.id` (077).
+- `trg_cleanup_post_on_vial_archive` on `user_vials` AFTER UPDATE OF `archived_at` — when `archived_at` becomes non-null, deletes the mirrored `posts` row so Network cards disappear (077).
 - `member_follows_notify_followee` on `member_follows` AFTER INSERT — inserts `notifications` row.
 - Engagement denorm sync (`sync_post_like_count`, `sync_post_comment_count`, `sync_comment_like_count` from 071; recreated `SECURITY DEFINER` in 075): triggers must bump `posts`/`comments` counters despite RLS — `posts` and `comments` have no `UPDATE` policy, so without `SECURITY DEFINER` the trigger `UPDATE`s were silently filtered to zero rows and counts stayed wrong until backfill (075). This pattern — `SECURITY DEFINER` on triggers that need to write through RLS-enabled tables without `UPDATE` policies — should be the default for any future denorm-sync trigger on tables that are read-public but not write-public (e.g. Phase 4 vial counters / `cleanup_post_on_vial_delete`-adjacent work).
 
@@ -76,13 +81,19 @@ See `docs/security/rls-audit.md` before touching policies.
 
 ## Polymorphic post sources (072)
 
-`public.posts` carries a `source_kind public.post_source_kind` enum (`'media' | 'stack'`; `'vial'` lands in 073) plus nullable `source_id uuid`. CHECK `posts_source_consistency`: `source_kind = 'media' ⇔ source_id IS NULL`.
+`public.posts` carries a `source_kind public.post_source_kind` enum (`'media' | 'stack'`; **`'vial'` added in 076**) plus nullable `source_id uuid`. CHECK `posts_source_consistency`: `source_kind = 'media' ⇔ source_id IS NULL`.
 
 Re-share is idempotent: partial unique index `posts_one_per_source_idx` on `(profile_id, source_kind, source_id) WHERE source_kind <> 'media'`. Hydration index: `posts_source_idx` on `(source_kind, source_id) WHERE source_kind <> 'media'`.
 
 **Phase 1 = DB only.** The Saved Stacks UI still writes `feed_visible` through `updateStack` in the client (`user_stacks` is source of truth). **Phase 2** switches the toggle to `rpc('set_stack_feed_visible', { p_stack_id, p_visible })` so `posts` stays in sync. **Phase 3 (073)** wires `get_network_feed()` to JOIN `posts` and emit `post_id` / `like_count` / `comment_count` so the Network tab can render likes and comments on stack-share cards.
 
 **Migration 074** adds `get_post_likers` / `get_comment_likers` RPCs so `LikersModal` no longer relies on PostgREST `member_profiles!inner(...)` (that embed dropped likers whose profile rows were hidden by RLS). **Migration 075** fixes denormalized counters (`posts.like_count`, `posts.comment_count`, `comments.like_count`, `comments.reply_count`) by making the 071 sync trigger functions `SECURITY DEFINER` (same root cause as invisible updates under RLS without `UPDATE` policies) and backfills counts from actual rows.
+
+**Migrations 076–078 (Phase 4 — vials)** extend the same pattern to vials: enum label `'vial'` (076); `user_vials.archived_at`, `user_vials.share_notes_to_network`, cleanup triggers + `set_vial_feed_visible` (077); `get_network_vial_feed()` for the Network tab (078).
+
+### Vial lifecycle (077+)
+
+Active vials stay in the tracker list (`archived_at IS NULL`). Archiving sets `archived_at` and deletes the mirrored `posts` row via trigger — engagement survives only while the post exists; unsharing toggles `visible_network` without deleting the post row until archive/delete. Unarchive clears `archived_at` so the vial returns to the active list; resharing uses `set_vial_feed_visible` again (fresh UPSERT after archive removed the prior post).
 
 ## Critical migrations to read before editing
 
