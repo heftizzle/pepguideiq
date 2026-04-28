@@ -40,6 +40,14 @@ export function VialArchiveButton({ vialId, userId, profileId, onArchived, disab
       disabled={disabled || busy}
       onClick={() => void onArchive()}
       style={{
+        minHeight: 44,
+        boxSizing: "border-box",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'Outfit', sans-serif",
+        fontWeight: 500,
+        lineHeight: 1.25,
         fontSize: 13,
         padding: "4px 10px",
         borderRadius: 12,

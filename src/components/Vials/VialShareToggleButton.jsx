@@ -16,12 +16,28 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(/** @type {string | null} */ (null));
   const archived = archivedAt != null && String(archivedAt).trim() !== "";
+  /** Match `btn-teal` / `btn-red` row siblings in VialTracker (min-height + box model from GlobalStyles.jsx). */
+  const sizeStyle = {
+    minHeight: 44,
+    boxSizing: "border-box",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "'Outfit', sans-serif",
+    fontWeight: 500,
+    lineHeight: 1.25,
+    fontSize: 13,
+    padding: "4px 10px",
+    borderRadius: 12,
+  };
   const inactiveStyle = {
+    ...sizeStyle,
     color: "var(--color-text-secondary)",
     border: "1px solid var(--color-border-default)",
     background: "transparent",
   };
   const activeStyle = {
+    ...sizeStyle,
     color: "var(--color-accent)",
     border: "1px solid var(--color-bell-border-unread)",
     background: "var(--color-accent-dim)",
@@ -66,9 +82,6 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
         disabled={mergedDisabled}
         onClick={() => void onClick()}
         style={{
-          fontSize: 13,
-          padding: "4px 10px",
-          borderRadius: 12,
           cursor: mergedDisabled ? "not-allowed" : "pointer",
           opacity: archived ? 0.5 : 1,
           ...(isShared ? activeStyle : inactiveStyle),
