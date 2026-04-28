@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase.js";
 
 /**
  * Toggle Network visibility for a vial (set_vial_feed_visible RPC).
+ * ON = filled accent + inverse text; OFF = outlined secondary (matches app toggle pattern).
  *
  * @param {{
  *   vialId: string,
@@ -16,7 +17,7 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(/** @type {string | null} */ (null));
   const archived = archivedAt != null && String(archivedAt).trim() !== "";
-  /** Match `btn-teal` / `btn-red` row siblings in VialTracker (min-height + box model from GlobalStyles.jsx). */
+  /** Match action-row buttons; allow label wrap so width stays ~110–130px. */
   const sizeStyle = {
     minHeight: 44,
     boxSizing: "border-box",
@@ -25,10 +26,13 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
     justifyContent: "center",
     fontFamily: "'Outfit', sans-serif",
     fontWeight: 500,
-    lineHeight: 1.25,
+    lineHeight: 1.2,
     fontSize: 13,
     padding: "4px 10px",
     borderRadius: 12,
+    maxWidth: 120,
+    whiteSpace: "normal",
+    textAlign: "center",
   };
   const inactiveStyle = {
     ...sizeStyle,
@@ -38,9 +42,9 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
   };
   const activeStyle = {
     ...sizeStyle,
-    color: "var(--color-accent)",
-    border: "1px solid var(--color-bell-border-unread)",
-    background: "var(--color-accent-dim)",
+    color: "var(--color-text-inverse)",
+    border: "1px solid var(--color-accent)",
+    background: "var(--color-accent)",
   };
 
   async function onClick() {
@@ -73,7 +77,7 @@ export function VialShareToggleButton({ vialId, archivedAt = null, isShared, onS
 
   const mergedDisabled = disabled || archived || busy;
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ display: "inline-flex", flexDirection: "column", gap: 4, maxWidth: 120 }}>
       <button
         type="button"
         title={

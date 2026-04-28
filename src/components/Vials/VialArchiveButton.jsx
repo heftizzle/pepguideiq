@@ -2,6 +2,8 @@ import { useState } from "react";
 import { updateUserVial } from "../../lib/supabase.js";
 
 /**
+ * Outlined amber — matches other row actions (not filled tier-dim).
+ *
  * @param {{
  *   vialId: string,
  *   userId: string,
@@ -54,8 +56,8 @@ export function VialArchiveButton({ vialId, userId, profileId, onArchived, disab
         cursor: disabled || busy ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         color: "var(--color-warning)",
-        background: "var(--tier-elite-dim)",
-        border: "1px solid var(--tier-elite-border)",
+        background: "transparent",
+        border: "1px solid var(--color-warning)",
       }}
     >
       {busy ? "…" : "Archive"}
