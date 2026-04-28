@@ -143,6 +143,17 @@ const INBODY_METRIC_LABEL = {
  * @param {{ row: Record<string, unknown> }} p
  */
 function InbodyNetworkProgressCard({ row }) {
+  const profileCtx = useContext(ProfileCtx);
+  const activeProfileId = profileCtx?.activeProfileId ?? null;
+  const activeProfile = profileCtx?.activeProfile ?? null;
+  const currentUserId = typeof activeProfile?.user_id === "string" ? activeProfile.user_id : null;
+  const currentProfileGoals = activeProfile?.goals ?? null;
+  const [likersOpen, setLikersOpen] = useState(false);
+
+  const postId = typeof row.post_id === "string" ? row.post_id : "";
+  const commentCount =
+    typeof row.comment_count === "number" ? row.comment_count : Number(row.comment_count) || 0;
+
   const cj = row.content_json;
   const o = cj != null && typeof cj === "object" ? /** @type {Record<string, unknown>} */ (cj) : {};
   const days = typeof o.daysBetween === "number" && Number.isFinite(o.daysBetween) ? o.daysBetween : null;
@@ -299,6 +310,47 @@ function InbodyNetworkProgressCard({ row }) {
           </span>
         ) : null}
       </div>
+
+      {postId ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 4 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 6, flexWrap: "wrap" }}>
+            <LikeButton
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              ownerUserId={userId || null}
+            />
+            <LikersRow
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              onOpenModal={() => setLikersOpen(true)}
+            />
+          </div>
+          <CommentsSection
+            postId={postId}
+            postCommentCount={commentCount}
+            currentUserId={currentUserId}
+            currentProfileId={activeProfileId}
+            currentProfile={activeProfile}
+            currentProfileGoals={currentProfileGoals}
+          />
+          <LikersModal
+            isOpen={likersOpen}
+            onClose={() => setLikersOpen(false)}
+            entityType="post"
+            entityId={postId}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -685,6 +737,164 @@ function StackShareCard({ row }) {
 }
 
 /**
+ * Live dose row from get_public_network_dose_feed (post_type dose).
+ * Engages via projected posts.post_id when present.
+ * @param {{ row: Record<string, unknown> }} p
+ */
+function LiveDoseCard({ row }) {
+  const profileCtx = useContext(ProfileCtx);
+  const activeProfileId = profileCtx?.activeProfileId ?? null;
+  const activeProfile = profileCtx?.activeProfile ?? null;
+  const currentUserId = typeof activeProfile?.user_id === "string" ? activeProfile.user_id : null;
+  const currentProfileGoals = activeProfile?.goals ?? null;
+  const [likersOpen, setLikersOpen] = useState(false);
+
+  const postId = typeof row.post_id === "string" ? row.post_id : "";
+  const commentCount =
+    typeof row.comment_count === "number" ? row.comment_count : Number(row.comment_count) || 0;
+  const ownerUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+
+  const handle = typeof row.handle === "string" ? row.handle.trim() : "";
+  const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";
+  const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+  const verified =
+    row.verified_credential != null &&
+    String(row.verified_credential).trim() !== "";
+  const compoundId = typeof row.compound_id === "string" ? row.compound_id.trim() : "";
+  const catalogEntry = catalogEntryByCompoundId(compoundId);
+  const compoundName = compoundDisplayName(compoundId);
+  const doseLine = formatDoseLine(row.dose_amount, row.dose_unit, catalogEntry);
+  const routeLabel = formatRouteLabel(row.route);
+  const sessionPretty = formatSessionLabel(row.session_label);
+  const stackLabel = typeof row.stack_label === "string" && row.stack_label.trim() ? row.stack_label.trim() : null;
+  const createdAt = typeof row.created_at === "string" ? row.created_at : "";
+  const expiresAt = typeof row.expires_at === "string" ? row.expires_at : "";
+  const expiresSoon = isExpiresWithinHours(expiresAt, 6);
+  const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
+  const rowUserId = typeof row.user_id === "string" ? row.user_id.trim() : "";
+  const avatarR2Key = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
+
+  return (
+    <div
+      id={typeof row.id === "string" && row.id ? `pepv-network-dose-${row.id}` : undefined}
+      className="pcard"
+      role="article"
+      style={{
+        cursor: "default",
+        transform: "none",
+        boxShadow: expiresSoon ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
+        opacity: expiresSoon ? 0.88 : 1,
+        fontFamily: "'Outfit', sans-serif",
+        color: "var(--color-text-primary)",
+      }}
+    >
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
+        <NetworkAvatar userId={rowUserId} r2Key={avatarR2Key} />
+        {handle ? (
+          <button
+            type="button"
+            onClick={() => openPublicMemberProfile(handle)}
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "left",
+              textDecoration: "underline",
+              textDecorationColor: "rgba(248, 250, 252, 0.25)",
+              textUnderlineOffset: 3,
+            }}
+          >
+            {handleShown}
+          </button>
+        ) : (
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{handleShown}</span>
+        )}
+        {verified ? (
+          <span
+            title="Verified"
+            className="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.06em",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-bell-border-unread)",
+              borderRadius: 6,
+              padding: "2px 8px",
+              background: "var(--color-accent-dim)",
+            }}
+          >
+            ✓ VERIFIED
+          </span>
+        ) : null}
+        {expiresSoon ? (
+          <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginLeft: "auto" }}>
+            Expires soon
+          </span>
+        ) : null}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-accent)", marginBottom: 6, lineHeight: 1.35 }}>
+        {compoundName}
+        <span style={{ color: "var(--color-text-secondary)", fontWeight: 500, fontSize: 14 }}>
+          {" "}
+          · {doseLine} · {routeLabel}
+        </span>
+      </div>
+      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
+        {sessionPretty ? <span>Session: {sessionPretty}</span> : null}
+        {stackLabel ? <span>Stack: {stackLabel}</span> : null}
+        {createdAt ? <span>{formatTimeAgo(createdAt)}</span> : null}
+      </div>
+
+      {postId ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 4 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 6, flexWrap: "wrap" }}>
+            <LikeButton
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              ownerUserId={ownerUserId || null}
+            />
+            <LikersRow
+              entityType="post"
+              entityId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={activeProfileId}
+              currentProfileGoals={currentProfileGoals}
+              onOpenModal={() => setLikersOpen(true)}
+            />
+          </div>
+          <CommentsSection
+            postId={postId}
+            postCommentCount={commentCount}
+            currentUserId={currentUserId}
+            currentProfileId={activeProfileId}
+            currentProfile={activeProfile}
+            currentProfileGoals={currentProfileGoals}
+          />
+          <LikersModal
+            isOpen={likersOpen}
+            onClose={() => setLikersOpen(false)}
+            entityType="post"
+            entityId={postId}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * @param {unknown} raw
  * @returns {object[]}
  */
@@ -998,104 +1208,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
               return <InbodyNetworkProgressCard key={id} row={row} />;
             }
             const id = typeof row.id === "string" ? row.id : `dose-${idx}`;
-            const handle = typeof row.handle === "string" ? row.handle.trim() : "";
-            const displayHandle = typeof row.display_handle === "string" ? row.display_handle.trim() : "";
-            const displayName = typeof row.display_name === "string" ? row.display_name.trim() : "";
-            const verified =
-              row.verified_credential != null &&
-              String(row.verified_credential).trim() !== "";
-            const compoundId = typeof row.compound_id === "string" ? row.compound_id.trim() : "";
-            const catalogEntry = catalogEntryByCompoundId(compoundId);
-            const compoundName = compoundDisplayName(compoundId);
-            const doseLine = formatDoseLine(row.dose_amount, row.dose_unit, catalogEntry);
-            const routeLabel = formatRouteLabel(row.route);
-            const sessionPretty = formatSessionLabel(row.session_label);
-            const stackLabel = typeof row.stack_label === "string" && row.stack_label.trim() ? row.stack_label.trim() : null;
-            const createdAt = typeof row.created_at === "string" ? row.created_at : "";
-            const expiresAt = typeof row.expires_at === "string" ? row.expires_at : "";
-            const expiresSoon = isExpiresWithinHours(expiresAt, 6);
-            const handleShown = handle ? formatHandleDisplay(handle, displayHandle || null) : displayName || "Member";
-            const userId = typeof row.user_id === "string" ? row.user_id.trim() : "";
-            const avatarR2Key = typeof row.avatar_r2_key === "string" ? row.avatar_r2_key.trim() : "";
-
-            return (
-              <div
-                key={id}
-                id={typeof row.id === "string" && row.id ? `pepv-network-dose-${row.id}` : undefined}
-                className="pcard"
-                role="article"
-                style={{
-                  cursor: "default",
-                  transform: "none",
-                  boxShadow: expiresSoon ? "0 1px 3px rgba(0,0,0,0.45)" : undefined,
-                  opacity: expiresSoon ? 0.88 : 1,
-                  fontFamily: "'Outfit', sans-serif",
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 12px", marginBottom: 10 }}>
-                  <NetworkAvatar userId={userId} r2Key={avatarR2Key} />
-                  {handle ? (
-                    <button
-                      type="button"
-                      onClick={() => openPublicMemberProfile(handle)}
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 600,
-                        color: "var(--color-text-secondary)",
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        textAlign: "left",
-                        textDecoration: "underline",
-                        textDecorationColor: "rgba(248, 250, 252, 0.25)",
-                        textUnderlineOffset: 3,
-                      }}
-                    >
-                      {handleShown}
-                    </button>
-                  ) : (
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--color-text-secondary)" }}>{handleShown}</span>
-                  )}
-                  {verified ? (
-                    <span
-                      title="Verified"
-                      className="mono"
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: "0.06em",
-                        color: "var(--color-accent)",
-                        border: "1px solid var(--color-bell-border-unread)",
-                        borderRadius: 6,
-                        padding: "2px 8px",
-                        background: "var(--color-accent-dim)",
-                      }}
-                    >
-                      ✓ VERIFIED
-                    </span>
-                  ) : null}
-                  {expiresSoon ? (
-                    <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", marginLeft: "auto" }}>
-                      Expires soon
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-accent)", marginBottom: 6, lineHeight: 1.35 }}>
-                  {compoundName}
-                  <span style={{ color: "var(--color-text-secondary)", fontWeight: 500, fontSize: 14 }}>
-                    {" "}
-                    · {doseLine} · {routeLabel}
-                  </span>
-                </div>
-                <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
-                  {sessionPretty ? <span>Session: {sessionPretty}</span> : null}
-                  {stackLabel ? <span>Stack: {stackLabel}</span> : null}
-                  {createdAt ? <span>{formatTimeAgo(createdAt)}</span> : null}
-                </div>
-              </div>
-            );
+            return <LiveDoseCard key={id} row={row} />;
           })}
         </div>
       )}
