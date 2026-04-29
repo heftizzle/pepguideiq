@@ -149,6 +149,23 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
     setSearch(name);
   };
 
+  /** Enter commits query (closes autocomplete); grid already filters via parent `search`. Escape clears query + dropdown. */
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setSuppressSuggestions(true);
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setSuppressSuggestions(true);
+      setInputValue("");
+      setSearch("");
+      e.currentTarget.blur();
+    }
+  };
+
   return (
     <div ref={rootRef} className="pepv-library-mobile-search-panel">
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -163,6 +180,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
           placeholder="Search by name, alias, tag…"
           value={inputValue}
           onChange={onChangeInput}
+          onKeyDown={handleSearchKeyDown}
           aria-label="Search compounds"
           style={{
             flex: 1,

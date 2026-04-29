@@ -110,6 +110,36 @@ function peptideCategories(p) {
   return [];
 }
 
+/** Every label on a compound (primary + full list) for Library category filter matching. */
+function allPeptideCategoryLabels(p) {
+  const a = Array.isArray(p.category) ? p.category : p.category != null && p.category !== "" ? [String(p.category)] : [];
+  const b = Array.isArray(p.categories) ? p.categories : p.categories != null && p.categories !== "" ? [String(p.categories)] : [];
+  return [...new Set([...a, ...b].map(String))];
+}
+
+/** Each filter pill key maps to one or more data `category` / `categories` strings. */
+const CATEGORY_FILTER_MAP = {
+  Longevity: ["Longevity", "Antioxidant", "Methylation"],
+  Nootropic: ["Nootropic", "Cognitive"],
+  "Healing / Recovery": ["Healing / Recovery", "Healing"],
+  "GLP / Metabolic": ["GLP / Metabolic", "Metabolic"],
+  "Anabolics / HRT": ["Anabolics / HRT", "HRT", "TRT", "Hormone Replacement", "Hormone"],
+  "Khavinson Bioregulators": ["Khavinson Bioregulators", "Bioregulator"],
+  "Skin / Hair / Nails": ["Skin / Hair / Nails", "Cosmetic"],
+  "Diabetes Management": ["Diabetes Management"],
+  Cardiovascular: ["Cardiovascular"],
+  Adaptogen: ["Adaptogen"],
+  Performance: ["Performance"],
+  Foundational: ["Foundational", "Foundational Supplement"],
+};
+
+function matchesCategory(p, activeCategory) {
+  if (activeCategory === "All") return true;
+  const filterStrings = CATEGORY_FILTER_MAP[activeCategory] ?? [activeCategory];
+  const pCats = allPeptideCategoryLabels(p);
+  return filterStrings.some((f) => pCats.includes(f));
+}
+
 function primaryCategory(p) {
   return peptideCategories(p)[0] ?? "";
 }
@@ -180,32 +210,42 @@ const LIBRARY_FILTER_PILL_ACTIVE = {
   color: "var(--color-accent)",
 };
 
-/** Display-only short names on pcard category badges; primary category string unchanged for CSS/filtering. */
+/** Display-only short names on filter pills + pcard badges; filter `selCat` / CSS still use full data strings. */
 const CATEGORY_SHORT = {
   "Khavinson Bioregulators": "Bioregulators",
+  "Anabolics / HRT": "HRT / TRT",
+  "GLP / Metabolic": "GLP",
+  "Diabetes Management": "Diabetes",
+  "Healing / Recovery": "Healing",
 };
 
 /** @param {string | { label: string; value: string }} cat */
 function libraryCategoryEntry(cat) {
-  return typeof cat === "string" ? { label: cat, value: cat } : { label: cat.label, value: cat.value };
+  const value = typeof cat === "string" ? cat : cat.value;
+  const label = CATEGORY_SHORT[value] ?? (typeof cat === "object" && cat.label ? cat.label : value);
+  return { label, value };
 }
 
 /** Library category pills — two horizontal scroll rows (order is intentional). */
 const LIBRARY_CATEGORY_ROW_1 = [
   "All",
+  "Foundational",
   "Anabolics / HRT",
   "Sexual Health",
   "GH Peptides",
   "Sleep",
   "Healing / Recovery",
+  "Cardiovascular",
   "Longevity",
   "Nootropic",
   "Immune",
-  "Vitamin",
+  "Adaptogen",
+  "Performance",
 ];
 
 const LIBRARY_CATEGORY_ROW_2 = [
   "GLP / Metabolic",
+  "Diabetes Management",
   "Skin / Hair / Nails",
   "Mitochondrial",
   "Relational Performance",
@@ -213,7 +253,8 @@ const LIBRARY_CATEGORY_ROW_2 = [
   "Testosterone Support",
   "Thyroid Support",
   "SARMs",
-  { label: "Bioregulators", value: "Khavinson Bioregulators" },
+  "Khavinson Bioregulators",
+  "Vitamin",
 ];
 
 const LIBRARY_CAT_SCROLL_OUTER = {
@@ -764,7 +805,7 @@ function PepGuideIQApp({ user, setUser }) {
   const filtered = useMemo(
     () =>
       PEPTIDES.filter((p) => {
-        const mc = selCat === "All" || peptideCategories(p).includes(selCat);
+        const mc = matchesCategory(p, selCat);
         const mr = peptideMatchesRouteFilter(p, routeFilter);
         const ms =
           !search ||
@@ -1686,8 +1727,21 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 cats={LIBRARY_CATEGORY_ROW_2}
                 selCat={selCat}
                 onSelect={handleCategorySelect}
-                marginBottom={12}
+                marginBottom={search.trim() !== "" ? 8 : 12}
               />
+              {search.trim() !== "" && (
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 12,
+                    color: "var(--color-text-placeholder)",
+                    marginBottom: 12,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Showing {sortedPeptides.length} results for &quot;{search.trim()}&quot;
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
