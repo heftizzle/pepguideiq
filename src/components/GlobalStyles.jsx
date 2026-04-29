@@ -148,8 +148,22 @@ export function GlobalStyles() {
         background:linear-gradient(135deg,color-mix(in srgb,var(--cc,var(--color-accent)) 20%,transparent) 0%,color-mix(in srgb,var(--cc,var(--color-accent)) 8%,transparent) 100%);
         color:var(--cc,var(--color-accent));
         border:1px solid color-mix(in srgb,var(--cc,var(--color-accent)) 21%,transparent);
+        white-space:nowrap;
       }
-      .pcard .pill--category{font-size:13px}
+      .pcard .pill--category{
+        font-size:13px;
+        flex-shrink:0;
+      }
+      .pcard--library .pcard-head-main{
+        min-width:0;
+        flex:1 1 auto;
+      }
+      .pcard--library .pcard-head-main > .brand{
+        min-width:0;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
       .build-tab-compound-meta .pill--category{font-size:11px;margin-top:4px;display:inline-block}
       .pepv-protocol-session-pill--active{
         box-shadow:0 0 0 1px var(--color-protocol-pill-active-1),0 0 14px var(--color-protocol-pill-active-2),0 0 4px var(--color-protocol-pill-active-3);

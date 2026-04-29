@@ -1816,8 +1816,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     : null;
                   return (
                     <div key={p.id} className="pcard pcard--library" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
-                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
-                        <div>
+                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8,minWidth:0 }}>
+                        <div className="pcard-head-main">
                           <div className="brand" style={{ fontWeight:700,fontSize:14,color:"var(--color-text-primary)" }}>{p.name}</div>
                           {p.variantOf && (
                             <div>
