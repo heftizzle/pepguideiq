@@ -18,12 +18,23 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000,
+    // Compounds chunk is ~2.1 MB until lazy-load; 1600 still warns — cap above that for clean CI logs.
+    chunkSizeWarningLimit: 2200,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "vendor-react": ["react", "react-dom"],
-          "vendor-supabase": ["@supabase/supabase-js"],
+        manualChunks(id) {
+          const x = id.replace(/\\/g, "/");
+          if (x.includes("src/data/compounds")) return "compounds";
+          if (x.includes("node_modules/@supabase")) return "vendor-supabase";
+          if (
+            x.includes("node_modules/react/") ||
+            x.includes("node_modules/react-dom/") ||
+            x.includes("node_modules/scheduler/") ||
+            x.includes("node_modules/use-sync-external-store/")
+          ) {
+            return "vendor-react";
+          }
+          if (x.includes("node_modules")) return "vendor-misc";
         },
       },
     },
