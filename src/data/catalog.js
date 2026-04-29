@@ -35,6 +35,7 @@ function sanitizeEntryText(entry) {
   if (finn) out.finnrickUrl = finn;
   else delete out.finnrickUrl;
   if (typeof out.notes === "string") out.notes = sanitizeVendorRefs(out.notes);
+  if (typeof out.sourcingNotes === "string") out.sourcingNotes = sanitizeVendorRefs(out.sourcingNotes);
   if (typeof out.mechanism === "string") out.mechanism = sanitizeVendorRefs(out.mechanism);
   if (typeof out.bioavailabilityNote === "string") out.bioavailabilityNote = sanitizeVendorRefs(out.bioavailabilityNote);
   if (typeof out.bioavailability === "string") out.bioavailability = sanitizeVendorRefs(out.bioavailability);

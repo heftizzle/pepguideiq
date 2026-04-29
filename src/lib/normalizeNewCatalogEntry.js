@@ -96,9 +96,12 @@ export function normalizeNewCatalogEntry(raw) {
   const warnings = Array.isArray(raw.warnings) ? raw.warnings.map((w) => sanitizeVendorRefs(String(w))) : [];
   const noteParts = [];
   if (raw.notes != null && String(raw.notes).trim()) noteParts.push(sanitizeVendorRefs(String(raw.notes)));
-  if (raw.sourcingNotes) noteParts.push(neutralSourcingFallback(String(raw.sourcingNotes)));
   if (raw.variantNote) noteParts.push(sanitizeVendorRefs(String(raw.variantNote)));
   const notesJoined = noteParts.filter(Boolean).join(" ");
+  const sourcingNotesNormalized =
+    raw.sourcingNotes != null && String(raw.sourcingNotes).trim()
+      ? neutralSourcingFallback(String(raw.sourcingNotes))
+      : "";
 
   const benefitsFromTags = tags
     .slice(0, 8)
@@ -231,12 +234,13 @@ export function normalizeNewCatalogEntry(raw) {
     cycle,
     storage: raw.storage != null ? sanitizeVendorRefs(String(raw.storage)) : storageDefault,
     reconstitution,
-    notes: notesJoined || neutralSourcingFallback(raw.sourcingNotes),
+    notes: notesJoined || "",
     tags,
     ...componentsField,
     ...reconstitutionVolumeField,
     ...vialSizeOptionsField,
     ...finnrickUrlField,
+    ...(sourcingNotesNormalized ? { sourcingNotes: sourcingNotesNormalized } : {}),
     ...(raw.variantOf ? { variantOf: String(raw.variantOf) } : {}),
     ...(raw.variantNote ? { variantNote: sanitizeVendorRefs(String(raw.variantNote)) } : {}),
     ...(raw.tier != null ? { tier: String(raw.tier) } : {}),

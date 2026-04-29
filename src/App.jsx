@@ -1740,8 +1740,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   const cat0 = primaryCategory(p);
                   const inStack = myStack.some((s) => s.id === p.id);
                   const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
+                  const halfLifeDisplay = p.halfLife
+                    ? p.halfLife.length > 40
+                      ? p.halfLife.split(";")[0].trim()
+                      : p.halfLife
+                    : null;
                   return (
-                    <div key={p.id} className="pcard" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
+                    <div key={p.id} className="pcard pcard--library" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8 }}>
                         <div>
                           <div className="brand" style={{ fontWeight:700,fontSize:14,color:"var(--color-text-primary)" }}>{p.name}</div>
@@ -1799,15 +1804,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                         <span className="pill pill--category">{cat0}</span>
                       </div>
-                      <div style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
-                        {p.mechanism.length > 90 ? p.mechanism.slice(0,90)+"…" : p.mechanism}
+                      <div className="pcard-summary" style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
+                        {p.mechanism}
                       </div>
                       {(() => {
                         const ba = resolvePeptideBioavailability(p);
                         if (!ba) return null;
                         return (
                           <div
-                            className="mono"
+                            className="mono pcard-bioavail"
                             onClick={(e) => e.stopPropagation()}
                             style={{
                               fontSize: 13,
@@ -1825,15 +1830,15 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       })()}
                       {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
                         <div
-                          className="mono"
+                          className="mono pcard-bioavail-warn"
                           onClick={(e) => e.stopPropagation()}
                           style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 10, lineHeight: 1.45 }}
                         >
                           ⚠ {p.bioavailabilityNote}
                         </div>
                       )}
-                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                        <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)" }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>t½</span> {p.halfLife}</div>
+                      <div className="pcard-footer" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minWidth:0 }}>
+                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-placeholder)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>t½</span> {halfLifeDisplay}</div>
                         <button
                           type="button"
                           className={inStack?"btn-green":"btn-teal"}
@@ -1841,6 +1846,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             padding:"5px 10px",
                             fontSize: 13,
                             opacity: inStack ? 1 : !stackListReady ? 0.55 : 1,
+                            flexShrink: 0,
                           }}
                           data-tutorial-target={cardIdx === 0 ? TUTORIAL_TARGET.library_add_stack : undefined}
                           {...tutorialHighlightProps(cardIdx === 0 && isHighlighted(TUTORIAL_TARGET.library_add_stack))}
@@ -2565,22 +2571,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
               >
                 {p.mechanism}
               </div>
-              {baDetail && (
-                <div
-                  className="mono"
-                  style={{ fontSize: 13, color: baDetail.warn ? "var(--color-warning)" : "var(--color-text-secondary)", marginBottom: 12, lineHeight: 1.45 }}
-                  title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
-                >
-                  {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
-                  {baDetail.text}
-                </div>
-              )}
-              {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
-                <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12, lineHeight: 1.45 }}>
-                  ⚠ {p.bioavailabilityNote}
-                </div>
-              )}
               {[
                 ["Typical Dose", p.typicalDose],
                 ["Start Dose", p.startDose],
@@ -2595,10 +2585,38 @@ function PepGuideIQMainTree({ mainUiRef }) {
               ].map(([l, v]) => (
                 <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
               ))}
+              {baDetail && (
+                <div
+                  className="mono"
+                  style={{ fontSize: 13, color: baDetail.warn ? "var(--color-warning)" : "var(--color-text-secondary)", marginTop: 12, marginBottom: 12, lineHeight: 1.45 }}
+                  title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
+                >
+                  {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
+                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
+                  {baDetail.text}
+                </div>
+              )}
+              {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
+                <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12, lineHeight: 1.45 }}>
+                  ⚠ {p.bioavailabilityNote}
+                </div>
+              )}
               <div style={{ marginTop:12 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
               </div>
+              {p.notes && (
+                <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
+                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>NOTES</div>
+                  <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.notes}</div>
+                </div>
+              )}
+              {typeof p.sourcingNotes === "string" && p.sourcingNotes.trim() !== "" && (
+                <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
+                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>SOURCING NOTES</div>
+                  <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.sourcingNotes}</div>
+                </div>
+              )}
               <div style={{ marginTop:10 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
@@ -2607,12 +2625,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div style={{ marginTop:10 }}>
                   <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
                   <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
-                </div>
-              )}
-              {p.notes && (
-                <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>NOTES</div>
-                  <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.notes}</div>
                 </div>
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>

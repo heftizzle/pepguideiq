@@ -118,6 +118,31 @@ export function GlobalStyles() {
         transition:transform 0.18s ease,box-shadow 0.18s ease,border-color 0.18s ease;
       }
       .pcard:active{transform:translateY(-1px)}
+      .pcard--library{
+        height:260px;
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+        min-width:0;
+      }
+      .pcard--library .pcard-summary{
+        display:-webkit-box;
+        -webkit-line-clamp:2;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+      }
+      .pcard--library .pcard-bioavail,
+      .pcard--library .pcard-bioavail-warn,
+      .pcard--library .pcard-halflife{
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        max-width:100%;
+        min-width:0;
+      }
+      .pcard--library .pcard-footer{
+        margin-top:auto;
+      }
       .pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
       .pill--category{
         background:linear-gradient(135deg,color-mix(in srgb,var(--cc,var(--color-accent)) 20%,transparent) 0%,color-mix(in srgb,var(--cc,var(--color-accent)) 8%,transparent) 100%);
