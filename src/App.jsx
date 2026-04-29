@@ -191,6 +191,7 @@ const LIBRARY_CATEGORY_ROW_1 = [
   "Longevity",
   "Nootropic",
   "Immune",
+  "Vitamin",
 ];
 
 const LIBRARY_CATEGORY_ROW_2 = [
