@@ -1,5 +1,5 @@
 import { getTierPlanCardBullets, TIERS, formatPrice } from "../lib/tiers.js";
-import { COMPOUNDS } from "./compounds/index.js";
+import { ALL_COMPOUNDS } from "./compounds/index.js";
 import { normalizeNewCatalogEntry } from "../lib/normalizeNewCatalogEntry.js";
 import { sanitizeVendorRefs } from "../lib/catalogVendorSanitize.js";
 import { resolveStability } from "../lib/catalogStability.js";
@@ -49,9 +49,9 @@ const PEPTIDES_CORE = [
 
 ];
 
-/** IDs present in batch `COMPOUNDS` — those rows win over legacy `PEPTIDES_CORE` when both define the same `id`. */
-const compoundIds = new Set(COMPOUNDS.map((raw) => String(raw.id)));
-const mergedFromCompounds = COMPOUNDS.map((raw) => sanitizeEntryText(normalizeNewCatalogEntry(raw)));
+/** IDs present in batch compounds — those rows win over legacy `PEPTIDES_CORE` when both define the same `id`. */
+const compoundIds = new Set(ALL_COMPOUNDS.map((raw) => String(raw.id)));
+const mergedFromCompounds = ALL_COMPOUNDS.map((raw) => sanitizeEntryText(normalizeNewCatalogEntry(raw)));
 const coreOnly = PEPTIDES_CORE.filter((p) => !compoundIds.has(String(p.id))).map(sanitizeEntryText);
 
 export const PEPTIDES = attachPopularityRanks(
