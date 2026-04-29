@@ -180,6 +180,16 @@ const LIBRARY_FILTER_PILL_ACTIVE = {
   color: "var(--color-accent)",
 };
 
+/** Display-only short names on pcard category badges; primary category string unchanged for CSS/filtering. */
+const CATEGORY_SHORT = {
+  "Khavinson Bioregulators": "Bioregulators",
+};
+
+/** @param {string | { label: string; value: string }} cat */
+function libraryCategoryEntry(cat) {
+  return typeof cat === "string" ? { label: cat, value: cat } : { label: cat.label, value: cat.value };
+}
+
 /** Library category pills — two horizontal scroll rows (order is intentional). */
 const LIBRARY_CATEGORY_ROW_1 = [
   "All",
@@ -203,7 +213,7 @@ const LIBRARY_CATEGORY_ROW_2 = [
   "Testosterone Support",
   "Thyroid Support",
   "SARMs",
-  "Khavinson Bioregulators",
+  { label: "Bioregulators", value: "Khavinson Bioregulators" },
 ];
 
 const LIBRARY_CAT_SCROLL_OUTER = {
@@ -249,7 +259,7 @@ const LIBRARY_CAT_CHEV_BTN = {
 };
 
 /**
- * @param {{ cats: string[]; selCat: string; onSelect: (cat: string) => void; marginBottom: number }} props
+ * @param {{ cats: (string | { label: string; value: string })[]; selCat: string; onSelect: (cat: string) => void; marginBottom: number }} props
  */
 function LibraryCategoryPillScrollRow({ cats, selCat, onSelect, marginBottom }) {
   const scrollRef = useRef(null);
@@ -292,21 +302,24 @@ function LibraryCategoryPillScrollRow({ cats, selCat, onSelect, marginBottom }) 
         style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 0 }}
       >
         <div style={LIBRARY_CAT_SCROLL_INNER}>
-          {cats.map((cat) => (
-            <button
-              type="button"
-              key={cat}
-              onClick={() => onSelect(cat)}
-              style={{
-                ...LIBRARY_FILTER_PILL_BASE,
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-                ...(selCat === cat ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+          {cats.map((cat) => {
+            const { label, value } = libraryCategoryEntry(cat);
+            return (
+              <button
+                type="button"
+                key={value}
+                onClick={() => onSelect(value)}
+                style={{
+                  ...LIBRARY_FILTER_PILL_BASE,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                  ...(selCat === value ? LIBRARY_FILTER_PILL_ACTIVE : {}),
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
       {showLeft ? (
@@ -1739,6 +1752,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               >
                 {sortedPeptides.map((p, cardIdx) => {
                   const cat0 = primaryCategory(p);
+                  const categoryBadgeLabel = CATEGORY_SHORT[cat0] ?? cat0;
                   const inStack = myStack.some((s) => s.id === p.id);
                   const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
                   const halfLifeDisplay = p.halfLife
@@ -1803,7 +1817,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           )}
                           {p.aliases[0] && <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:1 }}>{p.aliases[0]}</div>}
                         </div>
-                        <span className="pill pill--category">{cat0}</span>
+                        <span className="pill pill--category">{categoryBadgeLabel}</span>
                       </div>
                       <div className="pcard-summary" style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
                         {p.mechanism}
