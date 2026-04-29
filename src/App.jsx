@@ -1641,6 +1641,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   initialSearch={search}
                   onDismiss={dismissLibrarySearch}
                   setSearch={setSearch}
+                  onPickCompound={(p) => setSelPeptide(p)}
                 />
               )}
             </div>
