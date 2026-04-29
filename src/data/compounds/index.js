@@ -40,7 +40,7 @@ import { BATCH34 } from "./batch34.js";
 import { BATCH35 } from "./batch35.js";
 import { BATCH36 } from "./batch36.js";
 
-export const ALL_COMPOUNDS = [
+const _ALL_COMPOUNDS_RAW = [
   ...BATCH1,
   ...BATCH2,
   ...BATCH3,
@@ -78,6 +78,22 @@ export const ALL_COMPOUNDS = [
   ...BATCH35,
   ...BATCH36,
 ];
+
+// Last occurrence wins — newer batches override older ones for the same id.
+function dedupeById(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    const id = String(row?.id ?? "");
+    if (!id) continue;
+    if (map.has(id) && typeof console !== "undefined") {
+      console.warn(`[catalog] duplicate compound id "${id}" — keeping later batch entry`);
+    }
+    map.set(id, row);
+  }
+  return Array.from(map.values());
+}
+
+export const ALL_COMPOUNDS = dedupeById(_ALL_COMPOUNDS_RAW);
 
 /** @deprecated Prefer `ALL_COMPOUNDS` — same array reference. */
 export const COMPOUNDS = ALL_COMPOUNDS;

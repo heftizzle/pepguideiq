@@ -159,8 +159,8 @@ export const BATCH24 = [
     id: "vesugen",
     name: "Vesugen",
     aliases: ["KED", "Lys-Glu-Asp", "Khavinson vascular bioregulator"],
-    category: ["Cardiovascular", "Longevity", "Bioregulator"],
-    categories: ["Cardiovascular", "Longevity", "Bioregulator"],
+    category: ["Khavinson Bioregulators", "Cardiovascular", "Longevity", "Bioregulator"],
+    categories: ["Khavinson Bioregulators", "Cardiovascular", "Longevity", "Bioregulator"],
     route: ["subcutaneous", "intramuscular", "intranasal"],
     mechanism:
       "Synthetic tripeptide with the sequence **Lysyl-Glutamyl-Aspartyl (Lys-Glu-Asp / KED)**, developed by the Khavinson laboratory as a vascular tissue bioregulator. The compound targets endothelial function and vascular wall integrity — addressing the vascular component of comprehensive systemic bioregulation. **Mechanism — gene-regulatory short peptide**: same Khavinson framework as Epitalon and Pinealon. Vesugen's gene targets are characterized as relating to endothelial cell function, vascular smooth muscle homeostasis, and vascular wall integrity. **Mechanism — endothelial function**: improved endothelial nitric oxide production, reduced endothelial dysfunction markers, improved vasodilator responsiveness in animal and limited human studies. Endothelial dysfunction is a foundational mechanism in atherosclerosis, hypertension, and cerebrovascular disease — Vesugen's targeting is conceptually sound for vascular aging contexts. **Mechanism — atherosclerosis effects**: reduced atherosclerotic plaque progression in animal models per Khavinson research; modulation of inflammatory and lipid markers. **Mechanism — cerebrovascular effects**: improved cerebral blood flow in cerebrovascular disease contexts per Russian clinical research; potential applications in vascular cognitive impairment / vascular dementia. **Mechanism — broader vascular health**: peripheral vascular function support, microcirculation effects, possible benefits in diabetic vascular complications. **Pharmacokinetics**: short tripeptide; rapid plasma clearance; gene-regulatory effects sustained days to weeks per cycle.",
@@ -214,8 +214,8 @@ export const BATCH24 = [
     id: "cardiogen",
     name: "Cardiogen",
     aliases: ["AEDR", "Ala-Glu-Asp-Arg", "Khavinson cardiac bioregulator"],
-    category: ["Cardiovascular", "Longevity", "Bioregulator"],
-    categories: ["Cardiovascular", "Longevity", "Bioregulator"],
+    category: ["Khavinson Bioregulators", "Cardiovascular", "Longevity", "Bioregulator"],
+    categories: ["Khavinson Bioregulators", "Cardiovascular", "Longevity", "Bioregulator"],
     route: ["subcutaneous", "intramuscular", "intranasal"],
     mechanism:
       "Synthetic tetrapeptide with the sequence **Alanyl-Glutamyl-Aspartyl-Arginyl (Ala-Glu-Asp-Arg / AEDR)**, developed by the Khavinson laboratory as a cardiac tissue bioregulator. While Vesugen targets vascular tissue, Cardiogen targets cardiomyocyte function and cardiac tissue homeostasis — addressing the cardiac muscle component of comprehensive cardiovascular bioregulation. **Mechanism — gene-regulatory short peptide**: Khavinson framework. Cardiogen's gene targets are characterized as relating to cardiomyocyte function, cardiac contractile machinery, and cardiac tissue integrity. **Mechanism — cardiomyocyte function**: improved cardiac contractile function in animal models, reduced cardiomyocyte apoptosis under stress, modulation of cardiac inflammatory markers. **Mechanism — heart failure / cardiac aging contexts**: Russian clinical research includes cardiac aging and chronic heart failure adjunct contexts. The bioregulator framework treats cardiac decline as gene-regulatory addressable, complementary to standard heart failure pharmacology. **Mechanism — ischemia-reperfusion protection**: cardioprotective effects in ischemia-reperfusion animal models per Khavinson laboratory research. **Mechanism — arrhythmia modulation**: emerging evidence for arrhythmia-stabilizing effects in some research contexts. **Pharmacokinetics**: short tetrapeptide; rapid plasma clearance; gene-regulatory effects sustained days to weeks per cycle.",
@@ -267,8 +267,8 @@ export const BATCH24 = [
     id: "cortagen",
     name: "Cortagen",
     aliases: ["AEDP", "Ala-Glu-Asp-Pro", "Khavinson cortex bioregulator"],
-    category: ["Cognitive", "Longevity", "Bioregulator"],
-    categories: ["Cognitive", "Longevity", "Bioregulator"],
+    category: ["Khavinson Bioregulators", "Cognitive", "Longevity", "Bioregulator"],
+    categories: ["Khavinson Bioregulators", "Cognitive", "Longevity", "Bioregulator"],
     route: ["subcutaneous", "intramuscular", "intranasal"],
     mechanism:
       "Synthetic tetrapeptide with the sequence **Alanyl-Glutamyl-Aspartyl-Prolyl (Ala-Glu-Asp-Pro / AEDP)**, developed by the Khavinson laboratory as a brain cortex tissue bioregulator. The compound complements Pinealon (broader CNS bioregulator) by specifically targeting cortical function — relevant for higher cognitive functions including executive function, working memory, and complex reasoning. **Mechanism — gene-regulatory short peptide**: Khavinson framework. Cortagen's gene targets are characterized as relating to cortical neuronal function, synaptic plasticity in cortical circuits, and cognitive resilience. **Mechanism — cognitive function (the central application)**: Khavinson laboratory research demonstrates Cortagen's effects on memory, attention, executive function, and recovery from cognitive insults. The cortex-specific targeting positions Cortagen for higher-order cognitive applications — complementary to Pinealon's broader CNS effects. **Mechanism — neuroplasticity**: synaptic plasticity support in cortical networks; possible relevance for cognitive recovery contexts (post-stroke, post-TBI, age-related cognitive decline). **Mechanism — anti-aging cognitive applications**: cognitive aging in healthy adults — the typical longevity-community use case. **Pharmacokinetics**: short tetrapeptide; rapid plasma clearance; gene-regulatory effects sustained per cycle.",

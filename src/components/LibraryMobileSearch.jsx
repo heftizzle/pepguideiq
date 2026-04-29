@@ -89,9 +89,9 @@ export function LibraryMobileSearchIcon({ open, onOpen }) {
 
 /**
  * Full-width search row below header + autocomplete (Library tab).
- * @param {{ initialSearch?: string; onDismiss: () => void; setSearch: (s: string) => void }} props
+ * @param {{ initialSearch?: string; onDismiss: () => void; setSearch: (s: string) => void; onPickCompound?: (peptide: typeof PEPTIDES[number]) => void }} props
  */
-export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSearch }) {
+export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSearch, onPickCompound }) {
   const [inputValue, setInputValue] = useState(initialSearch);
   const [suppressSuggestions, setSuppressSuggestions] = useState(false);
   const inputRef = useRef(null);
@@ -137,11 +137,16 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
   };
 
   const pickPeptide = (p) => {
-    const name = p.name || "";
     setSuppressSuggestions(true);
+    inputRef.current?.blur();
+    if (typeof onPickCompound === "function") {
+      onPickCompound(p);
+      onDismiss();
+      return;
+    }
+    const name = p.name || "";
     setInputValue(name);
     setSearch(name);
-    inputRef.current?.blur();
   };
 
   return (
@@ -225,6 +230,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
                 <button
                   key={p.id}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => pickPeptide(p)}
                   style={{
                     display: "block",
