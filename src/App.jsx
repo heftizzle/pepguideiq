@@ -110,18 +110,11 @@ function peptideCategories(p) {
   return [];
 }
 
-/** Every label on a compound (primary + full list) for Library category filter matching. */
-function allPeptideCategoryLabels(p) {
-  const a = Array.isArray(p.category) ? p.category : p.category != null && p.category !== "" ? [String(p.category)] : [];
-  const b = Array.isArray(p.categories) ? p.categories : p.categories != null && p.categories !== "" ? [String(p.categories)] : [];
-  return [...new Set([...a, ...b].map(String))];
-}
-
-/** Each filter pill key maps to one or more data `category` / `categories` strings. */
+/** Each filter pill value maps to one or more data `category` / `categories` strings. */
 const CATEGORY_FILTER_MAP = {
   Longevity: ["Longevity", "Antioxidant", "Methylation"],
   Nootropic: ["Nootropic", "Cognitive"],
-  "Healing / Recovery": ["Healing / Recovery", "Healing"],
+  Healing: ["Healing / Recovery", "Healing"],
   "GLP / Metabolic": ["GLP / Metabolic", "Metabolic"],
   "Anabolics / HRT": ["Anabolics / HRT", "HRT", "TRT", "Hormone Replacement", "Hormone"],
   "Khavinson Bioregulators": ["Khavinson Bioregulators", "Bioregulator"],
@@ -131,12 +124,16 @@ const CATEGORY_FILTER_MAP = {
   Adaptogen: ["Adaptogen"],
   Performance: ["Performance"],
   Foundational: ["Foundational", "Foundational Supplement"],
+  "Sexual Health": ["Sexual Health", "Relational Performance", "Sexual Function"],
 };
 
 function matchesCategory(p, activeCategory) {
   if (activeCategory === "All") return true;
   const filterStrings = CATEGORY_FILTER_MAP[activeCategory] ?? [activeCategory];
-  const pCats = allPeptideCategoryLabels(p);
+  const pCats = [
+    ...(Array.isArray(p.category) ? p.category : p.category ? [p.category] : []),
+    ...(Array.isArray(p.categories) ? p.categories : p.categories ? [p.categories] : []),
+  ];
   return filterStrings.some((f) => pCats.includes(f));
 }
 
@@ -234,7 +231,7 @@ const LIBRARY_CATEGORY_ROW_1 = [
   "Sexual Health",
   "GH Peptides",
   "Sleep",
-  "Healing / Recovery",
+  "Healing",
   "Cardiovascular",
   "Longevity",
   "Nootropic",
@@ -245,10 +242,9 @@ const LIBRARY_CATEGORY_ROW_1 = [
 
 const LIBRARY_CATEGORY_ROW_2 = [
   "GLP / Metabolic",
-  "Diabetes Management",
+  { label: "Diabetes", value: "Diabetes Management" },
   "Skin / Hair / Nails",
   "Mitochondrial",
-  "Relational Performance",
   "Estrogen Control",
   "Testosterone Support",
   "Thyroid Support",
