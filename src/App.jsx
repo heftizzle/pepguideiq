@@ -214,6 +214,10 @@ const CATEGORY_SHORT = {
   "GLP / Metabolic": "GLP",
   "Diabetes Management": "Diabetes",
   "Healing / Recovery": "Healing",
+  "Anti-Inflammatory": "Anti-Inflam",
+  "Skin / Hair / Nails": "Skin",
+  "Bronchodilator": "Broncho",
+  "Testosterone Support": "Test Support",
 };
 
 /** @param {string | { label: string; value: string }} cat */

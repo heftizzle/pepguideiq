@@ -154,6 +154,11 @@ export function GlobalStyles() {
         font-size:13px;
         flex-shrink:0;
       }
+      .pcard--library .pill--category{
+        max-width:45%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
       .pcard--library .pcard-head-main{
         min-width:0;
         flex:1 1 auto;
