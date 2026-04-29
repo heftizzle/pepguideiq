@@ -2627,19 +2627,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <button type="button" style={{ background:"none",border:"none",color:"var(--color-text-secondary)",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
-              <div
-                style={{
-                  ...getCategoryCssVars(pCat),
-                  borderLeft: "3px solid var(--cc)",
-                  paddingLeft: 12,
-                  marginBottom: 14,
-                  fontSize: 13,
-                  color: "var(--color-text-placeholder)",
-                  lineHeight: 1.6,
-                }}
-              >
-                {p.mechanism}
-              </div>
               {[
                 ["Typical Dose", p.typicalDose],
                 ["Start Dose", p.startDose],
@@ -2670,9 +2657,33 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   ⚠ {p.bioavailabilityNote}
                 </div>
               )}
+              <div style={{ marginTop:10 }}>
+                <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
+              </div>
               <div style={{ marginTop:12 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
+              </div>
+              {p.stacksWith.length > 0 && (
+                <div style={{ marginTop:10 }}>
+                  <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
+                </div>
+              )}
+              <div
+                style={{
+                  ...getCategoryCssVars(pCat),
+                  borderLeft: "3px solid var(--cc)",
+                  paddingLeft: 12,
+                  marginTop: 12,
+                  marginBottom: 14,
+                  fontSize: 13,
+                  color: "var(--color-text-placeholder)",
+                  lineHeight: 1.6,
+                }}
+              >
+                {p.mechanism}
               </div>
               {p.notes && (
                 <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
@@ -2684,16 +2695,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
                   <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>SOURCING NOTES</div>
                   <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.sourcingNotes}</div>
-                </div>
-              )}
-              <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
-              </div>
-              {p.stacksWith.length > 0 && (
-                <div style={{ marginTop:10 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
-                  <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
                 </div>
               )}
               <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>

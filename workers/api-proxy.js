@@ -2118,6 +2118,7 @@ async function handleDeleteAccount(request, env, cors) {
 /**
  * Authenticated POST — create a member profile + empty user_stacks row; tier slot limit enforced.
  * Body: { "display_name": "string" }
+ * Does not PATCH `public.profiles`; account `display_name` is synced from the default member profile only (see migration 083).
  */
 async function handleCreateMemberProfile(request, env, cors) {
   if (!supabaseAuthReady(env)) {
