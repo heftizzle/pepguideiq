@@ -266,6 +266,8 @@ export function ProtocolTab({
       skipGuardrailForPeptideIdRef.current = null;
     }
 
+    const compoundIdForToast = r.peptideId;
+
     setLoggingPeptideId(peptideId);
     const now = new Date().toISOString();
     /** @type {{ data: { id?: string } | null; error: Error | null }} */
@@ -308,7 +310,7 @@ export function ProtocolTab({
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {
       bumpReload();
-      showMotivationToast(toastMessage, peptideId);
+      showMotivationToast(toastMessage, compoundIdForToast);
       return;
     }
     const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
@@ -328,14 +330,14 @@ export function ProtocolTab({
       if (nfErr) console.error("[ProtocolTab] network_feed insert failed", nfErr);
       else console.error("[ProtocolTab] network_feed insert returned no id", nf);
       bumpReload();
-      showMotivationToast(toastMessage, peptideId);
+      showMotivationToast(toastMessage, compoundIdForToast);
       return;
     }
     const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
     if (!networkFeedId) {
       console.error("[ProtocolTab] network_feed insert id empty", nf);
       bumpReload();
-      showMotivationToast(toastMessage, peptideId);
+      showMotivationToast(toastMessage, compoundIdForToast);
       return;
     }
     setNetworkPostError(null);
@@ -347,7 +349,7 @@ export function ProtocolTab({
       previewLine,
       toastMessage,
     });
-    showMotivationToast(toastMessage, peptideId);
+    showMotivationToast(toastMessage, compoundIdForToast);
     bumpReload();
   };
 

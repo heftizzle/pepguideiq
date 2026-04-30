@@ -184,6 +184,8 @@ export function StackProtocolQuickLog({
       skipGuardrailForPeptideIdRef.current = null;
     }
 
+    const compoundIdForToast = r.peptideId;
+
     setLoggingPeptideId(peptideId);
     const now = new Date().toISOString();
     /** @type {{ data: { id?: string } | null; error: Error | null }} */
@@ -220,9 +222,9 @@ export function StackProtocolQuickLog({
     setGuardrail(null);
     void refreshMemberProfiles();
     bumpReload();
-    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
+    const cat = findCatalogPeptideForStackRow({ id: compoundIdForToast, name: r.name });
     const planKey = typeof userPlan === "string" ? userPlan.trim().toLowerCase() : "entry";
-    const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [peptideId], planKey);
+    const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [compoundIdForToast], planKey);
     const doseLogId =
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {
@@ -245,13 +247,13 @@ export function StackProtocolQuickLog({
     if (nfErr || !nf?.id) {
       if (nfErr) console.error("[StackProtocolQuickLog] network_feed insert failed", nfErr);
       else console.error("[StackProtocolQuickLog] network_feed insert returned no id", nf);
-      showMotivationToast(toastMessage, peptideId);
+      showMotivationToast(toastMessage, compoundIdForToast);
       return;
     }
     const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
     if (!networkFeedId) {
       console.error("[StackProtocolQuickLog] network_feed insert id empty", nf);
-      showMotivationToast(toastMessage, peptideId);
+      showMotivationToast(toastMessage, compoundIdForToast);
       return;
     }
     setNetworkPostError(null);
@@ -263,7 +265,7 @@ export function StackProtocolQuickLog({
       previewLine,
       toastMessage,
     });
-    showMotivationToast(toastMessage, peptideId);
+    showMotivationToast(toastMessage, compoundIdForToast);
   };
 
   const dismissNetworkPrompt = useCallback(() => {

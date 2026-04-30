@@ -431,6 +431,18 @@ function TutorialSpotlightGate() {
   );
 }
 
+/** One line per compound for AI Atlas `sendAI` stack context (same strings as the previous inline `stackCtx` builder). */
+function formatMyStackLinesForAi(items) {
+  return items
+    .map((p) => {
+      const dose = p.stackDose || p.startDose || "";
+      const freq = p.stackFrequency ? `, ${p.stackFrequency}` : "";
+      const note = p.stackNotes ? `; notes: ${p.stackNotes}` : "";
+      return `${p.name} (${dose}${freq})${note}`;
+    })
+    .join("; ");
+}
+
 function readInitialActiveTab() {
   if (typeof sessionStorage === "undefined") return PEPV_DEFAULT_TAB;
   try {
@@ -910,16 +922,10 @@ function PepGuideIQApp({ user, setUser }) {
     const userMsg = { role:"user", content:aiInput };
     const msgs = [...aiMsgs, userMsg];
     setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
+    const stackLines = myStack.length > 0 ? formatMyStackLinesForAi(myStack) : "";
     const stackCtx =
       myStack.length > 0
-        ? `\n\nUser's current stack${stackName ? ` (“${stackName}”)` : ""}: ${myStack
-            .map((p) => {
-              const dose = p.stackDose || p.startDose || "";
-              const freq = p.stackFrequency ? `, ${p.stackFrequency}` : "";
-              const note = p.stackNotes ? `; notes: ${p.stackNotes}` : "";
-              return `${p.name} (${dose}${freq})${note}`;
-            })
-            .join("; ")}.`
+        ? `\n\nUser's current stack${stackName ? ` (“${stackName}”)` : ""}: ${stackLines}.`
         : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
     const system = `The user is an advanced biohacker.${stackCtx}${goalsCtx}`;

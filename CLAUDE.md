@@ -41,6 +41,15 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`i
 
 Local Worker + Vite same-origin option: set `VITE_API_WORKER_URL=http://localhost:5173/api-worker` and Vite proxies to 8787 (see `vite.config.js`).
 
+## Manual QA after `src/App.jsx` changes
+
+After any change to `src/App.jsx`, manually test:
+
+1. Log a dose from Protocol tab
+2. Log a dose from Stack Quick Log
+3. Confirm toast fires with motivational message
+4. Confirm no console errors
+
 ## File map
 
 ```
