@@ -50,6 +50,8 @@ After any change to `src/App.jsx`, manually test:
 3. Confirm toast fires with motivational message
 4. Confirm no console errors
 
+Never use backticks inside CSS comments within `GlobalStyles.jsx` or any other template-literal CSS block. Use single quotes or plain text for class names in comments. (A stray `` ` `` terminates the JavaScript template string and can ship as a runtime `ReferenceError`.)
+
 ## File map
 
 ```

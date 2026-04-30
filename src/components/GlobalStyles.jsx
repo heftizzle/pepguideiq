@@ -384,7 +384,7 @@ export function GlobalStyles() {
         0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,0.9)}
         50%{box-shadow:0 0 0 7px rgba(255,255,255,0.4)}
       }
-      /* Duration set inline on `.pepv-dose-toast-inner` from toastConstants (dwell + fade pad). Hold opacity 1 until ~93% so minimum readable time matches TOAST_DURATION_MS. */
+      /* Duration set inline on .pepv-dose-toast-inner (see toastConstants: dwell + fade). Hold opacity 1 until ~93% so min readable time matches TOAST_DURATION_MS. */
       @keyframes pepv-dose-toast-anim{
         0%{opacity:0;transform:translateY(8px)}
         4%{opacity:1;transform:translateY(0)}
