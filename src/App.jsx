@@ -2916,6 +2916,8 @@ export default function PepGuideIQ() {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured());
   const [user, setUser] = useState(null);
   const [ageVerified, setAgeVerified] = useState(readAgeVerifiedFromStorage);
+  /** Ensures Rewardful checkout conversion fires at most once per successful `?checkout=success` return. */
+  const rewardfulCheckoutConvertRef = useRef(false);
 
   const confirmAgeVerified = useCallback(() => {
     setAgeVerified(true);
@@ -2962,6 +2964,17 @@ export default function PepGuideIQ() {
         ? await getCurrentUserFreshAfterCheckout()
         : await getCurrentUser();
       if (!cancelled && u) setUser(u);
+      if (
+        !cancelled &&
+        checkoutSuccess &&
+        u?.email &&
+        typeof window !== "undefined" &&
+        typeof window.rewardful === "function" &&
+        !rewardfulCheckoutConvertRef.current
+      ) {
+        rewardfulCheckoutConvertRef.current = true;
+        window.rewardful("convert", { email: u.email });
+      }
       if (!cancelled) setAuthReady(true);
       if (!cancelled && checkoutSuccess) {
         try {
