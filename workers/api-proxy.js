@@ -557,10 +557,10 @@ const SECURITY_HEADERS = {
     "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\" \"https://hooks.stripe.com\")",
   "Content-Security-Policy":
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://js.stripe.com; " +
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://js.stripe.com https://r.wdfl.co; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.workers.dev; " +
-    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev https://api.stripe.com https://m.stripe.network; " +
+    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev https://api.stripe.com https://m.stripe.network https://r.wdfl.co https://api.rewardful.com; " +
     "frame-src https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
