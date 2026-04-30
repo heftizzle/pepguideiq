@@ -465,13 +465,19 @@ export function GlobalStyles() {
         overflow-x:auto;
       }
       @media (max-width:767px){
+        /* Own row + full width so justify-content:flex-end pins ? / AI Atlas / bell / menu to the right */
         .pepv-nav-account-pill-row{
+          flex-basis:100%;
+          width:100%;
+          box-sizing:border-box;
           flex-wrap:nowrap;
           white-space:nowrap;
+          overflow-x:auto;
           overflow-y:hidden;
           -webkit-overflow-scrolling:touch;
           min-width:0;
           overscroll-behavior-x:contain;
+          justify-content:flex-end;
         }
         .pepv-nav-account-pill-row > *{
           flex-shrink:0;
