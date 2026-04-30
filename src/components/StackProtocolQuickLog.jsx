@@ -18,7 +18,11 @@ import { PostDoseNetworkSheet } from "./PostDoseNetworkSheet.jsx";
 import { buildDoseNetworkPreviewLine, buildNetworkFeedInsertRow } from "../lib/doseNetworkFeed.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
-import { getConfirmationMessage, protocolSessionFromHour } from "../lib/protocolMessages.js";
+import {
+  formatDoseMotivationToast,
+  getConfirmationMessage,
+  protocolSessionFromHour,
+} from "../lib/protocolMessages.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import {
   localTodayYmd,
@@ -63,6 +67,12 @@ export function StackProtocolQuickLog({
   const [networkPostBusy, setNetworkPostBusy] = useState(false);
   const [networkPostError, setNetworkPostError] = useState(/** @type {string | null} */ (null));
   const showDoseToast = useShowDoseToast();
+  const showMotivationToast = useCallback(
+    (raw, peptideId) => {
+      showDoseToast(formatDoseMotivationToast(raw, { peptideId, session }));
+    },
+    [showDoseToast, session]
+  );
   const skipGuardrailForPeptideIdRef = useRef(null);
 
   useEffect(() => {
@@ -216,7 +226,7 @@ export function StackProtocolQuickLog({
     const doseLogId =
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
@@ -235,13 +245,13 @@ export function StackProtocolQuickLog({
     if (nfErr || !nf?.id) {
       if (nfErr) console.error("[StackProtocolQuickLog] network_feed insert failed", nfErr);
       else console.error("[StackProtocolQuickLog] network_feed insert returned no id", nf);
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
     if (!networkFeedId) {
       console.error("[StackProtocolQuickLog] network_feed insert id empty", nf);
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     setNetworkPostError(null);
@@ -253,15 +263,14 @@ export function StackProtocolQuickLog({
       previewLine,
       toastMessage,
     });
+    showMotivationToast(toastMessage, peptideId);
   };
 
   const dismissNetworkPrompt = useCallback(() => {
-    const msg = networkPrompt?.toastMessage;
     setNetworkPrompt(null);
     setNetworkPostError(null);
     setNetworkPostBusy(false);
-    if (msg) showDoseToast(msg);
-  }, [networkPrompt, showDoseToast]);
+  }, []);
 
   const confirmNetworkPost = useCallback(async () => {
     const id = networkPrompt?.networkFeedId?.trim();
@@ -275,11 +284,9 @@ export function StackProtocolQuickLog({
       setNetworkPostError(typeof error.message === "string" ? error.message : "Could not post to Network");
       return;
     }
-    const msg = networkPrompt.toastMessage;
     setNetworkPrompt(null);
     setNetworkPostBusy(false);
-    showDoseToast(msg);
-  }, [networkPrompt, showDoseToast]);
+  }, [networkPrompt]);
 
   const loggableLines = useMemo(() => (lines ?? []).filter((l) => l.display === "ok"), [lines]);
 

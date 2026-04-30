@@ -27,7 +27,11 @@ import { isProtocolSessionId } from "../data/protocolSessions.js";
 import { inferProtocolSessionForNow } from "../lib/sessionSchedule.js";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { useShowDoseToast } from "../context/DoseToastContext.jsx";
-import { getConfirmationMessage, protocolSessionFromHour } from "../lib/protocolMessages.js";
+import {
+  formatDoseMotivationToast,
+  getConfirmationMessage,
+  protocolSessionFromHour,
+} from "../lib/protocolMessages.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 import {
   localTodayYmd,
@@ -114,6 +118,12 @@ export function ProtocolTab({
   );
   networkPromptRef.current = networkPrompt;
   const showDoseToast = useShowDoseToast();
+  const showMotivationToast = useCallback(
+    (raw, peptideId) => {
+      showDoseToast(formatDoseMotivationToast(raw, { peptideId, session }));
+    },
+    [showDoseToast, session]
+  );
   const skipGuardrailForPeptideIdRef = useRef(null);
   const deepLinkConsumedRef = useRef(false);
   const tutorial = useTutorialOptional();
@@ -298,7 +308,7 @@ export function ProtocolTab({
       inserted && typeof inserted.id === "string" && inserted.id.trim() ? inserted.id.trim() : "";
     if (!doseLogId) {
       bumpReload();
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     const previewLine = buildDoseNetworkPreviewLine(r, payload, cat);
@@ -318,14 +328,14 @@ export function ProtocolTab({
       if (nfErr) console.error("[ProtocolTab] network_feed insert failed", nfErr);
       else console.error("[ProtocolTab] network_feed insert returned no id", nf);
       bumpReload();
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     const networkFeedId = typeof nf.id === "string" ? nf.id.trim() : "";
     if (!networkFeedId) {
       console.error("[ProtocolTab] network_feed insert id empty", nf);
       bumpReload();
-      showDoseToast(toastMessage);
+      showMotivationToast(toastMessage, peptideId);
       return;
     }
     setNetworkPostError(null);
@@ -337,23 +347,20 @@ export function ProtocolTab({
       previewLine,
       toastMessage,
     });
+    showMotivationToast(toastMessage, peptideId);
     bumpReload();
   };
 
   const dismissNetworkPrompt = useCallback(() => {
-    const prompt = networkPromptRef.current;
-    const msg = prompt?.toastMessage;
     setNetworkPrompt(null);
     setNetworkPostError(null);
     setNetworkPostBusy(false);
-    if (msg) showDoseToast(msg);
-  }, [showDoseToast]);
+  }, []);
 
   const confirmNetworkPost = useCallback(async () => {
     const prompt = networkPromptRef.current;
     const id = prompt?.networkFeedId?.trim();
     if (!id) return;
-    const msg = prompt?.toastMessage;
     setNetworkPostBusy(true);
     setNetworkPostError(null);
     const { error } = await updateNetworkFeedPostPublicVisible(id, true);
@@ -365,8 +372,7 @@ export function ProtocolTab({
     }
     setNetworkPrompt(null);
     setNetworkPostBusy(false);
-    if (msg) showDoseToast(msg);
-  }, [showDoseToast]);
+  }, []);
 
   const emptyBecauseNoStack = protocolBaseRows.length === 0;
 

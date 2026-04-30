@@ -245,9 +245,11 @@ export const COMPOUND_MESSAGES = {
   "ipamorelin-cjc":           "Combo logged. GH axis fully engaged. Sleep well tonight.",
 };
 
-export function getConfirmationMessage(session, compoundIds = [], userPlan = "entry") {
-  const isPaid = ["pro", "elite", "goat"].includes(userPlan);
-  if (isPaid && compoundIds.length > 0) {
+/** Rotating index — deterministic quote selection (no Math.random gate). */
+let doseMotivationRotation = 0;
+
+export function getConfirmationMessage(session, compoundIds = [], _userPlan = "entry") {
+  if (compoundIds.length > 0) {
     for (const id of compoundIds) {
       if (COMPOUND_MESSAGES[id]) return COMPOUND_MESSAGES[id];
     }
@@ -260,5 +262,56 @@ export function getConfirmationMessage(session, compoundIds = [], userPlan = "en
         : session === "evening"
           ? EVENING_MESSAGES
           : NIGHT_MESSAGES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const idx = doseMotivationRotation % pool.length;
+  doseMotivationRotation = (doseMotivationRotation + 1) % 1_000_000;
+  return pool[idx];
+}
+
+const MOTIVATION_WRAP_EMOJIS = ["💉", "🧬", "⚡", "🔥", "💪", "🐐"];
+
+/**
+ * Pick contextual leading/trailing emoji pair for dose toast wrapping.
+ * @param {string} peptideId
+ * @param {string} [session]
+ */
+export function pickMotivationEmojiPair(peptideId, session) {
+  const id = String(peptideId ?? "").toLowerCase();
+  if (/(semaglutide|tirzepatide|retatrutide|liraglutide|cagrisema)/.test(id)) return ["⚡", "🔥"];
+  if (/(ghrp|cjc|ipa|sermorelin|tesamorelin|hexarelin|hgh|frag)/.test(id)) return ["🧬", "💪"];
+  if (/(bpc|tb-500|tb500|ss-31)/.test(id)) return ["💉", "🧬"];
+  if (/(nad|mots-c|mitochond)/.test(id)) return ["⚡", "🐐"];
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = (seed + id.charCodeAt(i) * (i + 1)) % 997;
+  const bump =
+    session === "morning" ? 1 : session === "night" ? 5 : session === "evening" ? 3 : session === "afternoon" ? 2 : 0;
+  const a = MOTIVATION_WRAP_EMOJIS[(seed + bump) % MOTIVATION_WRAP_EMOJIS.length];
+  const b = MOTIVATION_WRAP_EMOJIS[(seed + bump + 3) % MOTIVATION_WRAP_EMOJIS.length];
+  return [a, b];
+}
+
+/** Strip leading/trailing decorative emoji so wrapped toast does not triple-stack glyphs. */
+function stripOuterEmojiDecorators(text) {
+  let t = String(text ?? "").trim();
+  const lead =
+    /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})|\uFE0F|\s)+/u;
+  const trail =
+    /(?:\s|\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})|\uFE0F)+$/u;
+  for (let i = 0; i < 3; i++) {
+    const before = t;
+    t = t.replace(lead, "").replace(trail, "").trim();
+    if (t === before) break;
+  }
+  return t;
+}
+
+/**
+ * Format confirmation copy for the dose toast: leading emoji + quote + trailing emoji.
+ * @param {string} quote
+ * @param {{ peptideId?: string; session?: string }} [opts]
+ */
+export function formatDoseMotivationToast(quote, opts = {}) {
+  const inner = stripOuterEmojiDecorators(quote);
+  if (!inner) return "";
+  const [start, end] = pickMotivationEmojiPair(opts.peptideId ?? "", opts.session);
+  return `${start} ${inner} ${end}`;
 }

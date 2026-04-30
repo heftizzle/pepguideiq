@@ -61,7 +61,7 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
           margin: 0,
           padding: 0,
           cursor: "pointer",
-          background: entered ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0)",
+          background: entered ? "var(--color-overlay)" : "transparent",
           transition: "background 0.22s ease",
         }}
       />
@@ -84,9 +84,9 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
         <div
           style={{
             borderRadius: "16px 16px 12px 12px",
-            border: "1px solid var(--color-accent-subtle-40)",
-            background: "rgba(11, 15, 23, 0.98)",
-            boxShadow: "0 -12px 40px rgba(0,0,0,0.55)",
+            border: "1px solid var(--color-border-strong)",
+            background: "var(--color-bg-card)",
+            boxShadow: "0 -12px 40px var(--color-shadow-45)",
             padding: "16px 16px 14px",
           }}
         >
@@ -122,8 +122,8 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
           <div
             style={{
               fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 12,
-              color: "var(--color-text-secondary)",
+              fontSize: 14,
+              color: "var(--color-text-primary)",
               lineHeight: 1.45,
               textAlign: "center",
               marginBottom: 6,
@@ -135,15 +135,16 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
           <div
             style={{
               fontFamily: "'Outfit', sans-serif",
-              fontSize: 13,
-              color: "var(--color-accent)",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--color-text-inverse)",
               lineHeight: 1.45,
               textAlign: "center",
               marginBottom: 16,
               padding: "10px 12px",
               borderRadius: 10,
-              background: "var(--color-accent-subtle-10)",
-              border: "1px solid var(--color-accent-subtle-30)",
+              background: "var(--color-accent)",
+              border: "1px solid var(--color-accent)",
             }}
           >
             {previewLine}
@@ -151,8 +152,8 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
           {postError ? (
             <div
               style={{
-                fontSize: 12,
-                color: "#f87171",
+                fontSize: 13,
+                color: "var(--color-text-danger)",
                 textAlign: "center",
                 marginBottom: 12,
               }}
@@ -163,7 +164,6 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
           <div style={{ display: "flex", gap: 10 }}>
             <button
               type="button"
-              className="form-input"
               disabled={busy}
               onClick={() => onKeepPrivate()}
               style={{
@@ -173,9 +173,9 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
                 fontFamily: "'Outfit', sans-serif",
                 fontWeight: 500,
                 cursor: busy ? "default" : "pointer",
-                border: "1px solid var(--color-border-default)",
-                background: "var(--color-bg-hover)",
-                color: "var(--color-text-secondary)",
+                border: "1px solid var(--color-border-emphasis)",
+                background: "transparent",
+                color: "var(--color-text-primary)",
                 borderRadius: 10,
               }}
             >
@@ -183,7 +183,6 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
             </button>
             <button
               type="button"
-              className="btn-teal"
               disabled={busy}
               onClick={() => void onPost()}
               style={{
@@ -194,6 +193,10 @@ export function PostDoseNetworkSheet({ open, compoundName, previewLine, busy, po
                 fontWeight: 600,
                 borderRadius: 10,
                 opacity: busy ? 0.65 : 1,
+                cursor: busy ? "default" : "pointer",
+                border: "1px solid var(--color-accent)",
+                background: "var(--color-accent)",
+                color: "var(--color-text-inverse)",
               }}
             >
               {busy ? "Posting…" : "Post It"}

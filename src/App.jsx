@@ -27,7 +27,10 @@ import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.js
 import { NotificationsBell } from "./components/NotificationsBell.jsx";
 import DeleteUndoToast from "./components/DeleteUndoToast.jsx";
 import { NavTooltips } from "./components/NavTooltips.jsx";
-import { ProfileSwitcher } from "./components/ProfileSwitcher.jsx";
+import { HamburgerMenu } from "./components/HamburgerMenu.jsx";
+import { GlossaryModal } from "./components/GlossaryModal.jsx";
+import { FAQModal } from "./components/FAQModal.jsx";
+import SupportModal from "./components/SupportModal.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
 import { LegalPage } from "./components/LegalPage.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
@@ -64,9 +67,7 @@ import {
   saveStack,
   signOut,
 } from "./lib/supabase.js";
-import { useMemberAvatarSrc } from "./hooks/useMemberAvatarSrc.js";
-import { formatHandleDisplay, normalizeHandleInput } from "./lib/memberProfileHandle.js";
-import { openPublicMemberProfile } from "./lib/openPublicProfile.js";
+import { normalizeHandleInput } from "./lib/memberProfileHandle.js";
 import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
@@ -390,26 +391,6 @@ function LibraryCategoryPillScrollRow({ cats, selCat, onSelect, marginBottom }) 
 }
 
 /** Top-right header: member profile avatar initial (no image). */
-function headerMemberAvatarInitial(displayName) {
-  const s = String(displayName || "").trim();
-  return s ? s[0].toUpperCase() : "?";
-}
-
-/** @param {unknown} plan */
-function tierHeaderMeta(plan) {
-  const p = typeof plan === "string" ? plan.trim().toLowerCase() : "entry";
-  switch (p) {
-    case "goat":
-      return { emoji: "🐐", label: "GOAT", tierClass: "pepv-header-tier--goat" };
-    case "elite":
-      return { emoji: "⚡", label: "ELITE", tierClass: "pepv-header-tier--elite" };
-    case "pro":
-      return { emoji: "🔬", label: "PRO", tierClass: "pepv-header-tier--pro" };
-    default:
-      return { emoji: "💸", label: "FREE", tierClass: "pepv-header-tier--entry" };
-  }
-}
-
 function profileHandleFromWindowPath() {
   if (typeof window === "undefined") return null;
   try {
@@ -525,7 +506,6 @@ function PepGuideIQApp({ user, setUser }) {
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
   /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
-  const [narrowHeader, setNarrowHeader] = useState(false);
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
   const [guideExiting, setGuideExiting] = useState(false);
@@ -634,27 +614,6 @@ function PepGuideIQApp({ user, setUser }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeTab, guideExiting, beginCloseGuide]);
-
-  const workerOkHeader = isApiWorkerConfigured();
-  const rawHeaderMemberAvatarKey =
-    activeProfile && typeof activeProfile.avatar_r2_key === "string" ? activeProfile.avatar_r2_key.trim() : "";
-  const rawHeaderMemberAvatarLegacy =
-    activeProfile && typeof activeProfile.avatar_url === "string" ? activeProfile.avatar_url.trim() : "";
-  const resolvedHeaderMemberAvatar = useMemberAvatarSrc(
-    user?.id,
-    rawHeaderMemberAvatarKey,
-    rawHeaderMemberAvatarLegacy,
-    workerOkHeader
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 560px)");
-    const sync = () => setNarrowHeader(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
 
   useEffect(() => {
     if (activeTab !== "library") setLibrarySearchOpen(false);
@@ -1056,6 +1015,9 @@ function PepGuideIQApp({ user, setUser }) {
   };
 
   const [showHandlePrompt, setShowHandlePrompt] = useState(false);
+  const [glossaryModalOpen, setGlossaryModalOpen] = useState(false);
+  const [faqModalOpen, setFaqModalOpen] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [showPeopleSearch, setShowPeopleSearch] = useState(false);
   const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
   /** Prefill Find People (e.g. deep link or reopen). */
@@ -1250,7 +1212,6 @@ function PepGuideIQApp({ user, setUser }) {
     setVariantNoteExpandedById,
     protocolDeepLink,
     setProtocolDeepLink,
-    narrowHeader,
     guideExiting,
     guideLayoutMobile,
     goalsOpen,
@@ -1260,8 +1221,6 @@ function PepGuideIQApp({ user, setUser }) {
     beginCloseGuide,
     handleGuideTakeoverAnimationEnd,
     onGuideTakeoverRootClick,
-    workerOkHeader,
-    resolvedHeaderMemberAvatar,
     sortedPeptides,
     handleCategorySelect,
     planForStackLimits,
@@ -1282,6 +1241,12 @@ function PepGuideIQApp({ user, setUser }) {
     sendAI,
     handleSignOut,
     showHandlePrompt,
+    glossaryModalOpen,
+    setGlossaryModalOpen,
+    faqModalOpen,
+    setFaqModalOpen,
+    supportModalOpen,
+    setSupportModalOpen,
     dismissHandlePrompt,
     setRouteFilter,
     librarySearchOpen,
@@ -1379,7 +1344,7 @@ function PepGuideIQApp({ user, setUser }) {
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const topHeaderRef = useRef(null);
-  const { isHighlighted, stripVisible, highlightTarget, flowKey } = useTutorial();
+  const { isHighlighted, stripVisible, highlightTarget, flowKey, setHelpMenuOpen } = useTutorial();
   const {
     user,
     setUser,
@@ -1438,7 +1403,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setVariantNoteExpandedById,
     protocolDeepLink,
     setProtocolDeepLink,
-    narrowHeader,
     guideExiting,
     guideLayoutMobile,
     goalsOpen,
@@ -1448,8 +1412,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
     beginCloseGuide,
     handleGuideTakeoverAnimationEnd,
     onGuideTakeoverRootClick,
-    workerOkHeader,
-    resolvedHeaderMemberAvatar,
     sortedPeptides,
     handleCategorySelect,
     planForStackLimits,
@@ -1470,6 +1432,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
     sendAI,
     handleSignOut,
     showHandlePrompt,
+    glossaryModalOpen,
+    setGlossaryModalOpen,
+    faqModalOpen,
+    setFaqModalOpen,
+    supportModalOpen,
+    setSupportModalOpen,
     dismissHandlePrompt,
     setRouteFilter,
     librarySearchOpen,
@@ -1528,7 +1496,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
       ro.disconnect();
       window.removeEventListener("resize", writeHeight);
     };
-  }, [activeTab, librarySearchOpen, narrowHeader]);
+  }, [activeTab, librarySearchOpen]);
 
   return (
     <>
@@ -1562,135 +1530,43 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 )}
                 <div style={{ flex: 1, minWidth: 8 }} aria-hidden />
                 <div id="nav-account-anchor" className="pepv-nav-account-pill-row">
-                  {(() => {
-                    const guideOn = activeTab === "guide";
-                    const tier = tierHeaderMeta(user.plan);
-                    const memberDisplayRaw = String(activeProfile?.display_name ?? "").trim() || "—";
-                    const memberNameShown = narrowHeader
-                      ? (memberDisplayRaw.split(/\s+/)[0] || memberDisplayRaw).trim() || "—"
-                      : memberDisplayRaw;
-                    return (
-                      <>
-                        <TutorialHelpButton />
-                        <button
-                          type="button"
-                          className="pepv-header-action-btn"
-                          data-tutorial-target={TUTORIAL_TARGET.nav_guide}
-                          data-active={guideOn ? "true" : undefined}
-                          {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.nav_guide))}
-                          onClick={() => setActiveTab("guide")}
-                        >
-                          <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
-                            🧙
-                          </span>
-                          {" "}AI Atlas
-                        </button>
-                        <button
-                          type="button"
-                          className={`pepv-header-action-btn ${tier.tierClass}`}
-                          onClick={() => openUpgradeModal()}
-                          aria-label={`Plan: ${tier.label}`}
-                        >
-                          <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
-                            {tier.emoji}
-                          </span>
-                          {tier.label}
-                        </button>
-                        {user.plan !== "goat" && (
-                          <button
-                            type="button"
-                            className="pepv-header-action-btn"
-                            onClick={() => openUpgradeModal()}
-                            style={{ color: "var(--color-accent)" }}
-                          >
-                            Upgrade
-                          </button>
-                        )}
-                        <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
-                        <div
-                          role="group"
-                          className={`pepv-header-action-surface pepv-header-profile-pill${narrowHeader ? " pepv-header-profile-pill--narrow" : ""}`}
-                          title={
-                            memberDisplayRaw !== "—"
-                              ? `${memberDisplayRaw}${activeProfile?.handle ? ` ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}` : ""}`
-                              : undefined
-                          }
-                          aria-label="Profile and find people"
-                        >
-                        <button
-                          type="button"
-                          className="pepv-header-profile-pill__segment pepv-header-profile-pill__segment--primary"
-                          onClick={() => setShowPeopleSearch(true)}
-                          aria-label={
-                            memberDisplayRaw !== "—"
-                              ? `Active profile: ${memberDisplayRaw}. Open find people.`
-                              : "Open find people"
-                          }
-                        >
-                          {resolvedHeaderMemberAvatar ? (
-                            <img
-                              src={resolvedHeaderMemberAvatar}
-                              alt=""
-                              draggable={false}
-                              style={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: "50%",
-                                objectFit: "cover",
-                                flexShrink: 0,
-                                border: "1px solid var(--color-border-emphasis)",
-                              }}
-                            />
-                          ) : (
-                            <span
-                              aria-hidden
-                              style={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: "50%",
-                                background: "var(--color-surface-hover)",
-                                border: "1px solid var(--color-border-emphasis)",
-                                color: "var(--color-accent)",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                flexShrink: 0,
-                                lineHeight: 1,
-                              }}
-                            >
-                              {headerMemberAvatarInitial(memberDisplayRaw)}
-                            </span>
-                          )}
-                          <span
-                            style={{
-                              flex: "1 1 auto",
-                              minWidth: 0,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {memberNameShown}
-                          </span>
-                        </button>
-                        {activeProfile?.handle ? (
-                          <button
-                            type="button"
-                            className={`pepv-header-profile-pill__segment pepv-header-profile-pill__segment--handle${narrowHeader ? " pepv-header-profile-pill--narrow" : ""}`}
-                            onClick={() => openPublicMemberProfile(activeProfile.handle)}
-                            aria-label={`View public profile ${formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}`}
-                            title="View public profile"
-                          >
-                            {formatHandleDisplay(activeProfile.handle, activeProfile.display_handle)}
-                          </button>
-                        ) : null}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+                  <TutorialHelpButton />
+                  <button
+                    type="button"
+                    className="pepv-header-action-btn"
+                    data-tutorial-target={TUTORIAL_TARGET.nav_guide}
+                    data-active={activeTab === "guide" ? "true" : undefined}
+                    {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.nav_guide))}
+                    onClick={() => setActiveTab("guide")}
+                  >
+                    <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
+                      🧙
+                    </span>
+                    {" "}AI Atlas
+                  </button>
+                  <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
+                  <HamburgerMenu
+                    user={user}
+                    onOpenProfile={() => setActiveTab("profile")}
+                    onOpenFindPeople={() => setShowPeopleSearch(true)}
+                    onOpenUpgrade={(reason) => openUpgradeModal(reason)}
+                    onOpenGlossary={() => setGlossaryModalOpen(true)}
+                    onOpenFAQ={() => setFaqModalOpen(true)}
+                    onOpenTutorials={() => setHelpMenuOpen(true)}
+                    onOpenSupport={() => setSupportModalOpen(true)}
+                    onOpenLegal={() => {
+                      try {
+                        window.location.assign("/legal");
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    onSignOut={handleSignOut}
+                    navTabButtonRef={(el) => {
+                      navTabButtonRefs.current.profile = el;
+                    }}
+                  />
+                </div>
               {activeTab === "library" && librarySearchOpen && (
                 <LibraryMobileSearchPanel
                   initialSearch={search}
@@ -2757,6 +2633,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
           />
         )}
 
+        {glossaryModalOpen ? <GlossaryModal onClose={() => setGlossaryModalOpen(false)} /> : null}
+        {faqModalOpen ? <FAQModal onClose={() => setFaqModalOpen(false)} /> : null}
+        <SupportModal isOpen={supportModalOpen} onClose={() => setSupportModalOpen(false)} />
+
         {user?.id && activeProfileId && activeTab !== "guide" && !guideExiting && (
           <DoseLogFAB
             onSessionPicked={(sid) => {
@@ -2962,14 +2842,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
             ))}
           </div>
         </nav>
-
-        <ProfileSwitcher
-          onOpenUpgrade={openUpgradeModal}
-          onGoToProfileSettings={() => setActiveTab("profile")}
-          navTooltipAnchorRef={(el) => {
-            navTabButtonRefs.current.profile = el;
-          }}
-        />
 
         {showHandlePrompt && (
           <Modal onClose={dismissHandlePrompt} maxWidth={440} label="Set your public handle">

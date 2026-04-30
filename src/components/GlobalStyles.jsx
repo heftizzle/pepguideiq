@@ -384,10 +384,11 @@ export function GlobalStyles() {
         0%,100%{box-shadow:0 0 0 3px rgba(255,255,255,0.9)}
         50%{box-shadow:0 0 0 7px rgba(255,255,255,0.4)}
       }
+      /* Duration set inline on `.pepv-dose-toast-inner` from toastConstants (dwell + fade pad). Hold opacity 1 until ~93% so minimum readable time matches TOAST_DURATION_MS. */
       @keyframes pepv-dose-toast-anim{
         0%{opacity:0;transform:translateY(8px)}
-        12%{opacity:1;transform:translateY(0)}
-        85%{opacity:1;transform:translateY(0)}
+        4%{opacity:1;transform:translateY(0)}
+        93%{opacity:1;transform:translateY(0)}
         100%{opacity:0;transform:translateY(4px)}
       }
       .pepv-dose-toast-wrap{
@@ -397,9 +398,11 @@ export function GlobalStyles() {
         pointer-events:none;box-sizing:border-box;padding:0 12px;
       }
       .pepv-dose-toast-inner{
-        animation:pepv-dose-toast-anim 5.3s cubic-bezier(0.22,1,0.36,1) forwards;
+        animation-name:pepv-dose-toast-anim;
+        animation-timing-function:cubic-bezier(0.22,1,0.36,1);
+        animation-fill-mode:forwards;
         background:var(--color-bg-card);border:1px solid var(--color-accent);color:var(--color-accent);min-height:44px;
-        padding:12px 20px;border-radius:10px;font-size:14px;line-height:1.45;text-align:center;
+        padding:12px 20px;border-radius:10px;font-size:15px;line-height:1.45;text-align:center;
         box-shadow:0 10px 40px var(--color-shadow-50);
         font-family:'Outfit',sans-serif,"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji","Noto Color Emoji",system-ui,sans-serif;
         font-weight:500;
@@ -629,6 +632,157 @@ export function GlobalStyles() {
       @media (max-width:560px){
         .pepv-header-action-surface.pepv-header-profile-pill--narrow{max-width:180px}
         .pepv-header-profile-pill__segment--handle.pepv-header-profile-pill--narrow{max-width:100px}
+      }
+
+      /* Hamburger account drawer — portal to body; above header (70) + dropdowns; below modal dialogs open from elsewhere at z=200 */
+      .pepv-hamburger-trigger.pepv-header-action-btn--icon{
+        flex-shrink:0;
+      }
+      .pepv-hamburger-overlay{
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.55);
+        z-index:240;
+        opacity:0;
+        pointer-events:none;
+        transition:opacity 180ms ease;
+      }
+      .pepv-hamburger-overlay[data-open="true"]{
+        opacity:1;
+        pointer-events:auto;
+      }
+      .pepv-hamburger-drawer{
+        position:fixed;
+        top:0;
+        right:0;
+        height:100vh;
+        height:100dvh;
+        width:80%;
+        max-width:320px;
+        box-sizing:border-box;
+        background:var(--color-bg-card);
+        border-left:1px solid var(--color-border-strong);
+        z-index:250;
+        transform:translateX(100%);
+        transition:transform 220ms cubic-bezier(0.2,0.8,0.2,1);
+        display:flex;
+        flex-direction:column;
+        padding-top:env(safe-area-inset-top,0px);
+        padding-bottom:env(safe-area-inset-bottom,0px);
+      }
+      .pepv-hamburger-drawer[data-open="true"]{
+        transform:translateX(0);
+        pointer-events:auto;
+      }
+      .pepv-hamburger-drawer[data-open="false"]{
+        pointer-events:none;
+      }
+      .pepv-hamburger-drawer__topbar{
+        display:flex;
+        align-items:flex-start;
+        justify-content:space-between;
+        gap:12px;
+        padding:14px 14px 10px;
+        border-bottom:1px solid var(--color-border-hairline);
+        flex-shrink:0;
+      }
+      .pepv-hamburger-drawer__identity{
+        display:flex;
+        align-items:flex-start;
+        gap:12px;
+        min-width:0;
+        flex:1;
+      }
+      .pepv-hamburger-drawer__avatar-img{
+        width:40px;
+        height:40px;
+        border-radius:50%;
+        object-fit:cover;
+        flex-shrink:0;
+        border:1px solid var(--color-border-emphasis);
+      }
+      .pepv-hamburger-drawer__avatar-fallback{
+        width:40px;
+        height:40px;
+        border-radius:50%;
+        flex-shrink:0;
+        border:1px solid var(--color-border-emphasis);
+        background:var(--color-surface-hover);
+        color:var(--color-accent);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:15px;
+        font-weight:700;
+      }
+      .pepv-hamburger-drawer__identity-text{
+        min-width:0;
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+      }
+      .pepv-hamburger-drawer__name-row{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        flex-wrap:wrap;
+      }
+      .pepv-hamburger-drawer__display{
+        font-size:15px;
+        font-weight:600;
+        color:var(--color-text-primary);
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+        min-width:0;
+      }
+      .pepv-hamburger-drawer__tier-badge{
+        flex-shrink:0;
+        font-size:13px;
+        font-weight:600;
+        white-space:nowrap;
+      }
+      .pepv-hamburger-drawer__handle{
+        font-size:12px;
+        color:var(--color-text-secondary);
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+      }
+      .pepv-hamburger-drawer__close{
+        flex-shrink:0;
+        width:44px;
+        height:44px;
+        margin:-6px -8px 0 0;
+        border:none;
+        border-radius:10px;
+        background:transparent;
+        color:var(--color-text-secondary);
+        font-size:26px;
+        line-height:1;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      }
+      .pepv-hamburger-drawer__close:hover{
+        background:var(--color-bg-hover);
+        color:var(--color-text-primary);
+      }
+      .pepv-hamburger-drawer__scroll{
+        flex:1;
+        min-height:0;
+        overflow-y:auto;
+        -webkit-overflow-scrolling:touch;
+        padding-bottom:12px;
+      }
+      .pepv-hamburger-row--theme{
+        justify-content:space-between!important;
+      }
+      .pepv-hamburger-row--theme .theme-toggle{
+        flex-shrink:0;
       }
     `}</style>
   );
