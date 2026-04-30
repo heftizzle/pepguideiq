@@ -65,9 +65,17 @@ const GOAL_OPTIONS = [
   { id: "longevity", label: "🧬 Longevity" },
   { id: "performance", label: "🏆 Performance" },
   { id: "optimize", label: "🎯 Optimize" },
-  { id: "mental_elevate", label: "🧠 Mental Elevate" },
+  { id: "cognitive", label: "🧠 Cognitive" },
+  { id: "sleep_recovery", label: "🌙 Sleep & Recovery" },
+  { id: "juiced", label: "💉 Juiced" },
   { id: "general_health", label: "💚 General Health" },
 ];
+
+/** Legacy CSV tokens from older app versions → canonical `GOAL_OPTIONS` ids */
+const LEGACY_GOAL_ID_TO_CANONICAL = {
+  mental_elevate: "cognitive",
+  mental: "cognitive",
+};
 
 const GOAL_IDS = new Set(GOAL_OPTIONS.map((g) => g.id));
 const GOAL_PICK_MAX = 8;
@@ -77,8 +85,11 @@ function parseGoalsFromStorage(s) {
   if (!s || typeof s !== "string") return [];
   const out = [];
   for (const p of s.split(",")) {
-    const id = p.trim();
-    if (!id || !GOAL_IDS.has(id) || out.includes(id)) continue;
+    const raw = p.trim();
+    if (!raw) continue;
+    const lower = raw.toLowerCase();
+    const id = LEGACY_GOAL_ID_TO_CANONICAL[lower] ?? lower;
+    if (!GOAL_IDS.has(id) || out.includes(id)) continue;
     out.push(id);
   }
   return out;

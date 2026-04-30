@@ -1,8 +1,8 @@
 /**
  * Goal emoji mapping — single source of truth.
  *
- * Mirrors `GOAL_OPTIONS` in `src/components/ProfileTab.jsx` plus the
- * `mental` alias that existed in NotificationsBell's local helper.
+ * Keys match canonical `GOAL_OPTIONS` ids in `ProfileTab.jsx` (`cognitive`,
+ * `sleep_recovery`, `juiced`, …). Legacy CSV tokens are normalized before lookup.
  *
  * Used by:
  *   - `NotificationsBell.jsx` — fallback emoji for notification rows
@@ -10,16 +10,22 @@
  *   - Any future tribe-based social-proof surface
  */
 
+const LEGACY_GOAL_ID_TO_CANONICAL = {
+  mental_elevate: "cognitive",
+  mental: "cognitive",
+};
+
 export const GOAL_PRIMARY_EMOJI = {
-  general_health: "💚",
-  longevity: "🧬",
-  performance: "🏆",
-  shred: "🔥",
-  bulk: "💪",
-  recomp: "⚖️",
-  optimize: "🎯",
-  mental_elevate: "🧠",
-  mental: "🧠",
+  general_health:   "💚",
+  longevity:        "🧬",
+  performance:      "🏆",
+  shred:            "🔥",
+  bulk:             "💪",
+  recomp:           "⚖️",
+  optimize:         "🎯",
+  cognitive:        "🧠",
+  sleep_recovery:   "🌙",
+  juiced:           "💉",
 };
 
 /** Fallback used by `LikeButton` when the viewer has no goals set. */
@@ -51,7 +57,8 @@ export function normalizeGoalIdList(userGoals) {
  */
 export function primaryGoalEmoji(userGoals, fallback = DEFAULT_LIKE_EMOJI) {
   for (const raw of normalizeGoalIdList(userGoals)) {
-    const key = raw.toLowerCase();
+    const lower = raw.toLowerCase();
+    const key = LEGACY_GOAL_ID_TO_CANONICAL[lower] ?? lower;
     if (GOAL_PRIMARY_EMOJI[key]) return GOAL_PRIMARY_EMOJI[key];
   }
   return fallback;
