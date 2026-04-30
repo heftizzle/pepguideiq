@@ -560,7 +560,7 @@ const SECURITY_HEADERS = {
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://js.stripe.com https://r.wdfl.co; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com https://*.workers.dev; " +
-    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev https://api.stripe.com https://m.stripe.network https://r.wdfl.co https://api.rewardful.com; " +
+    "connect-src 'self' https://api.anthropic.com https://*.supabase.co https://*.workers.dev https://api.stripe.com https://m.stripe.network https://r.wdfl.co https://api.rewardful.com https://api.getrewardful.com; " +
     "frame-src https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com; " +
     "object-src 'none'; " +
     "base-uri 'self'; " +
