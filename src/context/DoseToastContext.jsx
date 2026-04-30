@@ -7,7 +7,7 @@ export function DoseToastProvider({ children }) {
   const [message, setMessage] = useState(null);
   const clear = useCallback(() => setMessage(null), []);
   const showDoseToast = useCallback((msg) => {
-    if (typeof msg === "string" && msg.trim()) setMessage(msg.trim());
+    if (typeof msg === "string" && msg.trim()) setMessage(msg.trim() + "\u200B" + Date.now());
   }, []);
 
   const value = useMemo(() => showDoseToast, [showDoseToast]);

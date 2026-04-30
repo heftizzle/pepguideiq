@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
@@ -240,7 +240,8 @@ export function NotificationsBell({ userId, userGoals }) {
 
   if (!userId || !isSupabaseConfigured()) return null;
 
-  const bellEmoji = primaryGoalEmoji(userGoals, "🔔");
+  /** Viewer tribe emoji for the bell — single source of truth: {@link primaryGoalEmoji} in `goalEmoji.js` (juiced, sleep_recovery, cognitive, legacy ids). */
+  const bellEmoji = useMemo(() => primaryGoalEmoji(userGoals, "🔔"), [userGoals]);
 
   const maxPanelH =
     panelPlacement && typeof window !== "undefined"

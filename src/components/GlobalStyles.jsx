@@ -398,6 +398,7 @@ export function GlobalStyles() {
         pointer-events:none;box-sizing:border-box;padding:0 12px;
       }
       .pepv-dose-toast-inner{
+        /* animation-duration set inline in DoseToast.jsx only (TOAST_DURATION_MS + 500ms) — do not hardcode here */
         animation-name:pepv-dose-toast-anim;
         animation-timing-function:cubic-bezier(0.22,1,0.36,1);
         animation-fill-mode:forwards;
@@ -458,6 +459,7 @@ export function GlobalStyles() {
       .pepv-nav-account-pill-row{
         display:flex;
         align-items:center;
+        justify-content:flex-end;
         gap:6px;
         flex-wrap:wrap;
         overflow-x:auto;

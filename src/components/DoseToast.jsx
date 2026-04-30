@@ -10,7 +10,7 @@ const TOAST_FADE_PAD_MS = 500;
  * @param {{ message: string | null; onDismiss: () => void }} props
  */
 export function DoseToast({ message, onDismiss }) {
-  const animSeconds = (TOAST_DURATION_MS + TOAST_FADE_PAD_MS) / 1000;
+  const displayMessage = message ? message.replace(/\u200B\d+$/, "") : null;
 
   useEffect(() => {
     if (!message) return;
@@ -25,9 +25,9 @@ export function DoseToast({ message, onDismiss }) {
       <div
         key={message}
         className="pepv-dose-toast-inner"
-        style={{ animationDuration: `${animSeconds}s` }}
+        style={{ animationDuration: `${(TOAST_DURATION_MS + 500) / 1000}s` }}
       >
-        {message}
+        {displayMessage}
       </div>
     </div>,
     document.body
