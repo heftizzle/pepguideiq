@@ -2747,9 +2747,11 @@ async function handleApiCancelSubscription(request, env, cors) {
   }
   const list = Array.isArray(sdata.data) ? sdata.data : [];
   const subscr = pickPrimaryStripeSubscription(list, ["active", "trialing", "past_due"], false);
-  if (!subscr || typeof subscr.current_period_end !== "number") {
+  if (!subscr) {
     return jsonResponse({ error: "No active subscription to cancel" }, 400, cors);
   }
+  const cpeRaw = subscr.current_period_end;
+  const cpeNum = typeof cpeRaw === "number" && Number.isFinite(cpeRaw) ? cpeRaw : 0;
 
   const subscriptionId = typeof subscr.id === "string" ? subscr.id.trim() : "";
   if (!subscriptionId) {
@@ -2761,7 +2763,6 @@ async function handleApiCancelSubscription(request, env, cors) {
     return jsonResponse({ error: "No paid subscription to cancel" }, 400, cors);
   }
 
-  const cpeNum = subscr.current_period_end;
   if (subscr.cancel_at_period_end === true) {
     return jsonResponse(
       {
