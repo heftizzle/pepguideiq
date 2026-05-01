@@ -62,6 +62,7 @@ const sectionDividerStyle = {
 export function HamburgerMenu({
   user,
   onOpenProfile,
+  onOpenSettings,
   onOpenFindPeople,
   onOpenUpgrade,
   onOpenGlossary,
