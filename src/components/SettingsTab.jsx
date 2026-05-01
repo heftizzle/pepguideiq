@@ -1577,7 +1577,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                       type="button"
                       className="btn-red"
                       style={{ fontSize: 13, width: "100%", minHeight: 44, fontWeight: 600, boxSizing: "border-box" }}
-                      disabled={cancelSubBusy || !stripeSub?.current_period_end}
+                      disabled={cancelSubBusy}
                       onClick={() => void onConfirmCancelSubscription()}
                     >
                       {cancelSubBusy ? "Processing..." : "Yeah, cancel it"}
