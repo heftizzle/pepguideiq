@@ -419,6 +419,9 @@ const PEPV_VALID_TABS = new Set([
   "profile",
 ]);
 
+/** True when sessionStorage had a valid saved tab on boot (skip Network default for returning navigators). */
+let bootHadStoredTab = false;
+
 function TutorialSpotlightGate() {
   const { currentStep, highlightTarget, stepIndex } = useTutorial();
   const { rect, bottomNavReserve } = useSpotlightMeasure(highlightTarget, stepIndex);
@@ -480,6 +483,19 @@ function PepGuideIQApp({ user, setUser }) {
       /* ignore */
     }
   }, [activeTab]);
+
+  const networkDefaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (networkDefaultAppliedRef.current) return;
+    if (!activeProfile) return;
+    networkDefaultAppliedRef.current = true;
+    if (bootHadStoredTab) return;
+    const handleOk =
+      typeof activeProfile.handle === "string" && activeProfile.handle.trim() !== "";
+    const tutorialOk = activeProfile.tutorial_completed === true;
+    if (handleOk && tutorialOk) setActiveTab("network");
+  }, [activeProfile]);
+
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("popular");

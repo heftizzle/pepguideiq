@@ -7,6 +7,7 @@ export const BATCH1 = [
     category: ["Nootropic"],
     categories: ["Nootropic"],
     route: ["intranasal", "subcutaneous"],
+    validRoutes: ["injection", "intranasal_spray"],
     mechanism:
       "Synthetic heptapeptide composed of the ACTH(4-7) sequence (Met-Glu-His-Phe) extended at the C-terminus with Pro-Gly-Pro to confer enzymatic stability. Structurally derived from the corticotropic hormone backbone but lacking adrenocorticotropic activity — Semax does not stimulate cortisol or aldosterone release. Primary CNS effects are upregulation of BDNF (brain-derived neurotrophic factor) and NGF (nerve growth factor) within hours of administration, driving synaptic plasticity, hippocampal neurogenesis, and protection of cholinergic neurons. Secondary effects include modulation of dopaminergic and serotonergic tone in the prefrontal cortex, inhibition of enkephalin-degrading enzymes (extending endogenous opioid signaling), and antioxidant activity through reduction of lipid peroxidation in ischemic tissue models. Developed at the Russian Institute of Molecular Genetics in the 1980s and approved in Russia for ischemic stroke recovery and cognitive disorders. Intranasal delivery produces rapid CNS uptake via the olfactory and trigeminal pathways, bypassing first-pass metabolism. Subcutaneous administration yields a different exposure profile — slower onset, more systemic distribution. The unmodified base peptide has a short plasma half-life (~20 minutes), but the Pro-Gly-Pro C-terminal extension provides enough enzymatic resistance for downstream effects to outlast circulating peptide. The N-Acetyl Amidate form (separate catalog entry) protects both termini and meaningfully extends action.",
     halfLife: "~20 minutes plasma; intranasal active window 4–6 hours",
@@ -64,6 +65,7 @@ export const BATCH1 = [
     category: ["Nootropic", "Sleep"],
     categories: ["Nootropic", "Sleep"],
     route: ["intranasal", "subcutaneous"],
+    validRoutes: ["injection", "intranasal_spray"],
     mechanism:
       "Synthetic heptapeptide (Thr-Lys-Pro-Arg-Pro-Gly-Pro) derived from the immunomodulatory tetrapeptide Tuftsin, with a Pro-Gly-Pro C-terminal extension for enzymatic stability. Anxiolytic activity is mediated through several converging pathways. Selank potentiates GABAergic transmission without acting as a direct benzodiazepine receptor agonist — it modulates GABA-A receptor expression and binding kinetics rather than allosterically opening the chloride channel, which accounts for the absence of sedation, motor impairment, and dependence liability seen with benzodiazepines. It also modulates serotonergic and noradrenergic tone in limbic structures, upregulates BDNF (more modestly than Semax), and inhibits enkephalin-degrading enzymes. The Tuftsin parent fragment retains some immunomodulatory action — Selank affects T-helper cell balance and macrophage activation in preclinical work, contributing to a broader homeostatic profile than a pure CNS anxiolytic. Developed at the Russian Institute of Molecular Genetics alongside Semax, approved in Russia for generalized anxiety disorder and adaptation disorders. Subcutaneous and intranasal routes both produce CNS effects, with intranasal favored in the clinical literature for direct olfactory and trigeminal CNS delivery. Acetylation and amidation of the termini (the N-Acetyl Selank Amidate form, separate catalog entry) extend half-life and stability further than the unmodified base peptide.",
     halfLife: "~2 hours plasma; intranasal CNS effects 4–6 hours",
@@ -138,6 +140,7 @@ export const BATCH1 = [
     name: "BPC-157 Arginine Salt",
     aliases: ["BPC-157 Arg", "Stable BPC-157"],
     category: ["Healing / Recovery"],
+    validRoutes: ["injection", "oral"],
     mechanism:
       "Arginine salt form of BPC-157 (Body Protection Compound). Claimed higher water solubility and improved stability in solution vs acetate form. Same core mechanism: growth hormone receptor interaction, NO system modulation, angiogenesis, gut and tissue repair.",
     halfLife: "~4-6 hours",

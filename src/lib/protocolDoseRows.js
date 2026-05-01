@@ -45,6 +45,34 @@ export async function buildProtocolDoseRow(userId, profileId, peptideId, name, p
       active.length === 1
         ? active[0]
         : (active.find((v) => v.desired_dose_mcg != null && Number(v.desired_dose_mcg) > 0) ?? active[0]);
+    const rawDm =
+      typeof pick.delivery_method === "string" ? pick.delivery_method.trim().toLowerCase() : "";
+    const dm = rawDm === "intranasal_spray" || rawDm === "oral" ? rawDm : "injection";
+
+    if (dm === "intranasal_spray") {
+      const sprayVolumeMl = Number(pick.spray_volume_ml) || 0.10;
+      return {
+        kind: /** @type {const} */ ("intranasal_spray"),
+        peptideId,
+        name,
+        vials: active,
+        selectedVialId: pick.id,
+        sprays: 1,
+        spraySizePerDose: 1,
+        sprayVolumeMl,
+      };
+    }
+    if (dm === "oral") {
+      return {
+        kind: /** @type {const} */ ("oral_vial"),
+        peptideId,
+        name,
+        vials: active,
+        selectedVialId: pick.id,
+        doseMl: 0.5,
+      };
+    }
+
     const { doses } = await listRecentDosesForVial(pick.id, userId, profileId, 5);
     const recentDoses = doses ?? [];
     const lastMcg = recentDoses.length > 0 ? recentDoses[0].dose_mcg : null;

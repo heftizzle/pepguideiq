@@ -174,8 +174,73 @@ export function NotificationsBell({ userId, userGoals }) {
         await refresh();
       };
 
+      const targetTypeRaw = row.target_type;
+      const targetType =
+        typeof targetTypeRaw === "string" && targetTypeRaw.trim() !== ""
+          ? targetTypeRaw.trim().toLowerCase()
+          : "";
+
       setBusy(true);
       try {
+        if (targetType === "profile") {
+          const h = normalizeHandleInput(row.actor_handle ?? "");
+          if (h) {
+            openPublicMemberProfile(h);
+            await markIfNeeded();
+            return;
+          }
+          await markIfNeeded();
+          return;
+        }
+
+        if (targetType === "dose_log") {
+          const pid =
+            typeof row.target_id === "string"
+              ? row.target_id.trim()
+              : row.target_id != null && String(row.target_id).trim()
+                ? String(row.target_id).trim()
+                : "";
+          if (pid) {
+            window.dispatchEvent(new CustomEvent("pepguide:open-network-post", { detail: { postId: pid } }));
+            await markIfNeeded();
+            return;
+          }
+        }
+
+        if (targetType === "stack") {
+          const sid =
+            typeof row.target_id === "string"
+              ? row.target_id.trim()
+              : row.target_id != null && String(row.target_id).trim()
+                ? String(row.target_id).trim()
+                : "";
+          if (sid) {
+            await markIfNeeded();
+            window.location.assign(`/stack/${encodeURIComponent(sid)}`);
+            return;
+          }
+        }
+
+        if (targetType === "vial_post") {
+          const targetHandle = normalizeHandleInput(row.target_handle ?? "");
+          const targetPostId = typeof row.target_post_id === "string" ? row.target_post_id.trim() : "";
+          const targetCommentId =
+            typeof row.target_comment_id === "string" ? row.target_comment_id.trim() : "";
+          if (targetHandle && targetPostId) {
+            await markIfNeeded();
+            window.dispatchEvent(
+              new CustomEvent("pepguide:open-post", {
+                detail: {
+                  handle: targetHandle,
+                  postId: targetPostId,
+                  commentId: targetCommentId || null,
+                },
+              })
+            );
+            return;
+          }
+        }
+
         if (type === "new_follower" || type === "follow") {
           const h = normalizeHandleInput(row.actor_handle ?? "");
           if (h) {

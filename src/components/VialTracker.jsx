@@ -54,6 +54,7 @@ import {
   resolveCatalogBlendBacRefMl,
   scaleBlendComponentsToVial,
 } from "../lib/peptideMath.js";
+import { getValidRoutes, isMultiRouteCompound } from "../lib/peptideRoutes.js";
 
 const BLEND_DRAW_MIN = 0.05;
 const BLEND_DRAW_MAX = 0.5;
@@ -63,6 +64,19 @@ function clampBlendDrawMl(v) {
   if (!Number.isFinite(x)) return 0.1;
   return Math.min(BLEND_DRAW_MAX, Math.max(BLEND_DRAW_MIN, x));
 }
+
+/** @param {unknown} v */
+function normalizeDeliveryMethod(v) {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  if (s === "intranasal_spray" || s === "oral") return s;
+  return "injection";
+}
+
+const ROUTE_RADIO_LABELS = {
+  injection: "Injection (IM / SubQ)",
+  intranasal_spray: "Intranasal Spray",
+  oral: "Oral",
+};
 
 function formatBlendMgDraw(n) {
   const x = Number(n);
@@ -328,6 +342,16 @@ function formatShortDate(iso) {
  * @param {number} [catalogBlendBacRefMl=2]
  */
 function formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl = 2, catalogEntry) {
+  if (d.dose_unit === "sprays") {
+    const mcgLbl = formatDoseAmountFromMcg(d.dose_mcg, catalogEntry);
+    return `${d.dose_count} sprays${mcgLbl ? ` (${mcgLbl})` : ""}`;
+  }
+  if (d.dose_unit === "mL") {
+    const conc = Number(vial?.concentration_mcg_ml) || 0;
+    const ml = conc > 0 ? Math.round((Number(d.dose_mcg) / conc) * 10) / 10 : null;
+    const mcgLbl = formatDoseAmountFromMcg(d.dose_mcg, catalogEntry);
+    return `${ml ?? "—"} mL${mcgLbl ? ` (${mcgLbl})` : ""}`;
+  }
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
@@ -341,11 +365,21 @@ function formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl
  * @param {number} [catalogBlendBacRefMl=2]
  */
 function formatCalendarDoseAmount(d, vialsById, catalogBlendComponents, catalogBlendBacRefMl = 2, catalogEntry) {
+  const vid = typeof d.vial_id === "string" ? d.vial_id : null;
+  const vial = vid && vialsById?.get ? vialsById.get(vid) : null;
+  if (d.dose_unit === "sprays") {
+    const mcgLbl = formatDoseAmountFromMcg(d.dose_mcg, catalogEntry);
+    return `${d.dose_count} sprays${mcgLbl ? ` (${mcgLbl})` : ""}`;
+  }
+  if (d.dose_unit === "mL") {
+    const conc = Number(vial?.concentration_mcg_ml) || 0;
+    const ml = conc > 0 ? Math.round((Number(d.dose_mcg) / conc) * 10) / 10 : null;
+    const mcgLbl = formatDoseAmountFromMcg(d.dose_mcg, catalogEntry);
+    return `${ml ?? "—"} mL${mcgLbl ? ` (${mcgLbl})` : ""}`;
+  }
   if (d.dose_count != null && Number(d.dose_count) > 0 && typeof d.dose_unit === "string" && d.dose_unit.trim()) {
     return `${Number(d.dose_count)} ${d.dose_unit.trim()}`;
   }
-  const vid = typeof d.vial_id === "string" ? d.vial_id : null;
-  const vial = vid && vialsById?.get ? vialsById.get(vid) : null;
   return formatInjectableDoseHistoryAmount(d.dose_mcg, vial ?? null, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry);
 }
 
@@ -1010,6 +1044,8 @@ function VialRow({
   const [editingRecipe, setEditingRecipe] = useState(false);
   const [editMg, setEditMg] = useState("");
   const [editMl, setEditMl] = useState("");
+  const [editDeliveryMethod, setEditDeliveryMethod] = useState("injection");
+  const [editSprayVolumeMl, setEditSprayVolumeMl] = useState("0.10");
   const [recipeErr, setRecipeErr] = useState(/** @type {string | null} */ (null));
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [showArchivePrompt, setShowArchivePrompt] = useState(false);
@@ -1106,10 +1142,18 @@ function VialRow({
     void deleteUserVial(vial.id, userId, profileId).then(() => onReload());
   }
 
+  const vialPeptideId = typeof vial.peptide_id === "string" ? vial.peptide_id.trim() : "";
+
   function openRecipeEdit() {
     setRecipeErr(null);
     setEditMg(String(vial.vial_size_mg ?? ""));
     setEditMl(String(vial.bac_water_ml ?? ""));
+    const dm = normalizeDeliveryMethod(vial.delivery_method);
+    setEditDeliveryMethod(dm);
+    const sv = Number(vial.spray_volume_ml);
+    setEditSprayVolumeMl(
+      dm === "intranasal_spray" && Number.isFinite(sv) && sv > 0 ? String(sv) : "0.10"
+    );
     setEditingRecipe(true);
   }
 
@@ -1122,7 +1166,14 @@ function VialRow({
     }
     setSavingRecipe(true);
     setRecipeErr(null);
-    const { error } = await updateUserVial(vial.id, userId, profileId, { vial_size_mg: mg, bac_water_ml: ml });
+    /** @type {Record<string, unknown>} */
+    const patch = { vial_size_mg: mg, bac_water_ml: ml };
+    if (vialPeptideId && isMultiRouteCompound(vialPeptideId)) {
+      patch.delivery_method = editDeliveryMethod;
+      patch.spray_volume_ml =
+        editDeliveryMethod === "intranasal_spray" ? Number(editSprayVolumeMl) || 0.10 : null;
+    }
+    const { error } = await updateUserVial(vial.id, userId, profileId, patch);
     setSavingRecipe(false);
     if (error) {
       setRecipeErr(typeof error.message === "string" ? error.message : "Could not save.");
@@ -1444,6 +1495,46 @@ function VialRow({
                       inputMode="decimal"
                     />
                   </div>
+                  {vialPeptideId && isMultiRouteCompound(vialPeptideId) ? (
+                    <div style={{ marginBottom: 10 }}>
+                      <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+                        Route of Administration
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {getValidRoutes(vialPeptideId).map((route) => (
+                          <label
+                            key={route}
+                            className="mono"
+                            style={{ fontSize: 13, color: "var(--color-text-primary)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                          >
+                            <input
+                              type="radio"
+                              name={`delivery-method-${vial.id}`}
+                              checked={editDeliveryMethod === route}
+                              onChange={() => setEditDeliveryMethod(route)}
+                              disabled={!canMutate || savingRecipe}
+                            />
+                            {ROUTE_RADIO_LABELS[route] ?? route}
+                          </label>
+                        ))}
+                      </div>
+                      {editDeliveryMethod === "intranasal_spray" ? (
+                        <div style={{ marginTop: 10 }}>
+                          <div className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 4 }}>
+                            Volume per spray (mL)
+                          </div>
+                          <input
+                            className="form-input"
+                            style={{ width: 120, fontSize: 13 }}
+                            value={editSprayVolumeMl}
+                            onChange={(e) => setEditSprayVolumeMl(e.target.value)}
+                            inputMode="decimal"
+                            disabled={!canMutate || savingRecipe}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {recipeErr ? <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{recipeErr}</div> : null}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
@@ -1545,6 +1636,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const [desiredQuick, setDesiredQuick] = useState(null);
   const [blendDrawMl, setBlendDrawMl] = useState(0.1);
   const [vialSizeOptionIndex, setVialSizeOptionIndex] = useState(0);
+  const [formDeliveryMethod, setFormDeliveryMethod] = useState("injection");
+  const [formSprayVolumeMl, setFormSprayVolumeMl] = useState("0.10");
 
   const vialSizeOptionsList = useMemo(() => {
     const o = catalogEntry?.vialSizeOptions;
@@ -1794,6 +1887,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
     setFormDesiredMcg("");
     setFormNotes("");
     setDesiredQuick(null);
+    setFormDeliveryMethod("injection");
+    setFormSprayVolumeMl("0.10");
     setShowAdd(true);
   }
 
@@ -1841,6 +1936,9 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
       expires_at: expiresAtIso(formRecon, stabilityDays),
       notes: formNotes.trim() || null,
       status: "active",
+      delivery_method: formDeliveryMethod,
+      spray_volume_ml:
+        formDeliveryMethod === "intranasal_spray" ? Number(formSprayVolumeMl) || 0.10 : null,
     });
     if (import.meta.env.DEV && error) {
       console.error("[VialTracker saveVial]", error.message ?? error, error);
@@ -1854,6 +1952,8 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
       setMgQuick(null);
       setMlQuick(null);
       setDesiredQuick(null);
+      setFormDeliveryMethod("injection");
+      setFormSprayVolumeMl("0.10");
       void reload();
     }
   }
@@ -2101,6 +2201,45 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
               />
             )}
           </div>
+
+          {isMultiRouteCompound(peptideId) ? (
+            <div>
+              <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+                Route of Administration
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {getValidRoutes(peptideId).map((route) => (
+                  <label
+                    key={route}
+                    className="mono"
+                    style={{ fontSize: 13, color: "var(--color-text-primary)", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                  >
+                    <input
+                      type="radio"
+                      name="delivery-method-new-vial"
+                      checked={formDeliveryMethod === route}
+                      onChange={() => setFormDeliveryMethod(route)}
+                    />
+                    {ROUTE_RADIO_LABELS[route] ?? route}
+                  </label>
+                ))}
+              </div>
+              {formDeliveryMethod === "intranasal_spray" ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 4 }}>
+                    Volume per spray (mL)
+                  </div>
+                  <input
+                    className="form-input"
+                    style={{ fontSize: 13, maxWidth: 120 }}
+                    value={formSprayVolumeMl}
+                    onChange={(e) => setFormSprayVolumeMl(e.target.value)}
+                    inputMode="decimal"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {blendComponents && (
             <div
