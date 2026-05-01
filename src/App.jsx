@@ -1095,6 +1095,16 @@ function PepGuideIQApp({ user, setUser }) {
     const onOpenNetworkTabOnly = () => {
       setActiveTab("network");
     };
+    const onOpenProfileTabSettings = () => {
+      setActiveTab("profile");
+      window.setTimeout(() => {
+        try {
+          window.dispatchEvent(new CustomEvent("pepguide:open-settings"));
+        } catch {
+          /* ignore */
+        }
+      }, 50);
+    };
     const onOpenPost = (
       /** @type {CustomEvent<{ handle?: string; postId?: string; commentId?: string | null }>} */ e
     ) => {
@@ -1118,12 +1128,14 @@ function PepGuideIQApp({ user, setUser }) {
     window.addEventListener("pepguide:open-network-post", onOpenNetworkPost);
     window.addEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
     window.addEventListener("pepguide:open-post", onOpenPost);
+    window.addEventListener("pepguide:open-profile-tab-settings", onOpenProfileTabSettings);
     return () => {
       window.removeEventListener("pepguide:open-public-profile", onOpenPublicProfile);
       window.removeEventListener("popstate", syncPublicProfileFromUrl);
       window.removeEventListener("pepguide:open-network-post", onOpenNetworkPost);
       window.removeEventListener("pepguide:open-network-tab", onOpenNetworkTabOnly);
       window.removeEventListener("pepguide:open-post", onOpenPost);
+      window.removeEventListener("pepguide:open-profile-tab-settings", onOpenProfileTabSettings);
     };
   }, []);
 

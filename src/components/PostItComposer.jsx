@@ -1,10 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { isSupabaseConfigured } from "../lib/config.js";
+import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
+import { getSessionAccessToken, supabase } from "../lib/supabase.js";
 import { R2_UPLOAD_ACCEPT_ATTR, R2_UPLOAD_MAX_BYTES, validateUploadFile, uploadImageToR2 } from "../lib/r2Upload.js";
-import { supabase } from "../lib/supabase.js";
 
 const CAPTION_MAX = 280;
+
+/**
+ * If the caret is inside a `#tag` token being typed, return the `#` index and query after it.
+ * @returns {{ hashStart: number, query: string } | null}
+ */
+function getActiveHashtagQuery(text, caret) {
+  const t = String(text);
+  const c = Math.min(Math.max(0, caret | 0), t.length);
+  let i = c - 1;
+  while (i >= 0) {
+    const ch = t[i];
+    if (ch === "#") {
+      const prev = i > 0 ? t[i - 1] : "";
+      if (i > 0 && /[a-zA-Z0-9_]/.test(prev)) {
+        i--;
+        continue;
+      }
+      const slice = t.slice(i + 1, c);
+      if (!/^[a-zA-Z0-9_]*$/.test(slice)) return null;
+      return { hashStart: i, query: slice };
+    }
+    if (!/[a-zA-Z0-9_]/.test(ch)) break;
+    i--;
+  }
+  return null;
+}
 
 const CROP_VIEW_W = 340;
 const CROP_VIEW_H = 340;
@@ -252,6 +278,15 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
   const [uploading, setUploading] = useState(false);
   const [postError, setPostError] = useState(/** @type {string | null} */ (null));
   const fileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
+  const captionRef = useRef(/** @type {HTMLTextAreaElement | null} */ (null));
+  const tagSearchTimerRef = useRef(/** @type {number | null} */ (null));
+  const [hashtagSuggest, setHashtagSuggest] = useState(() => ({
+    open: false,
+    items: /** @type {{ tag: string; post_count?: number }[]} */ ([]),
+    replaceStart: 0,
+    replaceEnd: 0,
+    loading: false,
+  }));
 
   const [cropSrc, setCropSrc] = useState(/** @type {string | null} */ (null));
   const [cropNw, setCropNw] = useState(1);
@@ -297,7 +332,21 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
   }, [open, onClose, cropSrc, cancelCrop]);
 
   useEffect(() => {
+    return () => {
+      if (tagSearchTimerRef.current != null) {
+        window.clearTimeout(tagSearchTimerRef.current);
+        tagSearchTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!open) {
+      if (tagSearchTimerRef.current != null) {
+        window.clearTimeout(tagSearchTimerRef.current);
+        tagSearchTimerRef.current = null;
+      }
+      setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
       setMediaFile(null);
       setMediaPreview((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -470,6 +519,101 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
     }
   }, [mediaFile, activeProfileId, caption, visibleNetwork, visibleProfile, onPosted, onClose]);
 
+  const applyHashtagChoice = useCallback((chosenRaw) => {
+    const low = String(chosenRaw ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "");
+    if (!low) return;
+    const ta = captionRef.current;
+    if (!ta) return;
+    const start = hashtagSuggest.replaceStart;
+    const end = hashtagSuggest.replaceEnd;
+    const v = ta.value.slice(0, CAPTION_MAX);
+    const before = v.slice(0, start);
+    const after = v.slice(end);
+    const insert = `#${low} `;
+    const next = `${before}${insert}${after}`.slice(0, CAPTION_MAX);
+    setCaption(next);
+    setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+    window.requestAnimationFrame(() => {
+      try {
+        const pos = Math.min(start + insert.length, next.length);
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [hashtagSuggest.replaceEnd, hashtagSuggest.replaceStart]);
+
+  const onCaptionChange = useCallback((e) => {
+    const el = e.target;
+    const val = el.value.slice(0, CAPTION_MAX);
+    setCaption(val);
+    const caret = typeof el.selectionStart === "number" ? el.selectionStart : val.length;
+    const ctx = getActiveHashtagQuery(val, caret);
+    if (tagSearchTimerRef.current != null) {
+      window.clearTimeout(tagSearchTimerRef.current);
+      tagSearchTimerRef.current = null;
+    }
+    if (!ctx) {
+      setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+      return;
+    }
+    if (ctx.query.length < 1) {
+      setHashtagSuggest({ open: false, items: [], replaceStart: ctx.hashStart, replaceEnd: caret, loading: false });
+      return;
+    }
+    setHashtagSuggest({
+      open: false,
+      items: [],
+      replaceStart: ctx.hashStart,
+      replaceEnd: caret,
+      loading: true,
+    });
+    tagSearchTimerRef.current = window.setTimeout(() => {
+      tagSearchTimerRef.current = null;
+      const ta = captionRef.current;
+      if (!ta) return;
+      const v2 = ta.value.slice(0, CAPTION_MAX);
+      const c2 = typeof ta.selectionStart === "number" ? ta.selectionStart : v2.length;
+      const ctx2 = getActiveHashtagQuery(v2, c2);
+      if (!ctx2 || ctx2.query.length < 1) {
+        setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+        return;
+      }
+      void (async () => {
+        if (!isApiWorkerConfigured() || !String(API_WORKER_URL || "").trim()) {
+          setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+          return;
+        }
+        const token = await getSessionAccessToken();
+        if (!token) {
+          setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+          return;
+        }
+        try {
+          const res = await fetch(
+            `${String(API_WORKER_URL).replace(/\/$/, "")}/hashtags/search?q=${encodeURIComponent(ctx2.query)}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const data = await res.json().catch(() => ({}));
+          const items = Array.isArray(data.hashtags) ? data.hashtags : [];
+          setHashtagSuggest({
+            open: items.length > 0,
+            items: items.slice(0, 8),
+            replaceStart: ctx2.hashStart,
+            replaceEnd: c2,
+            loading: false,
+          });
+        } catch {
+          setHashtagSuggest({ open: false, items: [], replaceStart: 0, replaceEnd: 0, loading: false });
+        }
+      })();
+    }, 150);
+  }, []);
+
   if (typeof document === "undefined") return null;
   if (!open) return null;
 
@@ -606,22 +750,91 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
           >
             CAPTION (OPTIONAL)
           </div>
-          <textarea
-            className="form-input"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
-            placeholder="Say something about your post…"
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              minHeight: 72,
-              resize: "vertical",
-              marginBottom: 6,
-              fontFamily: "'Outfit', sans-serif",
-              fontSize: 14,
-            }}
-            aria-label="Caption"
-          />
+          <div style={{ position: "relative", marginBottom: 6 }}>
+            <textarea
+              ref={captionRef}
+              className="form-input"
+              value={caption}
+              onChange={onCaptionChange}
+              placeholder="Say something about your post…"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                minHeight: 72,
+                resize: "vertical",
+                fontFamily: "'Outfit', sans-serif",
+                fontSize: 14,
+              }}
+              aria-label="Caption"
+              aria-expanded={hashtagSuggest.open}
+              aria-controls={hashtagSuggest.open ? "pepv-hashtag-suggest" : undefined}
+            />
+            {hashtagSuggest.loading && !hashtagSuggest.open ? (
+              <div
+                className="mono"
+                style={{
+                  position: "absolute",
+                  right: 8,
+                  bottom: 8,
+                  fontSize: 10,
+                  color: "var(--color-text-muted)",
+                  pointerEvents: "none",
+                }}
+              >
+                …
+              </div>
+            ) : null}
+            {hashtagSuggest.open && hashtagSuggest.items.length > 0 ? (
+              <div
+                id="pepv-hashtag-suggest"
+                role="listbox"
+                aria-label="Hashtag suggestions"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: "100%",
+                  zIndex: 30,
+                  marginTop: 4,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border-default)",
+                  background: "var(--color-bg-elevated)",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                }}
+              >
+                {hashtagSuggest.items.map((row) => {
+                  const tg = typeof row.tag === "string" ? row.tag : "";
+                  if (!tg) return null;
+                  return (
+                    <button
+                      key={tg}
+                      type="button"
+                      role="option"
+                      className="mono"
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => applyHashtagChoice(tg)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        border: "none",
+                        borderBottom: "1px solid var(--color-border-default)",
+                        background: "transparent",
+                        color: "var(--color-text-info, #38bdf8)",
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      #{tg}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
           <div
             style={{
               fontSize: 11,

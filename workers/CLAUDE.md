@@ -2,7 +2,7 @@
 
 Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 34)
+## Routes (exactly 37)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
@@ -36,6 +36,11 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `POST /member-follows` — follow (body: `{follower_profile_id, following_profile_id}`).
 - `DELETE /member-follows` — unfollow (same body shape).
 - `GET /member-follows/following?profile_id=`
+
+### Hashtags (network posts)
+- `GET /hashtags/trending` — top 20 hashtags by `post_count` (auth).
+- `GET /hashtags/search?q=` — prefix typeahead on `hashtags.tag` (auth).
+- `GET /hashtags/:tag/posts` — network-visible `posts` rows linked to tag, merged with `member_profiles` for feed cards (auth).
 
 ### Body composition (InBody / DEXA)
 - `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Atlas daily KV quota.

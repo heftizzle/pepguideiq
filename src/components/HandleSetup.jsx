@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
-import { stripHandleAtPrefix } from "../lib/memberProfileHandle.js";
+import { MEMBER_HANDLE_PATTERN, stripHandleAtPrefix } from "../lib/memberProfileHandle.js";
 import {
   checkMemberProfileHandleAvailable,
   patchMemberProfileViaWorker,
   supabase,
   updateMemberProfile,
 } from "../lib/supabase.js";
-
-const HANDLE_RE = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
 
 /**
  * @param {string} raw
@@ -51,8 +49,8 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
 
   const formatError = useMemo(() => {
     if (!canonical) return null;
-    if (!HANDLE_RE.test(canonical)) {
-      return "3–32 characters: letters, numbers, underscore, period, or hyphen. Cannot start/end with a period or contain two consecutive periods.";
+    if (!MEMBER_HANDLE_PATTERN.test(canonical)) {
+      return "Start with a letter; 3–30 characters; letters, numbers, underscore, or hyphen only.";
     }
     return null;
   }, [canonical]);
@@ -75,6 +73,12 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
           const r = await checkMemberProfileHandleAvailable(canonical, activeProfileId);
           err = r.error;
           available = Boolean(r.available);
+          if (!err && r.reason === "reserved") {
+            if (cancelled) return;
+            setAvail("taken");
+            setAvailError("That handle is reserved.");
+            return;
+          }
         } else {
           const r = await checkHandleAvailableDirect(canonical, activeProfileId);
           err = r.error;
@@ -107,13 +111,13 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
 
   const canConfirm =
     !formatError &&
-    HANDLE_RE.test(canonical) &&
+    MEMBER_HANDLE_PATTERN.test(canonical) &&
     avail === "available" &&
     !confirmBusy &&
     avail !== "checking";
 
   const onConfirm = useCallback(async () => {
-    if (!formatError && HANDLE_RE.test(canonical) && avail === "available" && !confirmBusy) {
+    if (!formatError && MEMBER_HANDLE_PATTERN.test(canonical) && avail === "available" && !confirmBusy) {
       // use guard inline to avoid stale canConfirm
     } else {
       return;

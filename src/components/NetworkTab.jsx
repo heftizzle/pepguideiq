@@ -24,6 +24,7 @@ import CommentsSection from "./Comments/CommentsSection.jsx";
 import PostMenuButton from "./Posts/PostMenuButton.jsx";
 import VialShareCard from "./Network/VialShareCard.jsx";
 import { dispatchDeferredDelete } from "./DeleteUndoToast.jsx";
+import { HashtagText } from "./HashtagText.jsx";
 
 const AVATAR_BASE = `${String(API_WORKER_URL || "").replace(/\/$/, "")}/avatars`;
 
@@ -409,7 +410,7 @@ function DoseFeedSkeleton() {
 /**
  * @param {{ row: Record<string, unknown> }} p
  */
-function MediaPostCard({ row, onDeferredDelete }) {
+export function MediaPostCard({ row, onDeferredDelete }) {
   const profile = row.member_profiles != null && typeof row.member_profiles === "object" ? row.member_profiles : {};
   const handle = typeof profile.handle === "string" ? profile.handle.trim() : "";
   const displayHandle = typeof profile.display_handle === "string" ? profile.display_handle.trim() : "";
@@ -545,7 +546,7 @@ function MediaPostCard({ row, onDeferredDelete }) {
 
       {content ? (
         <div style={{ padding: "10px 14px 12px", fontSize: 14, lineHeight: 1.5, color: "var(--color-text-primary)" }}>
-          {content}
+          <HashtagText text={content} />
         </div>
       ) : null}
 

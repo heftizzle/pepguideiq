@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
+import { formatHandleDisplay, normalizeHandleInput, stripHandleAtPrefix } from "../lib/memberProfileHandle.js";
+import { useActiveProfile } from "../context/ProfileContext.jsx";
+import { HandleSetupBanner } from "./HandleSetupBanner.jsx";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import {
   followMemberProfile,
@@ -24,6 +26,16 @@ function bioSnippet(bio) {
   const t = typeof bio === "string" ? bio.trim() : "";
   if (!t) return null;
   return t.length > 80 ? `${t.slice(0, 80)}…` : t;
+}
+
+/** Primary line = display name; secondary = muted @handle when both exist. */
+function peopleCardPrimarySecondary(profile) {
+  const dispName = typeof profile?.display_name === "string" ? profile.display_name.trim() : "";
+  const handleLine = formatHandleDisplay(profile?.handle ?? "", profile?.display_handle ?? "");
+  const hasHandle = typeof profile?.handle === "string" && Boolean(normalizeHandleInput(profile.handle));
+  const primary = dispName || (hasHandle ? handleLine : "—");
+  const secondary = hasHandle && dispName ? handleLine : null;
+  return { primary, secondary };
 }
 
 function SuggestedProfileSkeleton() {
@@ -56,6 +68,10 @@ function SuggestedProfileSkeleton() {
  * }} props
  */
 export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose, initialQuery = null }) {
+  const { activeProfile } = useActiveProfile();
+  const sessionUserId =
+    activeProfile && typeof activeProfile.user_id === "string" ? activeProfile.user_id.trim() : "";
+
   const handleClose = useCallback(() => {
     if (typeof onClose === "function") {
       try {
@@ -142,8 +158,10 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
 
   useEffect(() => {
     if (!accessToken) return;
-    const q = debounced.replace(/^@/, "").trim();
-    if (!q) {
+    const trim = debounced.trim();
+    const handleOnlySearch = trim.startsWith("@");
+    const qForApi = stripHandleAtPrefix(trim);
+    if (!qForApi) {
       setResults([]);
       setLoading(false);
       return;
@@ -152,7 +170,9 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
     setLoading(true);
     void (async () => {
       try {
-        const rows = await searchMemberProfiles(debounced, workerUrl, accessToken);
+        const rows = await searchMemberProfiles(qForApi, workerUrl, accessToken, {
+          handleOnly: handleOnlySearch,
+        });
         if (reqId.current !== id) return;
         setResults(Array.isArray(rows) ? rows : []);
       } catch {
@@ -164,7 +184,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
     })();
   }, [debounced, accessToken, workerUrl]);
 
-  const emptyQuery = debounced.replace(/^@/, "").trim().length === 0;
+  const emptyQuery = stripHandleAtPrefix(debounced.trim()).length === 0;
 
   const toggleFollow = useCallback(
     async (followingId, nextFollowing) => {
@@ -266,6 +286,19 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
           FIND PEOPLE
         </div>
 
+        <HandleSetupBanner
+          userId={sessionUserId}
+          handle={activeProfile?.handle}
+          onGoSetHandle={() => {
+            try {
+              window.dispatchEvent(new CustomEvent("pepguide:open-profile-tab-settings"));
+            } catch {
+              /* ignore */
+            }
+            handleClose();
+          }}
+        />
+
         {suggestedLoading || suggestedRows.length > 0 ? (
           <div style={{ marginBottom: 20 }}>
             <div
@@ -292,8 +325,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                     const id = String(row.profile_id);
                     const isFollowing = followingSet.has(id);
                     const busy = pending.has(id);
-                    const handleLine = formatHandleDisplay(row.handle ?? "", row.display_handle ?? "");
-                    const dispName = typeof row.display_name === "string" ? row.display_name.trim() : "";
+                    const { primary: sugPrimary, secondary: sugSecondary } = peopleCardPrimarySecondary(row);
                     const avK =
                       typeof row.avatar_r2_key === "string" && row.avatar_r2_key.trim() ? row.avatar_r2_key.trim() : "";
                     const av = avK ? resolveMemberAvatarDisplayUrlFromKey(avK) : "";
@@ -366,10 +398,19 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                               className="brand"
                               style={{ fontSize: 15, fontWeight: 600, color: "var(--color-accent)", lineHeight: 1.3 }}
                             >
-                              {handleLine || "—"}
+                              {sugPrimary}
                             </div>
-                            {dispName ? (
-                              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>{dispName}</div>
+                            {sugSecondary ? (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: "var(--color-text-muted)",
+                                  marginTop: 2,
+                                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                                }}
+                              >
+                                {sugSecondary}
+                              </div>
                             ) : null}
                           </div>
                           {isFollowing ? (
@@ -501,7 +542,8 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
             </div>
           ) : showNoResults ? (
             <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: 8 }}>
-              No users found for @{debounced.replace(/^@/, "").trim()}
+              No users found for {debounced.trim().startsWith("@") ? "@" : ""}
+              {stripHandleAtPrefix(debounced.trim())}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -509,8 +551,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                 const id = String(p.id);
                 const isFollowing = followingSet.has(id);
                 const busy = pending.has(id);
-                const handleLine = formatHandleDisplay(p.handle ?? "", p.display_handle ?? "");
-                const dispName = typeof p.display_name === "string" ? p.display_name.trim() : "";
+                const { primary: resPrimary, secondary: resSecondary } = peopleCardPrimarySecondary(p);
                 const snippet = bioSnippet(p.bio);
                 const avK = typeof p.avatar_r2_key === "string" && p.avatar_r2_key.trim() ? p.avatar_r2_key.trim() : "";
                 const avLegacy = typeof p.avatar_url === "string" && p.avatar_url.trim() ? p.avatar_url.trim() : "";
@@ -574,10 +615,19 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
                       }}
                     >
                       <div className="brand" style={{ fontSize: 15, fontWeight: 600, color: "var(--color-accent)", lineHeight: 1.3 }}>
-                        {handleLine || "—"}
+                        {resPrimary}
                       </div>
-                      {dispName ? (
-                        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 2 }}>{dispName}</div>
+                      {resSecondary ? (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--color-text-muted)",
+                            marginTop: 2,
+                            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                          }}
+                        >
+                          {resSecondary}
+                        </div>
                       ) : null}
                       {snippet ? (
                         <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6, lineHeight: 1.45 }}>

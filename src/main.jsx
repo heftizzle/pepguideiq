@@ -12,6 +12,8 @@ import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import PricingPage from "./pages/PricingPage.jsx";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { normalizeHandleInput } from "./lib/memberProfileHandle.js";
+import { HashtagFeedPage } from "./components/HashtagFeedPage.jsx";
+import { HASHTAG_TAG_RE } from "./lib/hashtagConstants.js";
 
 function PublicStackViewWithAgeGate({ shareId }) {
   const [ageVerified, setAgeVerified] = useState(readAgeVerifiedFromStorage);
@@ -73,6 +75,14 @@ const profileMatch = path.match(/^\/profile\/([^/]+)$/i);
 const rawProfileHandle = profileMatch ? decodeURIComponent(profileMatch[1] ?? "") : "";
 const profileHandleFromPath = rawProfileHandle ? normalizeHandleInput(rawProfileHandle) : "";
 
+const hashtagMatch = path.match(/^\/explore\/hashtag\/([^/]+)$/i);
+const hashtagRawSeg = hashtagMatch ? decodeURIComponent(hashtagMatch[1] ?? "") : "";
+const hashtagSlug =
+  typeof hashtagRawSeg === "string"
+    ? hashtagRawSeg.toLowerCase().replace(/^#+/, "").replace(/[^a-z0-9_]/g, "")
+    : "";
+const hashtagOk = hashtagSlug.length > 0 && HASHTAG_TAG_RE.test(hashtagSlug);
+
 const app =
   path === "/pricing" ? (
     <>
@@ -84,6 +94,10 @@ const app =
   ) : profileHandleFromPath.length >= 3 ? (
     <ThemeProvider>
       <PublicMemberProfileWithAgeGate handle={profileHandleFromPath} />
+    </ThemeProvider>
+  ) : hashtagOk ? (
+    <ThemeProvider>
+      <HashtagFeedPage tag={hashtagSlug} />
     </ThemeProvider>
   ) : (
     <AppErrorBoundary>

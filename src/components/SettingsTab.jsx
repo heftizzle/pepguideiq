@@ -511,7 +511,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
   };
 
   const onHandleInputChange = (e) => {
-    const v = e.target.value.replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 32);
+    const v = e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 30);
     setHandleInput(v);
     setHandleAvailability("idle");
     setHandleSaveInlineErr(null);
@@ -565,7 +565,8 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       setHandleSaveInlineErr(error.message);
       return;
     }
-    if (!available || reason === "taken") setHandleAvailability("taken");
+    if (reason === "reserved") setHandleAvailability("reserved");
+    else if (!available || reason === "taken") setHandleAvailability("taken");
     else setHandleAvailability("available");
   };
 
@@ -588,7 +589,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
     if (normalized !== prev) {
       if (normalized && !isValidMemberHandleFormat(raw)) {
         setHandleSaveInlineErr(
-          "Handle must be 3–32 characters: letters, numbers, underscore, period, or hyphen; no ..; cannot start or end with ."
+          "Handle must start with a letter and be 3–30 characters (letters, numbers, underscore, or hyphen only)."
         );
         return;
       }
@@ -602,6 +603,11 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         if (error) {
           setHandleAvailability("idle");
           setHandleSaveInlineErr(error.message);
+          return;
+        }
+        if (reason === "reserved") {
+          setHandleAvailability("reserved");
+          setHandleSaveInlineErr("That handle is reserved. Pick another.");
           return;
         }
         if (!available || reason === "taken") {
@@ -1367,12 +1373,15 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               {handleAvailability === "taken" ? (
                 <span style={{ fontSize: 13, color: "var(--color-danger)" }}>✗ This handle is already taken</span>
               ) : null}
+              {handleAvailability === "reserved" ? (
+                <span style={{ fontSize: 13, color: "var(--color-danger)" }}>✗ Reserved handle</span>
+              ) : null}
               {handleAvailability === "short" ? (
                 <span style={{ fontSize: 13, color: "var(--color-warning)" }}>At least 3 characters</span>
               ) : null}
               {handleAvailability === "invalid" ? (
                 <span style={{ fontSize: 13, color: "var(--color-warning)" }}>
-                  Letters, numbers, underscore, period, or hyphen (3–32); no ..; cannot start or end with .
+                  Start with a letter; 3–30 chars; letters, numbers, underscore, or hyphen only.
                 </span>
               ) : null}
               <button
@@ -1386,7 +1395,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </button>
             </div>
             <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>
-              {handleInput.length}/32 · min 3 characters · shown as{" "}
+              {handleInput.length}/30 · min 3 characters · shown as{" "}
               {handleNormalized.length >= 3 && isValidMemberHandleFormat(handleInput)
                 ? formatHandleDisplay(handleInput)
                 : "@handle"}

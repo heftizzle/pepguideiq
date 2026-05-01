@@ -34,6 +34,7 @@ import {
   storedSocialHandleString,
 } from "../lib/socialProfileLinks.js";
 import { PostItComposer } from "./PostItComposer.jsx";
+import { HandleSetupBanner } from "./HandleSetupBanner.jsx";
 import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
 import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
 import { BodyScanView } from "./BodyScanView.jsx";
@@ -1238,7 +1239,7 @@ export function ProfileTab({
       return;
     }
     if (!isValidMemberHandleFormat(raw)) {
-      setHandleHint("Letters, numbers, _, ., or - (3–32) — no .. or . at start/end");
+      setHandleHint("Start with a letter; 3–30 chars; letters, numbers, _, or -");
       return;
     }
     const t = window.setTimeout(() => {
@@ -1250,6 +1251,7 @@ export function ProfileTab({
         }
         if (available) setHandleHint("Available");
         else if (reason === "taken") setHandleHint("Already taken");
+        else if (reason === "reserved") setHandleHint("Reserved — pick another");
         else setHandleHint("");
       })();
     }, 450);
@@ -1410,13 +1412,17 @@ export function ProfileTab({
       return;
     }
     if (!isValidMemberHandleFormat(rawTyped)) {
-      setErr("Handle: 3–32 chars; letters, numbers, _, ., or -; no .. or . at start/end");
+      setErr("Handle must start with a letter and be 3–30 chars (letters, numbers, _, or - only).");
       return;
     }
     if (workerOk) {
       const { available, reason, error } = await checkMemberProfileHandleAvailable(rawTyped, activeProfileId);
       if (error) {
         setErr(error.message);
+        return;
+      }
+      if (reason === "reserved") {
+        setErr("That handle is reserved. Pick another.");
         return;
       }
       if (!available || reason === "taken") {
@@ -1872,6 +1878,12 @@ export function ProfileTab({
           </span>
         </button>
       </div>
+
+      <HandleSetupBanner
+        userId={typeof user?.id === "string" ? user.id : ""}
+        handle={activeProfile?.handle}
+        onGoSetHandle={() => setSubView("settings")}
+      />
 
       {err && (
         <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12 }}>

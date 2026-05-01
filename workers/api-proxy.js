@@ -3593,11 +3593,35 @@ const MEMBER_PROFILE_ALLOWED_LANGUAGES = new Set(["en", "es", "pt-BR", "fr", "de
 
 const MEMBER_PROFILE_SHIFT_SCHEDULES = new Set(["days", "swings", "mids", "nights", "rotating"]);
 
-/** Aligned with `member_profiles_handle_format_chk`: 3–32, no .., alphanumeric ends, [a-z0-9_.-] middle. */
-const MEMBER_HANDLE_RE = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
+/** Aligned with `member_profiles_handle_format_chk` (091): letter-first, 3–30 chars, [a-zA-Z0-9_-] after first. */
+const MEMBER_HANDLE_RE = /^[a-zA-Z][a-zA-Z0-9_-]{2,29}$/;
 
-/** Lowercase slug only — same as DB `handle` after backfill; used for exact search before broad ILIKE. */
-const MEMBER_HANDLE_SLUG_RE = /^[a-z0-9][a-z0-9_.-]*[a-z0-9]$/;
+/** Lowercase canonical slug — exact handle lookup before broad ILIKE search. */
+const MEMBER_HANDLE_SLUG_RE = /^[a-z][a-z0-9_-]{2,29}$/;
+
+const RESERVED_MEMBER_HANDLES = new Set([
+  "admin",
+  "support",
+  "pepguide",
+  "pepguideiq",
+  "api",
+  "help",
+  "null",
+  "undefined",
+  "me",
+  "settings",
+  "notifications",
+  "explore",
+  "search",
+]);
+
+/** @param {string} lowerSlug canonical lowercase handle */
+function isReservedMemberHandle(lowerSlug) {
+  return RESERVED_MEMBER_HANDLES.has(String(lowerSlug ?? "").trim().toLowerCase());
+}
+
+/** Stored hashtag slug: lowercase [a-z0-9_], 1–50 chars (matches `hashtags.tag`). */
+const HASHTAG_TAG_RE = /^[a-z0-9_]{1,50}$/;
 
 const MEMBER_EXPERIENCE_LEVELS = new Set(["beginner", "intermediate", "advanced", "elite"]);
 
@@ -3873,6 +3897,9 @@ async function handleCheckHandleAvailability(request, env, cors) {
     return jsonResponse({ available: false, reason: "invalid_format" }, 200, cors);
   }
   const h = stripped.toLowerCase();
+  if (isReservedMemberHandle(h)) {
+    return jsonResponse({ available: false, reason: "reserved" }, 200, cors);
+  }
   const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, h, excludeProfileId ?? "");
@@ -4045,6 +4072,8 @@ async function handleSearchMemberProfiles(request, env, cors) {
   const userId = sessionUser.sub;
   const url = new URL(request.url);
   const rawQ = url.searchParams.get("q") ?? url.searchParams.get("query") ?? "";
+  const handleOnly =
+    url.searchParams.get("handle_only") === "1" || url.searchParams.get("mode") === "handle";
   let q = String(rawQ).trim();
   while (q.startsWith("@")) q = q.slice(1).trim();
   q = q.toLowerCase();
@@ -4073,7 +4102,9 @@ async function handleSearchMemberProfiles(request, env, cors) {
   }
 
   if (rows.length === 0) {
-    const orClause = `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
+    const orClause = handleOnly
+      ? `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*)`
+      : `(handle.ilike.*${safe}*,display_handle.ilike.*${safe}*,display_name.ilike.*${safe}*)`;
     const sel = `${supabaseUrl}/rest/v1/member_profiles?user_id=neq.${encodeURIComponent(
       userId
     )}&or=${encodeURIComponent(orClause)}&select=id,handle,display_handle,display_name,avatar_r2_key,bio,user_id&limit=20`;
@@ -4113,6 +4144,188 @@ async function handleSearchMemberProfiles(request, env, cors) {
   }));
 
   return jsonResponse({ profiles }, 200, cors);
+}
+
+/**
+ * GET /hashtags/trending — authenticated; top hashtags by post_count.
+ */
+async function handleHashtagsTrending(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  };
+  const url = `${supabaseUrl}/rest/v1/hashtags?select=tag,post_count&order=post_count.desc.nullslast,updated_at.desc&limit=20`;
+  const res = await fetch(url, { headers });
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    log(env, "warn", "hashtags_trending_failed", { status: res.status });
+    return jsonResponse({ error: "Could not load trending hashtags" }, 502, cors);
+  }
+  return jsonResponse({ hashtags: rows }, 200, cors);
+}
+
+/**
+ * GET /hashtags/search?q= — authenticated prefix search for typeahead.
+ */
+async function handleHashtagsSearchQuery(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const urlObj = new URL(request.url);
+  const rawQ = urlObj.searchParams.get("q") ?? "";
+  let t = stripHandleAtForApi(rawQ).toLowerCase().replace(/^#+/, "");
+  t = t.replace(/[^a-z0-9_]/g, "");
+  if (!t) {
+    return jsonResponse({ hashtags: [] }, 200, cors);
+  }
+  if (!HASHTAG_TAG_RE.test(t)) {
+    return jsonResponse(
+      {
+        error: "invalid_query",
+        message: "Hashtag search needs letters, digits, or underscores (1–50 chars).",
+      },
+      400,
+      cors
+    );
+  }
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  };
+  const pattern = `${t}*`;
+  const sel = `${supabaseUrl}/rest/v1/hashtags?tag=ilike.${encodeURIComponent(
+    pattern
+  )}&select=tag,post_count&order=post_count.desc&limit=10`;
+  const res = await fetch(sel, { headers });
+  const rows = await res.json().catch(() => []);
+  if (!res.ok || !Array.isArray(rows)) {
+    log(env, "warn", "hashtags_search_failed", { status: res.status });
+    return jsonResponse({ error: "Could not search hashtags" }, 502, cors);
+  }
+  return jsonResponse({ hashtags: rows }, 200, cors);
+}
+
+/**
+ * GET /hashtags/:tag/posts — network-visible posts tagged with `tag`.
+ * @param {string} tagRaw URL segment (decoded separately)
+ */
+async function handleHashtagPostsForTag(request, env, cors, tagRaw) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Supabase not configured" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  let decoded = typeof tagRaw === "string" ? tagRaw.trim() : "";
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    /* keep raw */
+  }
+  let tag = decoded.toLowerCase().replace(/^#+/, "");
+  tag = tag.replace(/[^a-z0-9_]/g, "");
+  if (!HASHTAG_TAG_RE.test(tag)) {
+    return jsonResponse({ error: "invalid_tag", message: "Invalid hashtag" }, 400, cors);
+  }
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+  };
+
+  const metaUrl = `${supabaseUrl}/rest/v1/hashtags?tag=eq.${encodeURIComponent(tag)}&select=id,tag,post_count&limit=1`;
+  const metaRes = await fetch(metaUrl, { headers });
+  const metaRows = await metaRes.json().catch(() => []);
+  if (!metaRes.ok || !Array.isArray(metaRows) || metaRows.length === 0) {
+    return jsonResponse({ hashtag: { tag, post_count: 0 }, posts: [] }, 200, cors);
+  }
+  const hashtagRow = metaRows[0];
+  const hashtagId = hashtagRow && hashtagRow.id != null ? String(hashtagRow.id) : "";
+  const postCountMeta =
+    typeof hashtagRow.post_count === "number"
+      ? hashtagRow.post_count
+      : Number(hashtagRow.post_count) || 0;
+  if (!hashtagId) {
+    return jsonResponse({ hashtag: { tag, post_count: 0 }, posts: [] }, 200, cors);
+  }
+
+  const linksUrl = `${supabaseUrl}/rest/v1/post_hashtags?hashtag_id=eq.${encodeURIComponent(
+    hashtagId
+  )}&select=post_id,created_at&order=created_at.desc&limit=120`;
+  const linksRes = await fetch(linksUrl, { headers });
+  const links = await linksRes.json().catch(() => []);
+  if (!linksRes.ok || !Array.isArray(links)) {
+    log(env, "warn", "hashtag_posts_links_failed", { status: linksRes.status });
+    return jsonResponse({ error: "Could not load hashtag posts" }, 502, cors);
+  }
+  const postIds = [...new Set(links.map((l) => (l && l.post_id != null ? String(l.post_id) : "")).filter(Boolean))];
+  if (postIds.length === 0) {
+    return jsonResponse({ hashtag: { tag, post_count: postCountMeta }, posts: [] }, 200, cors);
+  }
+
+  const inList = postIds.map((id) => encodeURIComponent(id)).join(",");
+  const postsUrl = `${supabaseUrl}/rest/v1/posts?id=in.(${inList})&visible_network=eq.true&select=id,profile_id,content,created_at,media_url,media_type,visible_network,visible_profile,like_count,comment_count,source_kind,source_id`;
+  const postsRes = await fetch(postsUrl, { headers });
+  const posts = await postsRes.json().catch(() => []);
+  if (!postsRes.ok || !Array.isArray(posts)) {
+    log(env, "warn", "hashtag_posts_fetch_failed", { status: postsRes.status });
+    return jsonResponse({ error: "Could not load posts" }, 502, cors);
+  }
+
+  posts.sort((a, b) => {
+    const ta = typeof a?.created_at === "string" ? Date.parse(a.created_at) : 0;
+    const tb = typeof b?.created_at === "string" ? Date.parse(b.created_at) : 0;
+    return tb - ta;
+  });
+  const topPosts = posts.slice(0, 50);
+
+  const profileIds = [
+    ...new Set(topPosts.map((p) => (p && p.profile_id != null ? String(p.profile_id) : "")).filter(Boolean)),
+  ];
+  /** @type {Record<string, Record<string, unknown>>} */
+  const profMap = {};
+  if (profileIds.length > 0) {
+    const profIn = profileIds.map((id) => encodeURIComponent(id)).join(",");
+    const profUrl = `${supabaseUrl}/rest/v1/member_profiles?id=in.(${profIn})&select=id,user_id,handle,display_handle,display_name,avatar_r2_key`;
+    const profRes = await fetch(profUrl, { headers });
+    const profRows = await profRes.json().catch(() => []);
+    if (profRes.ok && Array.isArray(profRows)) {
+      for (const row of profRows) {
+        if (row && row.id != null) {
+          profMap[String(row.id)] = row;
+        }
+      }
+    }
+  }
+
+  const merged = topPosts.map((p) => {
+    const pid = p && p.profile_id != null ? String(p.profile_id) : "";
+    const mp = pid ? profMap[pid] : null;
+    return {
+      ...p,
+      member_profiles: mp && typeof mp === "object" ? mp : {},
+    };
+  });
+
+  return jsonResponse({ hashtag: { tag, post_count: postCountMeta }, posts: merged }, 200, cors);
 }
 
 /**
@@ -4708,8 +4921,14 @@ function parseMemberProfilePatchBody(body) {
         patch.display_handle = null;
       } else if (!MEMBER_HANDLE_RE.test(rawTyped)) {
         return {
-          error:
-            "handle must be 3–32 characters: letters, numbers, underscore, period, or hyphen; no ..; cannot start or end with .",
+          error: "handle_invalid",
+          message:
+            "Handle must start with a letter and be 3–30 characters: letters, numbers, underscore, or hyphen only.",
+        };
+      } else if (isReservedMemberHandle(rawTyped.toLowerCase())) {
+        return {
+          error: "handle_reserved",
+          message: "That handle is reserved. Pick another.",
         };
       } else {
         patch.handle = rawTyped.toLowerCase();
@@ -4920,12 +5139,20 @@ async function handlePatchMemberProfile(request, env, cors, profileIdRaw) {
   }
   const parsed = parseMemberProfilePatchBody(body);
   if (parsed.error || !parsed.patch) {
-    return jsonResponse({ error: parsed.error ?? "Invalid body" }, 400, cors);
+    const errBody =
+      typeof parsed.message === "string" && parsed.message.trim()
+        ? { error: parsed.error ?? "Invalid body", message: parsed.message }
+        : { error: typeof parsed.error === "string" ? parsed.error : "Invalid body" };
+    return jsonResponse(errBody, 400, cors);
   }
   if (parsed.patch.handle != null && typeof parsed.patch.handle === "string") {
     const taken = await isHandleTakenElsewhere(supabaseUrl, serviceKey, parsed.patch.handle, profileId);
     if (taken) {
-      return jsonResponse({ error: "This handle is already taken" }, 409, cors);
+      return jsonResponse(
+        { error: "handle_taken", message: "This handle is already taken by another profile." },
+        409,
+        cors
+      );
     }
   }
   if (
@@ -5868,6 +6095,19 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/account/delete" && request.method === "POST") {
       return handleDeleteAccount(request, env, cors);
+    }
+
+    if (url.pathname === "/hashtags/trending" && request.method === "GET") {
+      return handleHashtagsTrending(request, env, cors);
+    }
+
+    if (url.pathname === "/hashtags/search" && request.method === "GET") {
+      return handleHashtagsSearchQuery(request, env, cors);
+    }
+
+    const hashtagPostsPathMatch = url.pathname.match(/^\/hashtags\/([^/]+)\/posts\/?$/);
+    if (hashtagPostsPathMatch && request.method === "GET") {
+      return handleHashtagPostsForTag(request, env, cors, hashtagPostsPathMatch[1]);
     }
 
     if (url.pathname === "/member-profiles/handle-available" && request.method === "GET") {

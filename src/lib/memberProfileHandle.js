@@ -1,8 +1,7 @@
 /**
- * Server + DB: letters, digits, underscore, period, hyphen; 3–32; no ..; cannot start or end with `.`
- * (first/last character must be alphanumeric — same rule as `member_profiles_handle_format_chk`).
+ * Server + DB (091): letter-first, 3–30 chars; letters, digits, underscore, hyphen only.
  */
-export const MEMBER_HANDLE_PATTERN = /^(?!.*\.\.)(?!\.)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9])$/;
+export const MEMBER_HANDLE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{2,29}$/;
 
 /**
  * Trim and strip all leading `@`; preserve casing.

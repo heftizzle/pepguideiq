@@ -10,6 +10,7 @@ import LikersModal from "./Likes/LikersModal.jsx";
 import CommentsSection from "./Comments/CommentsSection.jsx";
 import PostMenuButton from "./Posts/PostMenuButton.jsx";
 import { dispatchDeferredDelete } from "./DeleteUndoToast.jsx";
+import { HashtagText } from "./HashtagText.jsx";
 
 /**
  * Instagram-style photo wall of `public.posts` rows where `visible_profile = true`.
@@ -424,7 +425,11 @@ export default function PublicProfilePhotoGrid({
                     borderRadius: 4,
                   }}
                 >
-                  {lightboxRow.content && <div>{lightboxRow.content}</div>}
+                  {lightboxRow.content && (
+                    <div>
+                      <HashtagText text={String(lightboxRow.content)} />
+                    </div>
+                  )}
                   {lightboxRow.created_at && (
                     <div
                       className="mono"

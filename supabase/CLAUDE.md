@@ -13,6 +13,7 @@
 | `member_profiles` | Sub-profiles per user (Netflix-style, slot-limited by plan). `display_name`, `handle`, `display_handle`, `avatar_url`, `bio`, `goals` (CSV), `language`, `wake_time`, `schedule_shift`, `demo_sessions_shown`, `tutorial_completed` (core walkthrough finished), `current_streak`, `consecutive_days`, `is_default`, `social_{instagram,tiktok,facebook,snapchat,linkedin,x,youtube,rumble}_handle`, `locale_{city,state,country_code}`. |
 | `body_metrics` | Scoped per profile. Weight/height/body-fat, InBody/DEXA fields. |
 | `member_follows` | Graph edges. `(follower_id, following_id)`. Unique constraint. |
+| `hashtags` / `post_hashtags` | Lowercase tag registry + junction to `posts`; `post_count` maintained by triggers on `posts.content` / delete. |
 | `network_feed` | Receipted feed posts. `stack_id` for stack shares, `dose_log_id` for dose posts. `public_visible` flag. `expires_at` for TTL. |
 | `notifications` | In-app bell. `user_id`, `actor_id`, `type`, `read_at`, `nav_target`. |
 | `member_fasts` | Fasting tracker. `fast_type`, `started_at`, `target_hours`, `ended_at`. |
@@ -73,7 +74,7 @@ See `docs/security/rls-audit.md` before touching policies.
 ## Schema invariants
 
 - `profiles.plan` ∈ `('entry', 'pro', 'elite', 'goat')` — CHECK constraint in 001.
-- `member_profiles.handle` — lowercase, 3–32 chars, `^[a-zA-Z0-9][a-zA-Z0-9_.-]{1,30}[a-zA-Z0-9]$`, no consecutive dots (`..`), enforced by `member_profiles_handle_format_chk`.
+- `member_profiles.handle` — optional public @handle; as of `091_member_profiles_handle_strict_format.sql`: letter-first, 3–30 chars, `^[a-z][a-z0-9_-]{2,29}$`, reserved slugs blocked, enforced by `member_profiles_handle_format_chk` + global unique index on non-null `handle`.
 - `member_profiles.bio` ≤ 500 chars (migration 031).
 - `member_fasts.target_hours` > 0, ≤ 2160 (90 days, enforced client-side).
 - `user_stacks` unique on `(user_id, profile_id)` — one stack per profile slot.

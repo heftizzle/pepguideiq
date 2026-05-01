@@ -943,7 +943,8 @@ export async function patchMemberProfileViaWorker(profileId, body) {
     let msg = "Could not update profile";
     try {
       const j = await res.json();
-      if (j && typeof j.error === "string") msg = j.error;
+      if (j && typeof j.message === "string" && j.message.trim()) msg = j.message.trim();
+      else if (j && typeof j.error === "string" && j.error.trim()) msg = j.error.trim();
     } catch {
       /* ignore */
     }
