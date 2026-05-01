@@ -33,7 +33,7 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import
 - **Tier IDs: `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", "basic", "premium", or "pro+".
 - **Session IDs: `morning`, `afternoon`, `evening`, `night` — exactly 4.** Emojis: 🌞 🌅 🌙 🌑.
 - **Tab IDs: `library`, `guide`, `stackBuilder`, `stack`, `network`, `vialTracker`, `protocol`, `profile` — exactly 8.** `PEPV_VALID_TABS` in `src/App.jsx`.
-- **Affiliate codes (13 whitelisted)** in `src/lib/affiliateRef.js` via `normalizeAffiliateRef()`. Other Rewardful dashboard codes are silently dropped until added there.
+- **Affiliate codes (14 whitelisted)** in `src/lib/affiliateRef.js` via `normalizeAffiliateRef()`. One affiliate may have multiple active coupon codes (same account, separate attribution in Rewardful); whitelist each code. Other Rewardful dashboard codes are silently dropped until added there.
 - **Plan is server-authoritative.** Never update `profiles.plan` from the client — trigger rejects with `42501`. Only `update_user_plan(uuid, text)` via service role can change it.
 
 ## Data layer
@@ -66,7 +66,7 @@ Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCateg
 
 9. Before building or modifying any UI component, read `DESIGN.md` at the repo root. Use its color tokens, spacing scale, and component patterns. Never introduce colors, fonts, or spacing values not defined there.
 
-10. Affiliate codes — exactly 13, case-insensitive: `Primo15`, `Pete15`, `Tsource15`, `EDON15`, `ironresolve15`, `Palmer15`, `Ryba15`, `Fire15`, `Lake15`, `OTMen15`, `Elite15`, `Vitality15` (Dr. Tracy / Live In Vitality, Riverview FL), `Chad15`. All normalized via `normalizeAffiliateRef()`. Any code not in this list is silently dropped.
+10. Affiliate codes — exactly 14, case-insensitive: `Primo15`, `Pete15`, `Tsource15`, `EDON15`, `HEAVYDUTY15`, `ironresolve15`, `Palmer15`, `Ryba15`, `Fire15`, `Lake15`, `OTMen15`, `Elite15`, `Vitality15` (Dr. Tracy / Live In Vitality, Riverview FL), `Chad15`. All normalized via `normalizeAffiliateRef()`. Any code not in this list is silently dropped.
 
 
 ## When you need deeper context

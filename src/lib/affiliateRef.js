@@ -2,12 +2,18 @@ import { formatPrice, getTier } from "./tiers.js";
 
 const STORAGE_KEY = "pepguide_ref";
 
-/** Recognized affiliate refs (Rewardful / Stripe). Keys are lowercase for case-insensitive match. */
+/**
+ * Recognized `?ref=` coupon codes (Rewardful / Stripe). Keys are lowercase for case-insensitive match.
+ *
+ * A single affiliate account may have multiple active codes at once (e.g. personal brand vs rebrand);
+ * Rewardful tracks attribution per code; commission rules are unchanged — whitelist each distinct code here.
+ */
 const AFFILIATE_REF_BY_LOWER = Object.freeze({
   primo15: "Primo15",
   pete15: "Pete15",
   tsource15: "Tsource15",
   edon15: "EDON15",
+  heavyduty15: "HEAVYDUTY15",
   ironresolve15: "ironresolve15",
   elite15: "Elite15",
   otmen15: "OTMen15",

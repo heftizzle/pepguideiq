@@ -925,6 +925,15 @@ export function ProfileTab({
     }
   }, [tutorial, tutorial?.highlightTarget, tutorial?.flowKey]);
 
+  useEffect(() => {
+    const onOpenSettings = () => {
+      setSubView("settings");
+      setHealthSubview(null);
+    };
+    window.addEventListener("pepguide:open-settings", onOpenSettings);
+    return () => window.removeEventListener("pepguide:open-settings", onOpenSettings);
+  }, []);
+
   const [latestInbodyRow, setLatestInbodyRow] = useState(/** @type {Record<string, unknown> | null} */ (null));
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [handleDraft, setHandleDraft] = useState("@");

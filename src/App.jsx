@@ -1581,6 +1581,16 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <HamburgerMenu
                     user={user}
                     onOpenProfile={() => setActiveTab("profile")}
+                    onOpenSettings={() => {
+                      setActiveTab("profile");
+                      window.setTimeout(() => {
+                        try {
+                          window.dispatchEvent(new CustomEvent("pepguide:open-settings"));
+                        } catch {
+                          /* ignore */
+                        }
+                      }, 0);
+                    }}
                     onOpenFindPeople={() => setShowPeopleSearch(true)}
                     onOpenUpgrade={(reason) => openUpgradeModal(reason)}
                     onOpenGlossary={() => setGlossaryModalOpen(true)}

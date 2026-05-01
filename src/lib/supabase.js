@@ -205,7 +205,7 @@ export async function authSignIn(email, password) {
 }
 
 /**
- * @param {{ name?: string, plan?: string, affiliate_ref?: string }} [meta]
+ * @param {{ name?: string, plan?: string, affiliate_ref?: string }} [meta] — `affiliate_ref` is last-touch whitelisted code; same partner may publish multiple codes (see `affiliateRef.js`).
  * @param {string | null | undefined} turnstileToken
  * @returns {{ user: import('@supabase/supabase-js').User | null, error: Error | null }}
  */

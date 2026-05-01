@@ -65,14 +65,14 @@ Subdirectory briefs: `src/AGENTS.md`, `workers/AGENTS.md`, `supabase/AGENTS.md`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.
 - **Stripe hosted checkout for plan upgrades.** `UpgradePlanModal.jsx` → Worker `POST /stripe/create-subscription` → `{ url }` (Stripe Checkout for new subscriptions, or Billing Portal when changing an existing paid subscription’s price). Payment Links remain a fallback / alternative path.
-- **Affiliate codes (13 whitelisted).** Canonical codes (all 15% flat, case-insensitive via `normalizeAffiliateRef()` in `src/lib/affiliateRef.js`):
+- **Affiliate codes (14 whitelisted).** Canonical codes (all 15% flat, case-insensitive via `normalizeAffiliateRef()` in `src/lib/affiliateRef.js`). One Rewardful affiliate may have multiple active codes (tracked separately); list each code here.
 
   | Name             | Code          |
   |------------------|---------------|
   | Jose Primo       | Primo15       |
   | Pete Belcastro   | Pete15        |
   | Kirby Anderson   | Tsource15     |
-  | Nic Edon         | EDON15        |
+  | Nic Edon         | EDON15, HEAVYDUTY15 |
   | Miranda Geist    | ironresolve15 |
   | Debbie Palmer    | Palmer15      |
   | Jake Ryba        | Ryba15        |
@@ -83,7 +83,7 @@ Subdirectory briefs: `src/AGENTS.md`, `workers/AGENTS.md`, `supabase/AGENTS.md`.
   | Dr. Tracy / Live In Vitality (Riverview, FL) | Vitality15 |
   | Chad             | Chad15        |
 
-  All 13 codes are whitelisted in `normalizeAffiliateRef()`. Do not add codes not in this list. Old stale codes (KwElite15, OTMax15, Promo15) are retired.
+  All 14 codes are whitelisted in `normalizeAffiliateRef()`. Do not add codes not in this list. Old stale codes (KwElite15, OTMax15, Promo15) are retired.
 - **Plan (tier) is server-authoritative.** The `profiles.plan` column has a trigger that rejects direct updates. Only `update_user_plan(uuid, text)` via the service-role Worker can change it.
 - **Session IDs are `morning`, `afternoon`, `evening`, `night` — exactly 4.** See `src/data/protocolSessions.js`.
 - **Tab IDs are `library`, `guide`, `stackBuilder`, `stack`, `network`, `vialTracker`, `protocol`, `profile` — exactly 8.** See `PEPV_VALID_TABS` in `src/App.jsx`.

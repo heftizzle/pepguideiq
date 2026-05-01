@@ -48,9 +48,6 @@ const SECTION = {
   fontFamily: "'JetBrains Mono', monospace",
 };
 
-const SUBSCRIPTION_CANCEL_POLICY =
-  "You may cancel at any time. Your subscription and full tier access remain active through the end of your current billing period. No refunds are issued for partial periods. After your period ends, your account downgrades to Entry (free) tier automatically.";
-
 function formatSubscriptionPeriodEndDisplay(unixSec) {
   const n = typeof unixSec === "number" ? unixSec : Number(unixSec);
   if (!Number.isFinite(n) || n <= 0) return "—";
@@ -1532,69 +1529,72 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </button>
             </>
           ) : (
-            <>
-              <h2
-                style={{
-                  fontSize: 17,
-                  fontWeight: 600,
-                  margin: "0 0 12px",
-                  color: "var(--color-text-primary)",
-                  lineHeight: 1.35,
-                }}
-              >
-                Cancel subscription?
-              </h2>
-              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 16, lineHeight: 1.55 }}>
-                <div style={{ marginBottom: 10 }}>
-                  <strong style={{ color: "var(--color-text-primary)" }}>Current plan:</strong>{" "}
-                  {formatPlan(stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan)} —{" "}
-                  {TIERS[stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan]?.label ?? "—"}
-                </div>
-                <div style={{ marginBottom: 16 }}>
-                  <strong style={{ color: "var(--color-text-primary)" }}>Current period ends:</strong>{" "}
-                  {formatSubscriptionPeriodEndDisplay(stripeSub?.current_period_end)}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--color-text-secondary)",
-                    lineHeight: 1.55,
-                    padding: "12px 14px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-border-tab)",
-                    background: "var(--color-bg-page)",
-                    marginBottom: 16,
-                  }}
-                >
-                  {SUBSCRIPTION_CANCEL_POLICY}
-                </div>
-              </div>
-              {cancelSubModalErr ? (
-                <div className="mono" style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 14, lineHeight: 1.45 }}>
-                  {cancelSubModalErr}
-                </div>
-              ) : null}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <button
-                  type="button"
-                  className="btn-teal"
-                  style={{ fontSize: 13, flex: "1 1 140px", minHeight: 44 }}
-                  disabled={cancelSubBusy}
-                  onClick={closeCancelSubModal}
-                >
-                  Keep My Plan
-                </button>
-                <button
-                  type="button"
-                  className="btn-red"
-                  style={{ fontSize: 13, flex: "1 1 140px", minHeight: 44, fontWeight: 600 }}
-                  disabled={cancelSubBusy || !stripeSub?.current_period_end}
-                  onClick={() => void onConfirmCancelSubscription()}
-                >
-                  {cancelSubBusy ? "…" : "Cancel Subscription"}
-                </button>
-              </div>
-            </>
+            (() => {
+              const cancelModalPlanKey =
+                stripeSub?.plan && stripeSub.plan !== "entry" ? stripeSub.plan : user.plan;
+              const cancelModalPlanLabel = formatPlan(cancelModalPlanKey);
+              const cancelModalPeriodEnd = formatSubscriptionPeriodEndDisplay(stripeSub?.current_period_end);
+              return (
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    <p style={{ fontSize: 36, lineHeight: 1.2, margin: "0 0 10px" }} aria-hidden>
+                      🥺
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 17,
+                        fontWeight: 600,
+                        margin: "0 0 12px",
+                        color: "var(--color-text-primary)",
+                        lineHeight: 1.35,
+                        fontFamily: "'Outfit', sans-serif",
+                      }}
+                    >
+                      Awww... but we like money.
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--color-text-secondary)",
+                        lineHeight: 1.55,
+                        margin: 0,
+                      }}
+                    >
+                      Your{" "}
+                      <strong style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{cancelModalPlanLabel}</strong>{" "}
+                      access runs through{" "}
+                      <strong style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{cancelModalPeriodEnd}</strong>.
+                      After that you drop to the free Entry tier — your data and logs stay forever though.
+                    </p>
+                  </div>
+                  {cancelSubModalErr ? (
+                    <div className="mono" style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 14, lineHeight: 1.45 }}>
+                      {cancelSubModalErr}
+                    </div>
+                  ) : null}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <button
+                      type="button"
+                      className="btn-red"
+                      style={{ fontSize: 13, width: "100%", minHeight: 44, fontWeight: 600, boxSizing: "border-box" }}
+                      disabled={cancelSubBusy || !stripeSub?.current_period_end}
+                      onClick={() => void onConfirmCancelSubscription()}
+                    >
+                      {cancelSubBusy ? "Processing..." : "Yeah, cancel it"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      style={{ fontSize: 13, width: "100%", minHeight: 44, boxSizing: "border-box" }}
+                      disabled={cancelSubBusy}
+                      onClick={closeCancelSubModal}
+                    >
+                      {`Never mind, keep my ${cancelModalPlanLabel}`}
+                    </button>
+                  </div>
+                </>
+              );
+            })()
           )}
         </Modal>
       )}

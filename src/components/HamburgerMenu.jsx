@@ -47,6 +47,7 @@ const sectionDividerStyle = {
  * @param {{
  *   user: import("@supabase/supabase-js").User,
  *   onOpenProfile: () => void,
+ *   onOpenSettings: () => void,
  *   onOpenFindPeople: () => void,
  *   onOpenUpgrade: (reason?: string) => void,
  *   onOpenGlossary: () => void,
@@ -333,6 +334,10 @@ export function HamburgerMenu({
                 )}
               </div>
             ) : null}
+
+            <button type="button" className="pepv-hamburger-row" style={rowBtnStyle} onClick={() => closeAnd(onOpenSettings)}>
+              Settings
+            </button>
 
             <button type="button" className="pepv-hamburger-row" style={rowBtnStyle} onClick={() => closeAnd(() => onOpenUpgrade())}>
               Plan / Upgrade

@@ -133,7 +133,7 @@ export function AuthScreen({ onAuth }) {
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
   /** Login / signup password field visibility (default hidden). */
   const [showPassword, setShowPassword] = useState(false);
-  /** EDON15 / TSource15 (and variants) captured from URL or localStorage — drives 15% off copy on plan cards. */
+  /** Whitelisted refs (e.g. EDON15, HEAVYDUTY15, TSource15) from URL or localStorage — drives 15% off copy on plan cards. */
   const [partnerDiscountActive, setPartnerDiscountActive] = useState(false);
   const mainWidgetIdRef = useRef(null);
   const forgotWidgetIdRef = useRef(null);
