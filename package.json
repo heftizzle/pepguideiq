@@ -12,6 +12,9 @@
     "deploy:worker": "wrangler deploy --config wrangler.worker.toml"
   },
   "dependencies": {
+    "@capacitor/cli": "^8",
+    "@capacitor/core": "^8",
+    "@capacitor/ios": "^8",
     "@stripe/react-stripe-js": "^3.10.0",
     "@stripe/stripe-js": "^5.10.0",
     "@supabase/supabase-js": "^2.103.3",
