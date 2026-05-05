@@ -32,9 +32,14 @@ export function getBottomNavReservePx() {
  * @returns {{ top: number, left: number, w: number, h: number, cardTop: number | null, cardBottom: number | null, cardLeft: number, placement: "below" | "above", tailLeft: number }}
  */
 export function computeCardPosition({ rect, vw, vh, overlayBottom }) {
+  // Clamp to visible viewport - handles targets inside horizontal scroll containers
+  const clampedLeft = Math.max(0, Math.min(rect.left, vw));
+  const clampedRight = Math.max(0, Math.min(rect.right, vw));
+  const clampedWidth = Math.max(1, clampedRight - clampedLeft);
+
   const top = rect.top - CUTOUT_PAD;
-  const left = rect.left - CUTOUT_PAD;
-  const w = rect.width + CUTOUT_PAD * 2;
+  const left = clampedLeft - CUTOUT_PAD;
+  const w = clampedWidth + CUTOUT_PAD * 2;
   const h = rect.height + CUTOUT_PAD * 2;
 
   const cardBelowTop = rect.bottom + CARD_MARGIN;
@@ -44,7 +49,7 @@ export function computeCardPosition({ rect, vw, vh, overlayBottom }) {
   const cardTop = fitsBelow ? cardBelowTop : null;
   const cardBottom = fitsBelow ? null : Math.max(CARD_MARGIN, vh - rect.top + CARD_MARGIN);
 
-  const targetCenterX = rect.left + rect.width / 2;
+  const targetCenterX = clampedLeft + clampedWidth / 2; // use clamped center
   const idealLeft = targetCenterX - CARD_WIDTH / 2;
   const cardLeft = Math.max(CARD_MARGIN, Math.min(idealLeft, vw - CARD_WIDTH - CARD_MARGIN));
 

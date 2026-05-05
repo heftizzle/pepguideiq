@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTutorial } from "../context/TutorialContext.jsx";
 import {
@@ -17,6 +18,17 @@ const OVERLAY_DIM = "rgba(0,0,0,0.82)";
  */
 function TutorialSpotlightInner({ rect, bottomNavReserve }) {
   const { currentStep, steps, stepIndex, goNext, highlightTarget, forced } = useTutorial();
+
+  useEffect(() => {
+    if (!forced) return;
+    const prev = document.documentElement.style.overflowX;
+    document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowX = "hidden";
+    return () => {
+      document.documentElement.style.overflowX = prev;
+      document.body.style.overflowX = "";
+    };
+  }, [forced]);
 
   if (!forced || !currentStep || !highlightTarget || !rect || typeof document === "undefined") return null;
 

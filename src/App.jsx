@@ -424,8 +424,15 @@ const PEPV_VALID_TABS = new Set([
 let bootHadStoredTab = false;
 
 function TutorialSpotlightGate() {
-  const { currentStep, highlightTarget, stepIndex } = useTutorial();
-  const { rect, bottomNavReserve } = useSpotlightMeasure(highlightTarget, stepIndex);
+  const { currentStep, highlightTarget, stepIndex, forced, goNext } = useTutorial();
+  const { rect, bottomNavReserve, measureFailed } = useSpotlightMeasure(highlightTarget, stepIndex);
+
+  useEffect(() => {
+    if (!forced || !measureFailed) return;
+    const t = window.setTimeout(() => goNext(), 300);
+    return () => window.clearTimeout(t);
+  }, [forced, measureFailed, stepIndex, goNext]);
+
   if (!currentStep || !highlightTarget) return null;
   return (
     <>

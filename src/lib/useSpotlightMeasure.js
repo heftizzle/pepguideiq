@@ -13,12 +13,13 @@ import {
  *
  * @param {string | null} highlightTarget
  * @param {number} stepIndex
- * @returns {{ rect: DOMRect | null, bottomNavReserve: number }}
+ * @returns {{ rect: DOMRect | null, bottomNavReserve: number, measureFailed: boolean }}
  */
 export function useSpotlightMeasure(highlightTarget, stepIndex) {
   const [rect, setRect] = useState(/** @type {DOMRect | null} */ (null));
   const [bottomNavReserve, setBottomNavReserve] = useState(DEFAULT_BOTTOM_NAV_RESERVE_PX);
   const [targetLayoutReady, setTargetLayoutReady] = useState(false);
+  const [measureFailed, setMeasureFailed] = useState(false);
   const retryRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
 
   const measure = useCallback(() => {
@@ -26,6 +27,7 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
       clearTimeout(retryRef.current);
       retryRef.current = null;
     }
+    setMeasureFailed(false);
     if (typeof document === "undefined" || !highlightTarget) {
       setRect(null);
       setTargetLayoutReady(false);
@@ -42,6 +44,7 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
         } else {
           setRect(null);
           setTargetLayoutReady(false);
+          setMeasureFailed(true);
         }
         return;
       }
@@ -55,6 +58,7 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
         } else {
           setRect(null);
           setTargetLayoutReady(false);
+          setMeasureFailed(true);
         }
         return;
       }
@@ -102,5 +106,5 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
     };
   }, [highlightTarget, measure, targetLayoutReady]);
 
-  return { rect, bottomNavReserve };
+  return { rect, bottomNavReserve, measureFailed };
 }
