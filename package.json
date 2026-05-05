@@ -21,7 +21,8 @@
     "html2canvas": "^1.4.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-markdown": "^9.0.3",
+    "react-markdown": "^9.1.0",
+    "remark-gfm": "^4.0.1",
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {

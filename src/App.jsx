@@ -74,6 +74,7 @@ import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const getCatColor = (cat) => CAT_COLORS[cat] ?? "var(--color-accent)";
 
@@ -1558,7 +1559,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  padding: "12px 0 0",
+                  paddingTop: "max(12px, env(safe-area-inset-top, 0px))",
                   flexWrap: "wrap",
                   gap: 8,
                   width: "100%",
@@ -1804,8 +1805,10 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                         <span className="pill pill--category">{categoryBadgeLabel}</span>
                       </div>
-                      <div className="pcard-summary" style={{ fontSize: 13,color:"#7891af",marginBottom:12,lineHeight:1.55 }}>
-                        {p.mechanism}
+                      <div className="pcard-summary" style={{ fontSize: 13, color: "#7891af", marginBottom: 12, lineHeight: 1.55 }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
+                          {p.mechanism}
+                        </ReactMarkdown>
                       </div>
                       {(() => {
                         const ba = resolvePeptideBioavailability(p);
@@ -2614,7 +2617,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   lineHeight: 1.6,
                 }}
               >
-                {p.mechanism}
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
+                  {p.mechanism}
+                </ReactMarkdown>
               </div>
               {p.notes && (
                 <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
