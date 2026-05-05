@@ -21,12 +21,22 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
 
   useEffect(() => {
     if (!forced) return;
-    const prev = document.documentElement.style.overflowX;
-    document.documentElement.style.overflowX = "hidden";
-    document.body.style.overflowX = "hidden";
+    /** Horizontal scroll can live on nested layout nodes, not only html/body. */
+    const targets = [
+      document.documentElement,
+      document.body,
+      document.getElementById("root"),
+      document.querySelector(".pepv-app-shell"),
+      document.querySelector(".pepv-main-scroll"),
+    ].filter((el) => el instanceof HTMLElement);
+
+    const previous = targets.map((el) => el.style.overflowX);
+    for (const el of targets) el.style.overflowX = "hidden";
+
     return () => {
-      document.documentElement.style.overflowX = prev;
-      document.body.style.overflowX = "";
+      targets.forEach((el, i) => {
+        el.style.overflowX = previous[i] ?? "";
+      });
     };
   }, [forced]);
 
