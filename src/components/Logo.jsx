@@ -5,16 +5,20 @@ export function Logo({ size = 19, style = {} }) {
         style={{
           width: 32,
           height: 32,
-          background: "linear-gradient(135deg,var(--color-accent),var(--color-accent-hover))",
           borderRadius: 7,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 15,
           flexShrink: 0,
+          overflow: "hidden",
+          boxShadow: "0 0 0 1px rgba(0,212,170,0.18)",
         }}
       >
-        ⬡
+        <img
+          src="/app-icon.png"
+          alt=""
+          width={32}
+          height={32}
+          decoding="async"
+          style={{ display: "block", width: 32, height: 32, objectFit: "cover" }}
+        />
       </div>
       <div>
         <div className="brand" style={{ fontSize: size, fontWeight: 800, letterSpacing: ".05em", lineHeight: 1.1 }}>
