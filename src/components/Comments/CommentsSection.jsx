@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useComments } from "../../hooks/useComments.js";
 import CommentThread from "./CommentThread.jsx";
 import CommentComposer from "./CommentComposer.jsx";
+import CommentPreview from "./CommentPreview.jsx";
 
 /**
  * Top-level entry for a post's comments UI.
@@ -10,14 +11,14 @@ import CommentComposer from "./CommentComposer.jsx";
  *   - Composer is ALWAYS rendered in its slot (live for signed-in viewers,
  *     "Sign in to comment" stub for anon). It is NOT gated on whether the
  *     thread is open.
- *   - The "View all N comments" button toggles ONLY the `CommentThread`
- *     visibility. Label flips to "Hide comments" when open. Hidden entirely
- *     when `totalKnownCount === 0`.
+ *   - Default (`composerLayout !== "feed"`): "View all N comments" toggles
+ *     `CommentThread`. Label flips to "Hide comments" when open.
+ *   - Feed (`composerLayout === "feed"`): inline CommentPreview (0–2 rows),
+ *     "View all X comments" when collapsed with 3+, full CommentThread when
+ *     expanded — composer stays below (Network cards).
  *
  * The badge count uses `totalKnownCount = max(postCommentCount, knownLive)`
- * where `knownLive = topLevel.length + sum(repliesByParent[*])`. This keeps
- * the badge in sync with optimistic inserts without waiting for a parent
- * `fetchNetworkMediaPosts` refetch.
+ * where `knownLive = topLevel.length + sum(repliesByParent[*])`.
  *
  * @param {{
  *   postId: string,
@@ -43,14 +44,17 @@ export default function CommentsSection({
   composerLayout = "default",
 }) {
   const [threadOpen, setThreadOpen] = useState(false);
-  const autoOpenedRef = useRef(false);
+  const [feedThreadExpanded, setFeedThreadExpanded] = useState(false);
+  const autoOpenedDefaultRef = useRef(false);
+  const autoOpenedFeedRef = useRef(false);
 
   useEffect(() => {
+    if (composerLayout !== "default") return;
     if (!autoOpenThread) return;
-    if (autoOpenedRef.current) return;
-    autoOpenedRef.current = true;
+    if (autoOpenedDefaultRef.current) return;
+    autoOpenedDefaultRef.current = true;
     setThreadOpen(true);
-  }, [autoOpenThread]);
+  }, [composerLayout, autoOpenThread]);
 
   const hook = useComments({
     postId,
@@ -72,11 +76,108 @@ export default function CommentsSection({
     knownLive
   );
 
+  useEffect(() => {
+    if (composerLayout !== "feed") return;
+    if (!autoOpenThread) return;
+    if (autoOpenedFeedRef.current) return;
+    if (totalKnownCount < 3) return;
+    autoOpenedFeedRef.current = true;
+    setFeedThreadExpanded(true);
+  }, [composerLayout, autoOpenThread, totalKnownCount]);
+
   const toggleLabel = threadOpen
     ? "Hide comments"
     : totalKnownCount === 1
       ? "View 1 comment"
       : `View all ${totalKnownCount} comments`;
+
+  /** Top two newest top-level rows for inline preview (feed layout only). */
+  const previewComments =
+    composerLayout === "feed" && !(feedThreadExpanded && totalKnownCount >= 3) ? hook.topLevel.slice(0, 2) : [];
+
+  const showFeedPreview =
+    composerLayout === "feed" &&
+    totalKnownCount > 0 &&
+    previewComments.length > 0 &&
+    !(totalKnownCount >= 3 && feedThreadExpanded);
+
+  const showFeedViewAll =
+    composerLayout === "feed" && totalKnownCount >= 3 && !feedThreadExpanded;
+
+  const showFeedExpandedThread =
+    composerLayout === "feed" && totalKnownCount >= 3 && feedThreadExpanded;
+
+  if (composerLayout === "feed") {
+    return (
+      <div style={{ padding: "6px 14px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {showFeedExpandedThread ? (
+          <>
+            <CommentThread
+              hook={hook}
+              postId={postId}
+              currentUserId={currentUserId}
+              currentProfileId={currentProfileId}
+              currentProfile={currentProfile}
+              currentProfileGoals={currentProfileGoals}
+              highlightCommentId={highlightCommentId}
+            />
+            <button
+              type="button"
+              onClick={() => setFeedThreadExpanded(false)}
+              style={{
+                alignSelf: "flex-start",
+                background: "none",
+                border: "none",
+                padding: "2px 0",
+                margin: 0,
+                cursor: "pointer",
+                font: "inherit",
+                color: "var(--color-text-muted)",
+                fontSize: 13,
+                textAlign: "left",
+                textDecoration: "none",
+              }}
+            >
+              Hide comments
+            </button>
+          </>
+        ) : (
+          <>
+            {showFeedPreview ? <CommentPreview comments={previewComments} /> : null}
+            {showFeedViewAll ? (
+              <button
+                type="button"
+                onClick={() => setFeedThreadExpanded(true)}
+                aria-expanded={false}
+                style={{
+                  alignSelf: "flex-start",
+                  background: "none",
+                  border: "none",
+                  padding: "2px 0",
+                  margin: 0,
+                  cursor: "pointer",
+                  font: "inherit",
+                  color: "var(--color-text-muted)",
+                  fontSize: 13,
+                  textAlign: "left",
+                  textDecoration: "none",
+                }}
+              >
+                {`View all ${totalKnownCount} comments`}
+              </button>
+            ) : null}
+          </>
+        )}
+
+        <CommentComposer
+          hook={hook}
+          currentUserId={currentUserId}
+          currentProfileId={currentProfileId}
+          layout="feed"
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: "6px 14px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -118,7 +219,7 @@ export default function CommentsSection({
         hook={hook}
         currentUserId={currentUserId}
         currentProfileId={currentProfileId}
-        layout={composerLayout}
+        layout="default"
       />
     </div>
   );

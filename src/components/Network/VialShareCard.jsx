@@ -284,6 +284,7 @@ export default function VialShareCard({ row, onNotesChanged }) {
             currentProfileId={activeProfileId}
             currentProfile={activeProfile}
             currentProfileGoals={currentProfileGoals}
+            composerLayout="feed"
           />
           <LikersModal
             isOpen={likersOpen}

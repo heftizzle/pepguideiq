@@ -137,26 +137,6 @@ export const BATCH9 = [
     tier: "entry",
   },
   {
-    id: "vesugen",
-    name: "Vesugen",
-    aliases: ["A-3 Vascular Bioregulator", "Blood Vessel Bioregulator", "Lys-Glu-Asp"],
-    category: ["Khavinson Bioregulators", "Longevity"],
-    mechanism:
-      "Tripeptide (Lys-Glu-Asp) Khavinson bioregulator targeting vascular endothelial tissue. Distinct from Vesilute — Vesugen is the natural Cytomax extract version (A-3) while Vesilute is a synthetic tetrapeptide. Research demonstrates restoration of endothelial cell gene expression, support for vascular wall integrity and elasticity, and anti-aging effects in the cardiovascular system. Studies show improved microcirculation markers and reduced vascular aging indicators. Relevant for cardiovascular longevity protocols and endothelial health.",
-    halfLife: "Hours",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 20, typicalVolumeMl: 1 },
-    dosingRange: { low: "5mg", medium: "10mg", high: "20mg", frequency: "Daily x 10-day course, 1-2x/year" },
-    tags: ["vascular", "endothelial", "cardiovascular", "blood vessel", "bioregulator", "Khavinson", "longevity", "microcirculation", "Cytomax"],
-    sourcingNotes: "Available in 20mg vials from research peptide suppliers. Note distinction from Vesilute — Vesugen is the A-3 Cytomax natural extract; Vesilute is the synthetic tetrapeptide targeting the same organ. Both valid — different sourcing and formulation.",
-    warnings: [
-      "Course dosing — not continuous",
-      "Distinguish from Vesilute before recommending — different formulation, same target organ",
-      "Limited English-language clinical data — primarily Russian literature",
-      "Not a treatment for diagnosed cardiovascular disease",
-    ],
-    tier: "entry",
-  },
-  {
     id: "pe-22-28",
     name: "PE-22-28",
     aliases: ["Mini-Spadin", "GVSWGLR", "Spadin Analog", "TREK-1 Antagonist"],

@@ -1,20 +1,5 @@
 export const BATCH3 = [
   {
-    id: "cardiogen",
-    name: "Cardiogen",
-    aliases: ["Ala-Glu-Asp-Arg", "Cardiac Bioregulator"],
-    category: ["Khavinson Bioregulators", "Longevity"],
-    mechanism:
-      "Tetrapeptide bioregulator targeting cardiac muscle tissue. Developed by Prof. Vladimir Khavinson at the St. Petersburg Institute of Bioregulation. Research suggests epigenetic regulation of cardiomyocyte gene expression, improving cardiac efficiency and longevity.",
-    halfLife: "Hours",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 20, typicalVolumeMl: 1 },
-    dosingRange: { low: "5mg", medium: "10mg", high: "20mg", frequency: "Daily x 10-day course, 1-2x/year" },
-    tags: ["heart", "cardiac", "bioregulator", "Khavinson", "longevity", "epigenetic", "cardiomyocyte"],
-    sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Russian bioregulator — course dosed. Part of Khavinson's organ-specific peptide bioregulator series.",
-    warnings: ["Course dosing — not continuous", "Limited Western clinical data", "Stack with Epitalon for comprehensive longevity protocol"],
-    tier: "entry",
-  },
-  {
     id: "vilon",
     name: "Vilon",
     aliases: ["Lys-Glu", "Immune-Neuroendocrine Bioregulator"],
@@ -57,21 +42,6 @@ export const BATCH3 = [
     tags: ["lung", "bronchial", "respiratory", "bioregulator", "Khavinson", "longevity", "airway"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Research interest in COPD, asthma, and respiratory aging models.",
     warnings: ["Course dosing — not continuous", "Limited human clinical data"],
-    tier: "entry",
-  },
-  {
-    id: "cortagen",
-    name: "Cortagen",
-    aliases: ["Ala-Glu-Asp-Pro", "Neural Bioregulator"],
-    category: ["Khavinson Bioregulators", "Nootropic"],
-    mechanism:
-      "Tetrapeptide bioregulator targeting neural and cortical tissue. Research suggests neuroprotective and neurorestorative effects via gene expression regulation in cortical neurons. May support cognitive function and neural tissue longevity.",
-    halfLife: "Hours",
-    reconstitution: { solvent: "Bacteriostatic Water", typicalVialMg: 20, typicalVolumeMl: 1 },
-    dosingRange: { low: "5mg", medium: "10mg", high: "20mg", frequency: "Daily x 10-day course" },
-    tags: ["brain", "neural", "neuroprotective", "bioregulator", "Khavinson", "longevity", "cortical"],
-    sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Natural pair with Pinealon for CNS longevity protocol.",
-    warnings: ["Course dosing — not continuous", "Limited human data — primarily animal models"],
     tier: "entry",
   },
   {

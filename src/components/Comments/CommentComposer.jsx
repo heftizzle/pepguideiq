@@ -307,7 +307,17 @@ export default function CommentComposer({
             </button>
           </div>
         )}
-        {footerRow}
+        {error ? (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--color-warning)",
+              padding: "0 2px",
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
       </div>
     );
   }

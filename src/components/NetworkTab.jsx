@@ -343,6 +343,7 @@ function InbodyNetworkProgressCard({ row }) {
             currentProfileId={activeProfileId}
             currentProfile={activeProfile}
             currentProfileGoals={currentProfileGoals}
+            composerLayout="feed"
           />
           <LikersModal
             isOpen={likersOpen}
@@ -541,6 +542,7 @@ export function MediaPostCard({ row, onDeferredDelete }) {
           currentProfileId={activeProfileId}
           currentProfile={activeProfile}
           currentProfileGoals={currentProfileGoals}
+          composerLayout="feed"
         />
       ) : null}
 
@@ -724,6 +726,7 @@ function StackShareCard({ row }) {
             currentProfileId={activeProfileId}
             currentProfile={activeProfile}
             currentProfileGoals={currentProfileGoals}
+            composerLayout="feed"
           />
           <LikersModal
             isOpen={likersOpen}
