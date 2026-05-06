@@ -270,6 +270,11 @@ export function GlobalStyles() {
       @media (max-width: 640px) {
         .tab-btn{padding:10px 10px;font-size:13px}
       }
+      /* iOS WebView auto-zooms any focused input/select/textarea below 16px.
+         Bump touch-device inputs to 16px; desktop pointer:fine devices keep their 13px design. */
+      @media (pointer: coarse) {
+        input, select, textarea { font-size: 16px !important; }
+      }
       /* AI Atlas full-screen takeover — open/close use same duration per breakpoint */
       .guide-takeover-root{
         position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;box-sizing:border-box;

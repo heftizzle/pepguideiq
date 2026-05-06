@@ -432,6 +432,14 @@ export function TutorialProvider({ children, setActiveTab, setProtocolDeepLink, 
     setStepIndex(0);
     setHelpStripActive(false);
     setForced(false);
+    if (
+      typeof window !== "undefined" &&
+      window.visualViewport &&
+      window.visualViewport.scale !== 1
+    ) {
+      document.documentElement.style.zoom = "reset";
+      window.scrollTo(0, window.scrollY);
+    }
   }, []);
 
   const clearFlow = useCallback(() => {

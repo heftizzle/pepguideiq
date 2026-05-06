@@ -35,6 +35,7 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
 
     return () => {
       targets.forEach((el, i) => {
+        el.scrollLeft = 0;
         el.style.overflowX = previous[i] ?? "";
       });
     };
