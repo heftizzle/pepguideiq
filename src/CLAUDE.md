@@ -48,7 +48,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 ```jsx
 <ProtocolTab />                               // pulls from useActiveProfile + supabase directly
 <BuildTab ... />
-<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade tutorialAnchorFirst />
+<VialTracker userId profileId peptideId catalogEntry canUse onUpgrade tutorialAnchorFirst tutorialGhost />
 <SettingsTab user setUser onOpenUpgrade onSignOut onBack />
 <ProfileTab user setUser ...more />
 <StackProtocolQuickLog userId profileId protocolRows canUse onUpgrade wakeTime />

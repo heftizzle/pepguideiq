@@ -1597,9 +1597,10 @@ function VialRow({
  *   canUse: boolean,
  *   onUpgrade: () => void,
  *   tutorialAnchorFirst?: boolean,
+ *   tutorialGhost?: boolean,
  * }} props
  */
-export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade, tutorialAnchorFirst = false }) {
+export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse, onUpgrade, tutorialAnchorFirst = false, tutorialGhost = false }) {
   const stabilityDays = catalogEntry?.stabilityDays;
   const stabilityNote = typeof catalogEntry?.stabilityNote === "string" ? catalogEntry.stabilityNote.trim() : "";
   const compoundName = (catalogEntry?.name && String(catalogEntry.name).trim()) || "this peptide";
@@ -1917,6 +1918,19 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
 
   async function saveVial(e) {
     e.preventDefault();
+    if (tutorialGhost) {
+      setShowAdd(false);
+      setFormMg("");
+      setFormMl("");
+      setFormDesiredMcg("");
+      setFormNotes("");
+      setMgQuick(null);
+      setMlQuick(null);
+      setDesiredQuick(null);
+      setFormDeliveryMethod("injection");
+      setFormSprayVolumeMl("0.10");
+      return;
+    }
     if (!canMutate || typeof stabilityDays !== "number") return;
     let mg = parseFloat(String(formMg).replace(/,/g, ""));
     const ml = parseFloat(String(formMl).replace(/,/g, ""));

@@ -1386,7 +1386,7 @@ function PepGuideIQApp({ user, setUser }) {
 
 function PepGuideIQMainTree({ mainUiRef }) {
   const topHeaderRef = useRef(null);
-  const { isHighlighted, stripVisible, highlightTarget, flowKey, setHelpMenuOpen } = useTutorial();
+  const { isHighlighted, stripVisible, highlightTarget, flowKey, setHelpMenuOpen, forced } = useTutorial();
   const {
     user,
     setUser,
@@ -1539,6 +1539,39 @@ function PepGuideIQMainTree({ mainUiRef }) {
       window.removeEventListener("resize", writeHeight);
     };
   }, [activeTab, librarySearchOpen]);
+
+  /**
+   * Forced-tour fallback so the Vial Tracker tab always has a target for
+   * `vial_add` / `vial_name` / `vial_mix_date` / `vial_mg` / `vial_reconstitute` /
+   * `vial_desired_dose`, even when the reviewer has no injectable stack rows.
+   * The ghost uses BPC-157 catalog metadata; saveVial is short-circuited inside
+   * VialTracker via the `tutorialGhost` prop so no row is written to user_vials.
+   */
+  const tutorialGhostVialTracker =
+    forced && user?.id && activeProfileId
+      ? (() => {
+          const bpc = PEPTIDES.find((c) => c.id === "bpc-157");
+          const stab = bpc ? resolveStability(bpc) : { stabilityDays: 30, stabilityNote: null };
+          return (
+            <VialTracker
+              key="tutorial-ghost-vial"
+              userId={user.id}
+              profileId={activeProfileId}
+              peptideId="bpc-157"
+              catalogEntry={{
+                ...(bpc ?? { name: "BPC-157" }),
+                name: bpc?.name ?? "BPC-157",
+                stabilityDays: typeof stab.stabilityDays === "number" ? stab.stabilityDays : 30,
+                stabilityNote: stab.stabilityNote ?? null,
+              }}
+              canUse={canVialTracker}
+              onUpgrade={openUpgradeModal}
+              tutorialAnchorFirst
+              tutorialGhost
+            />
+          );
+        })()
+      : null;
 
   return (
     <>
@@ -2076,11 +2109,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
               </div>
               {myStack.length === 0 ? (
-                <div style={{ border: "1px dashed var(--color-border-default)", borderRadius: 10, padding: "60px 0", textAlign: "center" }}>
-                  <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13 }}>
-                    Save injectable compounds to your stack first, then manage them in Vial Tracker.
+                tutorialGhostVialTracker ?? (
+                  <div style={{ border: "1px dashed var(--color-border-default)", borderRadius: 10, padding: "60px 0", textAlign: "center" }}>
+                    <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13 }}>
+                      Save injectable compounds to your stack first, then manage them in Vial Tracker.
+                    </div>
                   </div>
-                </div>
+                )
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {(() => {
@@ -2091,9 +2126,11 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     });
                     if (injectableRows.length === 0) {
                       return (
-                        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                          No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
-                        </div>
+                        tutorialGhostVialTracker ?? (
+                          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+                            No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
+                          </div>
+                        )
                       );
                     }
                     if (!user?.id || !activeProfileId) return null;
