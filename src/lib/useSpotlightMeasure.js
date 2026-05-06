@@ -4,6 +4,10 @@ import {
   DEFAULT_BOTTOM_NAV_RESERVE_PX,
   MEASURE_MAX_ATTEMPTS,
   MEASURE_RETRY_MS,
+  SLOW_MOUNT_TARGETS,
+  SLOW_MOUNT_MAX_ATTEMPTS,
+  SLOW_MOUNT_RETRY_MS,
+  SLOW_MOUNT_INITIAL_DELAY_MS,
   getBottomNavReservePx,
 } from "./spotlightUtils.js";
 
@@ -33,14 +37,19 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
       setTargetLayoutReady(false);
       return;
     }
+    const isSlowMount = SLOW_MOUNT_TARGETS.has(highlightTarget);
+    const maxAttempts = isSlowMount ? SLOW_MOUNT_MAX_ATTEMPTS : MEASURE_MAX_ATTEMPTS;
+    const retryMs = isSlowMount ? SLOW_MOUNT_RETRY_MS : MEASURE_RETRY_MS;
+    const initialDelay = isSlowMount ? SLOW_MOUNT_INITIAL_DELAY_MS : 0;
+
     const tryMeasure = (attempt) => {
       const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
       if (!(el instanceof Element)) {
-        if (attempt + 1 < MEASURE_MAX_ATTEMPTS) {
+        if (attempt + 1 < maxAttempts) {
           retryRef.current = setTimeout(() => {
             retryRef.current = null;
             tryMeasure(attempt + 1);
-          }, MEASURE_RETRY_MS);
+          }, retryMs);
         } else {
           setRect(null);
           setTargetLayoutReady(false);
@@ -50,11 +59,11 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
       }
       const r = el.getBoundingClientRect();
       if (r.width === 0 && r.height === 0) {
-        if (attempt + 1 < MEASURE_MAX_ATTEMPTS) {
+        if (attempt + 1 < maxAttempts) {
           retryRef.current = setTimeout(() => {
             retryRef.current = null;
             tryMeasure(attempt + 1);
-          }, MEASURE_RETRY_MS);
+          }, retryMs);
         } else {
           setRect(null);
           setTargetLayoutReady(false);
@@ -66,7 +75,15 @@ export function useSpotlightMeasure(highlightTarget, stepIndex) {
       setBottomNavReserve(getBottomNavReservePx());
       setTargetLayoutReady(true);
     };
-    tryMeasure(0);
+
+    if (initialDelay > 0) {
+      retryRef.current = setTimeout(() => {
+        retryRef.current = null;
+        tryMeasure(0);
+      }, initialDelay);
+    } else {
+      tryMeasure(0);
+    }
   }, [highlightTarget]);
 
   useLayoutEffect(() => {

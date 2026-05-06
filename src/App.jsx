@@ -2220,6 +2220,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               onDeepLinkConsumed={() => {}}
               onLoggedNavigateLibrary={() => setActiveTab("library")}
               userPlan={planForStackLimits}
+              tutorialGhost={forced && protocolRows.length === 0}
             />
           )}
 

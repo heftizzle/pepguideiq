@@ -16,6 +16,24 @@ export const CUTOUT_PAD = 6;
 export const MEASURE_RETRY_MS = 250;
 export const MEASURE_MAX_ATTEMPTS = 10;
 
+/**
+ * Tutorial targets that live in tab subtrees React only mounts on demand
+ * (Settings/Profile, Protocol). They need a longer retry window because the
+ * tab swap, deep-link state update, and first paint can take well over 2.5s
+ * on a cold render. Add a target here only when its parent component is
+ * conditionally rendered, not when it merely scrolls into view.
+ */
+export const SLOW_MOUNT_TARGETS = new Set([
+  "settings_wake",
+  "protocol_log_dose",
+]);
+
+/** ~7.5s vs default ~2.5s. Pair with SLOW_MOUNT_RETRY_MS below. */
+export const SLOW_MOUNT_MAX_ATTEMPTS = 30;
+export const SLOW_MOUNT_RETRY_MS = 250;
+/** Wait this long before the first attempt so React can flush the lazy mount. */
+export const SLOW_MOUNT_INITIAL_DELAY_MS = 100;
+
 export function getBottomNavReservePx() {
   if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVE_PX;
   const nav = document.querySelector('nav[aria-label="Main"]');

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
 import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
+import { SLOW_MOUNT_TARGETS } from "../lib/spotlightUtils.js";
 import { useActiveProfile } from "./ProfileContext.jsx";
 
 /** @typedef {'core'|'profile'|'body'|'schedule'|'stack'|'share'|'guide'|'score'|'build'} TutorialFlowKey */
@@ -540,6 +541,7 @@ export function TutorialProvider({ children, setActiveTab, setProtocolDeepLink, 
 
   useEffect(() => {
     if (!highlightTarget || typeof document === "undefined") return;
+    const scrollDelay = SLOW_MOUNT_TARGETS.has(highlightTarget) ? 350 : 120;
     const t = window.setTimeout(() => {
       const ae = document.activeElement;
       if (
@@ -550,8 +552,8 @@ export function TutorialProvider({ children, setActiveTab, setProtocolDeepLink, 
         return;
       }
       const el = document.querySelector(`[data-tutorial-target="${highlightTarget}"]`);
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }, 120);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, scrollDelay);
     return () => window.clearTimeout(t);
   }, [highlightTarget, stepIndex, flowKey]);
 

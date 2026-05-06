@@ -103,6 +103,7 @@ export function ProtocolTab({
   onDeepLinkConsumed,
   onLoggedNavigateLibrary: _onLoggedNavigateLibrary,
   userPlan = "entry",
+  tutorialGhost = false,
 }) {
   const session = useMemo(
     () => (isProtocolSessionId(initialSession) ? initialSession : inferProtocolSessionForNow(wakeTime, shiftSchedule)),
@@ -503,19 +504,39 @@ export function ProtocolTab({
         {protocolHeaderLine()}
       </div>
 
-      {emptyBecauseNoStack && (
+      {emptyBecauseNoStack && !tutorialGhost && (
         <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
           No stack saved — build your stack in Saved Stacks first.
         </div>
       )}
 
-      {!emptyBecauseNoStack && rows === null && (
+      {!emptyBecauseNoStack && rows === null && !tutorialGhost && (
         <div className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)" }}>Loading protocol…</div>
       )}
 
-      {!emptyBecauseNoStack && rows !== null && rows.length === 0 && (
+      {!emptyBecauseNoStack && rows !== null && rows.length === 0 && !tutorialGhost && (
         <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
           No compounds in this session — edit Saved Stacks to assign morning / afternoon / evening / night.
+        </div>
+      )}
+
+      {tutorialGhost && (rows == null || rows.length === 0) && (
+        <div
+          style={{ borderBottom: "1px solid var(--color-border-default)", paddingBottom: 18 }}
+          data-tutorial-target={TUTORIAL_TARGET.protocol_log_dose}
+          {...tutorialHighlightProps(true)}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0" }}>
+            <div style={{ fontSize: 13, color: "var(--color-text-placeholder)" }}>BPC-157 · Morning · Demo dose</div>
+            <button
+              type="button"
+              className="btn-teal"
+              style={{ padding: "6px 16px", borderRadius: 8, fontSize: 13, minHeight: 44, opacity: 0.7 }}
+              onClick={() => {}}
+            >
+              Log Dose
+            </button>
+          </div>
         </div>
       )}
 
