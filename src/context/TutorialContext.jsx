@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
+import { POST_TUTORIAL_COMPLETE_EVENT } from "../lib/postTutorialSession.js";
 import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
 import { SLOW_MOUNT_TARGETS } from "../lib/spotlightUtils.js";
 import { useActiveProfile } from "./ProfileContext.jsx";
@@ -469,6 +470,13 @@ export function TutorialProvider({ children, setActiveTab, setProtocolDeepLink, 
       clearFlowInternal();
       if (wasForcedCore && profileId) {
         patchMemberProfileLocal(profileId, { tutorial_completed: true });
+        try {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent(POST_TUTORIAL_COMPLETE_EVENT));
+          }
+        } catch {
+          /* ignore */
+        }
         void (async () => {
           const res = isApiWorkerConfigured()
             ? await patchMemberProfileViaWorker(profileId, { tutorial_completed: true })

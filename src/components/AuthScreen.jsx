@@ -1072,6 +1072,7 @@ export function AuthScreen({ onAuth }) {
           <button
             type="button"
             className="btn-teal"
+            data-testid={mode === "login" ? "auth-toggle" : undefined}
             style={{ width: "100%", padding: "10px 0", fontSize: 13, opacity: authSubmitDisabled ? 0.5 : 1 }}
             onClick={submit}
             disabled={authSubmitDisabled}

@@ -36,7 +36,7 @@ import { LegalPage } from "./components/LegalPage.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
 import { ProfileProvider, useActiveProfile } from "./context/ProfileContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
-import { DoseToastProvider } from "./context/DoseToastContext.jsx";
+import { DoseToastProvider, useShowDoseToast } from "./context/DoseToastContext.jsx";
 import {
   TutorialProvider,
   TUTORIAL_TARGET,
@@ -49,9 +49,19 @@ import TutorialSpotlight from "./components/TutorialSpotlight.jsx";
 import GuideSpotlight from "./components/GuideSpotlight.jsx";
 import { useSpotlightMeasure } from "./lib/useSpotlightMeasure.js";
 import { DeferredCoreTutorialLauncher } from "./components/DeferredCoreTutorialLauncher.jsx";
+import { PostTutorialProfileModal } from "./components/PostTutorialProfileModal.jsx";
 import { canAddStackRow, getNextTierId, getSavedStackRowLimit, TIER_ORDER } from "./lib/tiers.js";
 import { getSuggestedUpgradeTier } from "./lib/upgradeGateCopy.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./lib/config.js";
+import {
+  getPostTutorialShown,
+  getStackBuilderToastShown,
+  isPostTutorialProfileComplete,
+  POST_TUTORIAL_COMPLETE_EVENT,
+  POST_TUTORIAL_TOAST_MESSAGE,
+  setPostTutorialShown,
+  setStackBuilderToastShown,
+} from "./lib/postTutorialSession.js";
 import { resolveStability } from "./lib/catalogStability.js";
 import { hasInjectableRoute } from "./lib/doseRouteKind.js";
 import { findCatalogPeptideForStackRow } from "./lib/resolveStackCatalogPeptide.js";
@@ -501,7 +511,7 @@ function PepGuideIQApp({ user, setUser }) {
     const handleOk =
       typeof activeProfile.handle === "string" && activeProfile.handle.trim() !== "";
     const tutorialOk = activeProfile.tutorial_completed === true;
-    if (handleOk && tutorialOk) setActiveTab("network");
+    if (handleOk && tutorialOk) setActiveTab("stackBuilder");
   }, [activeProfile]);
 
   const [selCat, setSelCat]       = useState("All");
@@ -1491,6 +1501,41 @@ function PepGuideIQMainTree({ mainUiRef }) {
     navTabButtonRefs,
   } = mainUiRef.current;
 
+  const { patchMemberProfileLocal, refreshMemberProfiles } = useActiveProfile();
+  const showDoseToast = useShowDoseToast();
+  const [postTutorialModalOpen, setPostTutorialModalOpen] = useState(false);
+
+  const finishPostTutorialFlow = useCallback(() => {
+    setPostTutorialModalOpen(false);
+    setPostTutorialShown();
+    setActiveTab("stackBuilder");
+    if (!getStackBuilderToastShown()) {
+      showDoseToast(POST_TUTORIAL_TOAST_MESSAGE);
+      setStackBuilderToastShown();
+    }
+  }, [showDoseToast, setActiveTab]);
+
+  useEffect(() => {
+    const onPostTutorial = () => {
+      if (getPostTutorialShown()) {
+        setActiveTab("stackBuilder");
+        return;
+      }
+      if (isPostTutorialProfileComplete(activeProfile)) {
+        setPostTutorialShown();
+        setActiveTab("stackBuilder");
+        if (!getStackBuilderToastShown()) {
+          showDoseToast(POST_TUTORIAL_TOAST_MESSAGE);
+          setStackBuilderToastShown();
+        }
+        return;
+      }
+      setPostTutorialModalOpen(true);
+    };
+    window.addEventListener(POST_TUTORIAL_COMPLETE_EVENT, onPostTutorial);
+    return () => window.removeEventListener(POST_TUTORIAL_COMPLETE_EVENT, onPostTutorial);
+  }, [activeProfile, setActiveTab, showDoseToast]);
+
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
   useEffect(() => {
@@ -1787,7 +1832,16 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       : p.halfLife
                     : null;
                   return (
-                    <div key={p.id} className="pcard pcard--library" style={getCategoryCssVars(cat0)} onClick={() => setSelPeptide(p)} onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)} role="button" tabIndex={0}>
+                    <div
+                      key={p.id}
+                      className="pcard pcard--library"
+                      data-testid="compound-card"
+                      style={getCategoryCssVars(cat0)}
+                      onClick={() => setSelPeptide(p)}
+                      onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8,minWidth:0 }}>
                         <div className="pcard-head-main">
                           <div className="brand" style={{ fontWeight:700,fontSize:14,color:"var(--color-text-primary)" }}>{p.name}</div>
@@ -2578,6 +2632,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             <Modal onClose={() => setSelPeptide(null)} label={p.name}>
               <div
                 className="pepv-peptide-modal-head"
+                data-testid="compound-detail"
                 style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,...getCategoryCssVars(pCat) }}
               >
                 <div>
@@ -2990,6 +3045,18 @@ function PepGuideIQMainTree({ mainUiRef }) {
         </div>
 
       </div>
+
+      {postTutorialModalOpen && activeProfileId ? (
+        <PostTutorialProfileModal
+          open={postTutorialModalOpen}
+          onSkip={finishPostTutorialFlow}
+          onComplete={finishPostTutorialFlow}
+          activeProfile={activeProfile}
+          activeProfileId={activeProfileId}
+          patchMemberProfileLocal={patchMemberProfileLocal}
+          refreshMemberProfiles={refreshMemberProfiles}
+        />
+      ) : null}
     </>
   );
 }
