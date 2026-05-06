@@ -23,8 +23,8 @@ export const BATCH17 = [
     id: "berberine",
     name: "Berberine",
     aliases: ["Berberine HCl", "Dihydroberberine", "DHB", "Berbevis", "Berberine phytosome", "Liposomal berberine", "GlucoVantage", "Berberis aristata extract"],
-    category: ["Metabolic", "Longevity", "AMPK Activator"],
-    categories: ["Metabolic", "Longevity", "AMPK Activator"],
+    category: ["GLP / Metabolic", "Longevity"],
+    categories: ["GLP / Metabolic", "Longevity"],
     route: ["oral"],
     mechanism:
       "Isoquinoline alkaloid found in multiple Berberis genus plants (barberry, Oregon grape, goldenseal, Chinese goldthread / Coptis chinensis). Used in Chinese and Ayurvedic medicine for centuries before modern pharmacological characterization. Mechanism (multi-pathway): (1) AMPK activation — the central mechanism, overlapping with metformin's primary mechanism. AMPK activation drives metabolic 'energy stress' signaling: enhanced fatty acid oxidation, improved insulin sensitivity, suppression of hepatic gluconeogenesis, mTOR pathway modulation. (2) Gut microbiome modulation — berberine has direct antimicrobial activity in the gut, shifting microbiome composition with downstream metabolic effects. The microbiome modulation may be a substantial fraction of berberine's metabolic benefit. (3) Lipid handling improvements — meaningful LDL cholesterol reductions in clinical trials (~20–25% in some studies), HDL elevation, triglyceride reductions. (4) Mild antimicrobial activity beyond gut. (5) Possible direct cardiovascular protective effects beyond lipid and glucose mechanisms. **Bioavailability is the dominant practical issue:** standard berberine HCl has only ~5% oral bioavailability due to extensive intestinal P-glycoprotein efflux and rapid hepatic metabolism. This pharmacological limitation has driven development of multiple alternative forms covered below. Effect sizes for standard berberine HCl in RCTs: HbA1c reduction ~0.5–0.9% (comparable to weaker oral diabetic medications), LDL reduction 20–25%, triglyceride reduction 15–25%, modest weight reduction, improved fasting glucose. Often called 'nature's metformin' though this oversimplifies — mechanism overlap is real (AMPK) but mechanism distinct (microbiome) and effect magnitude is generally smaller than metformin.",
@@ -79,8 +79,8 @@ export const BATCH17 = [
     id: "urolithin-a",
     name: "Urolithin A",
     aliases: ["UA", "Mitopure", "Urolithin A postbiotic"],
-    category: ["Longevity", "Mitochondrial Support"],
-    categories: ["Longevity", "Mitochondrial Support"],
+    category: ["Mitochondrial", "Longevity"],
+    categories: ["Mitochondrial", "Longevity"],
     route: ["oral"],
     mechanism:
       "Postbiotic metabolite — meaning a compound produced by gut bacteria from dietary precursors rather than directly consumed. Specifically, urolithin A is produced in the colon via bacterial conversion of ellagitannins and ellagic acid (found in pomegranate, walnuts, raspberries, strawberries, oak-aged wines and spirits). Mechanism: induces mitophagy — the cellular process of clearing damaged mitochondria — via PINK1/Parkin pathway activation. Mitophagy is essential for mitochondrial quality control; impaired mitophagy is implicated in aging, neurodegenerative disease, sarcopenia, and metabolic dysfunction. Urolithin A is the most-studied direct mitophagy enhancer in supplement form. Effects: improved mitochondrial function, increased muscle endurance, improved cellular ATP production, reduced inflammation in aging contexts, possible cognitive benefits. **Critical individual variation: only ~30–40% of the population produces urolithin A endogenously from precursors.** The conversion depends on specific gut bacteria (Gordonibacter, others); users without these bacteria gain little urolithin A from dietary pomegranate or walnut consumption regardless of intake. Direct urolithin A supplementation bypasses this microbiome-dependent conversion entirely — relevant for the majority of users who don't produce it natively. This is an unusual feature in the supplement landscape — most compounds work the same regardless of microbiome status; urolithin A's relevance is concentrated in users who can't produce it endogenously. Mitopure (Amazentis brand, FDA GRAS-cleared 2018) is the primary commercial product; multiple generic versions have entered the market.",
@@ -127,8 +127,8 @@ export const BATCH17 = [
     id: "ephedrine",
     name: "Ephedrine",
     aliases: ["Bronkaid Max", "Bronkaid", "Ephedrine sulfate", "Ephedrine HCl", "Primatene"],
-    category: ["Bronchodilator", "Stimulant", "Performance"],
-    categories: ["Bronchodilator", "Stimulant", "Performance"],
+    category: ["Nootropic", "Longevity"],
+    categories: ["Nootropic", "Longevity"],
     route: ["oral"],
     mechanism:
       "Sympathomimetic alkaloid originally isolated from Ephedra plants (ma huang in Chinese medicine). Indirect-acting plus direct-acting at adrenergic receptors: indirectly releases norepinephrine from sympathetic nerve terminals, plus directly agonizes α1, α2, β1, β2, and β3 adrenergic receptors. The β2 agonism produces bronchodilation (the FDA-approved indication for Bronkaid). The β1 agonism produces cardiovascular stimulation (BP elevation, HR elevation, increased cardiac contractility). The α1 agonism produces vasoconstriction. The β3 agonism produces thermogenesis and lipolysis (the basis for performance / fat-loss community use). Mechanistically distinct from caffeine (adenosine receptor antagonist) and from phentermine (sympathomimetic but predominantly CNS-acting amphetamine derivative) — ephedrine has more peripheral cardiovascular effects than either. **Regulatory and access reality:** the FDA banned ephedra-containing dietary supplements in 2004 following deaths attributed to ephedra. Pharmaceutical ephedrine was NOT banned — it remained available as an OTC bronchodilator (Bronkaid). Bronkaid Max (ephedrine sulfate 25mg + guaifenesin 200mg) is sold behind-the-counter in US pharmacies under PSE precursor monitoring laws (same restrictions as pseudoephedrine — ID required, quantity limits). The behind-the-counter access enables both medical use (asthma rescue) and the documented performance-community use (ECA stack — ephedrine + caffeine + aspirin — for fat-loss/thermogenesis). WADA banned in competition.",

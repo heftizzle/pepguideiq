@@ -3,6 +3,7 @@ import { TIER_RANK } from "../lib/tiers.js";
 import { inbodyDaysBetweenScanDates, inbodyToNum, INBODY_SCORE_RING_C, inbodyScoreProgressDash } from "../lib/inbodyScanDisplay.js";
 import { insertInbodyProgressNetworkPost } from "../lib/supabase.js";
 import { Modal } from "./Modal.jsx";
+import { shouldShowCharProximityCounter } from "../lib/charCounterProximity.js";
 
 const CAPTION_X_MAX = 280;
 
@@ -397,11 +398,13 @@ export function BodyScanShareComposer({
           rows={8}
           style={{ width: "100%", resize: "vertical", minHeight: 140, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, marginBottom: 14 }}>
-          <span style={{ fontSize: 11, color: caption.length > CAPTION_X_MAX ? "var(--color-text-danger)" : "var(--color-text-muted)" }}>
-            X · {caption.length} / {CAPTION_X_MAX}
-          </span>
-        </div>
+        {shouldShowCharProximityCounter(caption.length, CAPTION_X_MAX) ? (
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 11, color: "var(--color-text-danger)" }}>
+              X · {caption.length} / {CAPTION_X_MAX}
+            </span>
+          </div>
+        ) : null}
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 13, cursor: "pointer" }}>
           <input type="checkbox" checked={publicProfile} onChange={(e) => setPublicProfile(e.target.checked)} />
           Show on public profile

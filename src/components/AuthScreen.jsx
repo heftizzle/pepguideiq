@@ -857,7 +857,9 @@ export function AuthScreen({ onAuth }) {
                   borderColor: plan.color,
                   color: plan.color,
                   background: String(plan.color).trim().startsWith("var(")
-                    ? "var(--color-accent-dim)"
+                    ? String(plan.color).includes("tier-entry")
+                      ? "var(--tier-entry-dim)"
+                      : "var(--color-accent-dim)"
                     : `${plan.color}12`,
                   width: "100%",
                   padding: "8px 0",

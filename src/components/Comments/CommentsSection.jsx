@@ -28,6 +28,7 @@ import CommentComposer from "./CommentComposer.jsx";
  *   currentProfileGoals?: unknown,
  *   autoOpenThread?: boolean,
  *   highlightCommentId?: string | null,
+ *   composerLayout?: "default" | "feed",
  * }} props
  */
 export default function CommentsSection({
@@ -39,6 +40,7 @@ export default function CommentsSection({
   currentProfileGoals = null,
   autoOpenThread = false,
   highlightCommentId = null,
+  composerLayout = "default",
 }) {
   const [threadOpen, setThreadOpen] = useState(false);
   const autoOpenedRef = useRef(false);
@@ -116,6 +118,7 @@ export default function CommentsSection({
         hook={hook}
         currentUserId={currentUserId}
         currentProfileId={currentProfileId}
+        layout={composerLayout}
       />
     </div>
   );

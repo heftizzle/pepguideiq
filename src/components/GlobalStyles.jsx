@@ -119,7 +119,6 @@ export function GlobalStyles() {
       }
       .pcard:active{transform:translateY(-1px)}
       .pcard--library{
-        height:260px;
         display:flex;
         flex-direction:column;
         overflow:hidden;
@@ -132,16 +131,19 @@ export function GlobalStyles() {
         overflow:hidden;
       }
       .pcard--library .pcard-bioavail,
-      .pcard--library .pcard-bioavail-warn,
-      .pcard--library .pcard-halflife{
+      .pcard--library .pcard-bioavail-warn{
         white-space:nowrap;
         overflow:hidden;
         text-overflow:ellipsis;
         max-width:100%;
         min-width:0;
       }
-      .pcard--library .pcard-footer{
-        margin-top:auto;
+      .pcard--library .pcard-halflife{
+        white-space:normal;
+        overflow:visible;
+        max-width:100%;
+        min-width:0;
+        overflow-wrap:anywhere;
       }
       .pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
       .pill--category{
@@ -161,7 +163,7 @@ export function GlobalStyles() {
       }
       .pcard--library .pcard-head-main{
         min-width:0;
-        flex:1 1 auto;
+        flex:0 0 auto;
       }
       .pcard--library .pcard-head-main > .brand{
         min-width:0;

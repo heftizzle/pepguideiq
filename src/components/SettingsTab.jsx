@@ -21,7 +21,7 @@ import {
   updateUserProfile,
 } from "../lib/supabase.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
-import { ThemeToggle } from "./ThemeToggle.jsx";
+import { useThemeContext } from "../context/ThemeContext.jsx";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { getCountriesForProfileForm } from "../data/countries.js";
 import { formatLanguageOptionLabel, PROFILE_LANGUAGE_OPTIONS } from "../data/profileLanguages.js";
@@ -47,6 +47,15 @@ const SECTION = {
   textTransform: "uppercase",
   fontFamily: "'JetBrains Mono', monospace",
 };
+
+const THEME_PICKER_OPTIONS = /** @type {const} */ ([
+  { id: "dark", label: "Dark", fill: "#07090e", ring: "#00d4aa" },
+  { id: "light", label: "Light", fill: "#faf8f3", ring: "#2b4eaf" },
+  { id: "midnight", label: "Midnight", fill: "#000000", ring: "#a855f7" },
+  { id: "lab", label: "Lab", fill: "#0a1a0f", ring: "#00ff88" },
+  { id: "crimson", label: "Crimson", fill: "#0e0707", ring: "#e53e3e" },
+  { id: "amber", label: "Amber", fill: "#0d0a04", ring: "#f59e0b" },
+]);
 
 function formatSubscriptionPeriodEndDisplay(unixSec) {
   const n = typeof unixSec === "number" ? unixSec : Number(unixSec);
@@ -117,6 +126,7 @@ function hasProvider(identities, provider) {
 
 /** @param {{ user: object, setUser: (u: object | null) => void, onOpenUpgrade: () => void, onSignOut: () => Promise<void>, onBack: () => void }} props */
 export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack }) {
+  const { theme: activeTheme, setTheme } = useThemeContext();
   const scheduleUnlocked = Boolean(getTier(user?.plan ?? "entry").shift_schedule);
   const {
     activeProfileId,
@@ -792,8 +802,6 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
         <div className="brand" style={{ fontSize: 17, fontWeight: 700 }}>
           Settings
         </div>
-        <div style={{ flex: 1, minWidth: 0 }} />
-        <ThemeToggle />
       </div>
 
       {err && (
@@ -806,6 +814,73 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           {msg}
         </div>
       )}
+
+      <div style={SECTION}>Appearance</div>
+      <Card>
+        <div
+          role="group"
+          aria-label="Theme"
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 16,
+            alignItems: "flex-start",
+            justifyContent: "flex-start",
+          }}
+        >
+          {THEME_PICKER_OPTIONS.map((opt) => {
+            const isActive = activeTheme === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setTheme(opt.id)}
+                aria-label={`${opt.label} theme`}
+                aria-pressed={isActive}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 6px",
+                  margin: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  minWidth: 44,
+                  minHeight: 44,
+                  boxSizing: "border-box",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    background: opt.fill,
+                    boxSizing: "border-box",
+                    flexShrink: 0,
+                    boxShadow: isActive ? `0 0 0 2px ${opt.ring}` : "none",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 10,
+                    lineHeight: 1.2,
+                    color: "var(--color-text-muted)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {opt.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
       <div style={SECTION}>Default session</div>
       <Card>
@@ -1395,7 +1470,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
               </button>
             </div>
             <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>
-              {handleInput.length}/30 · min 3 characters · shown as{" "}
+              min 3 characters · shown as{" "}
               {handleNormalized.length >= 3 && isValidMemberHandleFormat(handleInput)
                 ? formatHandleDisplay(handleInput)
                 : "@handle"}

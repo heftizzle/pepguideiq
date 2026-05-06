@@ -5,7 +5,7 @@ const WRAP = {
   background: "var(--color-bg-page)",
   color: "#cbd5e1",
   /* Dark static page: keep headings readable when global [data-theme] is light */
-  "--color-text-primary": "#dde4ef",
+  "--color-text-primary": "var(--color-text-primary)",
 };
 
 const INNER = {

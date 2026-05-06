@@ -4,6 +4,7 @@ import { BodyMetricStepper } from "./BodyMetricStepper.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { formatPlan } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
+import { shouldShowCharProximityCounter } from "../lib/charCounterProximity.js";
 import {
   archiveProgressPhotoSetViaWorker,
   checkMemberProfileHandleAvailable,
@@ -2336,9 +2337,11 @@ export function ProfileTab({
             rows={3}
             aria-label="Bio"
           />
-          <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 4, textAlign: "right" }}>
-            {bioDraft.length}/500
-          </div>
+          {shouldShowCharProximityCounter(bioDraft.length, 500) ? (
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-danger)", marginTop: 4, textAlign: "right" }}>
+              {bioDraft.length}/500
+            </div>
+          ) : null}
         </div>
         <div style={{ marginBottom: 14 }}>
           <div

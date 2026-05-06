@@ -8,7 +8,7 @@ export function Logo({ size = 19, style = {} }) {
           borderRadius: 7,
           flexShrink: 0,
           overflow: "hidden",
-          boxShadow: "0 0 0 1px rgba(0,212,170,0.18)",
+          boxShadow: "0 0 0 1px var(--color-accent-subtle-18)",
         }}
       >
         <img

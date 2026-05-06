@@ -9,7 +9,7 @@ export const TIERS = {
     name: "Entry",
     emoji: "💸",
     /** Plan card border on Pricing / signup (`PLANS`). */
-    cardAccent: "#b0bec5",
+    cardAccent: "var(--tier-entry)",
     /** Solid hex for Upgrade modal RGB glows + CTAs (`hexToRgbTriple`). */
     modalGlowHex: "#22c55e",
     price: 0,

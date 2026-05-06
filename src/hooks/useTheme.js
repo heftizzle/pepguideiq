@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 
 const STORAGE_KEY = "pgi-theme";
-const VALID_THEMES = /** @type {const} */ (["dark", "light"]);
+const VALID_THEMES = /** @type {const} */ (["dark", "light", "midnight", "lab", "crimson", "amber"]);
 
-/** @returns {"dark" | "light"} */
+/** @returns {"dark" | "light" | "midnight" | "lab" | "crimson" | "amber"} */
 function readStoredTheme() {
   try {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -37,7 +37,7 @@ async function persistThemePreference(theme, expectedUserId) {
  *
  * @param {{ user?: import("@supabase/supabase-js").User | null }} [options]
  * @returns {{
- *   theme: "dark" | "light",
+ *   theme: "dark" | "light" | "midnight" | "lab" | "crimson" | "amber",
  *   setTheme: (t: string) => void,
  *   toggle: () => void,
  *   isDark: boolean,

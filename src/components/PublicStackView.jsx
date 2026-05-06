@@ -63,7 +63,7 @@ export function PublicStackView({ shareId }) {
         style={{
           minHeight: "100vh",
           background: "var(--color-bg-page)",
-          "--color-text-primary": "#dde4ef",
+          "--color-text-primary": "var(--color-text-primary)",
           color: "var(--color-text-primary)",
           fontFamily: "'Outfit', sans-serif",
           padding: "32px 20px 48px",

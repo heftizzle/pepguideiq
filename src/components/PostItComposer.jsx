@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
 import { getSessionAccessToken, supabase } from "../lib/supabase.js";
 import { R2_UPLOAD_ACCEPT_ATTR, R2_UPLOAD_MAX_BYTES, validateUploadFile, uploadImageToR2 } from "../lib/r2Upload.js";
+import { shouldShowCharProximityCounter } from "../lib/charCounterProximity.js";
 
 const CAPTION_MAX = 280;
 
@@ -835,17 +836,19 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
               </div>
             ) : null}
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: "var(--color-text-muted)",
-              textAlign: "right",
-              marginBottom: 14,
-            }}
-          >
-            {caption.length}/{CAPTION_MAX}
-          </div>
+          {shouldShowCharProximityCounter(caption.length, CAPTION_MAX) ? (
+            <div
+              style={{
+                fontSize: 11,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "var(--color-text-danger)",
+                textAlign: "right",
+                marginBottom: 14,
+              }}
+            >
+              {caption.length}/{CAPTION_MAX}
+            </div>
+          ) : null}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>

@@ -882,6 +882,7 @@ function LiveDoseCard({ row }) {
             currentProfileId={activeProfileId}
             currentProfile={activeProfile}
             currentProfileGoals={currentProfileGoals}
+            composerLayout="feed"
           />
           <LikersModal
             isOpen={likersOpen}

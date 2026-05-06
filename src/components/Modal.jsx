@@ -46,7 +46,7 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", var
         onClick={(e) => e.stopPropagation()}
         className={isSheet ? "modal-panel modal-panel--sheet" : "modal-panel"}
         style={{
-          background: "var(--color-bg-card, #0e1520)",
+          background: "var(--color-bg-card)",
           border: "1px solid var(--color-border-strong)",
           borderRadius: 12,
           padding: 28,

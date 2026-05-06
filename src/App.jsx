@@ -78,8 +78,13 @@ import {
   signOut,
 } from "./lib/supabase.js";
 import { normalizeHandleInput } from "./lib/memberProfileHandle.js";
-import { BIOAVAILABILITY_WARN_TOOLTIP, resolvePeptideBioavailability } from "./lib/peptideBioavailability.js";
+import {
+  BIOAVAILABILITY_WARN_TOOLTIP,
+  resolvePeptideBioavailability,
+  shouldShowBioavailabilityOnLibraryCard,
+} from "./lib/peptideBioavailability.js";
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
+import { formatLibraryCardHalfLifeDisplay } from "./lib/libraryCardHalfLifeDisplay.js";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
@@ -1826,11 +1831,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   const categoryBadgeLabel = CATEGORY_SHORT[cat0] ?? cat0;
                   const inStack = myStack.some((s) => s.id === p.id);
                   const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
-                  const halfLifeDisplay = p.halfLife
-                    ? p.halfLife.length > 40
-                      ? p.halfLife.split(";")[0].trim()
-                      : p.halfLife
-                    : null;
+                  const halfLifeDisplay = formatLibraryCardHalfLifeDisplay(p.halfLife);
                   return (
                     <div
                       key={p.id}
@@ -1899,43 +1900,47 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                         <span className="pill pill--category">{categoryBadgeLabel}</span>
                       </div>
-                      <div className="pcard-summary" style={{ fontSize: 13, color: "#7891af", marginBottom: 12, lineHeight: 1.55 }}>
+                      <div className="pcard-summary" style={{ fontSize: 13, color: "#7891af", marginBottom: 8, lineHeight: 1.55 }}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
                           {p.mechanism}
                         </ReactMarkdown>
                       </div>
-                      {(() => {
-                        const ba = resolvePeptideBioavailability(p);
-                        if (!ba) return null;
-                        return (
-                          <div
-                            className="mono pcard-bioavail"
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                              fontSize: 13,
-                              color: ba.warn ? "var(--color-warning)" : "var(--color-text-secondary)",
-                              marginBottom: 10,
-                              lineHeight: 1.45,
-                            }}
-                            title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
-                          >
-                            {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                            <span style={{ color: ba.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
-                            {ba.text}
-                          </div>
-                        );
-                      })()}
-                      {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
-                        <div
-                          className="mono pcard-bioavail-warn"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 10, lineHeight: 1.45 }}
-                        >
-                          ⚠ {p.bioavailabilityNote}
-                        </div>
-                      )}
-                      <div className="pcard-footer" style={{ display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,minWidth:0 }}>
-                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-placeholder)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>t½</span> {halfLifeDisplay}</div>
+                      {shouldShowBioavailabilityOnLibraryCard(p) ? (
+                        <>
+                          {(() => {
+                            const ba = resolvePeptideBioavailability(p);
+                            if (!ba) return null;
+                            return (
+                              <div
+                                className="mono pcard-bioavail"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  fontSize: 13,
+                                  color: ba.warn ? "var(--color-warning)" : "var(--color-text-secondary)",
+                                  marginBottom: 8,
+                                  lineHeight: 1.45,
+                                }}
+                                title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
+                              >
+                                {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
+                                <span style={{ color: ba.warn ? "#fbbf24" : "var(--color-text-secondary)" }}>Bioavailability: </span>
+                                {ba.text}
+                              </div>
+                            );
+                          })()}
+                          {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
+                            <div
+                              className="mono pcard-bioavail-warn"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 8, lineHeight: 1.45 }}
+                            >
+                              ⚠ {p.bioavailabilityNote}
+                            </div>
+                          )}
+                        </>
+                      ) : null}
+                      <div className="pcard-footer" style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,minWidth:0 }}>
+                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-placeholder)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>Half-life:</span>{" "}{halfLifeDisplay ?? ""}</div>
                         <button
                           type="button"
                           className={inStack?"btn-green":"btn-teal"}
@@ -1954,7 +1959,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             if (!inStack && stackListReady) openAdd(p);
                           }}
                         >
-                          {inStack ? "✓ Saved" : "+ Saved Stack"}
+                          {inStack ? "✓ Added to Stack" : "+ Add to Stack"}
                         </button>
                       </div>
                       {finnrickHref ? (
@@ -2516,7 +2521,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     overflowY: "auto",
                     padding: 14,
                     background: "var(--color-bg-page)",
-                    "--color-text-primary": "#dde4ef",
+                    "--color-text-primary": "var(--color-text-primary)",
                     color: "var(--color-text-primary)",
                   }}
                 >
@@ -2682,7 +2687,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
                 >
                   {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                  <span style={{ color: baDetail.warn ? "#fbbf24" : "#b0bec5" }}>Bioavailability: </span>
+                  <span style={{ color: baDetail.warn ? "#fbbf24" : "var(--color-text-secondary)" }}>Bioavailability: </span>
                   {baDetail.text}
                 </div>
               )}

@@ -39,7 +39,7 @@ export function AgeGate({ onConfirm, onExit }) {
         inset: 0,
         zIndex: 2147483000,
         background: "var(--color-bg-page)",
-        "--color-text-primary": "#dde4ef",
+        "--color-text-primary": "var(--color-text-primary)",
         display: "flex",
         flexDirection: "row",
         alignItems: "flex-start",

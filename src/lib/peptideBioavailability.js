@@ -26,3 +26,20 @@ export function resolvePeptideBioavailability(p) {
 
 export const BIOAVAILABILITY_WARN_TOOLTIP =
   "Low bioavailability — significantly less active compound reaches systemic circulation";
+
+/**
+ * Library `.pcard` tile only: show bioavailability when at least one `route[]` token
+ * matches oral, intranasal, or topical/transdermal — same intent as `peptideMatchesRouteFilter`
+ * for `oral` / `intranasal` / `topical` in App.jsx (ROUTE_FILTERS). Injectable-only cards: false.
+ * @param {{ route?: string[] } | null | undefined} p
+ * @returns {boolean}
+ */
+export function shouldShowBioavailabilityOnLibraryCard(p) {
+  if (!p) return false;
+  const parts = Array.isArray(p.route) ? p.route.map((x) => String(x).toLowerCase()) : [];
+  const s = parts.join(" | ");
+  const oral = /\boral\b|tablet|capsule/.test(s);
+  const intranasal = /intranasal|nasal|nasal spray/.test(s);
+  const topical = /topical|cream|serum|transdermal/.test(s);
+  return oral || intranasal || topical;
+}
