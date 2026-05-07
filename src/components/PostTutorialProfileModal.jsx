@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
 import { uploadImageToR2, R2_UPLOAD_ALLOWED_TYPES, R2_UPLOAD_MAX_BYTES } from "../lib/r2Upload.js";
 import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
+import { resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 
 /** Worker `MEMBER_EXPERIENCE_LEVELS` — UI label "Researcher" maps to `elite` (API has no separate researcher value). */
 const EXPERIENCE_OPTIONS = [
@@ -160,6 +161,10 @@ export function PostTutorialProfileModal({
     (typeof activeProfile?.avatar_r2_key === "string" ? activeProfile.avatar_r2_key.trim() : "") ||
     "";
 
+  // FIX: build a displayable URL from the key so the button renders the actual image.
+  // Previously only showed "Photo added ✓" text — image never appeared until re-login.
+  const avatarSrc = avatarKey ? resolveMemberAvatarDisplayUrlFromKey(avatarKey) : "";
+
   return (
     <div
       role="dialog"
@@ -207,7 +212,9 @@ export function PostTutorialProfileModal({
               width: 112,
               height: 112,
               borderRadius: "50%",
-              border: "2px dashed var(--color-border-default)",
+              border: avatarSrc
+                ? "2px solid var(--color-accent)"
+                : "2px dashed var(--color-border-default)",
               background: "var(--color-bg-sunken)",
               cursor: workerOk && !avatarBusy ? "pointer" : "not-allowed",
               padding: 0,
@@ -222,10 +229,20 @@ export function PostTutorialProfileModal({
           >
             {avatarBusy ? (
               "…"
-            ) : avatarKey ? (
-              <span className="mono" style={{ fontSize: 12 }}>
-                Photo added ✓
-              </span>
+            ) : avatarSrc ? (
+              // FIX: was <span>Photo added ✓</span> — no image ever rendered.
+              // Now shows the actual uploaded photo immediately after upload.
+              <img
+                src={avatarSrc}
+                alt="Your avatar"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  display: "block",
+                }}
+              />
             ) : (
               "Tap to add photo"
             )}

@@ -100,6 +100,7 @@ function PricingPage() {
       >
         {rows.map((row) => {
           const emoji = row.emoji;
+          const isGoat = row.id === "goat";
           const borderColor = row.id === "entry" ? "var(--color-border-tab)" : row.color;
           return (
             <article
@@ -115,19 +116,28 @@ function PricingPage() {
                   row.id === "pro" ? "0 0 0 1px var(--color-accent-subtle-22), 0 12px 40px #0006" : "0 8px 32px #0005",
               }}
             >
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: row.color,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  letterSpacing: "0.08em",
-                  marginBottom: 6,
-                }}
-              >
-                {emoji} {row.name}
+              {/* FIX: was {emoji} {row.name} inline at 13px — now prominent centered emoji matching UpgradePlanModal treatment */}
+              <div style={{ textAlign: "center", marginBottom: 10 }}>
+                <span
+                  className="pepv-emoji"
+                  style={{ fontSize: isGoat ? 48 : 36, lineHeight: 1, display: "block", marginBottom: 6 }}
+                  aria-hidden
+                >
+                  {emoji}
+                </span>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: row.color,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {row.name}
+                </div>
               </div>
-              <div className="brand" style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>
+              <div className="brand" style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, textAlign: "center" }}>
                 {row.priceLabel}
               </div>
               <p
@@ -194,6 +204,7 @@ function PricingPage() {
         })}
       </div>
 
+      {/* FIX: removed "Mobile may use App Store / Google Play" — IAP not built yet, text was misleading users */}
       <p
         style={{
           textAlign: "center",
@@ -203,11 +214,10 @@ function PricingPage() {
           fontFamily: "'JetBrains Mono',monospace",
         }}
       >
-        Subscriptions on web are billed via Stripe. Mobile may use App Store / Google Play.
+        Subscriptions billed monthly via Stripe. Cancel anytime.
       </p>
     </div>
   );
 }
 
 export default PricingPage;
-

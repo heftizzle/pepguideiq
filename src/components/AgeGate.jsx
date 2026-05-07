@@ -38,8 +38,7 @@ export function AgeGate({ onConfirm, onExit }) {
         position: "fixed",
         inset: 0,
         zIndex: 2147483000,
-        background: "var(--color-bg-page)",
-        "--color-text-primary": "var(--color-text-primary)",
+        background: "#07090e", // FIX: hardcoded — var(--color-bg-page) unresolved on Android Chrome before theme settles
         display: "flex",
         flexDirection: "row",
         alignItems: "flex-start",
@@ -103,7 +102,7 @@ export function AgeGate({ onConfirm, onExit }) {
             className="mono"
             style={{
               fontSize: "clamp(12px, 3.2vw, 13px)",
-              color: "var(--color-text-secondary)",
+              color: "#94a3b8", // FIX: hardcoded — was var(--color-text-secondary), unresolved = black on Android Chrome
               lineHeight: 1.55,
               marginBottom: 20,
               textAlign: "center",
@@ -121,7 +120,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 gap: 12,
                 cursor: "pointer",
                 fontSize: 14,
-                color: "var(--color-text-primary)",
+                color: "#e2e8f0", // FIX: hardcoded — was var(--color-text-primary), unresolved = black on Android Chrome
                 lineHeight: 1.45,
                 fontFamily: "'Outfit', sans-serif",
               }}
@@ -142,7 +141,7 @@ export function AgeGate({ onConfirm, onExit }) {
                 alignItems: "flex-start",
                 gap: 12,
                 fontSize: 14,
-                color: "var(--color-text-primary)",
+                color: "#e2e8f0", // FIX: hardcoded — was var(--color-text-primary), unresolved = black on Android Chrome
                 lineHeight: 1.45,
                 fontFamily: "'Outfit', sans-serif",
               }}
@@ -188,7 +187,7 @@ export function AgeGate({ onConfirm, onExit }) {
               gap: 10,
               cursor: "pointer",
               fontSize: 13,
-              color: "var(--color-text-secondary)",
+              color: "#94a3b8", // FIX: hardcoded — was var(--color-text-secondary), unresolved = black on Android Chrome
               lineHeight: 1.4,
               fontFamily: "'Outfit', sans-serif",
             }}
@@ -251,7 +250,7 @@ export function AgeGate({ onConfirm, onExit }) {
               letterSpacing: "0.05em",
               background: "transparent",
               border: "1px solid var(--color-upgrade-muted-border)",
-              color: "var(--color-text-secondary)",
+              color: "#94a3b8", // FIX: hardcoded — was var(--color-text-secondary)
               transition: "border-color 0.2s, color 0.2s, background 0.2s",
             }}
           >
