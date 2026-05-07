@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser } from "./helpers/auth.js";
+import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -8,7 +8,8 @@ test.describe("vial tracker", () => {
 
   test.beforeEach(async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await page.getByText("VIAL TRACKER", { exact: true }).click();
+    await dismissTutorialIfPresent(page);
+    await page.getByRole("button", { name: "Vial Tracker" }).click();
   });
 
   // ---------------------------------------------------------------------------
@@ -37,10 +38,10 @@ test.describe("vial tracker", () => {
 
   test("Log dose button is visible on all nav tabs", async ({ page }) => {
     // It's a persistent floating button — check on library tab too
-    await page.getByText("LIBRARY", { exact: true }).click();
+    await page.getByRole("button", { name: "Library, 264 compounds" }).click();
     await expect(page.getByRole("button", { name: "Log dose by session" })).toBeVisible({ timeout: 5_000 });
 
-    await page.getByText("STACK BUILDER", { exact: true }).click();
+    await page.getByRole("button", { name: "Stack Builder" }).click();
     await expect(page.getByRole("button", { name: "Log dose by session" })).toBeVisible({ timeout: 5_000 });
   });
 

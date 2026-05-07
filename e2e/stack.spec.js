@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser } from "./helpers/auth.js";
+import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -8,7 +8,8 @@ test.describe("stack builder", () => {
 
   test.beforeEach(async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await page.getByText("STACK BUILDER", { exact: true }).click();
+    await dismissTutorialIfPresent(page);
+    await page.getByRole("button", { name: "Stack Builder" }).click();
   });
 
   test("stack builder tab loads for authenticated user", async ({ page }) => {

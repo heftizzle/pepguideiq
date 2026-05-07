@@ -55,12 +55,12 @@ test.describe("plan upgrade (stripe)", () => {
 
       // Tiers
       await expect(page.getByText("ENTRY")).toBeVisible();
-      await expect(page.getByText("PRO")).toBeVisible();
+      await expect(page.getByText("Pro", { exact: true })).toBeVisible();
       await expect(page.getByText("ELITE")).toBeVisible();
-      await expect(page.getByText("GOAT")).toBeVisible();
+      await expect(page.getByText("GOAT", { exact: true })).toBeVisible();
 
       // Prices
-      await expect(page.getByText("Free")).toBeVisible();
+      await expect(page.getByText("Free", { exact: true })).toBeVisible();
       await expect(page.getByText(/\$8\.99/)).toBeVisible();
       await expect(page.getByText(/\$16\.99/)).toBeVisible();
       await expect(page.getByText(/\$23\.99/)).toBeVisible();
@@ -81,10 +81,8 @@ test.describe("plan upgrade (stripe)", () => {
       await page.getByRole("button", { name: "Plan / Upgrade" }).click();
 
       await expect(page.getByText("Choose your plan")).toBeVisible({ timeout: 8_000 });
-
-      // Scroll the modal to reveal lower tiers
-      await page.keyboard.press("End");
-      await page.waitForTimeout(500);
+      const isGoat = await page.getByText("GOAT TIER").isVisible({ timeout: 3_000 }).catch(() => false);
+      test.skip(isGoat, "Account is on GOAT tier — no upgrade CTAs available.");
 
       // At least one paid upgrade CTA must exist
       const eliteBtn = page.getByRole("button", { name: "Get Elite" });
@@ -170,7 +168,7 @@ test.describe("plan upgrade (stripe)", () => {
       await page.getByRole("button", { name: "Open account menu" }).click();
       await page.getByRole("button", { name: "Plan / Upgrade" }).click();
 
-      await expect(page.getByText(/cancel anytime/i)).toBeVisible({ timeout: 8_000 });
+      await expect(page.getByText(/cancel anytime/i).first()).toBeVisible({ timeout: 8_000 });
     });
   });
 });

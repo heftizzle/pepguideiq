@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser } from "./helpers/auth.js";
+import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -8,7 +8,8 @@ test.describe("catalog (library)", () => {
 
   test.beforeEach(async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await page.getByText("LIBRARY", { exact: true }).click();
+    await dismissTutorialIfPresent(page);
+    await page.getByRole("button", { name: "Library, 264 compounds" }).click();
   });
 
   test("catalog renders compound cards", async ({ page }) => {
@@ -16,10 +17,12 @@ test.describe("catalog (library)", () => {
   });
 
   test("search filters the compound list", async ({ page }) => {
-    const searchInput = page
-      .getByPlaceholder(/search/i)
-      .or(page.getByRole("searchbox"))
-      .first();
+    // Click the search icon to open the search input
+    await page.getByRole("button", { name: /open library search/i }).click();
+
+    // Wait for search input to appear — placeholder is "Search by name, alias, tag…"
+    const searchInput = page.getByPlaceholder(/search by name/i).first();
+    await expect(searchInput).toBeVisible({ timeout: 5_000 });
     await searchInput.fill("BPC");
     await expect(page.getByText(/BPC/i).first()).toBeVisible();
   });

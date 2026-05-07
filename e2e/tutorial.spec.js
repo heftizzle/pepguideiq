@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser } from "./helpers/auth.js";
+import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -15,6 +15,7 @@ test.describe("tutorial flow", () => {
   // ---------------------------------------------------------------------------
 
   test("Tutorials menu item is reachable from account menu", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await expect(page.getByRole("button", { name: "Tutorials" })).toBeVisible({ timeout: 5_000 });
   });
@@ -24,8 +25,11 @@ test.describe("tutorial flow", () => {
   });
 
   test("clicking Tutorials opens tutorial overlay", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
     // Tutorial should show some kind of step UI — look for step indicator or CTA
     const tutorialUI = page
@@ -40,23 +44,35 @@ test.describe("tutorial flow", () => {
   // ---------------------------------------------------------------------------
 
   test("tutorial has a forward navigation button", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
-    const nextBtn = page.getByRole("button", {
-      name: /next|continue|got it|start|let's go/i,
-    });
+    const nextBtn = page
+      .locator('button, [role="button"]')
+      .filter({ hasText: /^Next|^Done/ })
+      .filter({ not: page.getByTestId("compound-card") })
+      .first();
     await expect(nextBtn.first()).toBeVisible({ timeout: 8_000 });
     await expect(nextBtn.first()).toBeEnabled();
   });
 
   test("advancing tutorial steps progresses the flow", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
     // Advance 3 steps and confirm something changes each time
     for (let i = 0; i < 3; i++) {
-      const nextBtn = page.getByRole("button", { name: /next|continue|got it/i }).first();
+      const nextBtn = page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first();
       await expect(nextBtn).toBeVisible({ timeout: 6_000 });
       await nextBtn.click();
       await page.waitForTimeout(500); // allow mount animation
@@ -70,10 +86,19 @@ test.describe("tutorial flow", () => {
   });
 
   test("tutorial can be dismissed or closed", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
-    await expect(page.getByRole("button", { name: /next|continue|got it|start/i }).first()).toBeVisible({
+    await expect(
+      page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first()
+    ).toBeVisible({
       timeout: 8_000,
     });
 
@@ -106,29 +131,44 @@ test.describe("tutorial flow", () => {
 
   test("completing tutorial does not add compounds to the stack", async ({ page }) => {
     // Record stack state before tutorial
-    await page.getByText("STACK BUILDER", { exact: true }).click();
+    await page.getByRole("button", { name: "Stack Builder" }).click();
     await page.getByText(/search catalog/i).isVisible({ timeout: 5_000 }).catch(() => false);
 
     // Trigger tutorial
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
-    await expect(page.getByRole("button", { name: /next|continue|got it|start/i }).first()).toBeVisible({
+    await expect(
+      page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first()
+    ).toBeVisible({
       timeout: 8_000,
     });
 
     // Advance all 12 steps (max 13 clicks to be safe)
     for (let i = 0; i < 13; i++) {
-      const nextBtn = page.getByRole("button", { name: /next|continue|got it|done|finish/i }).first();
+      const nextBtn = page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first();
       if (!(await nextBtn.isVisible({ timeout: 2_000 }).catch(() => false))) break;
       await nextBtn.click();
       await page.waitForTimeout(400);
     }
 
     // Navigate back to stack builder — stack should be unchanged
-    await page.getByText("STACK BUILDER", { exact: true }).click();
+    await page.getByRole("button", { name: "Stack Builder" }).click();
     // "Search catalog…" placeholder means no ghost compound was committed
-    await expect(page.getByPlaceholder("Search catalog...").or(page.getByText("Search catalog..."))).toBeVisible({
+    await expect(
+      page.getByPlaceholder(/search catalog/i).or(page.getByText(/search catalog/i))
+    ).toBeVisible({
       timeout: 5_000,
     });
   });
@@ -138,16 +178,29 @@ test.describe("tutorial flow", () => {
   // ---------------------------------------------------------------------------
 
   test("completing all tutorial steps shows post-tutorial profile modal", async ({ page }) => {
+    await dismissTutorialIfPresent(page);
     await page.getByRole("button", { name: "Open account menu" }).click();
     await page.getByRole("button", { name: "Tutorials" }).click();
+    await page.getByText(/Replay Tutorial/i).click();
+    await page.waitForTimeout(1_000);
 
-    await expect(page.getByRole("button", { name: /next|continue|got it|start/i }).first()).toBeVisible({
+    await expect(
+      page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first()
+    ).toBeVisible({
       timeout: 8_000,
     });
 
     // Advance through all 12 steps
     for (let i = 0; i < 13; i++) {
-      const nextBtn = page.getByRole("button", { name: /next|continue|got it|done|finish/i }).first();
+      const nextBtn = page
+        .locator('button, [role="button"]')
+        .filter({ hasText: /^Next|^Done/ })
+        .filter({ not: page.getByTestId("compound-card") })
+        .first();
       if (!(await nextBtn.isVisible({ timeout: 2_000 }).catch(() => false))) break;
       await nextBtn.click();
       await page.waitForTimeout(500);

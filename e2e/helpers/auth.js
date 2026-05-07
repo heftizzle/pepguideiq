@@ -10,25 +10,32 @@ export async function passAgeGateIfPresent(page) {
   await enterButton.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
 }
 
+export async function dismissTutorialIfPresent(page) {
+  // The blocker is the HamburgerMenu backdrop: div[role="presentation"]
+  // It has onClick={() => setOpen(false)} — clicking it closes the menu/overlay
+  const backdrop = page.locator('div[role="presentation"]').first();
+  if (!(await backdrop.isVisible({ timeout: 3_000 }).catch(() => false))) return;
+  await backdrop.click({ force: true });
+  await backdrop.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+}
+
 export async function loginUser(page, email, password) {
   await page.goto("/");
   await passAgeGateIfPresent(page);
-  const libraryNav = page.getByText("LIBRARY", { exact: true });
-  if (await libraryNav.isVisible().catch(() => false)) {
-    await expect(libraryNav).toBeVisible();
+
+  // Already logged in
+  if (await page.getByText("LIBRARY", { exact: true }).isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await dismissTutorialIfPresent(page);
     return;
   }
 
-  const emailInput = page.getByLabel(/email/i);
-  if (!(await emailInput.first().isVisible().catch(() => false))) {
-    const signInTrigger = page
-      .getByRole("button", { name: /sign in|log in|get started/i })
-      .or(page.getByTestId("auth-toggle"));
-    await signInTrigger.first().click();
-  }
-
-  await emailInput.first().fill(email);
-  await page.getByLabel(/password/i).first().fill(password);
+  // Fill credentials using placeholder selectors (inputs have no labels)
+  await page.getByPlaceholder("you@email.com").first().fill(email);
+  await page.getByPlaceholder("••••••••").first().fill(password);
   await page.getByRole("button", { name: /sign in|log in|continue/i }).last().click();
-  await expect(page.getByText("LIBRARY", { exact: true })).toBeVisible({ timeout: 10_000 });
+
+  // After login: wait for app to render, then clear tutorial before asserting nav
+  await page.waitForTimeout(3_000);
+  await dismissTutorialIfPresent(page);
+  await expect(page.getByText("LIBRARY", { exact: true })).toBeVisible({ timeout: 15_000 });
 }
