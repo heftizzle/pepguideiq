@@ -354,12 +354,17 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
-/** Access token for Worker JWT verification (Authorization: Bearer …). */
+/**
+ * Access token for Worker JWT verification (Authorization: Bearer …).
+ * Refreshes the session first — getSession() alone can return a stale cached token
+ * and cause 401s on Worker routes; fallback to getSession if refresh did not return a token.
+ */
 export async function getSessionAccessToken() {
   if (!supabase) return null;
+  const { data: refreshed } = await supabase.auth.refreshSession();
+  if (refreshed?.session?.access_token) return refreshed.session.access_token;
   const { data } = await supabase.auth.getSession();
-  const session = data?.session;
-  return session?.access_token ?? null;
+  return data?.session?.access_token ?? null;
 }
 
 /** @param {unknown} raw — PostgREST date / timestamptz string */
