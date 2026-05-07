@@ -172,6 +172,10 @@ export function normalizeNewCatalogEntry(raw) {
     }
   }
   const componentsField = normalizedComponents.length ? { components: normalizedComponents } : {};
+  const dosePerInjectionField = (() => {
+    const dose = Number(raw.dose_per_injection_mg);
+    return Number.isFinite(dose) && dose > 0 ? { dose_per_injection_mg: dose } : {};
+  })();
 
   const defaultBacForVial = defaultBacWaterMlFromRaw(raw);
 
@@ -237,6 +241,7 @@ export function normalizeNewCatalogEntry(raw) {
     notes: notesJoined || "",
     tags,
     ...componentsField,
+    ...dosePerInjectionField,
     ...reconstitutionVolumeField,
     ...vialSizeOptionsField,
     ...finnrickUrlField,

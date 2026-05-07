@@ -164,6 +164,7 @@ export const BATCH1 = [
     reconstitution:
       "Bacteriostatic Water. Standard 10mg vial → 1mL BAC. Each 0.1mL (10 units) = 1mg total (BPC-157 500mcg · TB-500 500mcg). Large 20mg vial → 2mL BAC, same concentration. Dose 250–500mcg each, 1–2x daily.",
     dosingRange: { low: "250/2.5mg", medium: "500/5mg", high: "1000/10mg", frequency: "Daily BPC / Twice weekly TB" },
+    dose_per_injection_mg: 0.5,
     tags: ["healing", "recovery", "blend", "BPC-157", "TB-500", "tendon", "anti-inflammatory", "synergy"],
     sourcingNotes:
       "Available pre-blended from multiple research peptide vendors as BPC+TB combo listings. Named 'Wolverine' in the community for rapid recovery association.",

@@ -118,6 +118,32 @@ function parseDoseToMg(input) {
   return Number.isFinite(n) ? n : null;
 }
 
+function isBlendLike(peptide, doseInput) {
+  const dose = String(doseInput ?? "");
+  if (dose.includes("/")) return true;
+  if (peptide?.compound_type === "blend") return true;
+  if (Array.isArray(peptide?.components) && peptide.components.length > 1) return true;
+  if (Array.isArray(peptide?.tags) && peptide.tags.some((t) => String(t).toLowerCase() === "blend")) return true;
+  return false;
+}
+
+function resolveDosePerInjectionMg(peptide, doseInput, freqKey, customPerWeek) {
+  const blendLike = isBlendLike(peptide, doseInput);
+  if (blendLike) {
+    const explicitPerInjectionMg = Number(peptide?.dose_per_injection_mg);
+    if (Number.isFinite(explicitPerInjectionMg) && explicitPerInjectionMg > 0) return explicitPerInjectionMg;
+
+    const doseText = String(doseInput ?? "");
+    if (doseText.includes("/")) {
+      const weeklyPart = doseText.split("/")[1]?.trim() ?? "";
+      const weeklyMg = parseDoseToMg(weeklyPart);
+      const inj = injectionsPerWeek(freqKey, customPerWeek);
+      if (weeklyMg != null && inj > 0) return weeklyMg / inj;
+    }
+  }
+  return parseDoseToMg(doseInput);
+}
+
 function defaultVialSizeMg(peptide) {
   const opts = peptide?.vialSizeOptions;
   if (Array.isArray(opts) && opts.length > 0) {
@@ -558,7 +584,7 @@ export function BuildTab({
     return rows.map((row) => {
       const p = catalogById.get(row.peptideId);
       const name = p?.name ?? row.peptideId;
-      const doseMg = parseDoseToMg(row.dose);
+      const doseMg = resolveDosePerInjectionMg(p, row.dose, row.freqKey, row.customPerWeek);
       const inj = injectionsPerWeek(row.freqKey, row.customPerWeek);
       const totalMg = doseMg != null && inj > 0 ? doseMg * inj * w : null;
       const defVial = p ? defaultVialSizeMg(p) : 5;
