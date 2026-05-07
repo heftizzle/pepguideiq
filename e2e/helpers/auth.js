@@ -1,11 +1,13 @@
 import { expect } from "@playwright/test";
 
 export async function passAgeGateIfPresent(page) {
+  await page.waitForLoadState("networkidle");
   const enterButton = page.getByRole("button", { name: /i agree & enter/i });
-  if (!(await enterButton.isVisible().catch(() => false))) return;
+  if (!(await enterButton.isVisible({ timeout: 3_000 }).catch(() => false))) return;
   await page.getByRole("checkbox").nth(0).check();
   await page.getByRole("checkbox").nth(1).check();
   await enterButton.click();
+  await enterButton.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
 }
 
 export async function loginUser(page, email, password) {
