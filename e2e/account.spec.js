@@ -117,6 +117,18 @@ test.describe("account deletion", () => {
     await expect(page.getByText(/could not delete account/i)).not.toBeVisible();
   });
 
+  test("delete modal title is not purple", async ({ page }) => {
+    await loginUser(page, DELETE_EMAIL, DELETE_PASSWORD);
+    await openDeleteModal(page);
+
+    const title = page.locator('[data-testid="delete-modal-title"]');
+    const color = await title.evaluate((el) => getComputedStyle(el).color);
+
+    expect(color).not.toMatch(/rgb\(168,\s*85,\s*247\)/);
+    expect(color).not.toMatch(/rgb\(192,\s*132,\s*252\)/);
+    expect(color).not.toMatch(/rgb\(124,\s*58,\s*237\)/);
+  });
+
   test("delete account succeeds — no error, user signed out", async ({ page }) => {
     await loginUser(page, DELETE_EMAIL, DELETE_PASSWORD);
 

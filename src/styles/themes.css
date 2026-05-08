@@ -57,13 +57,13 @@
   --tier-pro-dim: rgba(0, 212, 170, 0.125);
   --tier-elite: #f59e0b;
   --tier-elite-dim: rgba(245, 158, 11, 0.125);
-  --tier-goat: #a855f7;
-  --tier-goat-dim: rgba(168, 85, 247, 0.125);
+  --tier-goat: #c084fc;
+  --tier-goat-dim: rgba(192, 132, 252, 0.125);
 
   --tier-entry-border: rgba(176, 190, 197, 0.25);
   --tier-pro-border: rgba(0, 212, 170, 0.19);
   --tier-elite-border: rgba(245, 158, 11, 0.19);
-  --tier-goat-border: rgba(168, 85, 247, 0.19);
+  --tier-goat-border: rgba(192, 132, 252, 0.19);
 
   /* Structural / chrome (GlobalStyles + App shell) */
   --color-bg-sunken: #0b0f17;
@@ -107,7 +107,7 @@
   --color-demo-pulse-outline-2: rgba(0, 212, 170, 0.9);
   --color-demo-pulse-shadow-2: rgba(0, 212, 170, 0.18);
   --tier-goat-text-strong: #d8b4fe;
-  --tier-goat-bg-active: rgba(168, 85, 247, 0.22);
+  --tier-goat-bg-active: rgba(192, 132, 252, 0.22);
 
   --color-shadow-50: rgba(0, 0, 0, 0.5);
   --color-shadow-25: rgba(0, 0, 0, 0.25);
@@ -173,7 +173,7 @@
   --tier-pro-dim: #ecfeff;
   --tier-elite: #d97706;
   --tier-elite-dim: #fffbeb;
-  --tier-goat: #7c3aed;
+  --tier-goat: #9333ea;
   --tier-goat-dim: #f5f3ff;
 
   --tier-entry-border: #cbd5e1;
@@ -221,8 +221,8 @@
   --color-demo-pulse-shadow: rgba(43, 78, 175, 0.08);
   --color-demo-pulse-outline-2: rgba(43, 78, 175, 0.55);
   --color-demo-pulse-shadow-2: rgba(43, 78, 175, 0.15);
-  --tier-goat-text-strong: #6b21a8;
-  --tier-goat-bg-active: rgba(124, 58, 237, 0.15);
+  --tier-goat-text-strong: #7c3aed;
+  --tier-goat-bg-active: rgba(147, 51, 234, 0.15);
 
   --color-shadow-50: rgba(26, 26, 46, 0.12);
   --color-shadow-25: rgba(26, 26, 46, 0.06);
@@ -241,8 +241,8 @@
   --color-bg-card: #0d0d0d;
   --color-bg-elevated: #111111;
   --color-bg-input: #080808;
-  --color-bg-hover: rgba(168, 85, 247, 0.05);
-  --color-bg-active: rgba(168, 85, 247, 0.09);
+  --color-bg-hover: rgba(192, 132, 252, 0.05);
+  --color-bg-active: rgba(192, 132, 252, 0.09);
 
   /* Text */
   --color-text-primary: #e8e0f0;
@@ -254,12 +254,12 @@
   --color-border-default: #1a0a2e;
   --color-border-emphasis: #2a1a40;
   --color-border-strong: #3a2a50;
-  --color-border-focus: #a855f7;
+  --color-border-focus: #c084fc;
 
   /* Brand accent — purple (GlobalStyles / App nav / .btn-teal) */
-  --color-accent: #a855f7;
-  --color-accent-dim: rgba(168, 85, 247, 0.15);
-  --color-accent-hover: #c084fc;
+  --color-accent: #c084fc;
+  --color-accent-dim: rgba(192, 132, 252, 0.15);
+  --color-accent-hover: #d8b4fe;
 
   /* Semantic */
   --color-success: #22c55e;
@@ -272,7 +272,7 @@
   --color-btn-green: #10b981;
   --color-btn-green-fill: rgba(16, 185, 129, 0.082);
   --color-border-pcard-hover: rgb(80, 50, 110);
-  --color-info: #a855f7;
+  --color-info: #c084fc;
   /* InBody scan card + similar UIs — semantic text/section aliases */
   --color-text-success: var(--color-success);
   --color-text-danger: var(--color-danger);
@@ -284,17 +284,17 @@
   /* Tiers — header pills (.pepv-header-tier--* in GlobalStyles.jsx). Elite = amber, GOAT = purple (`TIERS.*.cardAccent` / `modalGlowHex`). */
   --tier-entry: #b0bec5;
   --tier-entry-dim: rgba(176, 190, 197, 0.12);
-  --tier-pro: #a855f7;
-  --tier-pro-dim: rgba(168, 85, 247, 0.125);
+  --tier-pro: #c084fc;
+  --tier-pro-dim: rgba(192, 132, 252, 0.125);
   --tier-elite: #f59e0b;
   --tier-elite-dim: rgba(245, 158, 11, 0.125);
-  --tier-goat: #c084fc;
-  --tier-goat-dim: rgba(192, 132, 252, 0.125);
+  --tier-goat: #d8b4fe;
+  --tier-goat-dim: rgba(216, 180, 254, 0.125);
 
   --tier-entry-border: rgba(176, 190, 197, 0.25);
-  --tier-pro-border: rgba(168, 85, 247, 0.19);
+  --tier-pro-border: rgba(192, 132, 252, 0.19);
   --tier-elite-border: rgba(245, 158, 11, 0.19);
-  --tier-goat-border: rgba(192, 132, 252, 0.19);
+  --tier-goat-border: rgba(216, 180, 254, 0.19);
 
   /* Structural / chrome (GlobalStyles + App shell) */
   --color-bg-sunken: #080808;
@@ -302,50 +302,50 @@
   --color-border-tab: #2a1a40;
   --color-border-pcard-side: #2a1a40;
   --color-border-pcard-top: rgb(50, 30, 70);
-  --color-nav-tab-inactive-bg: rgba(168, 85, 247, 0.03);
+  --color-nav-tab-inactive-bg: rgba(192, 132, 252, 0.03);
   --color-text-placeholder: #6a5a80;
   --color-surface-hover: #1a0a2e;
   --color-border-interactive-hover: #6a3a90;
   --color-upgrade-muted-border: #3a2a50;
-  --color-scrollbar-thumb: rgba(168, 85, 247, 0.22);
-  --color-grid-faint: rgba(168, 85, 247, 0.025);
-  --color-accent-subtle-14: rgba(168, 85, 247, 0.14);
-  --color-accent-subtle-22: rgba(168, 85, 247, 0.22);
-  --color-accent-subtle-10: rgba(168, 85, 247, 0.1);
-  --color-accent-subtle-0e: rgba(168, 85, 247, 0.06);
-  --color-accent-subtle-18: rgba(168, 85, 247, 0.18);
-  --color-accent-subtle-30: rgba(168, 85, 247, 0.3);
-  --color-accent-subtle-40: rgba(168, 85, 247, 0.4);
-  --color-accent-subtle-50: rgba(168, 85, 247, 0.5);
-  --color-accent-nav-border: rgba(168, 85, 247, 0.55);
-  --color-accent-nav-fill: rgba(168, 85, 247, 0.14);
-  --color-accent-nav-ring: rgba(168, 85, 247, 0.12);
-  --color-accent-fab-border: rgba(168, 85, 247, 0.55);
-  --color-accent-fab-fill: rgba(168, 85, 247, 0.18);
-  --color-accent-fab-ring: rgba(168, 85, 247, 0.12);
-  --color-guide-toggle-bg: rgba(168, 85, 247, 0.08);
-  --color-guide-toggle-bg-hover: rgba(168, 85, 247, 0.12);
+  --color-scrollbar-thumb: rgba(192, 132, 252, 0.22);
+  --color-grid-faint: rgba(192, 132, 252, 0.025);
+  --color-accent-subtle-14: rgba(192, 132, 252, 0.14);
+  --color-accent-subtle-22: rgba(192, 132, 252, 0.22);
+  --color-accent-subtle-10: rgba(192, 132, 252, 0.1);
+  --color-accent-subtle-0e: rgba(192, 132, 252, 0.06);
+  --color-accent-subtle-18: rgba(192, 132, 252, 0.18);
+  --color-accent-subtle-30: rgba(192, 132, 252, 0.3);
+  --color-accent-subtle-40: rgba(192, 132, 252, 0.4);
+  --color-accent-subtle-50: rgba(192, 132, 252, 0.5);
+  --color-accent-nav-border: rgba(192, 132, 252, 0.55);
+  --color-accent-nav-fill: rgba(192, 132, 252, 0.14);
+  --color-accent-nav-ring: rgba(192, 132, 252, 0.12);
+  --color-accent-fab-border: rgba(192, 132, 252, 0.55);
+  --color-accent-fab-fill: rgba(192, 132, 252, 0.18);
+  --color-accent-fab-ring: rgba(192, 132, 252, 0.12);
+  --color-guide-toggle-bg: rgba(192, 132, 252, 0.08);
+  --color-guide-toggle-bg-hover: rgba(192, 132, 252, 0.12);
   --color-modal-scrim: rgba(0, 0, 0, 0.95);
   --color-shadow-bar: rgba(0, 0, 0, 0.85);
-  --color-demo-outline: rgba(168, 85, 247, 0.5);
-  --color-bell-glow: rgba(168, 85, 247, 0.7);
-  --color-bell-border-unread: rgba(168, 85, 247, 0.45);
-  --color-protocol-pill-active-1: rgba(168, 85, 247, 0.5);
-  --color-protocol-pill-active-2: rgba(168, 85, 247, 0.22);
-  --color-protocol-pill-active-3: rgba(168, 85, 247, 0.15);
-  --color-demo-pulse-outline-1: rgba(168, 85, 247, 0.35);
-  --color-demo-pulse-shadow: rgba(168, 85, 247, 0.08);
-  --color-demo-pulse-outline-2: rgba(168, 85, 247, 0.9);
-  --color-demo-pulse-shadow-2: rgba(168, 85, 247, 0.18);
+  --color-demo-outline: rgba(192, 132, 252, 0.5);
+  --color-bell-glow: rgba(192, 132, 252, 0.7);
+  --color-bell-border-unread: rgba(192, 132, 252, 0.45);
+  --color-protocol-pill-active-1: rgba(192, 132, 252, 0.5);
+  --color-protocol-pill-active-2: rgba(192, 132, 252, 0.22);
+  --color-protocol-pill-active-3: rgba(192, 132, 252, 0.15);
+  --color-demo-pulse-outline-1: rgba(192, 132, 252, 0.35);
+  --color-demo-pulse-shadow: rgba(192, 132, 252, 0.08);
+  --color-demo-pulse-outline-2: rgba(192, 132, 252, 0.9);
+  --color-demo-pulse-shadow-2: rgba(192, 132, 252, 0.18);
   --tier-goat-text-strong: #e9d5ff;
-  --tier-goat-bg-active: rgba(192, 132, 252, 0.22);
+  --tier-goat-bg-active: rgba(216, 180, 254, 0.22);
 
   --color-shadow-50: rgba(0, 0, 0, 0.5);
   --color-shadow-25: rgba(0, 0, 0, 0.25);
   --color-shadow-30: rgba(0, 0, 0, 0.3);
   --color-shadow-45: rgba(0, 0, 0, 0.45);
   --color-text-on-dark-muted: rgba(255, 255, 255, 0.55);
-  --color-bell-glow-transparent: rgba(168, 85, 247, 0);
+  --color-bell-glow-transparent: rgba(192, 132, 252, 0);
 }
 
 /* ============================================================
@@ -404,13 +404,13 @@
   --tier-pro-dim: rgba(0, 255, 136, 0.125);
   --tier-elite: #f59e0b;
   --tier-elite-dim: rgba(245, 158, 11, 0.125);
-  --tier-goat: #a855f7;
-  --tier-goat-dim: rgba(168, 85, 247, 0.125);
+  --tier-goat: #c084fc;
+  --tier-goat-dim: rgba(192, 132, 252, 0.125);
 
   --tier-entry-border: rgba(176, 190, 197, 0.25);
   --tier-pro-border: rgba(0, 255, 136, 0.19);
   --tier-elite-border: rgba(245, 158, 11, 0.19);
-  --tier-goat-border: rgba(168, 85, 247, 0.19);
+  --tier-goat-border: rgba(192, 132, 252, 0.19);
 
   /* Structural / chrome (GlobalStyles + App shell) */
   --color-bg-sunken: #080f0a;
@@ -454,7 +454,7 @@
   --color-demo-pulse-outline-2: rgba(0, 255, 136, 0.85);
   --color-demo-pulse-shadow-2: rgba(0, 255, 136, 0.15);
   --tier-goat-text-strong: #d8b4fe;
-  --tier-goat-bg-active: rgba(168, 85, 247, 0.22);
+  --tier-goat-bg-active: rgba(192, 132, 252, 0.22);
 
   --color-shadow-50: rgba(0, 0, 0, 0.5);
   --color-shadow-25: rgba(0, 0, 0, 0.25);
@@ -520,13 +520,13 @@
   --tier-pro-dim: rgba(229, 62, 62, 0.125);
   --tier-elite: #f59e0b;
   --tier-elite-dim: rgba(245, 158, 11, 0.125);
-  --tier-goat: #a855f7;
-  --tier-goat-dim: rgba(168, 85, 247, 0.125);
+  --tier-goat: #c084fc;
+  --tier-goat-dim: rgba(192, 132, 252, 0.125);
 
   --tier-entry-border: rgba(176, 190, 197, 0.25);
   --tier-pro-border: rgba(229, 62, 62, 0.19);
   --tier-elite-border: rgba(245, 158, 11, 0.19);
-  --tier-goat-border: rgba(168, 85, 247, 0.19);
+  --tier-goat-border: rgba(192, 132, 252, 0.19);
 
   /* Structural / chrome (GlobalStyles + App shell) */
   --color-bg-sunken: #0a0404;
@@ -570,7 +570,7 @@
   --color-demo-pulse-outline-2: rgba(229, 62, 62, 0.9);
   --color-demo-pulse-shadow-2: rgba(229, 62, 62, 0.18);
   --tier-goat-text-strong: #d8b4fe;
-  --tier-goat-bg-active: rgba(168, 85, 247, 0.22);
+  --tier-goat-bg-active: rgba(192, 132, 252, 0.22);
 
   --color-shadow-50: rgba(0, 0, 0, 0.5);
   --color-shadow-25: rgba(0, 0, 0, 0.25);
@@ -636,13 +636,13 @@
   --tier-pro-dim: rgba(245, 158, 11, 0.125);
   --tier-elite: #fbbf24;
   --tier-elite-dim: rgba(251, 191, 36, 0.125);
-  --tier-goat: #a855f7;
-  --tier-goat-dim: rgba(168, 85, 247, 0.125);
+  --tier-goat: #c084fc;
+  --tier-goat-dim: rgba(192, 132, 252, 0.125);
 
   --tier-entry-border: rgba(176, 190, 197, 0.25);
   --tier-pro-border: rgba(245, 158, 11, 0.19);
   --tier-elite-border: rgba(251, 191, 36, 0.19);
-  --tier-goat-border: rgba(168, 85, 247, 0.19);
+  --tier-goat-border: rgba(192, 132, 252, 0.19);
 
   /* Structural / chrome (GlobalStyles + App shell) */
   --color-bg-sunken: #090700;
@@ -686,7 +686,7 @@
   --color-demo-pulse-outline-2: rgba(245, 158, 11, 0.9);
   --color-demo-pulse-shadow-2: rgba(245, 158, 11, 0.18);
   --tier-goat-text-strong: #d8b4fe;
-  --tier-goat-bg-active: rgba(168, 85, 247, 0.22);
+  --tier-goat-bg-active: rgba(192, 132, 252, 0.22);
 
   --color-shadow-50: rgba(0, 0, 0, 0.5);
   --color-shadow-25: rgba(0, 0, 0, 0.25);

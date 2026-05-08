@@ -1722,7 +1722,10 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           maxWidth={420}
           label="Delete account"
         >
-          <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 12px", color: "var(--tier-goat-border)", lineHeight: 1.35 }}>
+          <h2
+            data-testid="delete-modal-title"
+            style={{ fontSize: 17, fontWeight: 600, margin: "0 0 12px", color: "var(--color-text-primary)", lineHeight: 1.35 }}
+          >
             Sad to see you go, but love to watch ya leave. 🙂
           </h2>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 16 }}>
