@@ -1,12 +1,193 @@
 import { createClient } from "@supabase/supabase-js";
 import { PEPTIDES } from "../data/catalog.js";
 import { getStoredAffiliateRef, normalizeAffiliateRef } from "./affiliateRef.js";
-import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./config.js";
+import { API_WORKER_URL, isApiWorkerConfigured, isE2EMockSupabaseEnabled, isSupabaseConfigured } from "./config.js";
 import { generateShareId8 } from "./stackShare.js";
 import { stripHandleAtPrefix } from "./memberProfileHandle.js";
 
 const url = import.meta.env.VITE_SUPABASE_URL ?? "";
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+const E2E_MOCK_SUPABASE = isE2EMockSupabaseEnabled();
+const MOCK_AUTH_STORAGE_KEY = "pepv.e2eMockSupabase.auth";
+const MOCK_STACK_STORAGE_KEY = "pepv.e2eMockSupabase.stacks";
+const MOCK_DEFAULT_EMAIL = String(import.meta.env.VITE_E2E_MOCK_EMAIL ?? "testuser@example.com").trim() || "testuser@example.com";
+const MOCK_DEFAULT_PASSWORD = String(import.meta.env.VITE_E2E_MOCK_PASSWORD ?? "TestPassword123!").trim() || "TestPassword123!";
+const MOCK_DEFAULT_PLAN = String(import.meta.env.VITE_E2E_MOCK_PLAN ?? "pro").trim().toLowerCase() || "pro";
+const MOCK_USER_ID = "00000000-0000-4000-8000-000000000001";
+const MOCK_PROFILE_ID = "00000000-0000-4000-8000-000000000101";
+const MOCK_STACK_ROW_ID = "00000000-0000-4000-8000-000000000201";
+/** @type {Set<(session: import('@supabase/supabase-js').Session | null) => void>} */
+const mockAuthListeners = new Set();
+
+function mockStorageAvailable() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function mockHandleFromEmail(email) {
+  const raw = String(email ?? "").trim().toLowerCase().split("@")[0] ?? "";
+  const handle = raw.replace(/[^a-z0-9_]/g, "").slice(0, 24);
+  return handle || "e2euser";
+}
+
+function mockDisplayNameFromEmail(email) {
+  const local = String(email ?? "").trim().split("@")[0] ?? "";
+  const cleaned = local.replace(/[._-]+/g, " ").trim();
+  if (!cleaned) return "E2E User";
+  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function readMockAuthState() {
+  if (!mockStorageAvailable()) return null;
+  try {
+    const raw = window.localStorage.getItem(MOCK_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeMockAuthState(next) {
+  if (!mockStorageAvailable()) return;
+  if (!next) {
+    window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(next));
+}
+
+function readMockStacks() {
+  if (!mockStorageAvailable()) return {};
+  try {
+    const raw = window.localStorage.getItem(MOCK_STACK_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeMockStacks(next) {
+  if (!mockStorageAvailable()) return;
+  window.localStorage.setItem(MOCK_STACK_STORAGE_KEY, JSON.stringify(next));
+}
+
+function buildMockAuthState(email, name = "", plan = MOCK_DEFAULT_PLAN) {
+  const normalizedEmail = String(email ?? "").trim().toLowerCase() || MOCK_DEFAULT_EMAIL.toLowerCase();
+  const displayName = String(name ?? "").trim() || mockDisplayNameFromEmail(normalizedEmail);
+  const handle = mockHandleFromEmail(normalizedEmail);
+  return {
+    id: MOCK_USER_ID,
+    profileId: MOCK_PROFILE_ID,
+    email: normalizedEmail,
+    name: displayName,
+    plan: typeof plan === "string" && plan.trim() ? plan.trim().toLowerCase() : MOCK_DEFAULT_PLAN,
+    handle,
+    displayHandle: handle,
+    demoSessionsShown: 11,
+    tutorialCompleted: true,
+  };
+}
+
+function currentMockAuthState() {
+  return readMockAuthState();
+}
+
+function buildMockSession(state) {
+  if (!state) return null;
+  return {
+    access_token: `mock.${state.id}.token`,
+    refresh_token: `mock.${state.id}.refresh`,
+    token_type: "bearer",
+    user: {
+      id: state.id,
+      email: state.email,
+      user_metadata: {
+        name: state.name,
+        plan: state.plan,
+      },
+      identities: [],
+    },
+  };
+}
+
+function buildMockCurrentUser(state) {
+  if (!state) return null;
+  return {
+    id: state.id,
+    email: state.email,
+    name: state.name,
+    plan: state.plan,
+    stackPhotoUrl: null,
+    stackPhotoKey: null,
+    displayName: state.name,
+    avatarR2Key: null,
+    defaultSession: "morning",
+    biological_sex: null,
+    cycle_tracking_enabled: null,
+    date_of_birth: null,
+    training_experience: null,
+    identities: [],
+  };
+}
+
+function buildMockMemberProfile(state) {
+  const nowIso = new Date(0).toISOString();
+  return {
+    id: state?.profileId ?? MOCK_PROFILE_ID,
+    user_id: state?.id ?? MOCK_USER_ID,
+    display_name: state?.name ?? "E2E User",
+    avatar_r2_key: null,
+    timezone: "America/Denver",
+    is_default: true,
+    created_at: nowIso,
+    city: "",
+    state: "",
+    country: "",
+    language: "en",
+    shift_schedule: null,
+    wake_time: null,
+    handle: state?.handle ?? "e2euser",
+    display_handle: state?.displayHandle ?? state?.handle ?? "e2euser",
+    demo_sessions_shown: Number(state?.demoSessionsShown ?? 0),
+    tutorial_completed: Boolean(state?.tutorialCompleted),
+    bio: "",
+    instagram_handle: null,
+    tiktok_handle: null,
+    facebook_handle: null,
+    snapchat_handle: null,
+    linkedin_handle: null,
+    x_handle: null,
+    youtube_handle: null,
+    rumble_handle: null,
+    experience_level: "",
+    goals: "",
+    body_scan_r2_key: null,
+    body_scan_uploaded_at: null,
+    body_scan_ocr_pending: false,
+    progress_photo_front_r2_key: null,
+    progress_photo_front_at: null,
+    progress_photo_side_r2_key: null,
+    progress_photo_side_at: null,
+    progress_photo_back_r2_key: null,
+    progress_photo_back_at: null,
+    progress_photo_sets: 1,
+    current_streak: 0,
+  };
+}
+
+function emitMockAuthState() {
+  const session = buildMockSession(currentMockAuthState());
+  for (const listener of mockAuthListeners) {
+    try {
+      listener(session);
+    } catch {
+      /* ignore mock listener failures */
+    }
+  }
+}
 
 /** Logs PostgREST 400 bodies in dev (column/schema mismatch, RLS hints, etc.). */
 function createBrowserClient() {
@@ -39,8 +220,8 @@ function createBrowserClient() {
   });
 }
 
-/** Browser client; `null` when env is missing (auth UI will prompt to configure). */
-export const supabase = isSupabaseConfigured() ? createBrowserClient() : null;
+/** Browser client; mock mode intentionally skips real client construction. */
+export const supabase = E2E_MOCK_SUPABASE ? null : isSupabaseConfigured() ? createBrowserClient() : null;
 
 /** @type {Promise<{ error: Error | null }> | null} */
 let authCodeExchangeInFlight = null;
@@ -196,6 +377,19 @@ function workerTurnstileEnforced() {
  */
 // enumeration-safe: always returns generic message regardless of supabase error
 export async function authSignIn(email, password) {
+  if (E2E_MOCK_SUPABASE) {
+    const normalizedEmail = String(email ?? "").trim().toLowerCase();
+    const normalizedPassword = String(password ?? "");
+    const passwordMatches = normalizedPassword === MOCK_DEFAULT_PASSWORD;
+    if (!normalizedEmail || !normalizedPassword || !passwordMatches) {
+      return { user: null, session: null, error: new Error("Invalid email or password") };
+    }
+    const authState = buildMockAuthState(normalizedEmail);
+    writeMockAuthState(authState);
+    const session = buildMockSession(authState);
+    emitMockAuthState();
+    return { user: session?.user ?? null, session, error: null };
+  }
   if (!supabase) return { user: null, session: null, error: notConfiguredError() };
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
@@ -211,6 +405,20 @@ export async function authSignIn(email, password) {
  */
 // enumeration-safe: upstream failures map to a generic message (except Worker bot / rate-limit copy).
 export async function authSignUp(email, password, meta = {}, turnstileToken) {
+  if (E2E_MOCK_SUPABASE) {
+    const policy = validatePassword(password);
+    if (!policy.valid) {
+      return { user: null, error: new Error(policy.errors[0] ?? "Password does not meet requirements.") };
+    }
+    const authState = buildMockAuthState(
+      email,
+      typeof meta.name === "string" ? meta.name : "",
+      typeof meta.plan === "string" ? meta.plan : "entry"
+    );
+    writeMockAuthState(authState);
+    emitMockAuthState();
+    return { user: buildMockSession(authState)?.user ?? null, error: null };
+  }
   if (!supabase) return { user: null, error: notConfiguredError() };
   const policy = validatePassword(password);
   if (!policy.valid) {
@@ -350,6 +558,11 @@ export async function signUp(name, email, password, plan = "entry", turnstileTok
 }
 
 export async function signOut() {
+  if (E2E_MOCK_SUPABASE) {
+    writeMockAuthState(null);
+    emitMockAuthState();
+    return;
+  }
   if (!supabase) return;
   await supabase.auth.signOut();
 }
@@ -360,6 +573,10 @@ export async function signOut() {
  * and cause 401s on Worker routes; fallback to getSession if refresh did not return a token.
  */
 export async function getSessionAccessToken() {
+  if (E2E_MOCK_SUPABASE) {
+    const state = currentMockAuthState();
+    return state ? `mock.${state.id}.token` : null;
+  }
   if (!supabase) return null;
   const { data: refreshed } = await supabase.auth.refreshSession();
   if (refreshed?.session?.access_token) return refreshed.session.access_token;
@@ -403,6 +620,9 @@ function profileTextLower(profile, snakeKey, camelKey) {
 }
 
 export async function getCurrentUser() {
+  if (E2E_MOCK_SUPABASE) {
+    return buildMockCurrentUser(currentMockAuthState());
+  }
   if (!supabase) return null;
   const { data: auth } = await supabase.auth.getUser();
   const u = auth?.user;
@@ -457,6 +677,9 @@ export async function getCurrentUser() {
  * @returns {Promise<Awaited<ReturnType<typeof getCurrentUser>>>}
  */
 export async function getCurrentUserFreshAfterCheckout() {
+  if (E2E_MOCK_SUPABASE) {
+    return getCurrentUser();
+  }
   if (!supabase) return null;
   try {
     const { error } = await supabase.auth.refreshSession();
@@ -799,6 +1022,11 @@ export async function fetchUserProfileStats(profileId) {
  * @returns {Promise<{ profiles: object[], error: Error | null }>}
  */
 export async function listMemberProfiles(userId) {
+  if (E2E_MOCK_SUPABASE) {
+    const state = currentMockAuthState();
+    if (!state || !userId) return { profiles: [], error: null };
+    return { profiles: [buildMockMemberProfile(state)], error: null };
+  }
   if (!supabase || !userId) return { profiles: [], error: notConfiguredError() };
   const { data, error } = await supabase
     .from("member_profiles")
@@ -815,6 +1043,9 @@ export async function listMemberProfiles(userId) {
  * @returns {Promise<{ profiles: object[], error: Error | null }>}
  */
 export async function fetchMemberProfiles(userId) {
+  if (E2E_MOCK_SUPABASE) {
+    return listMemberProfiles(userId);
+  }
   if (!userId) return { profiles: [], error: notConfiguredError() };
   if (!isSupabaseConfigured() && !isApiWorkerConfigured()) {
     return { profiles: [], error: notConfiguredError() };
@@ -872,6 +1103,16 @@ export async function resetMemberProfileDemoSessions(profileId) {
  * @returns {Promise<{ count: number, error: Error | null }>}
  */
 export async function incrementMemberProfileDemoSessions(profileId) {
+  if (E2E_MOCK_SUPABASE) {
+    const state = currentMockAuthState();
+    if (!state || profileId !== state.profileId) return { count: 0, error: null };
+    const nextCount = Number(state.demoSessionsShown ?? 0) + 1;
+    writeMockAuthState({
+      ...state,
+      demoSessionsShown: nextCount,
+    });
+    return { count: nextCount, error: null };
+  }
   if (!supabase) return { count: 0, error: notConfiguredError() };
   const pid = typeof profileId === "string" ? profileId.trim() : "";
   if (!pid) return { count: 0, error: new Error("Missing profile") };
@@ -1054,6 +1295,11 @@ export async function updateAuthEmail(newEmail) {
 
 /** Requires Worker route POST /account/delete + service role. */
 export async function deleteAccountViaWorker() {
+  if (E2E_MOCK_SUPABASE) {
+    writeMockAuthState(null);
+    emitMockAuthState();
+    return { error: null };
+  }
   if (!isApiWorkerConfigured()) {
     return { error: new Error("API worker is not configured (VITE_API_WORKER_URL).") };
   }
@@ -1080,6 +1326,18 @@ export async function deleteAccountViaWorker() {
  * @param {(session: import('@supabase/supabase-js').Session | null) => void} callback
  */
 export function onAuthStateChange(callback) {
+  if (E2E_MOCK_SUPABASE) {
+    mockAuthListeners.add(callback);
+    return {
+      data: {
+        subscription: {
+          unsubscribe() {
+            mockAuthListeners.delete(callback);
+          },
+        },
+      },
+    };
+  }
   if (!supabase) {
     return { data: { subscription: { unsubscribe() {} } } };
   }
@@ -1104,6 +1362,16 @@ export function onAuthStateChange(callback) {
  * @returns {Promise<{ stack: unknown[], shareId: string | null }>}
  */
 export async function loadStack(userId, profileId) {
+  if (E2E_MOCK_SUPABASE) {
+    if (!profileId) return { stack: [], shareId: null, feedVisible: false };
+    const stacks = readMockStacks();
+    const row = stacks[profileId] && typeof stacks[profileId] === "object" ? stacks[profileId] : null;
+    return {
+      stack: Array.isArray(row?.stack) ? row.stack : [],
+      shareId: typeof row?.shareId === "string" ? row.shareId : null,
+      feedVisible: Boolean(row?.feedVisible),
+    };
+  }
   if (!supabase || !profileId) return { stack: [], shareId: null, feedVisible: false };
   const { data, error } = await supabase
     .from("user_stacks")
@@ -1159,6 +1427,9 @@ export async function fetchNetworkFeed() {
  * @returns {Promise<{ vials: object[], error: Error | null }>}
  */
 export async function fetchArchivedVialsForProfile(userId, profileId) {
+  if (E2E_MOCK_SUPABASE) {
+    return { vials: [], error: null };
+  }
   if (!supabase || !profileId) return { vials: [], error: notConfiguredError() };
   try {
     const { data, error } = await supabase
@@ -1182,6 +1453,9 @@ export async function fetchArchivedVialsForProfile(userId, profileId) {
  * @returns {Promise<{ ids: Set<string>, error: Error | null }>}
  */
 export async function fetchSharedVialIdsForVials(profileId, vialIds) {
+  if (E2E_MOCK_SUPABASE) {
+    return { ids: new Set(), error: null };
+  }
   if (!supabase || !profileId) return { ids: new Set(), error: notConfiguredError() };
   const ids = [...new Set((vialIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (ids.length === 0) return { ids: new Set(), error: null };
@@ -1360,6 +1634,18 @@ export async function fetchNetworkMediaPosts() {
  * @param {unknown[]} stack JSON-serializable peptide stack rows
  */
 export async function saveStack(userId, profileId, stack) {
+  if (E2E_MOCK_SUPABASE) {
+    if (!profileId) return { error: new Error("Missing profile") };
+    const stacks = readMockStacks();
+    stacks[profileId] = {
+      id: MOCK_STACK_ROW_ID,
+      shareId: "mockshare1",
+      feedVisible: false,
+      stack: Array.isArray(stack) ? stack : [],
+    };
+    writeMockStacks(stacks);
+    return { error: null };
+  }
   if (!supabase) return { error: notConfiguredError() };
   if (!profileId) return { error: new Error("Missing profile") };
   const { error } = await supabase.from("user_stacks").upsert(
@@ -1471,6 +1757,9 @@ export async function getProfileStackShotR2Keys(userId) {
  * @param {string[]} peptideIds — deduped non-empty strings; single id uses `.eq`, multiple uses `.in`
  */
 export async function listVialsForPeptideIds(userId, profileId, peptideIds) {
+  if (E2E_MOCK_SUPABASE) {
+    return { vials: [], error: null };
+  }
   const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { vials: [], error: notConfiguredError() };
   if (ids.length === 0) return { vials: [], error: null };
@@ -1496,6 +1785,15 @@ export async function listVialsForPeptide(userId, profileId, peptideId) {
 
 /** @param {Record<string, unknown>} row */
 export async function insertUserVial(row) {
+  if (E2E_MOCK_SUPABASE) {
+    return {
+      data: {
+        id: "00000000-0000-4000-8000-000000000301",
+        ...(row && typeof row === "object" ? row : {}),
+      },
+      error: null,
+    };
+  }
   if (!supabase) return { data: null, error: notConfiguredError() };
   const { data, error } = await supabase.from("user_vials").insert(row).select("*");
   const row0 = Array.isArray(data) ? data[0] : null;
@@ -1508,6 +1806,9 @@ export async function insertUserVial(row) {
  * @param {Record<string, unknown>} patch
  */
 export async function updateUserVial(vialId, userId, profileId, patch) {
+  if (E2E_MOCK_SUPABASE) {
+    return { error: null };
+  }
   if (!supabase) return { error: notConfiguredError() };
   if (!profileId) return { error: new Error("Missing profile") };
   const { error } = await supabase
@@ -1525,6 +1826,9 @@ export async function updateUserVial(vialId, userId, profileId, patch) {
  * @param {string} profileId
  */
 export async function deleteUserVial(vialId, userId, profileId) {
+  if (E2E_MOCK_SUPABASE) {
+    return { error: null };
+  }
   if (!supabase) return { error: notConfiguredError() };
   if (!profileId) return { error: new Error("Missing profile") };
   const { error } = await supabase
@@ -1543,6 +1847,9 @@ export async function deleteUserVial(vialId, userId, profileId) {
  * @param {number} [limit]
  */
 export async function listRecentDosesForVial(vialId, userId, profileId, limit = 5) {
+  if (E2E_MOCK_SUPABASE) {
+    return { doses: [], error: null };
+  }
   if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };
   const { data, error } = await supabase
     .from("dose_logs")
@@ -1655,6 +1962,9 @@ export async function listLatestDosedAtByPeptideOnLocalDay(userId, profileId, ym
  * @returns {Promise<{ dosedAt: string | null, error: Error | null }>}
  */
 export async function getEarliestDosedAtForPeptideIds(userId, profileId, peptideIds) {
+  if (E2E_MOCK_SUPABASE) {
+    return { dosedAt: null, error: null };
+  }
   const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { dosedAt: null, error: notConfiguredError() };
   if (ids.length === 0) return { dosedAt: null, error: null };
@@ -1673,6 +1983,9 @@ export async function getEarliestDosedAtForPeptideIds(userId, profileId, peptide
 }
 
 export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideIds, startIso, endIso) {
+  if (E2E_MOCK_SUPABASE) {
+    return { doses: [], error: null };
+  }
   const ids = [...new Set((peptideIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };
   if (ids.length === 0) return { doses: [], error: null };
@@ -1698,6 +2011,9 @@ export async function listDoseLogsForPeptideIdsRange(userId, profileId, peptideI
  * @param {string} endIso
  */
 export async function listDoseLogsForVialIdsRange(userId, profileId, vialIds, startIso, endIso) {
+  if (E2E_MOCK_SUPABASE) {
+    return { doses: [], error: null };
+  }
   const ids = [...new Set((vialIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!supabase || !profileId) return { doses: [], error: notConfiguredError() };
   if (ids.length === 0) return { doses: [], error: null };
@@ -1738,6 +2054,9 @@ const DOSE_LOG_UPDATE_KEYS = /** @type {const} */ (["dose_mcg", "dose_count", "d
  * @returns {Promise<{ error: Error | null }>}
  */
 export async function deleteDoseLog(id) {
+  if (E2E_MOCK_SUPABASE) {
+    return { error: null };
+  }
   if (!supabase) return { error: notConfiguredError() };
   const rid = typeof id === "string" ? id.trim() : "";
   if (!rid) return { error: new Error("Missing dose log id.") };
@@ -1774,6 +2093,16 @@ export async function updateDoseLog(id, patch) {
  * @returns {Promise<{ stackRowId: string | null, feedVisible: boolean, error: Error | null }>}
  */
 export async function getUserStackRowId(userId, profileId) {
+  if (E2E_MOCK_SUPABASE) {
+    if (!userId || !profileId) return { stackRowId: null, feedVisible: false, error: null };
+    const stacks = readMockStacks();
+    const row = stacks[profileId] && typeof stacks[profileId] === "object" ? stacks[profileId] : null;
+    return {
+      stackRowId: row ? MOCK_STACK_ROW_ID : null,
+      feedVisible: Boolean(row?.feedVisible),
+      error: null,
+    };
+  }
   if (!supabase || !userId || !profileId)
     return { stackRowId: null, feedVisible: false, error: notConfiguredError() };
   const { data, error } = await supabase

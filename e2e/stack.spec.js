@@ -8,7 +8,7 @@ test.describe("stack builder", () => {
 
   test.beforeEach(async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await page.getByText("STACK BUILDER", { exact: true }).click();
+    await page.getByRole("button", { name: /stack builder/i }).click();
   });
 
   test("stack builder tab loads for authenticated user", async ({ page }) => {

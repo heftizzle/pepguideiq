@@ -8,7 +8,7 @@ test.describe("catalog (library)", () => {
 
   test.beforeEach(async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await page.getByText("LIBRARY", { exact: true }).click();
+    await page.getByRole("button", { name: /library/i }).click();
   });
 
   test("catalog renders compound cards", async ({ page }) => {
@@ -16,10 +16,16 @@ test.describe("catalog (library)", () => {
   });
 
   test("search filters the compound list", async ({ page }) => {
+    const openSearchButton = page.getByRole("button", { name: /open library search/i });
+    if (await openSearchButton.isVisible({ timeout: 1_500 }).catch(() => false)) {
+      await openSearchButton.click();
+    }
+
     const searchInput = page
       .getByPlaceholder(/search/i)
       .or(page.getByRole("searchbox"))
       .first();
+    await expect(searchInput).toBeVisible({ timeout: 5_000 });
     await searchInput.fill("BPC");
     await expect(page.getByText(/BPC/i).first()).toBeVisible();
   });

@@ -52,6 +52,13 @@ test.describe("session token freshness", () => {
 
   test("Worker call carries a valid fresh JWT after login", async ({ page }) => {
     await loginUser(page, MAIN_EMAIL, MAIN_PASSWORD);
+    const usingMockSupabase = await page.evaluate(() =>
+      Boolean(window.localStorage.getItem("pepv.e2eMockSupabase.auth"))
+    );
+    test.skip(
+      usingMockSupabase,
+      "Mock Supabase mode does not exercise Worker-backed JWT propagation."
+    );
 
     // Capture Bearer tokens from any Worker request — matches both local Vite
     // proxy (/api-worker → 127.0.0.1:8787) and production Worker URLs.
@@ -69,7 +76,7 @@ test.describe("session token freshness", () => {
     });
 
     // Navigate to Vial Tracker — fires a Worker call on load.
-    await page.getByText("VIAL TRACKER", { exact: true }).click();
+    await page.getByRole("button", { name: /vial tracker/i }).click();
     await page.waitForTimeout(2_000);
 
     // Mandatory: at least one Worker request must have fired so the JWT check
