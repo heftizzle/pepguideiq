@@ -2110,7 +2110,12 @@ async function handleDeleteAccount(request, env, cors) {
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     log(env, "error", "admin_delete_user_failed", { status: res.status, body: String(t).slice(0, 240) });
-    return jsonResponse({ error: "Could not delete account" }, 502, cors);
+    // TEMP: expose Supabase body slice for debugging delete failures — remove or strip in prod once fixed.
+    return jsonResponse(
+      { error: "Could not delete account", detail: String(t).slice(0, 200) },
+      502,
+      cors
+    );
   }
   return jsonResponse({ success: true }, 200, cors);
 }
