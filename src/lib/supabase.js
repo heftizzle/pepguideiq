@@ -1067,9 +1067,7 @@ export async function deleteAccountViaWorker() {
     let msg = "Could not delete account";
     try {
       const j = await res.json();
-      if (j && typeof j.error === "string" && j.error.trim()) msg = j.error.trim();
-      const d = j && typeof j.detail === "string" ? j.detail.trim() : "";
-      if (d) msg = `${msg}: ${d}`;
+      if (j && typeof j.error === "string") msg = j.error;
     } catch {
       /* ignore */
     }

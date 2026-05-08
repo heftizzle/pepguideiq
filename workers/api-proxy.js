@@ -2099,23 +2099,19 @@ async function handleDeleteAccount(request, env, cors) {
     await deleteUserR2Prefix(env, bucket, userId);
   }
 
-  const delUrl = `${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`;
-  const res = await fetch(delUrl, {
-    method: "DELETE",
+  const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/delete_user_account`, {
+    method: "POST",
     headers: {
       apikey: serviceKey,
       Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({ p_user_id: userId }),
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    log(env, "error", "admin_delete_user_failed", { status: res.status, body: String(t).slice(0, 240) });
-    // TEMP: expose Supabase body slice for debugging delete failures — remove or strip in prod once fixed.
-    return jsonResponse(
-      { error: "Could not delete account", detail: String(t).slice(0, 200) },
-      502,
-      cors
-    );
+  if (!rpcRes.ok) {
+    const t = await rpcRes.text().catch(() => "");
+    log(env, "error", "rpc_delete_user_failed", { status: rpcRes.status, body: String(t).slice(0, 240) });
+    return jsonResponse({ error: "Could not delete account" }, 502, cors);
   }
   return jsonResponse({ success: true }, 200, cors);
 }
