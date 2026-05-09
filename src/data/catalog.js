@@ -180,4 +180,5 @@ export const PLANS = PLAN_CONFIG.map((plan) => ({
   ...plan,
   label: TIERS[plan.id]?.name ?? TIERS.entry.name,
   price: formatPrice(plan.id),
+  emoji: TIERS[plan.id]?.emoji ?? "",
 }));

@@ -100,7 +100,6 @@ function PricingPage() {
       >
         {rows.map((row) => {
           const emoji = row.emoji;
-          const isGoat = row.id === "goat";
           const borderColor = row.id === "entry" ? "var(--color-border-tab)" : row.color;
           return (
             <article
@@ -116,12 +115,26 @@ function PricingPage() {
                   row.id === "pro" ? "0 0 0 1px var(--color-accent-subtle-22), 0 12px 40px #0006" : "0 8px 32px #0005",
               }}
             >
-              {/* FIX: was {emoji} {row.name} inline at 13px — now prominent centered emoji matching UpgradePlanModal treatment */}
-              <div style={{ textAlign: "center", marginBottom: 10 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                  gap: 0,
+                  marginBottom: 10,
+                }}
+              >
                 <span
                   className="pepv-emoji"
-                  style={{ fontSize: isGoat ? 48 : 36, lineHeight: 1, display: "block", marginBottom: 6 }}
                   aria-hidden
+                  style={{
+                    fontSize: 30,
+                    lineHeight: 1,
+                    display: "inline-block",
+                    marginRight: 8,
+                    flexShrink: 0,
+                  }}
                 >
                   {emoji}
                 </span>

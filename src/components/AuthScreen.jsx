@@ -801,16 +801,40 @@ export function AuthScreen({ onAuth }) {
                 </div>
               )}
               <div
-                className="brand"
                 style={{
-                  fontWeight: 800,
-                  fontSize: 15,
-                  color: plan.color,
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
                   marginBottom: 4,
                   marginTop: plan.popular ? 8 : 0,
+                  gap: 0,
                 }}
               >
-                {plan.label}
+                {plan.emoji ? (
+                  <span
+                    className="pepv-emoji"
+                    aria-hidden
+                    style={{
+                      fontSize: 30,
+                      lineHeight: 1,
+                      display: "inline-block",
+                      marginRight: 8,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {plan.emoji}
+                  </span>
+                ) : null}
+                <div
+                  className="brand"
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 15,
+                    color: plan.color,
+                  }}
+                >
+                  {plan.label}
+                </div>
               </div>
               <div style={{ marginBottom: 14 }}>
                 {priceDisplay.strike ? (

@@ -429,20 +429,40 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
         ) : null}
 
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <span className="pepv-emoji" style={{ fontSize: isGoat ? 48 : 36, lineHeight: 1 }} aria-hidden>
-            {emoji}
-          </span>
           <div
-            className="brand"
             style={{
-              fontSize: 14,
-              fontWeight: 800,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: accent,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              gap: 0,
             }}
           >
-            {row.name}
+            <span
+              className="pepv-emoji"
+              aria-hidden
+              style={{
+                fontSize: 30,
+                lineHeight: 1,
+                display: "inline-block",
+                marginRight: 8,
+                flexShrink: 0,
+              }}
+            >
+              {emoji}
+            </span>
+            <div
+              className="brand"
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: accent,
+              }}
+            >
+              {row.name}
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
             <span
