@@ -77,7 +77,7 @@ function PricingPage() {
           style={{
             margin: 0,
             fontSize: 15,
-            color: "#8b9cb3",
+            color: "var(--color-text-secondary)",
             maxWidth: 520,
             marginLeft: "auto",
             marginRight: "auto",
@@ -150,7 +150,7 @@ function PricingPage() {
                   {row.name}
                 </div>
               </div>
-              <div className="brand" style={{ fontSize: 28, fontWeight: 800, color: "#f1f5f9", marginBottom: 8, textAlign: "center" }}>
+              <div className="brand" style={{ fontSize: 28, fontWeight: 800, color: "var(--color-text-primary)", marginBottom: 8, textAlign: "center" }}>
                 {row.priceLabel}
               </div>
               <p
@@ -158,7 +158,7 @@ function PricingPage() {
                   margin: "0 0 10px",
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "#cbd5e1",
+                  color: "var(--color-text-secondary)",
                   lineHeight: 1.4,
                   fontFamily: "'Outfit',sans-serif",
                 }}
@@ -169,7 +169,7 @@ function PricingPage() {
                 style={{
                   margin: "0 0 18px",
                   fontSize: 13,
-                  color: "#64748b",
+                  color: "var(--color-text-muted)",
                   lineHeight: 1.5,
                   flex: 1,
                   fontFamily: "'Outfit',sans-serif",

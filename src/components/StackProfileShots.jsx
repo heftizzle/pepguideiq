@@ -178,7 +178,7 @@ function StackShotHeroSlot({ kind, r2Key, workerConfigured, canMutate, onUpgrade
         className="mono"
         style={{
           fontSize: 11,
-          color: "#7a8694",
+          color: "var(--color-text-secondary)",
           textAlign: "center",
           letterSpacing: "0.06em",
           lineHeight: 1.35,

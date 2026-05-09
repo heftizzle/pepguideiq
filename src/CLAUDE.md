@@ -94,6 +94,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 - Inline `style={{...}}` objects.
 - Global classes in `components/GlobalStyles.jsx`: `brand` (display font), `mono` (mono font), `btn-red`, `btn-teal`, `form-input`, `scard` (saved stack card), `pcard` (peptide card), `pill--category`, `search-input`.
 - Category colors come from `CAT_COLORS` in `src/data/catalog.js`. Use `getCategoryCssVars(cat)` to set `--cc` and `--cc-rgb` CSS custom properties on a container for downstream `.pcard` / `.pill--category` to read.
+- Z-index scale: src/lib/zIndex.js — consult before adding any new overlay. Use Z.nearestLayer + 1 rather than a new magic number.
 
 ## Storage keys (don't collide)
 

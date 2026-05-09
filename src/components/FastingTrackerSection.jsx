@@ -222,7 +222,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
         </div>
       ) : active ? (
         <>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#f1f5f9", marginBottom: 6 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 6 }}>
             {fastTypeLabel(active.fast_type)}
           </div>
           <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 4 }}>

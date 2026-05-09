@@ -1901,7 +1901,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </div>
                         <span className="pill pill--category">{categoryBadgeLabel}</span>
                       </div>
-                      <div className="pcard-summary" style={{ fontSize: 13, color: "#7891af", marginBottom: 8, lineHeight: 1.55 }}>
+                      <div className="pcard-summary" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 8, lineHeight: 1.55 }}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
                           {p.mechanism}
                         </ReactMarkdown>
@@ -2614,7 +2614,26 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     <div style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "right", marginTop: 4 }}>
                       {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
                       {aiQueryUsage.today >= aiQueryUsage.limit && (
-                        <span style={{ color: "#f97316", marginLeft: 8 }}>· Limit reached</span>
+                        <span style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ color: "var(--color-warning)", fontWeight: 700 }}>· Limit reached</span>
+                          <button
+                            type="button"
+                            onClick={() => openUpgradeModal("ai_guide")}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              color: "var(--color-accent)",
+                              fontWeight: 600,
+                              fontSize: "inherit",
+                              textDecoration: "underline",
+                              lineHeight: "inherit",
+                            }}
+                          >
+                            Upgrade for more
+                          </button>
+                        </span>
                       )}
                     </div>
                   )}

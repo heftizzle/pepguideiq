@@ -1005,7 +1005,7 @@ function DoseHistoryCalendar({
               return (
                 <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none" }}>
                   {typeof onDeleteDoseLog === "function" && typeof log.id === "string" && log.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "1px 4px", borderRadius: 4, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
                   ) : null}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="mono" style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
@@ -1257,11 +1257,11 @@ function VialRow({
             </div>
             <div style={{ textAlign: "right", minWidth: 120 }}>
           {expired ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7280", textDecoration: "line-through" }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)", textDecoration: "line-through" }}>
               EXPIRED
             </div>
           ) : depleted ? (
-            <div className="mono" style={{ fontSize: 13, color: "#6b7280" }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
               Depleted
             </div>
           ) : (
@@ -1572,7 +1572,7 @@ function VialRow({
               {doses.map((d) => (
                 <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                   {canMutate && typeof onDeleteDoseLog === "function" && typeof d.id === "string" && d.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "1px 4px", borderRadius: 4, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
                   ) : null}
                   <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
                     {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry)}

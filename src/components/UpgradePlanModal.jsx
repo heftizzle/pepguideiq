@@ -44,7 +44,7 @@ function neutralDisabledCtaStyle() {
     cursor: "default",
     borderRadius: 10,
     border: "1px solid #334155",
-    color: "#64748b",
+    color: "var(--color-text-muted)",
     background: "rgba(15, 23, 42, 0.45)",
   };
 }

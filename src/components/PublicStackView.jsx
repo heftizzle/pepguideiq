@@ -91,7 +91,7 @@ export function PublicStackView({ shareId }) {
               borderRadius: 12,
               border: "1px solid #f59e0b55",
               background: "#1a0f00",
-              color: "#fcd34d",
+              color: "var(--color-warning)",
               fontSize: 14,
             }}
           >

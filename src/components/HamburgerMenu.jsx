@@ -199,6 +199,7 @@ export function HamburgerMenu({
               className="pepv-hamburger-drawer__close"
               onClose={() => setOpen(false)}
               ariaLabel="Close menu"
+              style={{ fontSize: 16 }}
             />
           </div>
 
