@@ -6,6 +6,7 @@ import { HandleSetup } from "./components/HandleSetup.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
 import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
+import { CloseButton } from "./components/ui/CloseButton.jsx";
 import { LibraryMobileSearchIcon, LibraryMobileSearchPanel } from "./components/LibraryMobileSearch.jsx";
 import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
@@ -2350,18 +2351,13 @@ function PepGuideIQMainTree({ mainUiRef }) {
             onClick={onGuideTakeoverRootClick}
             onAnimationEnd={handleGuideTakeoverAnimationEnd}
           >
-            <button
-              type="button"
+            <CloseButton
               className="guide-takeover-close"
-              aria-label="Close AI Atlas"
+              ariaLabel="Close AI Atlas"
               style={{ zIndex: 72 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                beginCloseGuide();
-              }}
-            >
-              ×
-            </button>
+              stopPropagationOnClick
+              onClose={beginCloseGuide}
+            />
             <div className="guide-takeover-panel-wrap" onClick={(e) => e.stopPropagation()}>
               <div
                 style={{
@@ -2661,9 +2657,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   )}
                   <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:3 }}>{p.aliases.join(" · ")}</div>
                 </div>
-                <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span className="pill pill--category">{pCat}</span>
-                  <button type="button" style={{ background:"none",border:"none",color:"var(--color-text-secondary)",cursor:"pointer",fontSize:20,lineHeight:1 }} onClick={() => setSelPeptide(null)} aria-label="Close">×</button>
                 </div>
               </div>
               {[

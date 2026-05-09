@@ -68,7 +68,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 <AgeGate onConfirm onExit />
 <AddToStackForm peptide onCancel onSave={({dose, frequency, notes}) => …} />
 <SavedStackEntryRow item catColor catLabel onUpdate onRemove />
-<Modal onClose children maxWidth={580} label="Dialog" variant="default" />
+<Modal onClose children maxWidth={580} label="Dialog" variant="default" showCloseButton />
 <PostDoseNetworkSheet open compoundName previewLine busy postError onPost onKeepPrivate />
 <DoseToast message onDismiss />
 <TutorialBar />  <TutorialHelpButton />

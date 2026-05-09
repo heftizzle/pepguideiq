@@ -14,6 +14,7 @@ import { MemberProfileSocialIconRow } from "./MemberProfileSocialIcons.jsx";
 import { PublicProfileFastingBlock } from "./PublicProfileFastingBlock.jsx";
 import FollowersModal from "./FollowersModal.jsx";
 import PublicProfilePhotoGrid from "./PublicProfilePhotoGrid.jsx";
+import { CloseButton } from "./ui/CloseButton.jsx";
 import { TIERS, tierAccentCssVar } from "../lib/tiers.js";
 
 function tierEmoji(t) {
@@ -280,15 +281,7 @@ export function PublicMemberProfilePage({
         position: "relative",
       }}
     >
-      <button
-        type="button"
-        className="guide-takeover-close"
-        style={{ zIndex: 72 }}
-        onClick={onClose}
-        aria-label="Close profile"
-      >
-        ×
-      </button>
+      <CloseButton className="guide-takeover-close" onClose={onClose} ariaLabel="Close profile" style={{ zIndex: 72 }} />
 
       <div className="brand" style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
         <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ

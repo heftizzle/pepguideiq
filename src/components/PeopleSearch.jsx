@@ -11,6 +11,7 @@ import {
 } from "../lib/follows.js";
 import { resolveMemberAvatarDisplayUrl, resolveMemberAvatarDisplayUrlFromKey } from "../lib/memberAvatarUrl.js";
 import { fetchSuggestedProfiles } from "../lib/supabase.js";
+import { CloseButton } from "./ui/CloseButton.jsx";
 
 /** Match App.jsx fixed bottom nav band so overlay leaves it visible and tappable. */
 const PEOPLE_SEARCH_NAV_RESERVE_PX = "calc(80px + env(safe-area-inset-bottom, 0px))";
@@ -249,15 +250,7 @@ export function PeopleSearch({ activeProfileId, workerUrl, accessToken, onClose,
         boxSizing: "border-box",
       }}
     >
-      <button
-        type="button"
-        className="guide-takeover-close"
-        onClick={handleClose}
-        aria-label="Close"
-        style={{ zIndex: 72 }}
-      >
-        ×
-      </button>
+      <CloseButton className="guide-takeover-close" onClose={handleClose} ariaLabel="Close" style={{ zIndex: 72 }} />
 
       <div
         style={{

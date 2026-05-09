@@ -146,26 +146,8 @@ export function ArchivedVialsModal({ isOpen, onClose, userId, profileId, onChang
 
   return (
     <Modal onClose={onClose} label="Archived Vials" maxWidth={640}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-        <div className="brand" style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)" }}>
-          Archived Vials
-        </div>
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          style={{
-            border: "none",
-            background: "transparent",
-            color: "var(--color-text-secondary)",
-            fontSize: 22,
-            lineHeight: 1,
-            cursor: "pointer",
-            padding: 4,
-          }}
-        >
-          ×
-        </button>
+      <div className="brand" style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-primary)", marginBottom: 16 }}>
+        Archived Vials
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>

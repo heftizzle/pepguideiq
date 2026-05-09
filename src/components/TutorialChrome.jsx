@@ -2,17 +2,11 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NETWORK_TAB_EMOJI, TUTORIAL_TARGET, useTutorial } from "../context/TutorialContext.jsx";
 import SupportModal from "./SupportModal.jsx";
+import { CloseButton } from "./ui/CloseButton.jsx";
 
 const BOTTOM_NAV_OFFSET = "calc(64px + env(safe-area-inset-bottom, 0px))";
 const HELP_MENU_MIN_W = 220;
 const HELP_MENU_MAX_W = 280;
-const hit44 = {
-  minWidth: 44,
-  minHeight: 44,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
 
 const HELP_MENU_ROW = {
   display: "flex",
@@ -303,7 +297,7 @@ export function TutorialBar() {
                     marginBottom: 8,
                   }}
                 >
-                  {forced ? "Tap Next to follow along." : "Tap Next to follow along, or × to explore on your own"}
+                  {forced ? "Tap Next to follow along." : "Tap Next to follow along, or ✕ to explore on your own"}
                 </div>
                 <div style={{ fontSize: 14, color: "var(--color-text-primary)", lineHeight: 1.45 }}>{label}</div>
               </div>
@@ -312,25 +306,17 @@ export function TutorialBar() {
             )}
           </div>
           {!forced ? (
-            <button
-              type="button"
-              aria-label="Dismiss tutorial bar"
-              onClick={() => dismissBar()}
+            <CloseButton
+              variant="toolbar"
+              ariaLabel="Dismiss tutorial bar"
+              onClose={() => dismissBar()}
               style={{
                 flexShrink: 0,
-                ...hit44,
-                padding: 0,
                 borderRadius: 10,
                 border: "1px solid var(--color-border-emphasis)",
                 background: "rgba(255,255,255,0.04)",
-                color: "var(--color-text-secondary)",
-                cursor: "pointer",
-                fontSize: 20,
-                lineHeight: 1,
               }}
-            >
-              ×
-            </button>
+            />
           ) : null}
         </div>
         {flowKey && total > 0 && (

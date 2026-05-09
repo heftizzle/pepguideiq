@@ -9,6 +9,7 @@ import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { createMemberProfileViaWorker } from "../lib/supabase.js";
 import { getTier, tierAccentCssVar } from "../lib/tiers.js";
 import { ThemeToggle } from "./ThemeToggle.jsx";
+import { CloseButton } from "./ui/CloseButton.jsx";
 
 function initialLetter(displayName) {
   const s = String(displayName || "").trim();
@@ -194,14 +195,11 @@ export function HamburgerMenu({
                 )}
               </div>
             </div>
-            <button
-              type="button"
+            <CloseButton
               className="pepv-hamburger-drawer__close"
-              onClick={() => setOpen(false)}
-              aria-label="Close menu"
-            >
-              ×
-            </button>
+              onClose={() => setOpen(false)}
+              ariaLabel="Close menu"
+            />
           </div>
 
           <div className="pepv-hamburger-drawer__scroll">

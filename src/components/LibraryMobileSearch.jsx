@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PEPTIDES } from "../data/catalog.js";
+import { CloseButton } from "./ui/CloseButton.jsx";
 
 /**
  * @param {string} text
@@ -188,28 +189,7 @@ export function LibraryMobileSearchPanel({ initialSearch = "", onDismiss, setSea
             margin: 0,
           }}
         />
-        <button
-          type="button"
-          aria-label="Close search"
-          onClick={onDismiss}
-          style={{
-            minWidth: 44,
-            minHeight: 44,
-            flexShrink: 0,
-            borderRadius: 10,
-            border: "1px solid var(--color-border-emphasis)",
-            background: "var(--color-bg-hover)",
-            color: "var(--color-text-secondary)",
-            cursor: "pointer",
-            fontSize: 20,
-            lineHeight: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          ×
-        </button>
+        <CloseButton variant="toolbar" ariaLabel="Close search" onClose={onDismiss} style={{ flexShrink: 0 }} />
       </div>
 
       {showDropdown && (

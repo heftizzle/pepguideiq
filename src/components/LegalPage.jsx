@@ -66,6 +66,18 @@ function scrollToHash() {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function handleBack() {
+  try {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = "/";
+    }
+  } catch {
+    window.location.href = "/";
+  }
+}
+
 export function LegalPage() {
   useEffect(() => {
     scrollToHash();
@@ -79,6 +91,25 @@ export function LegalPage() {
         html { scroll-padding-top: 64px; }
       `}</style>
       <div style={INNER}>
+        <button
+          type="button"
+          onClick={handleBack}
+          style={{
+            display: "block",
+            marginBottom: 16,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+            color: "var(--color-accent)",
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          Back to pepguideIQ
+        </button>
         <nav aria-label="Legal sections" style={STICKY_NAV}>
           <a href="#privacy" style={NAV_LINK}>
             Privacy Policy

@@ -69,28 +69,10 @@ export default function LikersModal({ isOpen, onClose, entityType, entityId }) {
 
   return (
     <Modal onClose={onClose} maxWidth={560} label="Likers">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <div style={{ marginBottom: 12 }}>
         <h2 className="brand" style={{ margin: 0, fontSize: 22 }}>
           Liked by
         </h2>
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={onClose}
-          style={{
-            minWidth: 36,
-            minHeight: 36,
-            borderRadius: 10,
-            border: "1px solid var(--color-border-default)",
-            background: "var(--color-bg-hover)",
-            color: "var(--color-text-secondary)",
-            cursor: "pointer",
-            fontSize: 20,
-            lineHeight: 1,
-          }}
-        >
-          ×
-        </button>
       </div>
 
       <div style={{ maxHeight: "62vh", overflowY: "auto", borderTop: "1px solid var(--color-border-default)" }}>

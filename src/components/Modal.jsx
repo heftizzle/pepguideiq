@@ -1,10 +1,25 @@
 import { useEffect, useRef } from "react";
+import { CloseButton } from "./ui/CloseButton.jsx";
 import { useFocusTrap } from "./useFocusTrap.js";
 
 /**
- * @param {{ onClose: () => void; children: import("react").ReactNode; maxWidth?: number; label?: string; variant?: "default" | "sheet" }} props
+ * @param {{
+ *   onClose: () => void;
+ *   children: import("react").ReactNode;
+ *   maxWidth?: number;
+ *   label?: string;
+ *   variant?: "default" | "sheet";
+ *   showCloseButton?: boolean;
+ * }} props
  */
-export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", variant = "default" }) {
+export function Modal({
+  onClose,
+  children,
+  maxWidth = 580,
+  label = "Dialog",
+  variant = "default",
+  showCloseButton = true,
+}) {
   const ref = useRef(null);
   useFocusTrap(ref, true);
 
@@ -46,6 +61,7 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", var
         onClick={(e) => e.stopPropagation()}
         className={isSheet ? "modal-panel modal-panel--sheet" : "modal-panel"}
         style={{
+          position: "relative",
           background: "var(--color-bg-card)",
           border: "1px solid var(--color-border-strong)",
           borderRadius: 12,
@@ -57,7 +73,15 @@ export function Modal({ onClose, children, maxWidth = 580, label = "Dialog", var
           boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
         }}
       >
-        {children}
+        {showCloseButton ? (
+          <CloseButton
+            onClose={onClose}
+            ariaLabel="Close"
+            variant="modal-accent"
+            style={{ position: "absolute", top: 14, right: 14, zIndex: 1 }}
+          />
+        ) : null}
+        <div style={showCloseButton ? { paddingInlineEnd: 44 } : undefined}>{children}</div>
       </div>
     </div>
   );

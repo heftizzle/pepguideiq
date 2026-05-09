@@ -11,6 +11,7 @@ import CommentsSection from "./Comments/CommentsSection.jsx";
 import PostMenuButton from "./Posts/PostMenuButton.jsx";
 import { dispatchDeferredDelete } from "./DeleteUndoToast.jsx";
 import { HashtagText } from "./HashtagText.jsx";
+import { CloseButton } from "./ui/CloseButton.jsx";
 
 /**
  * Instagram-style photo wall of `public.posts` rows where `visible_profile = true`.
@@ -20,7 +21,7 @@ import { HashtagText } from "./HashtagText.jsx";
  *
  * Grid cells show photos only. Tap a cell to open a full-screen lightbox which
  * surfaces likes (goal-emoji LikeButton + LikersRow), the post's caption, and
- * a relative timestamp below the image. Close via backdrop tap, × button, or Escape.
+ * a relative timestamp below the image. Close via backdrop tap, ✕ button, or Escape.
  *
  * Active-profile context is null-safe: `/profile/:handle` does NOT mount a
  * ProfileProvider (only ThemeProvider), so anon viewers see LikersRow read-only
@@ -309,31 +310,26 @@ export default function PublicProfilePhotoGrid({
               padding: 16,
             }}
           >
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeLightbox();
-              }}
-              aria-label="Close"
+            <CloseButton
+              variant="floating"
+              ariaLabel="Close"
+              stopPropagationOnClick
+              onClose={closeLightbox}
               style={{
                 position: "fixed",
                 top: "max(16px, env(safe-area-inset-top))",
                 right: 16,
+                zIndex: 9001,
                 width: 40,
                 height: 40,
-                borderRadius: "50%",
+                minWidth: 40,
+                minHeight: 40,
                 border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.35)" : "rgba(0, 0, 0, 0.25)"}`,
                 background: isDark ? "rgba(0, 0, 0, 0.55)" : "rgba(255, 255, 255, 0.85)",
-                color: "var(--color-text-primary)",
                 fontSize: 22,
-                lineHeight: 1,
-                cursor: "pointer",
-                zIndex: 9001,
+                boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.45)" : "0 4px 20px rgba(0,0,0,0.12)",
               }}
-            >
-              ×
-            </button>
+            />
             {currentUserId && ownerUserId && currentUserId === ownerUserId ? (
               <div
                 onClick={(e) => e.stopPropagation()}

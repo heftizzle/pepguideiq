@@ -1359,8 +1359,25 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
                   >
                     {on ? "Connected" : "Disconnected"}
                   </span>
-                  <button type="button" className="btn-teal" style={{ fontSize: 13, padding: "4px 10px", opacity: 0.45 }} disabled>
-                    Connect
+                  <button
+                    type="button"
+                    disabled={true}
+                    aria-disabled={true}
+                    style={{
+                      fontSize: 13,
+                      padding: "4px 10px",
+                      opacity: 0.6,
+                      cursor: "not-allowed",
+                      background: "var(--color-accent-subtle-14)",
+                      border: "1px solid var(--color-accent)",
+                      color: "var(--color-accent)",
+                      borderRadius: 7,
+                      fontFamily: "'Outfit', sans-serif",
+                      fontWeight: 500,
+                      minHeight: "auto",
+                    }}
+                  >
+                    Coming Soon
                   </button>
                 </div>
               </div>
@@ -1592,7 +1609,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       </Card>
 
       {showCancelSubModal && (
-        <Modal onClose={closeCancelSubModal} maxWidth={480} label="Cancel subscription">
+        <Modal onClose={closeCancelSubModal} maxWidth={480} label="Cancel subscription" showCloseButton={false}>
           {cancelSubPhase === "success" ? (
             <>
               <p style={{ fontSize: 15, color: "var(--color-text-primary)", lineHeight: 1.55, marginBottom: 20 }}>
@@ -1684,7 +1701,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
       )}
 
       {showDeleteProfile && (
-        <Modal onClose={() => setShowDeleteProfile(false)} maxWidth={420} label="Delete profile">
+        <Modal onClose={() => setShowDeleteProfile(false)} maxWidth={420} label="Delete profile" showCloseButton={false}>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
             Delete <strong style={{ color: "var(--color-text-primary)" }}>{activeProfile?.display_name ?? "this profile"}</strong>? This removes its
             stack, vials, dose logs, and body metrics tied to this profile. Your account and other profiles stay intact.
@@ -1721,6 +1738,7 @@ export function SettingsTab({ user, setUser, onOpenUpgrade, onSignOut, onBack })
           }}
           maxWidth={420}
           label="Delete account"
+          showCloseButton={false}
         >
           <h2
             data-testid="delete-modal-title"

@@ -494,21 +494,13 @@ export function UpgradePlanModal({ onClose, user, upgradeFocusTier, setUser, gat
 
   return (
     <Modal onClose={onClose} maxWidth={1120} label="Plans and pricing" variant="sheet">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 12 }}>
-        <div>
-          <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>Choose your plan</div>
-          <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
-            Compare tiers — upgrade anytime. Cancel anytime.
-          </div>
+      <div style={{ marginBottom: 18 }}>
+        <div className="brand" style={{ fontSize: 18, fontWeight: 700 }}>
+          Choose your plan
         </div>
-        <button
-          type="button"
-          style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 22, lineHeight: 1, flexShrink: 0 }}
-          onClick={onClose}
-          aria-label="Close"
-        >
-          ×
-        </button>
+        <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
+          Compare tiers — upgrade anytime. Cancel anytime.
+        </div>
       </div>
 
       {subscriptionError ? (
