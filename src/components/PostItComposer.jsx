@@ -903,7 +903,7 @@ export function PostItComposer({ open, activeProfileId, displayName, onClose, on
             <div
               style={{
                 fontSize: 12,
-                color: "#f87171",
+                color: "var(--color-danger)",
                 textAlign: "center",
                 marginBottom: 12,
                 fontFamily: "'Outfit', sans-serif",

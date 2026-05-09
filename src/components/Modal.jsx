@@ -81,7 +81,7 @@ export function Modal({
             style={{ position: "absolute", top: 14, right: 14, zIndex: 1 }}
           />
         ) : null}
-        <div style={showCloseButton ? { paddingInlineEnd: 44 } : undefined}>{children}</div>
+        <div style={showCloseButton ? { paddingInlineEnd: 36 } : undefined}>{children}</div>
       </div>
     </div>
   );

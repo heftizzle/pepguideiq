@@ -805,7 +805,7 @@ export function BuildTab({
                     </div>
                     <span className="pill pill--category">{cat0}</span>
                   </div>
-                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
                     <button
                       type="button"
                       className="form-input"
@@ -829,11 +829,25 @@ export function BuildTab({
                     <button
                       type="button"
                       className="btn-red"
-                      style={{ padding: "4px 10px", fontSize: 13 }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        minWidth: 36,
+                        minHeight: 36,
+                        boxSizing: "border-box",
+                        padding: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        lineHeight: 1,
+                        fontSize: 16,
+                        alignSelf: "center",
+                        cursor: "pointer",
+                      }}
                       aria-label="Remove"
                       onClick={() => removeRow(row.key)}
                     >
-                      ×
+                      ✕
                     </button>
                   </div>
                 </div>
@@ -936,7 +950,7 @@ export function BuildTab({
               </div>
             </>
           ) : advisorError && !advisorData ? (
-            <p style={{ fontSize: 13, color: "#f87171", lineHeight: 1.55, margin: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--color-danger)", lineHeight: 1.55, margin: 0 }}>
               {advisorError}
             </p>
           ) : advisorData ? (

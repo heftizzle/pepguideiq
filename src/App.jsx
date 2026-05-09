@@ -1924,7 +1924,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                                 title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
                               >
                                 {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                                <span style={{ color: ba.warn ? "#fbbf24" : "var(--color-text-secondary)" }}>Bioavailability: </span>
+                                <span style={{ color: ba.warn ? "var(--color-warning)" : "var(--color-text-secondary)" }}>Bioavailability: </span>
                                 {ba.text}
                               </div>
                             );
@@ -2124,8 +2124,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       }}>
                       Analyze with AI →
                     </button>
-                    <div style={{ marginTop: 10, fontSize: 13, color: "#cbd5e1" }}>
-                      <span style={{ color: "#fbbf24" }}>⚠ </span>Review injection schedules for timing conflicts. Consult your physician.
+                    <div style={{ marginTop: 10, fontSize: 13, color: "var(--color-text-secondary)" }}>
+                      <span style={{ color: "var(--color-warning)" }}>⚠ </span>Review injection schedules for timing conflicts. Consult your physician.
                     </div>
                   </div>
                 </div>
@@ -2682,7 +2682,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
                 >
                   {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                  <span style={{ color: baDetail.warn ? "#fbbf24" : "var(--color-text-secondary)" }}>Bioavailability: </span>
+                  <span style={{ color: baDetail.warn ? "var(--color-warning)" : "var(--color-text-secondary)" }}>Bioavailability: </span>
                   {baDetail.text}
                 </div>
               )}

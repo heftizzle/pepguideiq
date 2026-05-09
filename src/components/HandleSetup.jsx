@@ -255,10 +255,10 @@ export function HandleSetup({ activeProfileId, patchMemberProfileLocal, onComple
               <span>Checking…</span>
             ) : avail === "available" ? (
               <>
-                <span style={{ color: "#22c55e", fontSize: 16 }} aria-hidden>
+                <span style={{ color: "var(--color-text-success)", fontSize: 16 }} aria-hidden>
                   ✓
                 </span>
-                <span style={{ color: "#22c55e" }}>Available</span>
+                <span style={{ color: "var(--color-text-success)" }}>Available</span>
               </>
             ) : avail === "taken" ? (
               <>

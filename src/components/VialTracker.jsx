@@ -509,7 +509,7 @@ function urgencyFromLifeRemaining(remainingFrac) {
       barColor: "var(--color-warning)",
       badgeBg: "rgba(245, 158, 11, 0.18)",
       badgeBorder: "rgba(245, 158, 11, 0.45)",
-      badgeText: "#fcd34d",
+      badgeText: "var(--color-warning)",
     };
   }
   return {
@@ -1005,7 +1005,7 @@ function DoseHistoryCalendar({
               return (
                 <div key={log.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: i > 0 ? "1px solid var(--color-border-hairline)" : "none" }}>
                   {typeof onDeleteDoseLog === "function" && typeof log.id === "string" && log.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(log.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
                   ) : null}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="mono" style={{ fontSize: 13, color: "var(--color-text-primary)", marginBottom: meta ? 4 : 0 }}>{name}</div>
@@ -1535,7 +1535,7 @@ function VialRow({
                       ) : null}
                     </div>
                   ) : null}
-                  {recipeErr ? <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{recipeErr}</div> : null}
+                  {recipeErr ? <div style={{ fontSize: 12, color: "var(--color-danger)", marginBottom: 8 }}>{recipeErr}</div> : null}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -1572,7 +1572,7 @@ function VialRow({
               {doses.map((d) => (
                 <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
                   {canMutate && typeof onDeleteDoseLog === "function" && typeof d.id === "string" && d.id.trim() ? (
-                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "#f87171", lineHeight: 1 }}>✕</button>
+                    <button type="button" aria-label="Delete dose log" onClick={() => void onDeleteDoseLog(d.id.trim())} style={{ flexShrink: 0, fontSize: 12, padding: "2px 6px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--color-border-default)", background: "transparent", color: "var(--color-danger)", lineHeight: 1 }}>✕</button>
                   ) : null}
                   <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
                     {formatShortDate(d.dosed_at)} — {formatDoseLogLine(d, vial, catalogBlendComponents, catalogBlendBacRefMl, catalogEntry)}

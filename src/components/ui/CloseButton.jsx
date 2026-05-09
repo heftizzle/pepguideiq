@@ -2,7 +2,7 @@
  * CloseButton — unified dismiss affordance for pepguideIQ
  *
  * Variants
- *   modal-accent  Default dialog chrome — bordered ~36 px control (Followers/Likers token set)
+ *   modal-accent  Default dialog chrome — compact bordered control for modal headers
  *   ghost         Transparent / minimal (peptide detail sheet, UpgradePlan)
  *   toolbar       ~44×44 tap target (LibraryMobileSearch chip, TutorialChrome dismiss)
  *   floating      Lightbox circle; caller may pass additional style for isDark edge cases
@@ -31,18 +31,18 @@ const BASE = {
 };
 
 const VARIANTS = {
-  /** Bordered header control — matches existing Followers / Likers / Archived chrome */
+  /** Bordered header control for modal chrome */
   "modal-accent": {
-    width: 36,
-    height: 36,
-    minWidth: 36,
-    minHeight: 36,
-    borderRadius: 10,
-    border: "1px solid var(--color-border-default)",
-    background: "transparent",
+    width: 28,
+    height: 28,
+    minWidth: 28,
+    minHeight: 28,
+    borderRadius: 8,
+    border: "1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent)",
+    background: "color-mix(in srgb, var(--color-text-secondary) 8%, transparent)",
     color: "var(--color-text-secondary)",
-    fontSize: 16,
-    "--hover-bg": "var(--color-bg-hover)",
+    fontSize: 12,
+    "--hover-bg": "color-mix(in srgb, var(--color-text-secondary) 16%, transparent)",
     "--hover-color": "var(--color-text-primary)",
   },
 

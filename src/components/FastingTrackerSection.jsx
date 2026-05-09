@@ -265,7 +265,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
               checked={Boolean(active.public_visible)}
               onChange={(e) => void onTogglePublic(e.target.checked)}
             />
-            <span className="mono" style={{ fontSize: 12, color: "#cbd5e1" }}>
+            <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
               Show active fast on public profile
             </span>
           </label>
@@ -364,7 +364,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer" }}>
             <input type="checkbox" checked={formPublic} onChange={(e) => setFormPublic(e.target.checked)} />
-            <span className="mono" style={{ fontSize: 12, color: "#cbd5e1" }}>
+            <span className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
               Show on public profile when fast starts
             </span>
           </label>
@@ -395,7 +395,7 @@ export function FastingTrackerSection({ userId, activeProfileId, setErr, showSav
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ color: "#cbd5e1" }}>{fastTypeLabel(row.fast_type)}</span>
+                <span style={{ color: "var(--color-text-secondary)" }}>{fastTypeLabel(row.fast_type)}</span>
                 <span style={{ color: "var(--color-text-secondary)" }}>{formatCompletedFastDuration(row.started_at, row.ended_at)}</span>
               </li>
             ))}

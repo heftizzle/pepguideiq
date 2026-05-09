@@ -615,7 +615,7 @@ export function ProtocolTab({
               <div
                 style={{
                   fontSize: 13,
-                  color: "#fbbf24",
+                  color: "var(--color-warning)",
                   lineHeight: 1.55,
                   letterSpacing: "0.03em",
                   whiteSpace: "pre-line",
@@ -920,7 +920,7 @@ function ProtocolTodayDoseLogs({ logs, rowKind, protocolRow, onChanged }) {
                         border: "none",
                         background: "transparent",
                         cursor: "pointer",
-                        color: "#f87171",
+                        color: "var(--color-danger)",
                       }}
                       onClick={() => void handleDelete(log)}
                     >
@@ -1009,7 +1009,7 @@ function ProtocolTodayDoseLogs({ logs, rowKind, protocolRow, onChanged }) {
               value={editing.notes}
               onChange={(e) => setEditing((prev) => (prev ? { ...prev, notes: e.target.value } : prev))}
             />
-            {saveErr ? <div style={{ fontSize: 12, color: "#f87171", marginBottom: 10 }}>{saveErr}</div> : null}
+            {saveErr ? <div style={{ fontSize: 12, color: "var(--color-danger)", marginBottom: 10 }}>{saveErr}</div> : null}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
               <button type="button" className="form-input" disabled={saveBusy} onClick={() => setEditing(null)} style={{ fontSize: 13 }}>
                 Cancel
@@ -1077,7 +1077,7 @@ function ProtocolIntranasalSprayRow({
           className="mono"
           style={{
             fontSize: 13,
-            color: "#fbbf24",
+            color: "var(--color-warning)",
             marginTop: 4,
             marginBottom: 4,
             lineHeight: 1.5,
@@ -1193,7 +1193,7 @@ function ProtocolOralVialRow({
           className="mono"
           style={{
             fontSize: 13,
-            color: "#fbbf24",
+            color: "var(--color-warning)",
             marginTop: 4,
             marginBottom: 4,
             lineHeight: 1.5,
@@ -1301,7 +1301,7 @@ function ProtocolNonInjectableRow({
           className="mono"
           style={{
             fontSize: 13,
-            color: "#fbbf24",
+            color: "var(--color-warning)",
             marginTop: 4,
             marginBottom: 4,
             lineHeight: 1.5,
@@ -1421,7 +1421,7 @@ function ProtocolInjectableRow({
           className="mono"
           style={{
             fontSize: 13,
-            color: "#fbbf24",
+            color: "var(--color-warning)",
             marginTop: 4,
             marginBottom: 4,
             lineHeight: 1.5,

@@ -1184,7 +1184,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             background: "var(--color-bg-elevated)",
           }}
         >
-          <div style={{ fontSize: 13, color: "#fcd34d", lineHeight: 1.55, maxWidth: 420, margin: "0 auto" }}>
+          <div style={{ fontSize: 13, color: "var(--color-warning)", lineHeight: 1.55, maxWidth: 420, margin: "0 auto" }}>
             Live dose activity could not be loaded right now. Try refresh in a moment.
           </div>
         </div>
@@ -1252,7 +1252,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             background: "var(--color-bg-elevated)",
           }}
         >
-          <div style={{ fontSize: 13, color: "#fcd34d", lineHeight: 1.55 }}>
+          <div style={{ fontSize: 13, color: "var(--color-warning)", lineHeight: 1.55 }}>
             Posts could not be loaded right now. Try refresh in a moment.
           </div>
         </div>
@@ -1317,7 +1317,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             background: "var(--color-bg-card)",
           }}
         >
-          <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
+          <div style={{ fontSize: 14, color: "var(--color-warning)", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
             Shared stacks could not be loaded right now. Try refresh in a moment.
           </div>
         </div>
@@ -1384,7 +1384,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
             background: "var(--color-bg-card)",
           }}
         >
-          <div style={{ fontSize: 14, color: "#fcd34d", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
+          <div style={{ fontSize: 14, color: "var(--color-warning)", lineHeight: 1.55, maxWidth: 380, margin: "0 auto" }}>
             Shared vials could not be loaded right now. Try refresh in a moment.
           </div>
         </div>

@@ -123,7 +123,7 @@ export function SavedStackEntryRow({ item, catColor, catLabel, onUpdate, onRemov
                 <div
                   style={{
                     fontSize: 13,
-                    color: "#fbbf24",
+                    color: "var(--color-warning)",
                     lineHeight: 1.5,
                     whiteSpace: "pre-line",
                     marginBottom: 8,

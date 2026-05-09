@@ -3,7 +3,7 @@ import { useEffect } from "react";
 const WRAP = {
   minHeight: "100vh",
   background: "var(--color-bg-page)",
-  color: "#cbd5e1",
+  color: "var(--color-text-secondary)",
   /* Dark static page: keep headings readable when global [data-theme] is light */
   "--color-text-primary": "var(--color-text-primary)",
 };
@@ -55,7 +55,7 @@ const SECTION_HDR = {
 const BODY = {
   fontSize: 15,
   lineHeight: 1.65,
-  color: "#cbd5e1",
+  color: "var(--color-text-secondary)",
   margin: "0 0 14px",
 };
 

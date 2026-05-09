@@ -492,7 +492,7 @@ export function StackProtocolQuickLog({
           <div
             style={{
               fontSize: 13,
-              color: "#fbbf24",
+              color: "var(--color-warning)",
               lineHeight: 1.55,
               letterSpacing: "0.03em",
               whiteSpace: "pre-line",
@@ -621,7 +621,7 @@ function QuickNonInjectableRow({ line, isLast, session, loggedToday, busy, onDos
         </div>
       </div>
       {timingWarning && (
-        <div className="mono" style={{ fontSize: 12, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 4, lineHeight: 1.45 }}>
           ⚠ {timingWarning}
         </div>
       )}
@@ -720,7 +720,7 @@ function QuickIntranasalSprayRow({ line, isLast, session, loggedToday, busy, onS
         </div>
       </div>
       {timingWarning && (
-        <div className="mono" style={{ fontSize: 12, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 4, lineHeight: 1.45 }}>
           ⚠ {timingWarning}
         </div>
       )}
@@ -815,7 +815,7 @@ function QuickOralVialRow({ line, isLast, session, loggedToday, busy, onDoseMlDe
         </div>
       </div>
       {timingWarning && (
-        <div className="mono" style={{ fontSize: 12, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 4, lineHeight: 1.45 }}>
           ⚠ {timingWarning}
         </div>
       )}
@@ -913,7 +913,7 @@ function QuickInjectableRow({ line, isLast, session, loggedToday, busy, onUnitsD
         </div>
       </div>
       {timingWarning && (
-        <div className="mono" style={{ fontSize: 12, color: "#fbbf24", marginTop: 4, lineHeight: 1.45 }}>
+        <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginTop: 4, lineHeight: 1.45 }}>
           ⚠ {timingWarning}
         </div>
       )}
