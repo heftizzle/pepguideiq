@@ -102,6 +102,9 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
           ...(placement === "below" ? { top: cardTop } : { bottom: cardBottom }),
           left: cardLeft,
           width: CARD_WIDTH,
+          maxWidth: CARD_WIDTH,
+          overflowX: "hidden",
+          boxSizing: "border-box",
           background: "var(--color-bg-elevated)",
           borderRadius: 12,
           padding: "12px 16px",
@@ -148,15 +151,33 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
               margin: "0 0 10px 0",
               lineHeight: 1.5,
               fontFamily: "var(--font-sans)",
+              overflowWrap: "break-word",
+              wordBreak: "break-word",
+              minWidth: 0,
             }}
           >
             {currentStep.tooltip || currentStep.text}
           </p>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+            flexWrap: "wrap",
+          }}
+        >
           <span
             className="mono"
-            style={{ fontSize: 13, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}
+            style={{
+              fontSize: 13,
+              color: "var(--color-text-muted)",
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              flexShrink: 1,
+            }}
           >
             Step {idx} of {total}
           </span>
@@ -170,6 +191,8 @@ function TutorialSpotlightInner({ rect, bottomNavReserve }) {
               padding: "8px 14px",
               marginLeft: "auto",
               whiteSpace: "nowrap",
+              minWidth: 0,
+              flexShrink: 1,
             }}
           >
             {stepIndex >= total - 1 ? "Done" : "Next →"}

@@ -83,6 +83,9 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
           ...(placement === "below" ? { top: cardTop } : { bottom: cardBottom }),
           left: cardLeft,
           width: CARD_WIDTH,
+          maxWidth: CARD_WIDTH,
+          overflowX: "hidden",
+          boxSizing: "border-box",
           background: "var(--color-bg-elevated)",
           borderRadius: 12,
           padding: "12px 16px",
@@ -129,25 +132,59 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
               margin: "0 0 10px 0",
               lineHeight: 1.5,
               fontFamily: "var(--font-sans)",
+              overflowWrap: "break-word",
+              wordBreak: "break-word",
+              minWidth: 0,
             }}
           >
             {currentStep.tooltip || currentStep.text}
           </p>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+            flexWrap: "wrap",
+          }}
+        >
           <span
             className="mono"
-            style={{ fontSize: 13, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}
+            style={{
+              fontSize: 13,
+              color: "var(--color-text-muted)",
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              flexShrink: 1,
+            }}
           >
             Step {idx} of {total}
           </span>
-          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginLeft: "auto",
+              minWidth: 0,
+              flexShrink: 1,
+            }}
+          >
             {!isFirst && (
               <button
                 type="button"
                 className="btn-teal"
                 onClick={() => goPrev()}
-                style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", opacity: 0.8, whiteSpace: "nowrap" }}
+                style={{
+                  fontSize: 13,
+                  minHeight: 40,
+                  padding: "8px 14px",
+                  opacity: 0.8,
+                  whiteSpace: "nowrap",
+                  minWidth: 0,
+                  flexShrink: 1,
+                }}
               >
                 ← Back
               </button>
@@ -156,7 +193,14 @@ function GuideSpotlightInner({ rect, bottomNavReserve }) {
               type="button"
               className="btn-teal"
               onClick={() => goNext()}
-              style={{ fontSize: 13, minHeight: 40, padding: "8px 14px", whiteSpace: "nowrap" }}
+              style={{
+                fontSize: 13,
+                minHeight: 40,
+                padding: "8px 14px",
+                whiteSpace: "nowrap",
+                minWidth: 0,
+                flexShrink: 1,
+              }}
             >
               {isLast ? "Done" : "Next →"}
             </button>
