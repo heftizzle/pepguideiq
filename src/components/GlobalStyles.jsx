@@ -286,12 +286,14 @@ export function GlobalStyles() {
       .guide-takeover-root.guide-takeover-root--exit{animation:guideTakeoverOutDesktop .28s ease forwards}
       @keyframes guideTakeoverInDesktop{from{opacity:0}to{opacity:1}}
       @keyframes guideTakeoverOutDesktop{from{opacity:1}to{opacity:0}}
+      /* size: keep in sync with CLOSE_SIZES.takeover in
+         src/lib/closeButtonSizes.js */
       .guide-takeover-close{
         position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));
-        z-index:55;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;
+        z-index:55;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;margin:0;
         display:flex;align-items:center;justify-content:center;
-        border:1px solid var(--color-border-emphasis);border-radius:12px;background:var(--color-bg-card);color:var(--color-text-secondary);
-        font-size:22px;line-height:1;cursor:pointer;font-family:'Outfit',sans-serif;
+        border:1px solid var(--color-border-emphasis);border-radius:8px;background:var(--color-bg-card);color:var(--color-text-secondary);
+        font-size:15px;line-height:1;cursor:pointer;font-family:'Outfit',sans-serif;
         box-shadow:0 4px 20px var(--color-shadow-45);
         transition:color .15s,border-color .15s,background .15s;
       }

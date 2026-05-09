@@ -16,6 +16,7 @@
  */
 
 import React from "react";
+import { CLOSE_SIZES } from "../../lib/closeButtonSizes.js";
 
 const BASE = {
   display: "flex",
@@ -33,12 +34,12 @@ const BASE = {
 const VARIANTS = {
   /** Bordered header control for modal chrome */
   "modal-accent": {
-    width: 28,
-    height: 28,
+    width: CLOSE_SIZES.modal,
+    height: CLOSE_SIZES.modal,
     padding: 8,
     boxSizing: "border-box",
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: CLOSE_SIZES.modal,
+    minHeight: CLOSE_SIZES.modal,
     borderRadius: 8,
     border: "1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent)",
     background: "color-mix(in srgb, var(--color-text-secondary) 8%, transparent)",

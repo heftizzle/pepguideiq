@@ -7,6 +7,7 @@ import { getSessionAccessToken, supabase } from "../lib/supabase.js";
 import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
+import { CLOSE_SIZES } from "../lib/closeButtonSizes.js";
 import { canAddStackRow } from "../lib/tiers.js";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 
@@ -830,10 +831,11 @@ export function BuildTab({
                       type="button"
                       className="btn-red"
                       style={{
-                        width: 36,
-                        height: 36,
-                        minWidth: 36,
-                        minHeight: 36,
+                        width: CLOSE_SIZES.danger,
+                        height: CLOSE_SIZES.danger,
+                        minWidth: CLOSE_SIZES.danger,
+                        minHeight: CLOSE_SIZES.danger,
+                        borderRadius: 6,
                         boxSizing: "border-box",
                         padding: 0,
                         display: "flex",

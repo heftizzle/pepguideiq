@@ -7,6 +7,7 @@ import { isApiWorkerConfigured } from "../lib/config.js";
 import { formatHandleDisplay, normalizeHandleInput } from "../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
 import { createMemberProfileViaWorker } from "../lib/supabase.js";
+import { CLOSE_SIZES } from "../lib/closeButtonSizes.js";
 import { getTier, tierAccentCssVar } from "../lib/tiers.js";
 import { ThemeToggle } from "./ThemeToggle.jsx";
 import { CloseButton } from "./ui/CloseButton.jsx";
@@ -199,7 +200,7 @@ export function HamburgerMenu({
               className="pepv-hamburger-drawer__close"
               onClose={() => setOpen(false)}
               ariaLabel="Close menu"
-              style={{ fontSize: 16 }}
+              style={{ fontSize: CLOSE_SIZES.glyphOnly }}
             />
           </div>
 
