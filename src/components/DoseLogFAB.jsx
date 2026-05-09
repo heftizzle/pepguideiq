@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { getProtocolSessionsOrdered } from "../data/protocolSessions.js";
 import { useTutorialOptional } from "../context/TutorialContext.jsx";
 
-const FAB_SIZE = 56;
-const FAB_BODY_MIN_HEIGHT = 72;
+const FAB_SIZE = 44;
+const FAB_BODY_MIN_HEIGHT = 57;
 /** Total vertical footprint used for bounds (matches main button minHeight). */
 const FAB_HEIGHT = FAB_BODY_MIN_HEIGHT;
 /** Clears bottom nav; safe-area keeps FAB above home indicator on notched phones. */
@@ -440,7 +440,7 @@ export function DoseLogFAB({ onSessionPicked }) {
       ref={fabRef}
       style={{
         position: "fixed",
-        zIndex: 38,
+        zIndex: 199,
         left: "50%",
         right: "auto",
         // Bottom-layout (tour-strip) mode stays anchored from bottom; top stays "auto".
@@ -541,7 +541,7 @@ export function DoseLogFAB({ onSessionPicked }) {
           borderRadius: FAB_SIZE / 2,
           border: "1px solid var(--color-accent-fab-border)",
           background: "var(--color-accent-fab-fill)",
-          boxShadow: "0 6px 24px var(--color-shadow-45), 0 0 0 1px var(--color-accent-fab-ring)",
+          boxShadow: "0 5px 19px var(--color-shadow-45), 0 0 0 1px var(--color-accent-fab-ring)",
           touchAction: "none",
           WebkitUserSelect: "none",
           userSelect: "none",
@@ -551,9 +551,9 @@ export function DoseLogFAB({ onSessionPicked }) {
           alignItems: "center",
           justifyContent: "center",
           gap: 2,
-          padding: "6px 4px",
+          padding: "5px 3px",
           margin: 0,
-          fontSize: 26,
+          fontSize: 20,
           lineHeight: 1,
         }}
       >
