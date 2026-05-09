@@ -35,8 +35,10 @@ const VARIANTS = {
   "modal-accent": {
     width: 28,
     height: 28,
-    minWidth: 28,
-    minHeight: 28,
+    padding: 8,
+    boxSizing: "border-box",
+    minWidth: 44,
+    minHeight: 44,
     borderRadius: 8,
     border: "1px solid color-mix(in srgb, var(--color-text-secondary) 35%, transparent)",
     background: "color-mix(in srgb, var(--color-text-secondary) 8%, transparent)",
