@@ -31,6 +31,8 @@ export const Z = {
   postComposerSheet:  220,        // PostItComposer sheet layer
   librarySearch:      221,        // LibraryMobileSearch overlay
   postComposerTop:    230,        // PostItComposer top chrome
+  appHelpSheetBackdrop: 260,      // AppHelpModal.jsx backdrop
+  appHelpSheet:         261,      // AppHelpModal.jsx bottom sheet
   tutorialModal:      1000,       // PostTutorialProfileModal
   imageViewer:        5000,       // ProfileTab full-screen image viewer
   lightbox:           9000,       // PublicProfilePhotoGrid lightbox backdrop

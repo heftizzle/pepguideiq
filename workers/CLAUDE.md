@@ -2,10 +2,11 @@
 
 Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 37)
+## Routes (exactly 38)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
+- `POST /v1/app-help` — App Help (Haiku). Auth Bearer; separate KV cap `apphelp:{userId}:{YYYY-MM-DD}` (10/day). Body: `{messages}`. Response: `{text, usage: {queries_today, queries_limit}}`. No Atlas catalog or profile context injection.
 
 ### Stripe
 - `POST /stripe/webhook` — event handler: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`. Syncs plan via `update_user_plan`. After a successful paid `checkout.session.completed`, sends a Resend confirmation email (plan + amount + CTA) when `RESEND_API_KEY` is set.

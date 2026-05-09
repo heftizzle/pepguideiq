@@ -95,6 +95,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 - Global classes in `components/GlobalStyles.jsx`: `brand` (display font), `mono` (mono font), `btn-red`, `btn-teal`, `form-input`, `scard` (saved stack card), `pcard` (peptide card), `pill--category`, `search-input`.
 - Category colors come from `CAT_COLORS` in `src/data/catalog.js`. Use `getCategoryCssVars(cat)` to set `--cc` and `--cc-rgb` CSS custom properties on a container for downstream `.pcard` / `.pill--category` to read.
 - Z-index scale: src/lib/zIndex.js — consult before adding any new overlay. Use Z.nearestLayer + 1 rather than a new magic number.
+- App Help sheet: `appHelpSheetBackdrop` 260 / `appHelpSheet` 261 — [`src/lib/zIndex.js`](src/lib/zIndex.js)
 
 ## Storage keys (don't collide)
 
@@ -182,3 +183,76 @@ Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCateg
 - `VialTracker.jsx` has its own date helpers and doesn't always use `src/lib/localCalendarDay.js`. Match the style already in that file (`todayYmd`, `localYmdFromIso`, etc.).
 - `ProfileTab.jsx` toggles an internal `subView` between `"profile"` and `"settings"` — it nests `<SettingsTab>` inside itself. Don't duplicate settings chrome.
 - `useMemberAvatarSrc()` returns either a cache-busted https URL or an object URL from a Worker blob fetch; you can set it as `<img src>` directly.
+
+---
+
+## UX / UI Guidelines
+
+1. **Touch targets** — Aim for ~44×44px minimum for primary actions on 
+   real devices. If the visible control stays small (e.g. 28×28), use 
+   padding or min-* so thumbs still hit it without shifting the visual 
+   anchor. Modal close was the reference example.
+
+2. **Theme fidelity** — Prefer var(--color-*) over raw hex so all 
+   themes stay consistent. After token swaps, spot-check light + one 
+   dark theme where contrast shifts most.
+
+3. **Hierarchy vs tokens** — Not every hex maps to a token. If 
+   something is deliberately quieter than text-muted (e.g. pricing 
+   footer fine print), keep the hex or add a named token rather than 
+   forcing the wrong semantic.
+
+4. **Soft danger / badges** — If fca5a5-style soft danger text matters, 
+   add a dedicated token. --color-danger and --color-danger-soft-bg 
+   alone don't cover that text role.
+
+5. **Limit / quota UX** — When a limit is hit, pair the status with a 
+   clear next step (e.g. "Upgrade for more" + openUpgradeModal).
+
+6. **Takeover chrome** — After resizing .guide-takeover-close, 
+   sanity-check safe areas and tap targets on notched phones. Stacking 
+   (zIndex.js) is separate from physical size (closeButtonSizes.js).
+
+7. **Post App.jsx QA** — After any shell changes: log a dose from 
+   Protocol, log from Stack quick log, confirm toast fires and no 
+   console errors.
+
+## Maintainability / Scalability
+
+1. **Central size tokens** — CLOSE_SIZES is the pattern: one place to 
+   change a family. Document what cannot import JS (CSS-only files like 
+   GlobalStyles) and keep those in sync manually with a comment.
+
+2. **Modal tap policy** — modal-accent dropped 44×44 min-* when tied to 
+   CLOSE_SIZES.modal. If WCAG/mobile tap targets matter, split visual 
+   size vs hit box explicitly in the constant or via padding.
+
+3. **Z-index discipline** — src/lib/zIndex.js is the map for all global 
+   layers. New overlays get nearest layer + 1, not a new magic number. 
+   File-local constants (NOTIFICATIONS_DROPDOWN_Z_INDEX etc.) are 
+   documented there.
+
+4. **JSDoc vs reality** — When behavior changes, update comments 
+   immediately. Stale intent in headers misleads the next reader.
+
+5. **Design system** — Follow DESIGN.md for tokens, spacing, and 
+   patterns. Avoid one-off colors or spacing outside that doc.
+
+6. **Stack constraints** — No new routers, state libs, or CSS 
+   frameworks. Inline styles + existing global classes unless there is 
+   a strong reason and a repo-wide pattern already exists.
+
+7. **Server truth** — Plans, entitlements, and billing stay 
+   server/worker authoritative. Client is presentation and triggers 
+   only.
+
+8. **Grep habits** — Use grep -E when patterns use |. grep -v filters 
+   whole lines not paths unless you match path substrings explicitly.
+
+## Glyph convention
+
+- ✕ (U+2715) — CloseButton dismiss controls (modals, takeover, drawer)
+- × (U+00D7) — Multiplication in copy strings and data displays
+- Destructive row removes (SavedStackEntryRow, VialTracker dose delete) 
+  use ✕ visually but are NOT CloseButton — they are semantic actions, 
+  not dismiss controls.

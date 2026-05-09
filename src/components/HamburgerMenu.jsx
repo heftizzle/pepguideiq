@@ -54,6 +54,7 @@ const sectionDividerStyle = {
  *   onOpenUpgrade: (reason?: string) => void,
  *   onOpenGlossary: () => void,
  *   onOpenFAQ: () => void,
+ *   onOpenAppHelp: () => void,
  *   onOpenTutorials: () => void,
  *   onOpenSupport: () => void,
  *   onOpenLegal: () => void,
@@ -69,6 +70,7 @@ export function HamburgerMenu({
   onOpenUpgrade,
   onOpenGlossary,
   onOpenFAQ,
+  onOpenAppHelp,
   onOpenTutorials,
   onOpenSupport,
   onOpenLegal,
@@ -361,6 +363,14 @@ export function HamburgerMenu({
             </button>
             <button type="button" className="pepv-hamburger-row" style={rowBtnStyle} onClick={() => closeAnd(onOpenFAQ)}>
               FAQ
+            </button>
+            <button
+              type="button"
+              className="pepv-hamburger-row"
+              style={rowBtnStyle}
+              onClick={() => closeAnd(() => onOpenAppHelp())}
+            >
+              App Help 💬
             </button>
             <button type="button" className="pepv-hamburger-row" style={rowBtnStyle} onClick={() => closeAnd(onOpenLegal)}>
               Legal / Privacy

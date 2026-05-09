@@ -32,6 +32,7 @@ import { HamburgerMenu } from "./components/HamburgerMenu.jsx";
 import { GlossaryModal } from "./components/GlossaryModal.jsx";
 import { FAQModal } from "./components/FAQModal.jsx";
 import SupportModal from "./components/SupportModal.jsx";
+import AppHelpModal from "./components/AppHelpModal.jsx";
 import { LegalDisclaimer } from "./components/LegalDisclaimer.jsx";
 import { LegalPage } from "./components/LegalPage.jsx";
 import { AgeGate } from "./components/AgeGate.jsx";
@@ -1064,6 +1065,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [glossaryModalOpen, setGlossaryModalOpen] = useState(false);
   const [faqModalOpen, setFaqModalOpen] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [appHelpOpen, setAppHelpOpen] = useState(false);
   const [showPeopleSearch, setShowPeopleSearch] = useState(false);
   const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
   /** Prefill Find People (e.g. deep link or reopen). */
@@ -1305,6 +1307,8 @@ function PepGuideIQApp({ user, setUser }) {
     setFaqModalOpen,
     supportModalOpen,
     setSupportModalOpen,
+    appHelpOpen,
+    setAppHelpOpen,
     dismissHandlePrompt,
     setRouteFilter,
     librarySearchOpen,
@@ -1496,6 +1500,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
     setFaqModalOpen,
     supportModalOpen,
     setSupportModalOpen,
+    appHelpOpen,
+    setAppHelpOpen,
     dismissHandlePrompt,
     setRouteFilter,
     librarySearchOpen,
@@ -1699,6 +1705,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     onOpenUpgrade={(reason) => openUpgradeModal(reason)}
                     onOpenGlossary={() => setGlossaryModalOpen(true)}
                     onOpenFAQ={() => setFaqModalOpen(true)}
+                    onOpenAppHelp={() => setAppHelpOpen(true)}
                     onOpenTutorials={() => setHelpMenuOpen(true)}
                     onOpenSupport={() => setSupportModalOpen(true)}
                     onOpenLegal={() => {
@@ -2815,6 +2822,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
         {glossaryModalOpen ? <GlossaryModal onClose={() => setGlossaryModalOpen(false)} /> : null}
         {faqModalOpen ? <FAQModal onClose={() => setFaqModalOpen(false)} /> : null}
         <SupportModal isOpen={supportModalOpen} onClose={() => setSupportModalOpen(false)} />
+        <AppHelpModal isOpen={appHelpOpen} onClose={() => setAppHelpOpen(false)} />
 
         {user?.id && activeProfileId && activeTab !== "guide" && !guideExiting && (
           <DoseLogFAB

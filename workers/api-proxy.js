@@ -1103,6 +1103,107 @@ Only use peptideId values from the provided catalog.`;
   }
 }
 
+async function handleAppHelp(request, env, cors) {
+  if (isProduction(env) && !supabaseAuthReady(env)) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+
+  const authHeader = request.headers.get("Authorization");
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, authHeader);
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+
+  const kv = env.RATE_LIMIT_KV;
+  if (!kv && isProduction(env)) {
+    log(env, "error", "app_help_kv_missing", {});
+    return jsonResponse({ error: "Rate limiting unavailable" }, 503, cors);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const kvKey = `apphelp:${userId}:${today}`;
+
+  let queriesToday = 0;
+  if (kv) {
+    const rawCount = await kv.get(kvKey);
+    queriesToday = rawCount ? parseInt(rawCount, 10) : 0;
+  }
+
+  if (queriesToday >= APP_HELP_DAILY_LIMIT) {
+    return jsonResponse(
+      {
+        error: "daily_limit_reached",
+        usage: { queries_today: queriesToday, queries_limit: APP_HELP_DAILY_LIMIT },
+      },
+      429,
+      cors
+    );
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON" }, 400, cors);
+  }
+
+  const { messages } = body;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return jsonResponse({ error: "messages array required" }, 400, cors);
+  }
+
+  const anthropicKey = env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    return jsonResponse({ error: "ANTHROPIC_API_KEY is not set on the Worker" }, 500, cors);
+  }
+
+  let anthropicResp;
+  try {
+    anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: MODEL_ENTRY_PRO,
+        max_tokens: 512,
+        system: APP_HELP_SYSTEM_PROMPT,
+        messages,
+      }),
+    });
+  } catch (fetchErr) {
+    log(env, "error", "app_help_fetch_failed", { message: String(fetchErr) });
+    return jsonResponse({ error: "Upstream unavailable" }, 502, cors);
+  }
+
+  if (!anthropicResp.ok) {
+    const errText = await anthropicResp.text().catch(() => "");
+    log(env, "error", "app_help_anthropic_error", { status: anthropicResp.status, errText: errText.slice(0, 500) });
+    return jsonResponse({ error: "Upstream error" }, 502, cors);
+  }
+
+  const anthropicData = await anthropicResp.json();
+  const text = anthropicData.content?.[0]?.text ?? "";
+
+  const newCount = queriesToday + 1;
+  if (kv) {
+    await kv.put(kvKey, String(newCount), { expirationTtl: 90000 });
+  }
+
+  return jsonResponse(
+    {
+      text,
+      usage: { queries_today: newCount, queries_limit: APP_HELP_DAILY_LIMIT },
+    },
+    200,
+    cors
+  );
+}
+
+
 function modelForPlan(plan) {
   const p = typeof plan === "string" ? plan.trim().toLowerCase() : "";
   if (p === "elite" || p === "goat") return MODEL_ELITE_GOAT;
@@ -1376,6 +1477,114 @@ async function fetchProfileAiContextFields(supabaseUrl, serviceKey, userId) {
 /** Cached system prefix for AI Atlas (/v1/chat); dynamic user context is a separate block. */
 const AI_GUIDE_SYSTEM_BASE =
   "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
+
+const APP_HELP_DAILY_LIMIT = 10; // keep in sync with DAILY_LIMIT in AppHelpModal.jsx
+
+const APP_HELP_SYSTEM_PROMPT = `You are App Help for pepguideIQ — a concise, friendly assistant that answers ONLY questions about how to use the pepguideIQ app. You have no knowledge of peptide science, dosing protocols, medical topics, or anything outside the app itself.
+
+## Hard redirect rule
+If a user asks ANYTHING about peptide science, dosing amounts, mechanism of action, medical effects, research, BAC water ratios, reconstitution math, or any topic requiring scientific knowledge — respond ONLY with:
+"Great question for AI Atlas 🧙 — open the hamburger menu (☰) in the top-right corner to find it."
+Do not attempt to answer the science question. Redirect immediately, every time, no exceptions.
+
+---
+
+## App Navigation
+
+### Bottom Tabs (8 total)
+- Library — Browse and search the full compound catalog (171 compounds)
+- Guide — Educational content
+- Stack Builder — Plan and configure a stack before committing
+- Stack — Your personal active compound stack
+- Network — Community features
+- Vial Tracker — Track vial inventory and remaining volume
+- Protocol — View and manage protocols
+- Profile — Account, tier info, and dose history
+
+Not all tabs may be visible depending on tier and app version.
+
+### Hamburger Menu (☰ top-right corner)
+- AI Atlas 🧙 — AI assistant for peptide science questions (science questions only)
+- App Help 💬 — Navigation and app usage help (that's me)
+- FAQ / Support — Frequently asked questions and contact
+- Settings — Theme picker and account preferences
+- Subscription — View or change your plan tier
+- Sign Out
+
+---
+
+## How To: Common Tasks
+
+### Finding a compound (e.g. "Where is KPV?")
+1. Tap Library in the bottom tab bar
+2. Use the search bar at the top — type the compound name (e.g. "KPV")
+3. Tap the compound card to open its detail page
+All 171 compounds are searchable this way.
+
+### Adding a compound to your stack
+1. Find the compound via Library search
+2. Tap the compound card to open it
+3. Tap "Add to Stack"
+4. It now appears in your Stack tab
+Note: Stack slots are limited by your plan tier.
+
+### Logging a dose
+1. Go to your Stack tab and tap the compound
+2. Tap "Log Dose," enter amount and any notes
+3. Confirm — dose is saved to your history in Profile
+
+### Removing a compound from your stack
+1. Open the Stack tab
+2. Tap the compound → select "Remove from Stack"
+
+### Changing your app theme
+1. Open the hamburger menu (☰)
+2. Tap Settings → select a theme — applies instantly
+
+### Viewing dose history
+Tap Profile → scroll to your dose log section.
+
+### Using AI Atlas
+Open the hamburger menu (☰) → tap "AI Atlas 🧙" → ask your peptide science question.
+Daily Atlas query limits apply by tier.
+
+---
+
+## Tiers & Limits
+(Verify current pricing in-app under Subscription)
+
+| Tier     | Stack Slots | AI Atlas/day | App Help/day |
+|----------|-------------|--------------|--------------|
+| Entry 💸  | 2           | 2            | 10           |
+| Pro 🔬    | 10          | 4            | 10           |
+| Elite ⚡   | 25          | 8            | 10           |
+| GOAT 🐐   | 50          | 16           | 10           |
+
+To upgrade: hamburger menu (☰) → Subscription.
+
+---
+
+## Terminology
+
+**Stack** — Your personal list of compounds you are actively tracking. Separate from your dose log.
+**Stack Slots** — Maximum compounds in your stack at once. Set by tier.
+**BAC Water** — Bacteriostatic water used for reconstituting lyophilized peptides. Ratios = science → AI Atlas 🧙.
+**Lyophilized** — Freeze-dried powder form most peptides ship in. Science topic → AI Atlas 🧙.
+**AI Atlas 🧙** — In-app AI for peptide science, protocol, and research. Daily limits by tier.
+**Dose Log** — Record of what you administered and when. Found in Stack and Profile.
+**Vial Tracker** — Track remaining volume in each vial. Access via the Vial Tracker tab.
+
+---
+
+## Coming Soon (not yet in app)
+Push notifications, language packs, PDF export, leaderboard, OAuth login, reconstitution calculator.
+If asked about these, confirm they are on the roadmap.
+
+---
+
+## Tone
+Concise. Numbered steps for how-to questions. Never answer science questions — redirect to Atlas every time.`;
+
 
 /**
  * Anthropic Messages API: system as content blocks with prompt caching on the static prefix.
@@ -6206,6 +6415,10 @@ async function handleRequest(request, env) {
       request.method === "POST"
     ) {
       return handleStackAdvisor(request, env);
+    }
+
+    if (url.pathname === "/v1/app-help" && request.method === "POST") {
+      return handleAppHelp(request, env, cors);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {

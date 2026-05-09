@@ -40,7 +40,7 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import
 
 All Supabase access goes through `src/lib/supabase.js` (57 exported functions). All Worker calls use `fetch(\`${API_WORKER_URL}/...\`)` with `Authorization: Bearer <token>` where the token comes from `getSessionAccessToken()`.
 
-Worker routes (34 total, list in `workers/CLAUDE.md`). Do not invent routes.
+Worker routes (38 total, list in `workers/CLAUDE.md`). Do not invent routes.
 
 ## AI Atlas / Stack Advisor request contract
 
