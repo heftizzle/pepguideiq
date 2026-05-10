@@ -39,6 +39,7 @@ import { BATCH33 } from "./batch33.js";
 import { BATCH34 } from "./batch34.js";
 import { BATCH35 } from "./batch35.js";
 import { BATCH36 } from "./batch36.js";
+import { BATCH37 } from "./batch37.js";
 
 const _ALL_COMPOUNDS_RAW = [
   ...BATCH1,
@@ -77,6 +78,7 @@ const _ALL_COMPOUNDS_RAW = [
   ...BATCH34,
   ...BATCH35,
   ...BATCH36,
+  ...BATCH37,
 ];
 
 // Last occurrence wins — newer batches override older ones for the same id.
