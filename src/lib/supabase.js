@@ -355,16 +355,46 @@ export async function signOut() {
 }
 
 /**
- * Access token for Worker JWT verification (Authorization: Bearer …).
- * Refreshes the session first — getSession() alone can return a stale cached token
- * and cause 401s on Worker routes; fallback to getSession if refresh did not return a token.
+ * Returns the current Supabase session's access token, refreshing only if expiring soon.
+ *
+ * Boot-path performance: `getSession()` is local (reads from localStorage), so it's instant.
+ * `refreshSession()` is a network round-trip to Supabase auth servers (~500-2000ms).
+ * We only call refresh when the token has <2 minutes of validity left.
+ *
+ * Graceful degradation: if refresh fails (network drop, Supabase outage), return the
+ * existing (soon-to-expire-but-still-valid) token rather than bouncing the user to login.
+ * The token may expire mid-session and that's a separate problem for the calling code
+ * to handle (typically a 401 response → retry refresh → log out only if refresh fails).
  */
 export async function getSessionAccessToken() {
   if (!supabase) return null;
-  const { data: refreshed } = await supabase.auth.refreshSession();
-  if (refreshed?.session?.access_token) return refreshed.session.access_token;
+
+  // Step 1 — read the cached session (instant, no network).
   const { data } = await supabase.auth.getSession();
-  return data?.session?.access_token ?? null;
+  const session = data?.session ?? null;
+  if (!session?.access_token) return null;
+
+  // Step 2 — if the token has more than 2 minutes of validity left, use it as-is.
+  // expires_at is a Unix timestamp in seconds; Date.now() returns milliseconds.
+  const expiresAt = typeof session.expires_at === "number" ? session.expires_at : 0;
+  const secondsLeft = expiresAt - Math.floor(Date.now() / 1000);
+  if (secondsLeft > 120) return session.access_token;
+
+  // Step 3 — token is expired or about to expire. Try to refresh, but fall back to the
+  // current token if refresh fails. The calling code can handle a 401 on the actual API
+  // request; we should not block the boot path or sign the user out.
+  try {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshed?.session?.access_token) {
+      return refreshed.session.access_token;
+    }
+  } catch {
+    /* graceful fallback */
+  }
+
+  // Refresh failed; return whatever we have. May produce a 401 on the next API call,
+  // but that's preferable to blocking the entire app boot.
+  return session.access_token;
 }
 
 /** @param {unknown} raw — PostgREST date / timestamptz string */
