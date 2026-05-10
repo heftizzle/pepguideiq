@@ -37,7 +37,7 @@ test.describe("App Help — smoke", () => {
   test.skip(!HAS_CREDS, "Skipping: E2E_TEST_EMAIL / E2E_TEST_PASSWORD not set in e2e/.env");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page);
+    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
     await dismissTutorialIfPresent(page);
   });
 
@@ -169,7 +169,7 @@ test.describe("App Help — 429 exhausted (mocked)", () => {
   test.skip(!HAS_CREDS, "Skipping: E2E_TEST_EMAIL / E2E_TEST_PASSWORD not set in e2e/.env");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page);
+    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
     await dismissTutorialIfPresent(page);
   });
 
