@@ -1492,7 +1492,7 @@ Do not attempt to answer the science question. Redirect immediately, every time,
 ## App Navigation
 
 ### Bottom Tabs (8 total)
-- Library — Browse and search the full compound catalog (171 compounds)
+- Library — Browse and search the full compound catalog (275 compounds)
 - Guide — Educational content
 - Stack Builder — Plan and configure a stack before committing
 - Stack — Your personal active compound stack
@@ -1519,7 +1519,7 @@ Not all tabs may be visible depending on tier and app version.
 1. Tap Library in the bottom tab bar
 2. Use the search bar at the top — type the compound name (e.g. "KPV")
 3. Tap the compound card to open its detail page
-All 171 compounds are searchable this way.
+All 275 compounds are searchable this way.
 
 ### Adding a compound to your stack
 1. Find the compound via Library search

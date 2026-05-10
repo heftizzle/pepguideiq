@@ -10,6 +10,22 @@
 
 There is no router library. Add one only if a new multi-page requirement justifies it.
 
+## Catalog size (do not hardcode)
+
+Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`. **Live count:** `PEPTIDES.length` / `CATALOG_COUNT` (currently **275** after BATCH41). `MAX_ADVISOR_CATALOG` in `src/lib/advisorCatalogPayload.js` is the **AI advisor payload cap** (153), not the library size.
+
+## Route filtering data source
+
+`validRoutes` lives on raw `ALL_COMPOUNDS` rows but is **NOT** copied onto the normalized `PEPTIDES` array during normalization.
+
+**Any UI that needs the batch-file `validRoutes` list** (e.g. `injection`, `oral`, `intranasal_spray`) **must use `getValidRoutes(peptideId)`** from `src/lib/peptideRoutes.js`, which reads from `ALL_COMPOUNDS` — not from `PEPTIDES` (where `validRoutes` is always absent). Example: `VialTracker.jsx` maps vial route options with `getValidRoutes(...)`.
+
+The normalization pipeline in `normalizeNewCatalogEntry` only emits fields needed for the default catalog path. `validRoutes` is omitted there. That is intentional, but it means code that assumes “one object, full schema” on `PEPTIDES` will silently miss route metadata if it looks for `validRoutes`.
+
+**Library route pills** (`peptideMatchesRouteFilter` in `App.jsx`) are a separate path: they filter using the normalized `route` string array on each `PEPTIDES` row (regex/heuristic matching). That is **not** the same as `validRoutes`; do not conflate them when adding new route-aware features. If the feature must mirror batch `validRoutes` exactly, use `getValidRoutes` like VialTracker.
+
+*Surfaced during BATCH8 integration verification (May 2026) — prevents “undefined validRoutes on PEPTIDES” bug class.*
+
 ## Shell
 
 `App.jsx` default export is `PepGuideIQ`. It renders:

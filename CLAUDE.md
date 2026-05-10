@@ -4,7 +4,7 @@ Read before making changes. This file tells you what's actually in the repo vs w
 
 ## What this is
 
-A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 171-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Atlas (Anthropic) and Stack Advisor — both proxied through a Cloudflare Worker so the API key never hits the browser.
+A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 275-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Atlas (Anthropic) and Stack Advisor — both proxied through a Cloudflare Worker so the API key never hits the browser.
 
 ## Stack (exact)
 
@@ -63,7 +63,7 @@ src/components/BuildTab.jsx       1385 lines
 src/components/SettingsTab.jsx    1280 lines
 src/lib/supabase.js               1183 lines — 57 exported data-layer functions
 src/data/catalog.js                355 lines — schema + merges COMPOUNDS batches
-src/data/compounds/batch1..9.js          — compound rows, ~171 total
+src/data/compounds/batch1..9.js          — compound rows across batch1..41 (~275 total)
 supabase/migrations/                     — 51 migrations (001..050 + 045a)
 ```
 
@@ -71,7 +71,7 @@ Subdirectory briefs: `src/CLAUDE.md`, `workers/CLAUDE.md`, `supabase/CLAUDE.md`.
 
 ## Corrections to common AI assumptions
 
-- **Catalog has 171 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count do `PEPTIDES.length`.
+- **Catalog has 275 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count do `PEPTIDES.length`.
 - **Tier emojis are 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** Source: `src/lib/tiers.js`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.

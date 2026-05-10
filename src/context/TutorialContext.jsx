@@ -234,7 +234,7 @@ const STATIC_FLOWS = {
       target: TUTORIAL_TARGET.nav_library,
       tab: "library",
       text: "Browse the compound library",
-      tooltip: "171 compounds with stability data, dosing info, and Finnrick vendor links. This is your research hub.",
+      tooltip: "275 compounds with stability data, dosing info, and Finnrick vendor links. This is your research hub.",
     },
     {
       target: TUTORIAL_TARGET.library_add_stack,
@@ -273,7 +273,7 @@ const STATIC_FLOWS = {
       tab: "library",
       text: "Start in the Library",
       tooltip:
-        "Every compound card has an 'Ask AI Atlas →' button at the bottom. AI Atlas knows the full 171-compound catalog — ask it anything about any compound.",
+        "Every compound card has an 'Ask AI Atlas →' button at the bottom. AI Atlas knows the full 275-compound catalog — ask it anything about any compound.",
     },
     {
       target: TUTORIAL_TARGET.atlas_compound_cta,

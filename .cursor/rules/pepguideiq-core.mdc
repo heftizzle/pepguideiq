@@ -27,7 +27,7 @@ Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import
 
 ## Corrections to common assumptions
 
-- **Catalog has 171 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count, use `PEPTIDES.length`.
+- **Catalog has 275 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count, use `PEPTIDES.length`.
 - **51 Supabase migrations** (`001` through `050` plus `045a`).
 - **Tier emojis: 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** NOT 🌱 for Entry.
 - **Tier IDs: `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", "basic", "premium", or "pro+".
