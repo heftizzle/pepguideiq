@@ -19,7 +19,6 @@ export const BATCH9 = [
       "WADA prohibited — banned in competitive sport",
       "Cycle — avoid continuous indefinite use",
     ],
-    tier: "entry",
   },
   {
     id: "adamax",
@@ -40,7 +39,6 @@ export const BATCH9 = [
       "Limited long-term human safety data",
       "Not FDA approved — research context only",
     ],
-    tier: "entry",
   },
   {
     id: "crystagen",
@@ -60,7 +58,6 @@ export const BATCH9 = [
       "Limited English-language clinical data — primarily Russian and Eastern European literature",
       "Distinct from Visoluten — educate users on the lens vs. retina distinction before recommending",
     ],
-    tier: "entry",
   },
   {
     id: "tri-heal",
@@ -86,7 +83,6 @@ export const BATCH9 = [
       "BPC-157 may modulate dopamine — caution if on psychiatric medications",
       "Cycle — avoid continuous indefinite use",
     ],
-    tier: "entry",
   },
   {
     id: "aod-cjc-ipa-blend",
@@ -113,7 +109,6 @@ export const BATCH9 = [
       "Administer fasted for optimal GH pulse — avoid carbohydrates for 1–2 hours post-injection",
       "Cycle — continuous GH stimulation may suppress endogenous GHRH signaling over time",
     ],
-    tier: "entry",
   },
   {
     id: "pnc-27",
@@ -134,7 +129,6 @@ export const BATCH9 = [
       "No long-term safety data in humans",
       "Source exclusively from vendors with verified third-party CoA",
     ],
-    tier: "entry",
   },
   {
     id: "pe-22-28",
@@ -155,7 +149,6 @@ export const BATCH9 = [
       "Distinct mechanism from SSRIs/SNRIs — caution if currently on antidepressants",
       "Cycle — avoid continuous indefinite use",
     ],
-    tier: "entry",
   },
   {
     id: "adipotide",
@@ -177,6 +170,5 @@ export const BATCH9 = [
       "Source exclusively from vendors with verified third-party CoA",
       "Do not confuse dose — primate studies used weight-based dosing, human protocol undefined",
     ],
-    tier: "entry",
   },
 ];

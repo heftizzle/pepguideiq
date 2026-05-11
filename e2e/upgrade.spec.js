@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { loginUser, passAgeGateIfPresent } from "./helpers/auth.js";
+import {
+  dismissTutorialIfPresent,
+  passAgeGateIfPresent,
+  waitForOverlaysToClear,
+} from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -37,7 +41,10 @@ test.describe("plan upgrade (stripe)", () => {
 
   test.describe("authenticated upgrade modal", () => {
     test.beforeEach(async ({ page }) => {
-      await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
+      await page.goto("/");
+      await passAgeGateIfPresent(page);
+      await dismissTutorialIfPresent(page);
+      await waitForOverlaysToClear(page);
     });
 
     test("Plan / Upgrade opens from account menu", async ({ page }) => {

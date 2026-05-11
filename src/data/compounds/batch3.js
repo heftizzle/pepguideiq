@@ -12,7 +12,6 @@ export const BATCH3 = [
     tags: ["immune", "neuroendocrine", "bioregulator", "Khavinson", "longevity", "dipeptide"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Dipeptide structure makes it one of the most stable Khavinson bioregulators.",
     warnings: ["Course dosing — not continuous", "May modulate immune response — caution with autoimmune conditions"],
-    tier: "entry",
   },
   {
     id: "livagen",
@@ -27,7 +26,6 @@ export const BATCH3 = [
     tags: ["liver", "hepatic", "detox", "bioregulator", "Khavinson", "longevity", "genoprotective"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Relevant for anyone running aggressive stacks with hepatic load concerns.",
     warnings: ["Course dosing — not continuous", "Not a replacement for liver support supplements like TUDCA/NAC"],
-    tier: "entry",
   },
   {
     id: "bronchogen",
@@ -42,7 +40,6 @@ export const BATCH3 = [
     tags: ["lung", "bronchial", "respiratory", "bioregulator", "Khavinson", "longevity", "airway"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Research interest in COPD, asthma, and respiratory aging models.",
     warnings: ["Course dosing — not continuous", "Limited human clinical data"],
-    tier: "entry",
   },
   {
     id: "thymogen",
@@ -57,7 +54,6 @@ export const BATCH3 = [
     tags: ["immune", "thymus", "T-cell", "bioregulator", "Khavinson", "longevity", "dipeptide"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Approved pharmaceutical in Russia. Distinct from Thymalin — different structure, similar target organ.",
     warnings: ["Course dosing — not continuous", "May interact with immunosuppressive therapy"],
-    tier: "entry",
   },
   {
     id: "vesilute",
@@ -72,7 +68,6 @@ export const BATCH3 = [
     tags: ["vascular", "endothelial", "cardiovascular", "bioregulator", "Khavinson", "longevity"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Cardiovascular longevity focus — relevant for Lp(a) and endothelial health concerns.",
     warnings: ["Course dosing — not continuous", "Limited English-language clinical data — primarily Russian literature"],
-    tier: "entry",
   },
   {
     id: "ovagen",
@@ -87,7 +82,6 @@ export const BATCH3 = [
     tags: ["liver", "ovary", "female", "bioregulator", "Khavinson", "longevity", "fertility"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Primarily female longevity protocol use, though liver effects are gender-neutral.",
     warnings: ["Course dosing — not continuous", "Limited data in males"],
-    tier: "entry",
   },
   {
     id: "pancragen",
@@ -102,7 +96,6 @@ export const BATCH3 = [
     tags: ["pancreas", "insulin", "metabolic", "bioregulator", "Khavinson", "longevity", "diabetes"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Logical stack companion to GLP-1 agents for comprehensive metabolic longevity.",
     warnings: ["Course dosing — not continuous", "Monitor blood glucose if running alongside GLP-1 agents"],
-    tier: "entry",
   },
   {
     id: "chonluten",
@@ -117,7 +110,6 @@ export const BATCH3 = [
     tags: ["lung", "bronchial", "respiratory", "airway", "bioregulator", "Khavinson", "longevity", "anti-inflammatory"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Natural complement to KPV and BPC-157 for gut healing protocols.",
     warnings: ["Course dosing — not continuous", "Research interest in COPD, asthma, and respiratory aging models", "Limited human clinical data"],
-    tier: "entry",
   },
   {
     id: "prostamax",
@@ -132,7 +124,6 @@ export const BATCH3 = [
     tags: ["prostate", "BPH", "male", "bioregulator", "Khavinson", "longevity", "anti-inflammatory"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Relevant complement to retatrutide/TRT protocols given prostate health considerations.",
     warnings: ["Course dosing — not continuous", "Not a treatment for prostate cancer — research context only"],
-    tier: "entry",
   },
   {
     id: "cartalax",
@@ -150,7 +141,6 @@ export const BATCH3 = [
       "Course dosing — not continuous",
       "Not a substitute for BPC-157/TB-500 in acute injury — Cartalax is longer-term maintenance",
     ],
-    tier: "entry",
   },
   {
     id: "testagen",
@@ -165,7 +155,6 @@ export const BATCH3 = [
     tags: ["testes", "testosterone", "fertility", "Leydig cell", "bioregulator", "Khavinson", "TRT", "longevity"],
     sourcingNotes: "Available in ~20mg vials from research peptide suppliers. Relevant for men on TRT wanting to maintain testicular function alongside Gonadorelin/HCG.",
     warnings: ["Course dosing — not continuous", "Not a replacement for HCG or Gonadorelin for testicular preservation on TRT"],
-    tier: "entry",
   },
   {
     id: "thyreogen",
@@ -185,7 +174,6 @@ export const BATCH3 = [
       "Not a replacement for thyroid hormone therapy (T3/T4/NDT) in diagnosed hypothyroidism",
       "Monitor thyroid panel if stacking with iodine or other thyroid-active compounds",
     ],
-    tier: "entry",
   },
   {
     id: "visoluten",
@@ -205,7 +193,6 @@ export const BATCH3 = [
       "Not a substitute for ophthalmological evaluation in diagnosed retinal conditions",
       "Limited English-language clinical data — primarily Russian and Eastern European literature",
     ],
-    tier: "entry",
   },
   {
     id: "stamakort",
@@ -225,7 +212,6 @@ export const BATCH3 = [
       "Oral route viable for gut-targeted delivery",
       "Not a substitute for H. pylori treatment or PPI therapy in acute gastric conditions",
     ],
-    tier: "entry",
   },
   {
     id: "gotratix",
@@ -245,7 +231,6 @@ export const BATCH3 = [
       "Complements but does not replace anabolic peptides (GHRP/CJC/IGF-1) — different mechanism entirely",
       "Limited head-to-head data vs. other muscle-preserving compounds",
     ],
-    tier: "entry",
   },
   {
     id: "sigumir",
@@ -265,7 +250,6 @@ export const BATCH3 = [
       "Not a substitute for BPC-157 or TB-500 in acute joint injury — Sigumir is chronic maintenance, not acute repair",
       "Differentiate from Cartalax before recommending — overlapping but distinct targets",
     ],
-    tier: "entry",
   },
   {
     id: "cerluten",
@@ -285,6 +269,5 @@ export const BATCH3 = [
       "Distinct from Cortagen — educate users on the Cytomax vs synthetic tetrapeptide distinction",
       "Limited English-language clinical data — primarily Russian and Eastern European research",
     ],
-    tier: "entry",
   },
 ];

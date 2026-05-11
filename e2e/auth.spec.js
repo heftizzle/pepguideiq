@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser, passAgeGateIfPresent } from "./helpers/auth.js";
+import { loginUser, passAgeGateIfPresent, postLoginNavLandmark } from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -8,7 +8,7 @@ test.describe("auth flows", () => {
 
   test("valid login lands on authenticated view with bottom nav", async ({ page }) => {
     await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
-    await expect(page.getByText("LIBRARY", { exact: true })).toBeVisible();
+    await expect(postLoginNavLandmark(page)).toBeVisible();
     await expect(page.getByRole("button", { name: /stack builder/i })).toBeVisible();
   });
 

@@ -17,7 +17,6 @@ export const BATCH6 = [
       "May compete with AI — monitor E2 labs when combining",
       "Reduces estrogen — do not combine with estrogen-sensitive medications without physician oversight",
     ],
-    tier: "entry",
   },
   {
     id: "calcium-d-glucarate",
@@ -32,7 +31,6 @@ export const BATCH6 = [
     tags: ["estrogen", "detox", "enterohepatic", "glucuronidation", "protocol support", "liver", "gut"],
     sourcingNotes: "Supplement category. Widely available. Logical addition to any estrogen management protocol — closes the enterohepatic loop that AIs miss.",
     warnings: ["May also reduce clearance of other glucuronidated drugs — check interactions", "Less impact if gut microbiome is healthy (less β-glucuronidase activity)"],
-    tier: "entry",
   },
   {
     id: "liothyronine-t3",
@@ -52,7 +50,6 @@ export const BATCH6 = [
       "Muscle catabolism at high doses — adequate protein intake essential",
       "Do not combine with other stimulants without physician oversight",
     ],
-    tier: "entry",
   },
   {
     id: "levothyroxine-t4",
@@ -67,7 +64,6 @@ export const BATCH6 = [
     tags: ["thyroid", "T4", "metabolic", "hypothyroid", "protocol support", "conversion"],
     sourcingNotes: "Available from research peptide vendors. Preferred over T3 alone for stable levels. Conversion to T3 varies — poor converters may need T3 addition.",
     warnings: ["Same cardiac and suppression caveats as T3 — slightly more forgiving due to slower conversion", "Take fasted — food and supplements (calcium, iron) reduce absorption", "Labs required to dial in dose"],
-    tier: "entry",
   },
   {
     id: "tesofensine",
@@ -88,7 +84,6 @@ export const BATCH6 = [
       "Drug interactions with monoamine system medications",
       "Start at 0.125mg and wait before increasing",
     ],
-    tier: "entry",
   },
   {
     id: "mirabegron",
@@ -103,7 +98,6 @@ export const BATCH6 = [
     tags: ["brown adipose", "BAT", "thermogenesis", "metabolic", "beta-3", "fat loss", "protocol support"],
     sourcingNotes: "Available from research peptide vendors. FDA-approved — cleaner safety profile than many metabolic compounds. BAT activation mechanism distinct from other weight loss compounds.",
     warnings: ["Blood pressure elevation at higher doses", "Urinary retention possible", "Drug interactions via CYP2D6"],
-    tier: "entry",
   },
   {
     id: "telmisartan",
@@ -118,7 +112,6 @@ export const BATCH6 = [
     tags: ["blood pressure", "cardiovascular", "PPARγ", "insulin sensitivity", "metabolic", "longevity", "ARB"],
     sourcingNotes: "Available from research peptide vendors. FDA-approved pharmaceutical. Bryan Johnson protocol compound. Particularly relevant for those with cardiovascular concerns alongside peptide protocols.",
     warnings: ["Hypotension risk — monitor BP", "Hyperkalemia risk — avoid with high potassium supplements", "Renal monitoring recommended"],
-    tier: "entry",
   },
   {
     id: "oea",
@@ -133,7 +126,6 @@ export const BATCH6 = [
     tags: ["satiety", "appetite", "PPARα", "lipid signaling", "fat oxidation", "metabolic", "gut"],
     sourcingNotes: "Available from research peptide vendors. Natural endogenous compound — excellent safety profile. Stack with GLP-1 agents for additive appetite suppression via independent pathway.",
     warnings: ["Take pre-meal for maximal effect", "Fat-soluble — take with fatty foods or MCT oil for absorption"],
-    tier: "entry",
   },
   {
     id: "ru58841",
@@ -155,7 +147,6 @@ export const BATCH6 = [
       "Systemic anti-androgen effects possible if overused or carrier is wrong",
       "Research compound — no clinical trial completion",
     ],
-    tier: "entry",
   },
   {
     id: "tesofensine-ipamorelin",
@@ -195,7 +186,6 @@ export const BATCH6 = [
     tags: ["blend", "tesofensine", "ipamorelin", "metabolic", "GH", "appetite", "subQ", "compounded"],
     popularityRank: 150,
     bioavailability: "~100% (injectable)",
-    tier: "entry",
     vialSizeOptions: [{ label: "500mcg Teso + 2mg Ipa (2.5mg total)", totalMg: 2.5, bacWaterMl: 2 }],
   },
   {
@@ -239,7 +229,6 @@ export const BATCH6 = [
     tags: ["blend", "GH", "CJC-1295", "ipamorelin", "GHRP-6", "GHRP-2", "secretagogue", "triple stack"],
     popularityRank: 151,
     bioavailability: "~100% (injectable)",
-    tier: "entry",
     vialSizeOptions: [{ label: "2mg CJC + 2mg Ipa + 2mg GHRP-6 (6mg total)", totalMg: 6, bacWaterMl: 3 }],
   },
   {
@@ -274,7 +263,6 @@ export const BATCH6 = [
       "Stronger metabolic effect than CJC-1295/Ipa. Best for adults targeting visceral fat while preserving muscle. Popular for transitions off GLP-1 medications. Nighttime dosing aligns with natural GH release during deep sleep.",
     popularityRank: 152,
     bioavailability: "~100% (injectable)",
-    tier: "entry",
   },
   {
     id: "tesa-ipa-cjc",
@@ -304,6 +292,5 @@ export const BATCH6 = [
       "Triple blend from Peptide Sciences. 6:3:3 ratio — Tesamorelin dominant for metabolic effect, Ipamorelin and CJC-1295 No DAC for synergistic pulsatile GH amplification. More comprehensive GH axis coverage than any dual blend.",
     popularityRank: 153,
     bioavailability: "~100% (injectable)",
-    tier: "entry",
   },
 ];

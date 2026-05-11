@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
+import {
+  dismissTutorialIfPresent,
+  passAgeGateIfPresent,
+  waitForOverlaysToClear,
+} from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -7,9 +11,11 @@ test.describe("catalog (library)", () => {
   test.skip(!HAS_CREDS, "Skipped: no E2E_TEST_EMAIL / E2E_TEST_PASSWORD set");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
+    await page.goto("/");
+    await passAgeGateIfPresent(page);
     await dismissTutorialIfPresent(page);
-    await page.getByRole("button", { name: "Library, 264 compounds" }).click();
+    await waitForOverlaysToClear(page);
+    await page.getByRole("button", { name: /^Library,/ }).click();
   });
 
   test("catalog renders compound cards", async ({ page }) => {

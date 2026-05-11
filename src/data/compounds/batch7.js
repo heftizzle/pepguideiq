@@ -24,7 +24,6 @@ export const BATCH7 = [
     reconstitution: "BAC water per vial",
     notes: "Hexarelin-class ghrelin mimetic; often stacked with CJC-1295. Pairs with CJC-1295 No DAC and Ipamorelin in classic GH protocols.",
     tags: ["GH", "GHRP", "ghrelin", "growth hormone", "research"],
-    tier: "entry",
   },
   {
     id: "follistatin-315",
@@ -47,7 +46,6 @@ export const BATCH7 = [
     reconstitution: "Acetic acid 0.6% or BAC water per supplier stability data",
     notes: "Shorter isoform of Follistatin-344; review parent entry for broader myostatin context.",
     tags: ["myostatin", "follistatin", "muscle", "GH peptide", "isoform"],
-    tier: "entry",
     variantOf: "follistatin-344",
     variantNote: "Shorter isoform; similar myostatin/activin inhibition with distinct tissue distribution vs FST-344.",
   },
@@ -72,7 +70,6 @@ export const BATCH7 = [
     reconstitution: "Pre-filled devices — no user reconstitution",
     notes: "Pharmaceutical GLP-1; daily injection schedule vs weekly semaglutide.",
     tags: ["GLP-1", "metabolic", "weight loss", "T2D", "pharma"],
-    tier: "entry",
   },
   {
     id: "clenbuterol",
@@ -95,7 +92,6 @@ export const BATCH7 = [
     reconstitution: "N/A (oral)",
     notes: "Small-molecule β2 agonist; cardiac risk — physician oversight essential.",
     tags: ["metabolic", "fat loss", "beta-2", "cutting", "small molecule"],
-    tier: "entry",
   },
   {
     id: "albuterol",
@@ -118,7 +114,6 @@ export const BATCH7 = [
     reconstitution: "N/A",
     notes: "Prescription bronchodilator; do not equate recreational dosing with asthma care.",
     tags: ["beta-2", "bronchodilator", "metabolic", "pharma"],
-    tier: "entry",
   },
   {
     id: "gdf-15",
@@ -141,7 +136,6 @@ export const BATCH7 = [
     reconstitution: "BAC water or sterile saline per COA",
     notes: "Emerging metabolic target; not a retail peptide — context is clinical/research.",
     tags: ["metabolic", "appetite", "GFRAL", "research", "cytokine"],
-    tier: "entry",
   },
   {
     id: "fgf-21",
@@ -164,7 +158,6 @@ export const BATCH7 = [
     reconstitution: "Per kit instructions",
     notes: "Metabolic hormone class; most human use is engineered analogs with extended half-life.",
     tags: ["longevity", "metabolic", "insulin", "β-Klotho", "liver hormone"],
-    tier: "entry",
   },
   {
     id: "p21-peptide",
@@ -201,7 +194,6 @@ export const BATCH7 = [
     notes:
       "Single-lab origin (Iqbal et al., NYSIBR) with strong internal consistency across ~10–15 peer-reviewed studies (2010–2024). Chronic oral P021 in 3xTg-AD mice prevented cognitive decline, reduced tau pathology, and preserved synapses at 12 months. 2024 work expanded into CDKL5 deficiency disorder. No human clinical trials completed. Distinct from but mechanistically complementary to Adamax (BDNF receptor sensitization) and Dihexa (synaptogenesis via HGF/c-Met). Available from Swiss Chems as 5 mg lyophilized vials.",
     tags: ["nootropic", "CNTF", "neurogenesis", "BDNF", "tau", "Alzheimer research", "hippocampus", "research"],
-    tier: "entry",
   },
   {
     id: "gdf-11",
@@ -224,7 +216,6 @@ export const BATCH7 = [
     reconstitution: "Sterile buffer per supplier",
     notes: "Controversial — some studies conflicting on net benefit.",
     tags: ["longevity", "TGF-beta", "aging", "research", "controversial"],
-    tier: "entry",
   },
   {
     id: "klotho",
@@ -247,7 +238,6 @@ export const BATCH7 = [
     reconstitution: "Sterile diluent per COA",
     notes: "Circulating Klotho declines with age; exogenous replacement is not standardized.",
     tags: ["longevity", "FGF23", "kidney", "anti-aging", "protein"],
-    tier: "entry",
   },
   {
     id: "svetinorm",
@@ -270,7 +260,6 @@ export const BATCH7 = [
     reconstitution: "BAC water or sterile saline per ampule",
     notes: "Khavinson liver-targeted bioregulator.",
     tags: ["Khavinson", "liver", "bioregulator", "longevity"],
-    tier: "entry",
   },
   {
     id: "endoluten",
@@ -293,7 +282,6 @@ export const BATCH7 = [
     reconstitution: "Per manufacturer",
     notes: "Khavinson pineal/reproductive bioregulator line.",
     tags: ["Khavinson", "pineal", "melatonin", "bioregulator"],
-    tier: "entry",
   },
   {
     id: "bonomarlot",
@@ -316,6 +304,5 @@ export const BATCH7 = [
     reconstitution: "Per manufacturer",
     notes: "Khavinson bone marrow / hematopoietic bioregulator.",
     tags: ["Khavinson", "bone marrow", "immune", "bioregulator"],
-    tier: "entry",
   },
 ];

@@ -1,5 +1,14 @@
 import { expect } from "@playwright/test";
 
+/** Bottom nav first tab (Library) — stable vs visible label text (`App.jsx` `nav[aria-label="Main"]`). */
+export function postLoginNavLandmark(page) {
+  return page.getByRole("navigation", { name: "Main" }).getByRole("button").first();
+}
+
+export async function requireAuth(_page) {
+  // no-op: storageState provides session for chromium project
+}
+
 export async function passAgeGateIfPresent(page) {
   await page.waitForLoadState("networkidle");
   const enterButton = page.getByRole("button", { name: /i agree & enter/i });
@@ -19,13 +28,38 @@ export async function dismissTutorialIfPresent(page) {
   await backdrop.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
 }
 
+export async function waitForOverlaysToClear(page) {
+  await page
+    .locator('[style*="tutorialPulse"]')
+    .first()
+    .waitFor({ state: "hidden", timeout: 5000 })
+    .catch(() => {});
+}
+
+/**
+ * Fresh profiles with no `handle` render `HandleSetup` only — no `nav[aria-label="Main"]` yet
+ * (see App.jsx `needsHandleOnboarding`). Complete it so post-login landmarks exist.
+ */
+async function completeHandleOnboardingIfPresent(page) {
+  const handleHeading = page.getByText("CHOOSE YOUR HANDLE", { exact: true });
+  if (!(await handleHeading.isVisible({ timeout: 4_000 }).catch(() => false))) return;
+  const unique = `e2e${Date.now()}`;
+  await page.getByPlaceholder("yourhandle").fill(unique);
+  await expect(page.getByText("Available", { exact: true })).toBeVisible({ timeout: 25_000 });
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(handleHeading).toBeHidden({ timeout: 30_000 });
+}
+
 export async function loginUser(page, email, password) {
   await page.goto("/");
   await passAgeGateIfPresent(page);
 
+  const navLandmark = postLoginNavLandmark(page);
+
   // Already logged in
-  if (await page.getByText("LIBRARY", { exact: true }).isVisible({ timeout: 2_000 }).catch(() => false)) {
+  if (await navLandmark.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await dismissTutorialIfPresent(page);
+    await waitForOverlaysToClear(page);
     return;
   }
 
@@ -37,5 +71,7 @@ export async function loginUser(page, email, password) {
   // After login: wait for app to render, then clear tutorial before asserting nav
   await page.waitForTimeout(3_000);
   await dismissTutorialIfPresent(page);
-  await expect(page.getByText("LIBRARY", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await completeHandleOnboardingIfPresent(page);
+  await expect(navLandmark).toBeVisible({ timeout: 15_000 });
+  await waitForOverlaysToClear(page);
 }

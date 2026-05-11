@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loginUser } from "./helpers/auth.js";
+import { dismissTutorialIfPresent, loginUser, passAgeGateIfPresent, waitForOverlaysToClear } from "./helpers/auth.js";
 
 /**
  * Account deletion + session token tests.
@@ -11,7 +11,8 @@ import { loginUser } from "./helpers/auth.js";
 
 const DELETE_EMAIL = process.env.E2E_DELETE_EMAIL ?? "";
 const DELETE_PASSWORD = process.env.E2E_DELETE_PASSWORD ?? "";
-const HAS_DELETE_CREDS = Boolean(DELETE_EMAIL && DELETE_PASSWORD);
+const HAS_DELETE_CREDS =
+  !!process.env.E2E_DELETE_EMAIL && !!process.env.E2E_DELETE_PASSWORD;
 
 const MAIN_EMAIL = process.env.E2E_TEST_EMAIL ?? "";
 const MAIN_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
@@ -51,7 +52,10 @@ test.describe("session token freshness", () => {
   test.skip(!HAS_MAIN_CREDS, "No E2E_TEST_EMAIL / E2E_TEST_PASSWORD — skipping");
 
   test("Worker call carries a valid fresh JWT after login", async ({ page }) => {
-    await loginUser(page, MAIN_EMAIL, MAIN_PASSWORD);
+    await page.goto("/");
+    await passAgeGateIfPresent(page);
+    await dismissTutorialIfPresent(page);
+    await waitForOverlaysToClear(page);
 
     // Capture Bearer tokens from any Worker request — matches both local Vite
     // proxy (/api-worker → 127.0.0.1:8787) and production Worker URLs.
@@ -69,7 +73,7 @@ test.describe("session token freshness", () => {
     });
 
     // Navigate to Vial Tracker — fires a Worker call on load.
-    await page.getByText("VIAL TRACKER", { exact: true }).click();
+    await page.getByRole("button", { name: "Vial Tracker" }).click();
     await page.waitForTimeout(2_000);
 
     // Mandatory: at least one Worker request must have fired so the JWT check
@@ -88,14 +92,10 @@ test.describe("session token freshness", () => {
 // ─── Delete account flow ──────────────────────────────────────────────────────
 
 test.describe("account deletion", () => {
-  test.skip(
-    !HAS_DELETE_CREDS,
-    "No E2E_DELETE_EMAIL / E2E_DELETE_PASSWORD — skipping destructive test"
-  );
-
   test("delete confirmation modal renders correctly and can be dismissed", async ({
     page,
   }) => {
+    test.skip(!HAS_DELETE_CREDS, "Skipped: E2E_DELETE_EMAIL / E2E_DELETE_PASSWORD not set");
     await loginUser(page, DELETE_EMAIL, DELETE_PASSWORD);
     await openDeleteModal(page);
 
@@ -118,6 +118,7 @@ test.describe("account deletion", () => {
   });
 
   test("delete modal title is not purple", async ({ page }) => {
+    test.skip(!HAS_DELETE_CREDS, "Skipped: E2E_DELETE_EMAIL / E2E_DELETE_PASSWORD not set");
     await loginUser(page, DELETE_EMAIL, DELETE_PASSWORD);
     await openDeleteModal(page);
 
@@ -130,6 +131,7 @@ test.describe("account deletion", () => {
   });
 
   test("delete account succeeds — no error, user signed out", async ({ page }) => {
+    test.skip(!HAS_DELETE_CREDS, "Skipped: E2E_DELETE_EMAIL / E2E_DELETE_PASSWORD not set");
     await loginUser(page, DELETE_EMAIL, DELETE_PASSWORD);
 
     // Watch for Worker 4xx / 5xx on the delete endpoint.

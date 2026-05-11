@@ -19,7 +19,6 @@ export const BATCH5 = [
       "May worsen insulin sensitivity — monitor fasting glucose",
       "Long-term use caution — sustained IGF-1 elevation",
     ],
-    tier: "entry",
   },
   {
     id: "rad-140",
@@ -40,7 +39,6 @@ export const BATCH5 = [
       "Not for use without baseline labs",
       "Phase 1 trials paused due to hepatotoxicity signals",
     ],
-    tier: "entry",
   },
   {
     id: "gw-501516",
@@ -62,7 +60,6 @@ export const BATCH5 = [
       "Risk-benefit ratio is individual decision — informed use only",
       "Do not use long-term",
     ],
-    tier: "entry",
   },
   {
     id: "yk-11",
@@ -83,7 +80,6 @@ export const BATCH5 = [
       "Steroidal backbone — more systemic than non-steroidal SARMs",
       "Limited human data",
     ],
-    tier: "entry",
   },
   {
     id: "s4",
@@ -99,7 +95,6 @@ export const BATCH5 = [
     tags: ["SARM", "anabolic", "hardening", "vascularity", "androgen receptor", "lean mass"],
     sourcingNotes: "Available from research peptide vendors. Split dosing (AM/PM) due to short half-life. Yellow vision tint at >50mg typically resolves off-cycle.",
     warnings: ["Yellow/green vision tint at higher doses — dose-dependent, reversible", "Testosterone suppression — PCT consideration", "Short half-life requires split dosing"],
-    tier: "entry",
   },
   {
     id: "s23",
@@ -120,7 +115,6 @@ export const BATCH5 = [
       "Do not use if trying to conceive",
       "Liver monitoring recommended",
     ],
-    tier: "entry",
   },
   {
     id: "rad-150",
@@ -136,7 +130,6 @@ export const BATCH5 = [
     tags: ["SARM", "anabolic", "ester", "prodrug", "androgen receptor", "lean mass"],
     sourcingNotes: "Available from research peptide vendors. Newer compound — less data than RAD-140 but same mechanism with extended half-life advantage.",
     warnings: ["Same warnings as RAD-140", "Ester cleavage variability between individuals", "Even less long-term data than RAD-140"],
-    tier: "entry",
     variantOf: "rad-140",
     variantNote: "Esterified prodrug of RAD-140. More stable blood levels, extended half-life. Otherwise same mechanism and precautions.",
   },
@@ -155,7 +148,6 @@ export const BATCH5 = [
     sourcingNotes:
       "Available from research peptide vendors. Not androgenic — no suppression. Circadian biology mechanism makes it relevant for shift workers and those with disrupted sleep schedules.",
     warnings: ["Not a SARM in the traditional androgen receptor sense — categorized here for catalog organization only", "Short half-life requires split dosing", "Limited human data"],
-    tier: "entry",
   },
   {
     id: "ac-262",
@@ -171,7 +163,6 @@ export const BATCH5 = [
     tags: ["SARM", "partial agonist", "anabolic", "androgen receptor", "muscle", "bone"],
     sourcingNotes: "Available from research peptide vendors. One of the more conservative SARMs — appropriate starting point for those new to androgen receptor modulators.",
     warnings: ["Testosterone suppression still occurs — monitor", "Less characterized than RAD-140 or Ostarine", "PCT consideration"],
-    tier: "entry",
   },
   {
     id: "slu-pp-332",
@@ -191,6 +182,5 @@ export const BATCH5 = [
       "Long-term ERR agonism effects unknown",
       "Not androgenic — no PCT needed but mechanism has systemic transcriptional effects",
     ],
-    tier: "entry",
   },
 ];

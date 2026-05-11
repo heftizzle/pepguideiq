@@ -12,7 +12,6 @@ export const BATCH2 = [
     tags: ["GH", "growth hormone", "GHRP", "appetite", "ghrelin", "bulking", "muscle"],
     sourcingNotes: "Available from research peptide vendors. Older generation GHRP — Ipamorelin preferred for cleaner GH pulse. GHRP-6 favored specifically for appetite stimulation in hard gainers.",
     warnings: ["Significant appetite increase — plan meals accordingly", "Cortisol and prolactin elevation greater than Ipamorelin", "Inject fasted for maximal GH pulse"],
-    tier: "entry",
   },
   {
     id: "igf-1-des",
@@ -27,7 +26,6 @@ export const BATCH2 = [
     tags: ["IGF-1", "muscle", "hyperplasia", "satellite cells", "site-specific", "recovery", "GH peptide"],
     sourcingNotes: "Available in ~1mg vials from research peptide suppliers. Inject at or near target tissue immediately post-training for site-specific effect.",
     warnings: ["Hypoglycemia risk — dose post-meal or have glucose available", "Very short acting — timing critical", "Site injection technique matters"],
-    tier: "entry",
   },
   {
     id: "peg-mgf",
@@ -42,7 +40,6 @@ export const BATCH2 = [
     tags: ["IGF-1", "MGF", "muscle", "satellite cells", "hyperplasia", "recovery", "PEGylated"],
     sourcingNotes: "Available in ~2mg vials from research peptide suppliers. PEG form enables twice-weekly or weekly dosing vs immediate post-workout timing required for non-PEG MGF.",
     warnings: ["PEG carrier can cause immune reactions in rare cases", "Do not confuse dosing with non-PEG MGF — PEG form is far longer acting"],
-    tier: "entry",
   },
   {
     id: "mgf",
@@ -57,7 +54,6 @@ export const BATCH2 = [
     tags: ["IGF-1", "MGF", "muscle", "satellite cells", "hyperplasia", "recovery", "site-specific"],
     sourcingNotes: "Available from research peptide vendors. Timing is everything — must inject within minutes of training. PEG-MGF preferred for convenience.",
     warnings: ["Extremely short half-life — inject immediately post-training", "Site injection for local satellite cell activation", "Hypoglycemia risk lower than IGF-1 LR3 but monitor"],
-    tier: "entry",
     variantOf: "peg-mgf",
     variantNote: "Non-PEGylated. Requires precise post-workout timing. PEG-MGF allows weekly dosing with systemic distribution.",
   },
@@ -74,7 +70,6 @@ export const BATCH2 = [
     tags: ["TRT", "testosterone", "LH", "FSH", "fertility", "HPG axis", "GnRH", "pituitary"],
     sourcingNotes: "Available from research peptide vendors. Growing preference over HCG for TRT ancillary due to more physiologic LH/FSH pulsatility.",
     warnings: ["Must be dosed pulsatile — continuous infusion downregulates receptors", "Refrigerate after reconstitution", "Short half-life requires twice-daily dosing minimum"],
-    tier: "entry",
   },
   {
     id: "triptorelin",
@@ -89,7 +84,6 @@ export const BATCH2 = [
     tags: ["PCT", "HPG axis", "restart", "GnRH", "LH", "FSH", "testosterone recovery"],
     sourcingNotes: "Often sold as GnRH (Triptorelin) ~2mg from research peptide suppliers. Used primarily for post-cycle HPG axis restart.",
     warnings: ["Single dose restart protocol only — not for continuous use", "Initial testosterone surge then crash before recovery", "Not a substitute for proper PCT"],
-    tier: "entry",
   },
   {
     id: "follistatin-344",
@@ -104,7 +98,6 @@ export const BATCH2 = [
     tags: ["myostatin", "muscle", "hypertrophy", "anti-myostatin", "lean mass", "GH peptide"],
     sourcingNotes: "Available in ~1mg vials from research peptide suppliers. Course-dosed, not continuous. Extremely potent — limited human data. Acetic acid reconstitution preferred for stability.",
     warnings: ["Very limited human safety data", "Course dosing only", "Potential for unregulated tissue growth", "Acetic acid reconstitution required"],
-    tier: "entry",
   },
   {
     id: "ace-031",
@@ -119,6 +112,5 @@ export const BATCH2 = [
     tags: ["myostatin", "muscle", "hypertrophy", "anti-myostatin", "lean mass", "ActRIIB", "Duchenne"],
     sourcingNotes: "Available from research peptide vendors. Fusion protein compound — more complex than standard peptide. Long half-life. Clinical-grade research compound.",
     warnings: ["Nosebleeds and telangiectasias observed in clinical trials", "Broad myostatin/activin inhibition has systemic effects beyond muscle", "Very limited human data outside clinical trials"],
-    tier: "entry",
   },
 ];

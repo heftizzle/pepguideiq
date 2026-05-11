@@ -8,7 +8,11 @@
 //   2. mocked — page.route intercept; 429 exhausted UI without burning KV quota (CI-safe)
 
 import { test, expect } from "@playwright/test";
-import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
+import {
+  dismissTutorialIfPresent,
+  passAgeGateIfPresent,
+  waitForOverlaysToClear,
+} from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -37,8 +41,10 @@ test.describe("App Help — smoke", () => {
   test.skip(!HAS_CREDS, "Skipping: E2E_TEST_EMAIL / E2E_TEST_PASSWORD not set in e2e/.env");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
+    await page.goto("/");
+    await passAgeGateIfPresent(page);
     await dismissTutorialIfPresent(page);
+    await waitForOverlaysToClear(page);
   });
 
   test("hamburger contains App Help row", async ({ page }) => {
@@ -169,8 +175,10 @@ test.describe("App Help — 429 exhausted (mocked)", () => {
   test.skip(!HAS_CREDS, "Skipping: E2E_TEST_EMAIL / E2E_TEST_PASSWORD not set in e2e/.env");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
+    await page.goto("/");
+    await passAgeGateIfPresent(page);
     await dismissTutorialIfPresent(page);
+    await waitForOverlaysToClear(page);
   });
 
   test("shows exhausted copy when Worker returns 429", async ({ page }) => {

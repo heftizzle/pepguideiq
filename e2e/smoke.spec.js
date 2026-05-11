@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { passAgeGateIfPresent } from "./helpers/auth.js";
+import { passAgeGateIfPresent, postLoginNavLandmark } from "./helpers/auth.js";
 
 test("landing page loads and shows PepGuideIQ branding", async ({ page }) => {
   await page.goto("/");
@@ -17,9 +17,9 @@ test("landing page loads and shows PepGuideIQ branding", async ({ page }) => {
 test("landing page has a sign-in entry point", async ({ page }) => {
   await page.goto("/");
   await passAgeGateIfPresent(page);
-  const libraryNav = page.getByText("LIBRARY", { exact: true });
-  if (await libraryNav.isVisible().catch(() => false)) {
-    await expect(libraryNav).toBeVisible();
+  const navLandmark = postLoginNavLandmark(page);
+  if (await navLandmark.isVisible().catch(() => false)) {
+    await expect(navLandmark).toBeVisible();
     return;
   }
   const authEntry = page

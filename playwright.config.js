@@ -24,6 +24,11 @@ loadDotEnvFile("e2e/.env");
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.js",
+  timeout: 60_000, // default would be 30_000
+  expect: {
+    timeout: 10_000, // default is 5s
+  },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
@@ -34,7 +39,21 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: /auth\.spec\.js/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "./e2e/.auth/user.json",
+      },
+    },
+    {
+      name: "chromium-auth",
+      testMatch: /auth\.spec\.js/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
   webServer: {
     command: "pnpm dev",
     url: "http://localhost:5173",

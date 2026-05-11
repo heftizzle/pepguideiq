@@ -16,7 +16,6 @@ export const BATCH4 = [
       "Potent TrkB agonism — theoretical oncogenic risk with chronic use (same concern as BDNF)",
       "Oral — DMSO carrier may irritate GI",
     ],
-    tier: "entry",
   },
   {
     id: "78-dhf",
@@ -31,7 +30,6 @@ export const BATCH4 = [
     tags: ["BDNF", "TrkB", "nootropic", "neurogenesis", "flavone", "neuroprotective", "cognitive"],
     sourcingNotes: "Available in capsule and powder from research peptide vendors. Precursor/lower-potency alternative to Eutropoflavin.",
     warnings: ["Lower bioavailability than Eutropoflavin — higher doses required", "Theoretical long-term TrkB agonism concerns"],
-    tier: "entry",
     variantOf: "eutropoflavin",
     variantNote: "Parent compound. Less potent, lower cost, more characterized. Eutropoflavin is the optimized synthetic derivative.",
   },
@@ -52,7 +50,6 @@ export const BATCH4 = [
       "Long tissue half-life — dosing conservatively advised",
       "Not technically a peptide — longevity mechanism only",
     ],
-    tier: "entry",
   },
   {
     id: "ftpp",
@@ -72,7 +69,6 @@ export const BATCH4 = [
       "Most experimental compound on the platform",
       "Dehydration must be avoided",
     ],
-    tier: "entry",
   },
   {
     id: "trevogrumab",
@@ -91,7 +87,6 @@ export const BATCH4 = [
       "Limited long-term human data outside clinical trials",
       "Cold chain storage critical",
     ],
-    tier: "entry",
   },
   {
     id: "os-01",
@@ -107,7 +102,6 @@ export const BATCH4 = [
     sourcingNotes:
       "Cosmetic topical from the originating skin-longevity brand — not a standard research-vial peptide. AI-discovered and peer-reviewed — notable credibility vs most cosmetic peptides.",
     warnings: ["Topical only — not for injection", "Proprietary formulation — third-party purity testing not available"],
-    tier: "entry",
   },
   {
     id: "9-me-bc",
@@ -123,7 +117,6 @@ export const BATCH4 = [
     sourcingNotes:
       "Available in capsule and powder from research peptide vendors. Finnrick does not test — research community COAs and reports are the best quality signal. Light-sensitive compound.",
     warnings: ["Light sensitive — store in dark container", "MAO-B inhibitory activity — avoid with tyramine-rich foods at high doses", "Limited human safety data", "Not for those on SSRIs/MAOIs"],
-    tier: "entry",
   },
   {
     id: "noopept",
@@ -138,7 +131,6 @@ export const BATCH4 = [
     tags: ["nootropic", "BDNF", "NGF", "acetylcholine", "glutamate", "cognitive", "racetam-adjacent"],
     sourcingNotes: "Available in capsule and powder from research peptide vendors. One of the most well-characterized smart drugs. Widely available.",
     warnings: ["Headache at high doses — choline supplementation may help", "Tolerance develops — cycle on/off", "Mild psychostimulant at higher doses"],
-    tier: "entry",
   },
   {
     id: "nsi-189",
@@ -153,7 +145,6 @@ export const BATCH4 = [
     tags: ["nootropic", "neurogenesis", "hippocampus", "depression", "cognitive", "neural progenitor"],
     sourcingNotes: "Available in capsule and powder from research peptide vendors. Free base and phosphate salt forms — phosphate preferred for stability.",
     warnings: ["Emotional blunting reported at high doses (>40mg)", "Cycle — continuous use data limited", "Not technically a peptide — mechanism is unique enough to earn catalog inclusion"],
-    tier: "entry",
   },
   {
     id: "phenibut",
@@ -173,7 +164,6 @@ export const BATCH4 = [
       "Potentiates alcohol and other CNS depressants",
       "Not for anxious or addictive personality profiles without physician oversight",
     ],
-    tier: "entry",
   },
   {
     id: "bam-15",
@@ -192,7 +182,6 @@ export const BATCH4 = [
       "Do NOT confuse with DNP (2,4-dinitrophenol) — different compound, safer profile but still experimental",
       "Hyperthermia theoretically possible at overdose",
     ],
-    tier: "entry",
   },
   {
     id: "methylene-blue",
@@ -256,6 +245,5 @@ export const BATCH4 = [
       "Orthostatic hypotension — rise slowly",
       "Nausea common when starting — take with food",
     ],
-    tier: "entry",
   },
 ];

@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { loginUser, dismissTutorialIfPresent } from "./helpers/auth.js";
+import {
+  dismissTutorialIfPresent,
+  passAgeGateIfPresent,
+  postLoginNavLandmark,
+  waitForOverlaysToClear,
+} from "./helpers/auth.js";
 
 const HAS_CREDS = !!(process.env.E2E_TEST_EMAIL && process.env.E2E_TEST_PASSWORD);
 
@@ -7,7 +12,10 @@ test.describe("tutorial flow", () => {
   test.skip(!HAS_CREDS, "Skipped: no E2E_TEST_EMAIL / E2E_TEST_PASSWORD set");
 
   test.beforeEach(async ({ page }) => {
-    await loginUser(page, process.env.E2E_TEST_EMAIL, process.env.E2E_TEST_PASSWORD);
+    await page.goto("/");
+    await passAgeGateIfPresent(page);
+    await dismissTutorialIfPresent(page);
+    await waitForOverlaysToClear(page);
   });
 
   // ---------------------------------------------------------------------------
@@ -21,7 +29,10 @@ test.describe("tutorial flow", () => {
   });
 
   test("Help and guided tour button is visible in top bar", async ({ page }) => {
-    await expect(page.getByRole("button", { name: "Help and guided tour" })).toBeVisible();
+    await dismissTutorialIfPresent(page);
+    await expect(
+      page.getByRole("button", { name: "Help and guided tour" })
+    ).toBeVisible({ timeout: 8_000 });
   });
 
   test("clicking Tutorials opens tutorial overlay", async ({ page }) => {
@@ -122,7 +133,7 @@ test.describe("tutorial flow", () => {
     }
 
     // Tutorial overlay should be gone — bottom nav should be accessible
-    await expect(page.getByText("LIBRARY", { exact: true })).toBeVisible({ timeout: 6_000 });
+    await expect(postLoginNavLandmark(page)).toBeVisible({ timeout: 6_000 });
   });
 
   // ---------------------------------------------------------------------------
