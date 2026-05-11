@@ -17,7 +17,6 @@ import { normalizeFinnrickProductUrl } from "../lib/finnrickUrl.js";
  * - secondaryCategory?: string[] — optional, not populated yet; reserved for dual-tag filter mode (see App.jsx).
  * - variantOf?: string — optional parent peptide id; UI shows “Variant of: [parent name]”.
  * - variantNote?: string — optional difference vs parent; card shows as tooltip on the variant line.
- * - tier?: string — optional entitlements / catalog tier hint.
  * - stabilityDays?: number | null — reconstituted vial fridge stability (days); null = no vial tracking (see catalogStability.js).
  * - popularityRank?: number — Library "Popular" sort; lower = more popular (see popularityRank.js); missing/999 sinks to bottom.
  * - bioavailability?: string — shown on library cards / detail (see peptideBioavailability.js).

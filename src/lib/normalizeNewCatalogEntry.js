@@ -248,7 +248,6 @@ export function normalizeNewCatalogEntry(raw) {
     ...(sourcingNotesNormalized ? { sourcingNotes: sourcingNotesNormalized } : {}),
     ...(raw.variantOf ? { variantOf: String(raw.variantOf) } : {}),
     ...(raw.variantNote ? { variantNote: sanitizeVendorRefs(String(raw.variantNote)) } : {}),
-    ...(raw.tier != null ? { tier: String(raw.tier) } : {}),
     ...(raw.bioavailabilityNote != null && String(raw.bioavailabilityNote).trim()
       ? { bioavailabilityNote: sanitizeVendorRefs(String(raw.bioavailabilityNote)) }
       : {}),
