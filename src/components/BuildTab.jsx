@@ -29,6 +29,60 @@ function normalizeAdvisorTier(t) {
   return ADVISOR_TIER_KEYS.has(k) ? k : undefined;
 }
 
+/** localStorage key prefix for advisor result cache. */
+const ADVISOR_CACHE_KEY_PREFIX = "pepguideiq.advisor_cache.v1.";
+
+/** Advisor cache TTL: 24 hours. Long enough to survive multiple sessions; short enough that catalog updates eventually flush. */
+const ADVISOR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Read a cached advisor result for the given fingerprint.
+ * Returns null if missing, expired, or unparseable.
+ * @param {string} fingerprint
+ * @returns {{ insight: string, recommendations: Array<{peptideId: string, name: string, rationale: string, tier?: string}> } | null}
+ */
+function readAdvisorCache(fingerprint) {
+  if (!fingerprint || typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ADVISOR_CACHE_KEY_PREFIX + fingerprint);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.cachedAt !== "number") return null;
+    if (Date.now() - parsed.cachedAt > ADVISOR_CACHE_TTL_MS) {
+      try {
+        localStorage.removeItem(ADVISOR_CACHE_KEY_PREFIX + fingerprint);
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
+    const data = parsed.data;
+    if (!data || typeof data !== "object") return null;
+    if (typeof data.insight !== "string") return null;
+    if (!Array.isArray(data.recommendations)) return null;
+    return { insight: data.insight, recommendations: data.recommendations };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist an advisor result for the given fingerprint.
+ * Best-effort; silently fails on quota/serialization errors.
+ * @param {string} fingerprint
+ * @param {{ insight: string, recommendations: Array<{peptideId: string, name: string, rationale: string, tier?: string}> }} data
+ */
+function writeAdvisorCache(fingerprint, data) {
+  if (!fingerprint || !data || typeof localStorage === "undefined") return;
+  try {
+    const payload = JSON.stringify({ cachedAt: Date.now(), data });
+    localStorage.setItem(ADVISOR_CACHE_KEY_PREFIX + fingerprint, payload);
+  } catch {
+    /* quota exceeded or storage disabled — skip cache */
+  }
+}
+
 const ADVISOR_TIER_BADGE_STYLES = {
   must_have: {
     emoji: "🟢",
@@ -306,6 +360,28 @@ export function BuildTab({
       return;
     }
 
+    // CACHE HYDRATION — check localStorage for a prior result matching this fingerprint.
+    // If found, render it immediately and skip the network fetch entirely.
+    // This makes Stack Builder cold-open instant when the stack hasn't changed.
+    const cached = readAdvisorCache(advisorStackFingerprint);
+    if (cached) {
+      lastAdvisorFingerprint.current = advisorStackFingerprint;
+      setAdvisorData(cached);
+      setAdvisorError(null);
+      setAdvisorLoading(false);
+      return;
+    }
+
+    // VISIBILITY GATE — only fetch if the user is actually looking at the Stack Builder tab.
+    // If the user landed on a different tab (sessionStorage may have last set it to stackBuilder
+    // but they tapped away during boot), don't burn an Anthropic round trip they won't see.
+    // When they switch back to stackBuilder, this effect will rerun (activeTab is in the dep array)
+    // and the fetch will fire then.
+    if (activeTab !== "stackBuilder") {
+      setAdvisorLoading(false);
+      return;
+    }
+
     const myId = ++advisorFetchGen.current;
     setAdvisorLoading(true);
     setAdvisorError(null);
@@ -430,7 +506,9 @@ export function BuildTab({
           setAdvisorError(null);
           if (insightTrim || recs.length) {
             lastAdvisorFingerprint.current = advisorStackFingerprint;
-            setAdvisorData({ insight: insightTrim, recommendations: recs });
+            const newData = { insight: insightTrim, recommendations: recs };
+            setAdvisorData(newData);
+            writeAdvisorCache(advisorStackFingerprint, newData);
           } else {
             lastAdvisorFingerprint.current = "";
             setAdvisorData(null);
@@ -453,7 +531,7 @@ export function BuildTab({
         advisorDebounce.current = null;
       }
     };
-  }, [advisorStackFingerprint]);
+  }, [advisorStackFingerprint, activeTab]);
 
   useEffect(() => {
     if (activeTab !== "stackBuilder") return;
