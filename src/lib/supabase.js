@@ -350,6 +350,7 @@ export async function signUp(name, email, password, plan = "entry", turnstileTok
 }
 
 export async function signOut() {
+  clearCurrentUserCache();
   if (!supabase) return;
   await supabase.auth.signOut();
 }
@@ -432,7 +433,66 @@ function profileTextLower(profile, snakeKey, camelKey) {
   return String(v).trim().toLowerCase();
 }
 
+/**
+ * Module-level cache for the current user — coalesces concurrent boot-time calls
+ * and absorbs the short-window cold-boot waterfall (App.jsx's initial fetch +
+ * onAuthStateChange handler + downstream component effects all flow through here).
+ *
+ * Pattern: request deduplication via inFlight Promise + brief TTL cache.
+ * The TTL is short enough that profile changes propagate quickly (5s); the
+ * deduplication is what kills the cold-boot triplication.
+ */
+const CURRENT_USER_CACHE_TTL_MS = 5000;
+let _currentUserInFlight = null;
+let _currentUserCached = null;
+let _currentUserCachedAt = 0;
+
+/**
+ * Clear the cached current-user object. Call this after:
+ *   - Sign out (so the next user does not see previous-user cached state)
+ *   - Profile updates (display name change, plan upgrade via Stripe webhook return)
+ *   - Any other server-side mutation where the next read must be fresh
+ *
+ * Boot-path performance: deduplicates 3+ concurrent `getCurrentUser()` calls during
+ * cold boot into a single network round-trip pair (auth/v1/user + profiles?select=*).
+ */
+export function clearCurrentUserCache() {
+  _currentUserInFlight = null;
+  _currentUserCached = null;
+  _currentUserCachedAt = 0;
+}
+
 export async function getCurrentUser() {
+  // Cache hit: within TTL, return the cached object (synchronous-feeling).
+  if (_currentUserCached && Date.now() - _currentUserCachedAt < CURRENT_USER_CACHE_TTL_MS) {
+    return _currentUserCached;
+  }
+
+  // Coalesce concurrent callers: if a fetch is already in flight, await its result.
+  // This is the key deduplication that kills the cold-boot triple-fire pattern.
+  if (_currentUserInFlight) return _currentUserInFlight;
+
+  _currentUserInFlight = (async () => {
+    try {
+      const result = await _fetchCurrentUserUncached();
+      _currentUserCached = result;
+      _currentUserCachedAt = Date.now();
+      return result;
+    } finally {
+      // Always clear in-flight even on error so the next call retries instead of
+      // returning a rejected Promise forever.
+      _currentUserInFlight = null;
+    }
+  })();
+
+  return _currentUserInFlight;
+}
+
+/**
+ * Internal: actual auth + profile fetch. Preserved exactly from the original
+ * `getCurrentUser` body — no logic changes, just wrapped for cache layering.
+ */
+async function _fetchCurrentUserUncached() {
   if (!supabase) return null;
   const { data: auth } = await supabase.auth.getUser();
   const u = auth?.user;
@@ -496,6 +556,7 @@ export async function getCurrentUserFreshAfterCheckout() {
   } catch (e) {
     if (import.meta.env.DEV) console.warn("[getCurrentUserFreshAfterCheckout]", e);
   }
+  clearCurrentUserCache(); // Stripe webhook just updated profile.plan — invalidate stale cache.
   return getCurrentUser();
 }
 
