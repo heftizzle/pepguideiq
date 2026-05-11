@@ -10,6 +10,7 @@ dist
 supabase/.temp/
 /playwright-report/
 /test-results/
+playwright-results*.txt
 /e2e/.env
 e2e/.auth/user.json
 
