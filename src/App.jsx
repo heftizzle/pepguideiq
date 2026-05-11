@@ -423,6 +423,8 @@ function profileHandleFromWindowPath() {
 }
 
 const PEPV_LAST_TAB_KEY = "pepv_last_tab";
+/** localStorage key — user's sticky preference for which tab to land on after browser restart. */
+const PEPV_PREFERRED_TAB_KEY = "pepguideiq.preferred_tab";
 const PEPV_DEFAULT_TAB = "profile";
 
 /** Bottom / main content tab ids (must match `setActiveTab` values). */
@@ -437,7 +439,11 @@ const PEPV_VALID_TABS = new Set([
   "profile",
 ]);
 
-/** True when sessionStorage had a valid saved tab on boot (skip Network default for returning navigators). */
+/**
+ * True when the user's tab was resolved from a saved storage value on boot
+ * (sessionStorage last-tab OR localStorage preferred tab). When true, the
+ * post-profile-load default-tab effect must NOT override the user's choice.
+ */
 let bootHadStoredTab = false;
 
 function TutorialSpotlightGate() {
@@ -471,16 +477,45 @@ function formatMyStackLinesForAi(items) {
     .join("; ");
 }
 
+/**
+ * Resolve the initial active tab from storage with this priority:
+ *   1. sessionStorage `pepv_last_tab` (the tab the user was on most recently in this browser session)
+ *   2. localStorage `pepguideiq.preferred_tab` (the user's sticky preference across browser restarts)
+ *   3. PEPV_DEFAULT_TAB ("profile")
+ *
+ * Sets the module-level `bootHadStoredTab` flag to true if either storage value resolved.
+ * This flag is read by the post-profile-load default-tab effect to know whether to
+ * override the resolved tab or respect the user's stored choice.
+ */
 function readInitialActiveTab() {
-  if (typeof sessionStorage === "undefined") return PEPV_DEFAULT_TAB;
-  try {
-    const raw = sessionStorage.getItem(PEPV_LAST_TAB_KEY);
-    const v = typeof raw === "string" ? raw.trim() : "";
-    if (!v || !PEPV_VALID_TABS.has(v)) return PEPV_DEFAULT_TAB;
-    return v;
-  } catch {
-    return PEPV_DEFAULT_TAB;
+  // Priority 1: sessionStorage — last tab the user was on, survives reloads within session.
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      const raw = sessionStorage.getItem(PEPV_LAST_TAB_KEY);
+      const v = typeof raw === "string" ? raw.trim() : "";
+      if (v && PEPV_VALID_TABS.has(v)) {
+        bootHadStoredTab = true;
+        return v;
+      }
+    } catch {
+      /* ignore and fall through */
+    }
   }
+  // Priority 2: localStorage — sticky personal preference, survives full browser restart.
+  if (typeof localStorage !== "undefined") {
+    try {
+      const raw = localStorage.getItem(PEPV_PREFERRED_TAB_KEY);
+      const v = typeof raw === "string" ? raw.trim() : "";
+      if (v && PEPV_VALID_TABS.has(v)) {
+        bootHadStoredTab = true;
+        return v;
+      }
+    } catch {
+      /* ignore and fall through */
+    }
+  }
+  // Priority 3: default for fresh users.
+  return PEPV_DEFAULT_TAB;
 }
 
 function PepGuideIQApp({ user, setUser }) {
@@ -509,15 +544,19 @@ function PepGuideIQApp({ user, setUser }) {
     }
   }, [activeTab]);
 
-  const networkDefaultAppliedRef = useRef(false);
+  const onboardedDefaultAppliedRef = useRef(false);
   useEffect(() => {
-    if (networkDefaultAppliedRef.current) return;
+    if (onboardedDefaultAppliedRef.current) return;
     if (!activeProfile) return;
-    networkDefaultAppliedRef.current = true;
+    onboardedDefaultAppliedRef.current = true;
+    // Respect any stored tab choice (sessionStorage last-tab OR localStorage preferred-tab).
+    // Only override for fresh users who have no storage history.
     if (bootHadStoredTab) return;
     const handleOk =
       typeof activeProfile.handle === "string" && activeProfile.handle.trim() !== "";
     const tutorialOk = activeProfile.tutorial_completed === true;
+    // Onboarded users (handle set + tutorial done) land on Stack Builder by default;
+    // fresh users land on PEPV_DEFAULT_TAB ("profile") so they see their own profile first.
     if (handleOk && tutorialOk) setActiveTab("stackBuilder");
   }, [activeProfile]);
 
