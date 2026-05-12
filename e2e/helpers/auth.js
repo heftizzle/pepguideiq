@@ -1,13 +1,10 @@
 import { expect } from "@playwright/test";
 
-/** Bottom nav first tab (Library) — stable vs visible label text (`App.jsx` `nav[aria-label="Main"]`). */
 export function postLoginNavLandmark(page) {
   return page.getByRole("navigation", { name: "Main" }).getByRole("button").first();
 }
 
-export async function requireAuth(_page) {
-  // no-op: storageState provides session for chromium project
-}
+export async function requireAuth(_page) {}
 
 export async function passAgeGateIfPresent(page) {
   await page.waitForLoadState("networkidle");
@@ -20,26 +17,41 @@ export async function passAgeGateIfPresent(page) {
 }
 
 export async function dismissTutorialIfPresent(page) {
-  // The blocker is the HamburgerMenu backdrop: div[role="presentation"]
-  // It has onClick={() => setOpen(false)} — clicking it closes the menu/overlay
-  const backdrop = page.locator('div[role="presentation"]').first();
-  if (!(await backdrop.isVisible({ timeout: 3_000 }).catch(() => false))) return;
-  await backdrop.click({ force: true });
-  await backdrop.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+  // Press Escape to dismiss tutorial overlay and/or hamburger drawer.
+  // The old code targeted div[role="presentation"] (hamburger backdrop) which
+  // never dismissed the tutorial — Step 1 of 12 was left blocking all nav clicks.
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+
+  // If tutorial "Next" button is still visible, try clicking a skip/close control.
+  const nextBtn = page.getByRole("button", { name: /next/i }).first();
+  const tutorialActive = await nextBtn.isVisible({ timeout: 1_000 }).catch(() => false);
+  if (tutorialActive) {
+    // Try Escape again — some tutorial steps need two presses
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+  }
 }
 
 export async function waitForOverlaysToClear(page) {
+  // 1. Wait for tutorial spotlight pulse ring to clear
   await page
     .locator('[style*="tutorialPulse"]')
     .first()
     .waitFor({ state: "hidden", timeout: 5000 })
     .catch(() => {});
+
+  // 2. Close hamburger drawer only when actually open (data-open="true")
+  const hamburgerBackdrop = page.locator('.pepv-hamburger-overlay[data-open="true"]');
+  const isOpen = await hamburgerBackdrop.isVisible().catch(() => false);
+  if (isOpen) {
+    await hamburgerBackdrop.click().catch(() => {});
+    await hamburgerBackdrop
+      .waitFor({ state: "hidden", timeout: 3000 })
+      .catch(() => {});
+  }
 }
 
-/**
- * Fresh profiles with no `handle` render `HandleSetup` only — no `nav[aria-label="Main"]` yet
- * (see App.jsx `needsHandleOnboarding`). Complete it so post-login landmarks exist.
- */
 async function completeHandleOnboardingIfPresent(page) {
   const handleHeading = page.getByText("CHOOSE YOUR HANDLE", { exact: true });
   if (!(await handleHeading.isVisible({ timeout: 4_000 }).catch(() => false))) return;
@@ -56,19 +68,16 @@ export async function loginUser(page, email, password) {
 
   const navLandmark = postLoginNavLandmark(page);
 
-  // Already logged in
   if (await navLandmark.isVisible({ timeout: 2_000 }).catch(() => false)) {
     await dismissTutorialIfPresent(page);
     await waitForOverlaysToClear(page);
     return;
   }
 
-  // Fill credentials using placeholder selectors (inputs have no labels)
   await page.getByPlaceholder("you@email.com").first().fill(email);
   await page.getByPlaceholder("••••••••").first().fill(password);
   await page.getByRole("button", { name: /sign in|log in|continue/i }).last().click();
 
-  // After login: wait for app to render, then clear tutorial before asserting nav
   await page.waitForTimeout(3_000);
   await dismissTutorialIfPresent(page);
   await completeHandleOnboardingIfPresent(page);
