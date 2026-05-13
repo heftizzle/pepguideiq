@@ -168,13 +168,12 @@ export function GlobalStyles() {
       }
       .pcard--library .pcard-head-main{
         min-width:0;
-        flex:0 0 auto;
+        flex:1 1 0;
       }
       .pcard--library .pcard-head-main > .brand{
         min-width:0;
-        overflow:hidden;
-        text-overflow:ellipsis;
-        white-space:nowrap;
+        white-space:normal;
+        overflow-wrap:break-word;
       }
       .build-tab-compound-meta .pill--category{font-size:11px;margin-top:4px;display:inline-block}
       .pepv-protocol-session-pill--active{
