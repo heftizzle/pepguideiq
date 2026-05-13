@@ -1867,7 +1867,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))",
                   gap: 14,
                   width: "100%",
                   minWidth: 0,
