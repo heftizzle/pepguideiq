@@ -16,6 +16,7 @@ test.describe("vial tracker", () => {
     await dismissTutorialIfPresent(page);
     await waitForOverlaysToClear(page);
     await page.getByRole("button", { name: "Vial Tracker" }).click();
+    await page.waitForLoadState("networkidle", { timeout: 20_000 });
   });
 
   // ---------------------------------------------------------------------------
@@ -44,7 +45,7 @@ test.describe("vial tracker", () => {
 
   test("Log dose button is visible on all nav tabs", async ({ page }) => {
     // It's a persistent floating button — check on library tab too
-    await page.getByRole("button", { name: "Library, 264 compounds" }).click();
+    await page.getByRole("button", { name: /Library/ }).click();
     await expect(page.getByRole("button", { name: "Log dose by session" })).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole("button", { name: "Stack Builder" }).click();

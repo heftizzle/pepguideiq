@@ -161,6 +161,7 @@ export function HamburgerMenu({
           role="presentation"
           onClick={() => setOpen(false)}
           aria-hidden={!open}
+          style={{ pointerEvents: open ? "auto" : "none" }}
         />
         <aside
           className="pepv-hamburger-drawer"

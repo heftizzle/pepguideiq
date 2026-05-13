@@ -17,39 +17,27 @@ export async function passAgeGateIfPresent(page) {
 }
 
 export async function dismissTutorialIfPresent(page) {
-  // Press Escape to dismiss tutorial overlay and/or hamburger drawer.
-  // The old code targeted div[role="presentation"] (hamburger backdrop) which
-  // never dismissed the tutorial — Step 1 of 12 was left blocking all nav clicks.
+  await page.waitForLoadState("domcontentloaded");
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
-
-  // If tutorial "Next" button is still visible, try clicking a skip/close control.
   const nextBtn = page.getByRole("button", { name: /next/i }).first();
   const tutorialActive = await nextBtn.isVisible({ timeout: 1_000 }).catch(() => false);
   if (tutorialActive) {
-    // Try Escape again — some tutorial steps need two presses
     await page.keyboard.press("Escape");
     await page.waitForTimeout(400);
   }
 }
 
 export async function waitForOverlaysToClear(page) {
-  // 1. Wait for tutorial spotlight pulse ring to clear
+  // Wait for tutorial spotlight pulse ring to clear
   await page
     .locator('[style*="tutorialPulse"]')
     .first()
     .waitFor({ state: "hidden", timeout: 5000 })
     .catch(() => {});
 
-  // 2. Close hamburger drawer only when actually open (data-open="true")
-  const hamburgerBackdrop = page.locator('.pepv-hamburger-overlay[data-open="true"]');
-  const isOpen = await hamburgerBackdrop.isVisible().catch(() => false);
-  if (isOpen) {
-    await hamburgerBackdrop.click().catch(() => {});
-    await hamburgerBackdrop
-      .waitFor({ state: "hidden", timeout: 3000 })
-      .catch(() => {});
-  }
+  // Brief settle for CSS transitions
+  await page.waitForTimeout(200);
 }
 
 async function completeHandleOnboardingIfPresent(page) {
@@ -65,6 +53,10 @@ async function completeHandleOnboardingIfPresent(page) {
 export async function loginUser(page, email, password) {
   await page.goto("/");
   await passAgeGateIfPresent(page);
+
+  // Suppress nav tooltips overlay — it renders as a full-screen inset:0 layer
+  // that intercepts pointer events on all nav buttons when tips haven't been seen.
+  await page.evaluate(() => localStorage.setItem("pepv_nav_tips_seen", "true"));
 
   const navLandmark = postLoginNavLandmark(page);
 
