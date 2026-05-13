@@ -15,6 +15,7 @@ import {
   listVialsForPeptideIds,
   updateUserVial,
 } from "../lib/supabase.js";
+import { Z } from "../lib/zIndex.js";
 import { VialArchiveButton } from "./Vials/VialArchiveButton.jsx";
 import { VialNotesShareToggle } from "./Vials/VialNotesShareToggle.jsx";
 import { VialShareToggleButton } from "./Vials/VialShareToggleButton.jsx";
@@ -1049,6 +1050,8 @@ function VialRow({
   const [recipeErr, setRecipeErr] = useState(/** @type {string | null} */ (null));
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [showArchivePrompt, setShowArchivePrompt] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef(null);
 
   useEffect(() => {
     setLabel(vial.label ?? "Vial 1");
@@ -1067,6 +1070,22 @@ function VialRow({
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [expiryDetailOpen]);
+
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function handleClick(e) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target)) setOverflowOpen(false);
+    }
+    function handleKey(e) {
+      if (e.key === "Escape") setOverflowOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [overflowOpen]);
 
   const dr = daysRemaining(vial.expires_at);
   const expired = dr < 0 || new Date(vial.expires_at) < new Date();
@@ -1373,7 +1392,7 @@ function VialRow({
                     onChange={() => onReload()}
                   />
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", position: "relative" }}>
                   <button
                     type="button"
                     className="btn-teal"
@@ -1384,13 +1403,57 @@ function VialRow({
                     Mark as Depleted
                   </button>
                   <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
-                  <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
-                    Delete Vial
+                  <button
+                    type="button"
+                    className="btn-teal"
+                    style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                    aria-label="More actions"
+                    onClick={() => setOverflowOpen((v) => !v)}
+                  >
+                    •••
                   </button>
+                  {overflowOpen && (
+                    <div
+                      ref={overflowRef}
+                      style={{
+                        position: "absolute",
+                        zIndex: Z.contextMenu,
+                        background: "var(--color-bg-card)",
+                        border: "1px solid var(--color-border-default)",
+                        borderRadius: 10,
+                        padding: 6,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                        minWidth: 220,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                        right: 0,
+                        top: "100%",
+                        marginTop: 4,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn-teal"
+                        style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                        onClick={() => { openRecipeEdit(); setOverflowOpen(false); }}
+                      >
+                        Edit reconstitution (mg / BAC mL)
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-red"
+                        style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                        onClick={() => { removeVial(); setOverflowOpen(false); }}
+                      >
+                        Delete Vial
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center", position: "relative" }}>
                 <VialShareToggleButton
                   vialId={vial.id}
                   archivedAt={vial.archived_at ?? null}
@@ -1402,9 +1465,53 @@ function VialRow({
                   Mark as Depleted
                 </button>
                 <VialArchiveButton vialId={vial.id} userId={userId} profileId={profileId} onArchived={onReload} disabled={!canMutate} />
-                <button type="button" className="btn-red" style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }} onClick={() => removeVial()}>
-                  Delete Vial
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                  aria-label="More actions"
+                  onClick={() => setOverflowOpen((v) => !v)}
+                >
+                  •••
                 </button>
+                {overflowOpen && (
+                  <div
+                    ref={overflowRef}
+                    style={{
+                      position: "absolute",
+                      zIndex: Z.contextMenu,
+                      background: "var(--color-bg-card)",
+                      border: "1px solid var(--color-border-default)",
+                      borderRadius: 10,
+                      padding: 6,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      minWidth: 220,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+                      right: 0,
+                      top: "100%",
+                      marginTop: 4,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn-teal"
+                      style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                      onClick={() => { openRecipeEdit(); setOverflowOpen(false); }}
+                    >
+                      Edit reconstitution (mg / BAC mL)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-red"
+                      style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
+                      onClick={() => { removeVial(); setOverflowOpen(false); }}
+                    >
+                      Delete Vial
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -1449,18 +1556,8 @@ function VialRow({
             </div>
           ) : null}
 
-          {canMutate && !depleted && !expired ? (
+          {editingRecipe && canMutate && !depleted && !expired ? (
             <div style={{ marginTop: 10 }}>
-              {!editingRecipe ? (
-                <button
-                  type="button"
-                  className="btn-teal"
-                  style={{ fontSize: 13, padding: "4px 10px", borderRadius: 12 }}
-                  onClick={() => openRecipeEdit()}
-                >
-                  Edit reconstitution (mg / BAC mL)
-                </button>
-              ) : (
                 <div
                   style={{
                     marginTop: 4,
@@ -1560,7 +1657,6 @@ function VialRow({
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           ) : null}
 

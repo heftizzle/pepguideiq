@@ -117,11 +117,17 @@ test.describe("vial tracker", () => {
   });
 
   test("Edit reconstitution button is present on vial card", async ({ page }) => {
-    const editBtn = page.getByRole("button", { name: "Edit reconstitution (mg / BAC mL)" });
-    const hasVials = await editBtn.isVisible({ timeout: 8_000 }).catch(() => false);
+    const moreBtn = page.getByRole("button", { name: "More actions" }).first();
+    const hasVials = await moreBtn.isVisible({ timeout: 8_000 }).catch(() => false);
 
     test.skip(!hasVials, "No existing vials found for this test account.");
-    await expect(editBtn.first()).toBeVisible();
+
+    await moreBtn.click();
+
+    const editBtn = page.getByRole("button", { name: "Edit reconstitution (mg / BAC mL)" });
+    await expect(editBtn).toBeVisible({ timeout: 4_000 });
+
+    await page.keyboard.press("Escape");
   });
 
   test("vial expiry badge is shown on vial card", async ({ page }) => {

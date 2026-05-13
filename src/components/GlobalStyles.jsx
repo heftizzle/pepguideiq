@@ -25,7 +25,9 @@ export function GlobalStyles() {
       }
       .pepv-main-scroll{
         background-color:var(--color-bg-page);
-        background:var(--color-bg-page);
+        background:
+          radial-gradient(ellipse at 50% 100%, var(--color-ambient-glow, color-mix(in srgb, var(--color-accent) 8%, transparent)) 0%, transparent 55%),
+          var(--color-bg-page);
         min-height:100vh;
         box-sizing:border-box;
       }
@@ -109,6 +111,8 @@ export function GlobalStyles() {
         position:relative;
         overflow:hidden;
         box-shadow:0 1px 3px var(--color-shadow-50),0 4px 12px var(--color-shadow-25);
+        backdrop-filter:blur(4px);
+        -webkit-backdrop-filter:blur(4px);
       }
       .pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,var(--color-accent));opacity:.5}
       .pcard:hover{
@@ -151,6 +155,7 @@ export function GlobalStyles() {
         color:var(--cc,var(--color-accent));
         border:1px solid color-mix(in srgb,var(--cc,var(--color-accent)) 21%,transparent);
         white-space:nowrap;
+        box-shadow:0 0 8px color-mix(in srgb, var(--color-accent) 30%, transparent);
       }
       .pcard .pill--category{
         font-size:13px;
@@ -186,7 +191,10 @@ export function GlobalStyles() {
         }
       }
       .btn-teal{background:var(--color-accent-subtle-14);border:1px solid var(--color-accent);color:var(--color-accent);padding:10px 20px;border-radius:7px;min-height:44px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;transition:all .2s}
-      .btn-teal:hover{background:var(--color-accent-subtle-22)}
+      .btn-teal:hover{
+        background:var(--color-accent-subtle-22);
+        box-shadow:0 0 12px color-mix(in srgb, var(--color-accent) 20%, transparent);
+      }
       .btn-teal:disabled{opacity:.4;cursor:not-allowed}
       @keyframes pepvBtnSavedPulse{
         0%{border-color:var(--color-success);box-shadow:0 0 0 0 var(--color-success-glow)}
@@ -226,7 +234,7 @@ export function GlobalStyles() {
       }
       .brand{font-family:'Oxanium',sans-serif}
       .drow{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--color-border-hairline);align-items:flex-start}
-      .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--color-accent);text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0}
+      .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--color-accent);text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0;text-shadow:0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent)}
       .dval{font-size:13px;color:var(--color-text-secondary);flex:1;line-height:1.6}
       .goal-chip{padding:6px 10px;border-radius:20px;border:1px solid var(--color-border-default);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s;text-align:left;width:100%}
       .goal-chip.on{border-color:var(--color-accent);color:var(--color-accent);background:var(--color-accent-subtle-10)}
