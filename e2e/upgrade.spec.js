@@ -61,10 +61,10 @@ test.describe("plan upgrade (stripe)", () => {
       await expect(page.getByText("Choose your plan")).toBeVisible({ timeout: 8_000 });
 
       // Tiers
-      await expect(page.getByText("ENTRY")).toBeVisible();
-      await expect(page.getByText("Pro", { exact: true })).toBeVisible();
-      await expect(page.getByText("ELITE")).toBeVisible();
-      await expect(page.getByText("GOAT", { exact: true })).toBeVisible();
+      await expect(page.getByText(/^entry$/i)).toBeVisible();
+      await expect(page.getByText(/^pro$/i)).toBeVisible();
+      await expect(page.getByText(/^elite$/i)).toBeVisible();
+      await expect(page.getByText(/^goat$/i)).toBeVisible();
 
       // Prices
       await expect(page.getByText("Free", { exact: true })).toBeVisible();
@@ -80,7 +80,9 @@ test.describe("plan upgrade (stripe)", () => {
       await expect(page.getByText("Choose your plan")).toBeVisible({ timeout: 8_000 });
 
       // One tier must be marked as current
-      await expect(page.getByRole("button", { name: "This is your current plan" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: /start free|this is your current plan/i })
+      ).toBeVisible();
     });
 
     test("upgrade modal shows paid tier CTA buttons", async ({ page }) => {

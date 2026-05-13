@@ -49,7 +49,10 @@ async function openDeleteModal(page) {
 // ─── Token freshness regression ───────────────────────────────────────────────
 
 test.describe("session token freshness", () => {
-  test.skip(!HAS_MAIN_CREDS, "No E2E_TEST_EMAIL / E2E_TEST_PASSWORD — skipping");
+  test.skip(
+    !HAS_MAIN_CREDS || !process.env.VITE_API_WORKER_URL,
+    "No E2E_TEST_EMAIL / E2E_TEST_PASSWORD or VITE_API_WORKER_URL not configured — skipping"
+  );
 
   test("Worker call carries a valid fresh JWT after login", async ({ page }) => {
     await page.goto("/");

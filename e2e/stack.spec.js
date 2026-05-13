@@ -46,13 +46,17 @@ test.describe("stack builder", () => {
       .first();
     const addButton = searchHit.getByRole("button", { name: /\+ add|add/i });
     const addEnabled = await addButton.isEnabled().catch(() => false);
-    if (addEnabled) await addButton.click();
+    if (!addEnabled) {
+      test.skip(true, "Add button disabled — stack limit reached for this tier");
+    }
+    await addButton.click();
 
     const stackRow = page
       .locator(".build-tab-compound-meta")
       .filter({ has: page.getByText("Wolverine Blend", { exact: true }) })
       .filter({ has: page.locator("select") })
       .first();
+    await stackRow.waitFor({ state: "visible", timeout: 10_000 });
     await stackRow.locator("select").selectOption("daily");
 
     await page.locator('input[type="number"]').first().fill("8");
