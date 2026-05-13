@@ -2757,12 +2757,47 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
               )}
               <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
-              </div>
-              <div style={{ marginTop:12 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
+              </div>
+              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"var(--color-accent-subtle-0e)",display:"flex",justifyContent:"flex-end",gap:8 }}>
+                <button
+                  type="button"
+                  className="btn-teal"
+                  style={{ fontSize: 13 }}
+                  data-tutorial-target={TUTORIAL_TARGET.atlas_compound_cta}
+                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atlas_compound_cta))}
+                  onClick={() => {
+                    if (!canAI) {
+                      openUpgradeModal("ai_guide");
+                      return;
+                    }
+                    setSelPeptide(null);
+                    setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
+                    setActiveTab("guide");
+                  }}
+                >
+                  Ask AI Atlas →
+                </button>
+                <button
+                  type="button"
+                  className={inStack?"btn-green":"btn-teal"}
+                  style={{ fontSize: 13, opacity: inStack ? 1 : !stackListReady ? 0.55 : 1 }}
+                  disabled={!inStack && !stackListReady}
+                  title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
+                  onClick={() => {
+                    if (!inStack && stackListReady) {
+                      openAdd(p);
+                      setSelPeptide(null);
+                    }
+                  }}
+                >
+                  {inStack ? "✓ Saved" : "+ Add to Saved Stack"}
+                </button>
+              </div>
+              <div style={{ marginTop:10 }}>
+                <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
               </div>
               {p.stacksWith.length > 0 && (
                 <div style={{ marginTop:10 }}>
@@ -2798,41 +2833,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.sourcingNotes}</div>
                 </div>
               )}
-              <div style={{ marginTop:16,display:"flex",justifyContent:"flex-end",gap:8 }}>
-                <button
-                  type="button"
-                  className="btn-teal"
-                  style={{ fontSize: 13 }}
-                  data-tutorial-target={TUTORIAL_TARGET.atlas_compound_cta}
-                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atlas_compound_cta))}
-                  onClick={() => {
-                    if (!canAI) {
-                      openUpgradeModal("ai_guide");
-                      return;
-                    }
-                    setSelPeptide(null);
-                    setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
-                    setActiveTab("guide");
-                  }}
-                >
-                  Ask AI Atlas →
-                </button>
-                <button
-                  type="button"
-                  className={inStack?"btn-green":"btn-teal"}
-                  style={{ fontSize: 13, opacity: inStack ? 1 : !stackListReady ? 0.55 : 1 }}
-                  disabled={!inStack && !stackListReady}
-                  title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
-                  onClick={() => {
-                    if (!inStack && stackListReady) {
-                      openAdd(p);
-                      setSelPeptide(null);
-                    }
-                  }}
-                >
-                  {inStack ? "✓ Saved" : "+ Add to Saved Stack"}
-                </button>
-              </div>
             </Modal>
           );
         })()}
