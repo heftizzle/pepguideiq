@@ -2758,9 +2758,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
               )}
               <div style={{ marginTop:10 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ padding:"1px 5px",background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
               </div>
-              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"var(--color-accent-subtle-0e)",display:"flex",justifyContent:"flex-end",gap:8 }}>
+              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"var(--color-bg-page)",display:"flex",justifyContent:"flex-end",gap:8 }}>
                 <button
                   type="button"
                   className="btn-teal"
@@ -2797,12 +2797,12 @@ function PepGuideIQMainTree({ mainUiRef }) {
               </div>
               <div style={{ marginTop:10 }}>
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ padding:"1px 5px",background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
               </div>
               {p.stacksWith.length > 0 && (
                 <div style={{ marginTop:10 }}>
                   <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
-                  <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ padding:"1px 5px",background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
                 </div>
               )}
               <div

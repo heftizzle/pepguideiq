@@ -232,9 +232,9 @@ export function GlobalStyles() {
         font-style:normal;font-weight:400;line-height:1;
       }
       .brand{font-family:'Oxanium',sans-serif}
-      .drow{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid var(--color-border-hairline);align-items:flex-start}
-      .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--color-accent);text-transform:uppercase;letter-spacing:.12em;min-width:110px;padding-top:3px;flex-shrink:0;text-shadow:0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent)}
-      .dval{font-size:13px;color:var(--color-text-secondary);flex:1;line-height:1.6}
+      .drow{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid var(--color-border-hairline)}
+      .dlabel{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--color-accent);text-transform:uppercase;letter-spacing:.12em;text-shadow:0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent)}
+      .dval{font-size:13px;color:var(--color-text-secondary);line-height:1.6}
       .goal-chip{padding:6px 10px;border-radius:20px;border:1px solid var(--color-border-default);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;transition:all .2s;text-align:left;width:100%}
       .goal-chip.on{border-color:var(--color-accent);color:var(--color-accent);background:var(--color-accent-subtle-10)}
       .ai-msg{padding:12px 14px;border-radius:8px;margin:6px 0;font-size:13px;line-height:1.65;animation:fi .3s ease}
