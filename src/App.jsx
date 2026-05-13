@@ -2765,7 +2765,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
                 <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ padding:"1px 5px",background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
               </div>
-              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"var(--color-bg-page)",display:"flex",justifyContent:"flex-end",gap:8 }}>
+              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"transparent",display:"flex",justifyContent:"flex-end",gap:8 }}>
                 <button
                   type="button"
                   className="btn-teal"
