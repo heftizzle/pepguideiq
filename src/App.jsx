@@ -2695,37 +2695,42 @@ function PepGuideIQMainTree({ mainUiRef }) {
           const inStack = myStack.some((s)=>s.id===p.id);
           const baDetail = resolvePeptideBioavailability(p);
           return (
-            <Modal onClose={() => setSelPeptide(null)} label={p.name}>
-              <div
-                className="pepv-peptide-modal-head"
-                data-testid="compound-detail"
-                style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14,...getCategoryCssVars(pCat) }}
-              >
-                <div>
-                  <div className="brand" style={{ fontSize:20,fontWeight:800,color:"var(--color-text-primary)" }}>{p.name}</div>
-                  {p.variantOf && (
-                    <div
-                      className="mono"
-                      title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
-                      style={{
-                        fontSize: 13,
-                        opacity: 0.65,
-                        color: "var(--color-text-secondary)",
-                        marginTop: 4,
-                        lineHeight: 1.4,
-                        fontWeight: 400,
-                        ...(p.variantNote ? { cursor: "help" } : {}),
-                      }}
-                    >
-                      Variant of: {getVariantParent(p)?.name ?? p.variantOf}
-                    </div>
-                  )}
-                  <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:3 }}>{p.aliases.join(" · ")}</div>
+            <Modal
+              onClose={() => setSelPeptide(null)}
+              label={p.name}
+              header={
+                <div
+                  className="pepv-peptide-modal-head"
+                  data-testid="compound-detail"
+                  style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",...getCategoryCssVars(pCat) }}
+                >
+                  <div>
+                    <div className="brand" style={{ fontSize:20,fontWeight:800,color:"var(--color-text-primary)" }}>{p.name}</div>
+                    {p.variantOf && (
+                      <div
+                        className="mono"
+                        title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
+                        style={{
+                          fontSize: 13,
+                          opacity: 0.65,
+                          color: "var(--color-text-secondary)",
+                          marginTop: 4,
+                          lineHeight: 1.4,
+                          fontWeight: 400,
+                          ...(p.variantNote ? { cursor: "help" } : {}),
+                        }}
+                      >
+                        Variant of: {getVariantParent(p)?.name ?? p.variantOf}
+                      </div>
+                    )}
+                    <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:3 }}>{p.aliases.join(" · ")}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className="pill pill--category">{pCat}</span>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span className="pill pill--category">{pCat}</span>
-                </div>
-              </div>
+              }
+            >
               {[
                 ["Typical Dose", p.typicalDose],
                 ["Start Dose", p.startDose],

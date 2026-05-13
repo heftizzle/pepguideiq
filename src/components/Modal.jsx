@@ -6,6 +6,7 @@ import { useFocusTrap } from "./useFocusTrap.js";
  * @param {{
  *   onClose: () => void;
  *   children: import("react").ReactNode;
+ *   header?: import("react").ReactNode;
  *   maxWidth?: number;
  *   label?: string;
  *   variant?: "default" | "sheet";
@@ -15,6 +16,7 @@ import { useFocusTrap } from "./useFocusTrap.js";
 export function Modal({
   onClose,
   children,
+  header,
   maxWidth = 580,
   label = "Dialog",
   variant = "default",
@@ -65,11 +67,12 @@ export function Modal({
           background: "var(--color-bg-card)",
           border: "1px solid var(--color-border-strong)",
           borderRadius: 12,
-          padding: 28,
           maxWidth,
           width: "100%",
           maxHeight: "90vh",
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
           boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
         }}
       >
@@ -78,10 +81,26 @@ export function Modal({
             onClose={onClose}
             ariaLabel="Close"
             variant="modal-accent"
-            style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}
+            style={{ position: "absolute", top: 6, right: 6, zIndex: 2 }}
           />
         ) : null}
-        <div style={showCloseButton ? { paddingInlineEnd: 36 } : undefined}>{children}</div>
+        {header ? (
+          <div style={{
+            padding: "14px 64px 10px 20px",
+            background: "var(--color-bg-card)",
+            borderBottom: "1px solid var(--color-border-hairline)",
+            flexShrink: 0,
+          }}>
+            {header}
+          </div>
+        ) : null}
+        <div style={{
+          padding: header ? "10px 20px 20px 20px" : 28,
+          overflowY: "auto",
+          flex: 1,
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   );
