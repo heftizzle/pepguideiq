@@ -78,6 +78,7 @@ import {
   onAuthStateChange,
   saveStack,
   signOut,
+  supabase,
 } from "./lib/supabase.js";
 import { normalizeHandleInput } from "./lib/memberProfileHandle.js";
 import {
@@ -1005,10 +1006,73 @@ function PepGuideIQApp({ user, setUser }) {
     const stackLines = myStack.length > 0 ? formatMyStackLinesForAi(myStack) : "";
     const stackCtx =
       myStack.length > 0
-        ? `\n\nUser's current stack${stackName ? ` (“${stackName}”)` : ""}: ${stackLines}.`
+        ? `\n\nUser's current stack${stackName ? ` (\u201c${stackName}\u201d)` : ""}: ${stackLines}.`
         : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
-    const system = `The user is an advanced biohacker.${stackCtx}${goalsCtx}`;
+
+    // --- Atlas live user context injection ---
+    let scanCtx = "";
+    let doseLogCtx = "";
+    let profileCtx = "";
+
+    if (supabase && activeProfileId) {
+      const [{ data: latestScans }, { data: recentDoseLogs }, { data: bodyMetricsRows }] =
+        await Promise.all([
+          supabase
+            .from("inbody_scan_history")
+            .select("scan_date, inbody_score, weight_lbs, smm_lbs, pbf_pct, fat_mass_lbs")
+            .eq("profile_id", activeProfileId)
+            .order("scan_date", { ascending: false, nullsFirst: false })
+            .limit(3),
+          supabase
+            .from("dose_logs")
+            .select("peptide_id, dose_mcg, dose_count, dose_unit, dosed_at")
+            .eq("profile_id", activeProfileId)
+            .order("dosed_at", { ascending: false })
+            .limit(20),
+          supabase
+            .from("body_metrics")
+            .select("weight_lbs")
+            .eq("user_id", user.id)
+            .eq("profile_id", activeProfileId)
+            .order("updated_at", { ascending: false })
+            .limit(1),
+        ]);
+
+      const age = user?.date_of_birth
+        ? Math.floor((Date.now() - Date.parse(user.date_of_birth)) / 31557600000)
+        : null;
+      const weightLbs = bodyMetricsRows?.[0]?.weight_lbs ?? null;
+
+      const profileParts = [
+        age ? `Age ${age}` : null,
+        user?.biological_sex ? `Sex: ${user.biological_sex}` : null,
+        weightLbs ? `Weight: ${weightLbs} lbs` : null,
+        user?.training_experience ? `Training experience: ${user.training_experience}` : null,
+      ].filter(Boolean);
+      profileCtx = profileParts.length ? `\n\nUser profile: ${profileParts.join(", ")}.` : "";
+
+      if (latestScans?.length) {
+        const s = latestScans[0];
+        scanCtx = `\n\nLatest InBody scan (${s.scan_date}): InBody Score ${s.inbody_score ?? "N/A"}, Weight ${s.weight_lbs ?? "N/A"} lbs, SMM ${s.smm_lbs ?? "N/A"} lbs, BF% ${s.pbf_pct ?? "N/A"}%, Fat Mass ${s.fat_mass_lbs ?? "N/A"} lbs.`;
+      }
+
+      if (recentDoseLogs?.length) {
+        const lines = recentDoseLogs.map((d) => {
+          const name = PEPTIDES.find((p) => p.id === d.peptide_id)?.name ?? d.peptide_id;
+          const doseStr =
+            d.dose_mcg != null
+              ? `${d.dose_mcg} mcg`
+              : d.dose_count != null
+              ? `${d.dose_count} ${d.dose_unit ?? ""}`.trim()
+              : "logged";
+          return `${name} ${doseStr} on ${d.dosed_at?.slice(0, 10) ?? "unknown"}`;
+        });
+        doseLogCtx = `\n\nRecent dose log (last 20): ${lines.join("; ")}.`;
+      }
+    }
+
+    const system = `You are PepGuideIQ AI Atlas — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`;
     const catalog = buildAdvisorCatalogPayload(PEPTIDES, primaryCategory);
     if (!isApiWorkerConfigured()) {
       setAiMsgs((prev) => [
