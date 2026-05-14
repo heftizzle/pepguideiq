@@ -684,33 +684,6 @@ function PepGuideIQApp({ user, setUser }) {
     setMobileSidebarOpen(false);
   }, []);
 
-  const handleContinueThread = useCallback(async () => {
-    if (!activeThreadId) return;
-    setAiLoading(true);
-    setThreadError(null);
-    try {
-      const token = await getSessionAccessToken();
-      const res = await fetch(`${API_WORKER_URL}/atfeh/threads/${activeThreadId}/continue`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 402) {
-        openUpgradeModal("thread_limit");
-        return;
-      }
-      if (!res.ok) throw new Error(`Continue failed (${res.status})`);
-      const data = await res.json();
-      setActiveThreadId(data.thread_id);
-      setThreadMessages([]);
-      setThreadLocked(false);
-      setThreadListVersion((n) => n + 1);
-    } catch (err) {
-      setThreadError(err.message || "Could not continue thread");
-    } finally {
-      setAiLoading(false);
-    }
-  }, [activeThreadId, openUpgradeModal]);
-
   const toggleGuideGoal = useCallback(
     (g) => {
       setGoals((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
@@ -1025,6 +998,33 @@ function PepGuideIQApp({ user, setUser }) {
     setUpgradeFocusTier(null);
     setUpgradeGateReason(null);
   }, []);
+
+  const handleContinueThread = useCallback(async () => {
+    if (!activeThreadId) return;
+    setAiLoading(true);
+    setThreadError(null);
+    try {
+      const token = await getSessionAccessToken();
+      const res = await fetch(`${API_WORKER_URL}/atfeh/threads/${activeThreadId}/continue`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 402) {
+        openUpgradeModal("thread_limit");
+        return;
+      }
+      if (!res.ok) throw new Error(`Continue failed (${res.status})`);
+      const data = await res.json();
+      setActiveThreadId(data.thread_id);
+      setThreadMessages([]);
+      setThreadLocked(false);
+      setThreadListVersion((n) => n + 1);
+    } catch (err) {
+      setThreadError(err.message || "Could not continue thread");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [activeThreadId, openUpgradeModal]);
 
   const openAdd = (p) => {
     if (!stackListReady) return;
