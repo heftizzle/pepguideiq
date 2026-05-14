@@ -5825,7 +5825,10 @@ async function handleAtfehCreateThread(request, env, cors) {
     return jsonResponse({ error: "Thread limit reached", limit, plan }, 429, cors);
   }
 
-  const threadTitle = typeof title === "string" && title.trim() ? title.trim().slice(0, 120) : "New Thread";
+  const d = new Date();
+  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getUTCMonth()];
+  const fallback = `Thread \u00b7 ${mon} ${d.getUTCDate()}, ${d.getUTCHours() % 12 || 12}:${String(d.getUTCMinutes()).padStart(2,"0")} ${d.getUTCHours() >= 12 ? "PM" : "AM"} UTC`;
+  const threadTitle = typeof title === "string" && title.trim() ? title.trim().slice(0, 120) : fallback;
 
   const insRes = await fetch(`${supabaseUrl}/rest/v1/ai_threads`, {
     method: "POST",
@@ -6170,6 +6173,39 @@ async function handleAtfehRestoreThread(request, env, cors, threadId) {
   if (!patchRes.ok) return jsonResponse({ error: "Failed to restore thread" }, 500, cors);
 
   await env.RATE_LIMIT_KV.delete(`atfeh:threads:${thread.profile_id}`).catch(() => {});
+  return jsonResponse({ success: true }, 200, cors);
+}
+
+// DELETE /atfeh/threads/:threadId — permanently delete thread and its messages
+async function handleAtfehDeleteThread(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+
+  const threadRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,profile_id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threadData = await threadRes.json().catch(() => []);
+  if (!Array.isArray(threadData) || threadData.length === 0) {
+    return jsonResponse({ error: "Thread not found" }, 404, cors);
+  }
+  const profileId = threadData[0].profile_id;
+
+  await fetch(
+    `${supabaseUrl}/rest/v1/ai_messages?thread_id=eq.${encodeURIComponent(threadId)}`,
+    { method: "DELETE", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: "return=minimal" } }
+  );
+  const delRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: "return=minimal" } }
+  );
+  if (!delRes.ok) return jsonResponse({ error: "Failed to delete thread" }, 500, cors);
+
+  if (env.RATE_LIMIT_KV) await env.RATE_LIMIT_KV.delete(`atfeh:threads:${profileId}`).catch(() => {});
   return jsonResponse({ success: true }, 200, cors);
 }
 
@@ -6842,6 +6878,10 @@ async function handleRequest(request, env) {
     const atfehRestoreMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/restore\/?$/);
     if (atfehRestoreMatch && request.method === "PATCH") {
       return handleAtfehRestoreThread(request, env, cors, atfehRestoreMatch[1]);
+    }
+    const atfehDeleteMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/?$/);
+    if (atfehDeleteMatch && request.method === "DELETE") {
+      return handleAtfehDeleteThread(request, env, cors, atfehDeleteMatch[1]);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {

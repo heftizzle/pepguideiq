@@ -93,6 +93,21 @@ export default function AtfehThreadSidebar({
     }
   };
 
+  const handleDelete = async (threadId) => {
+    if (!window.confirm("Delete this thread permanently? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`${workerUrl}/atfeh/threads/${threadId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      if (threadId === activeThreadId) onSelectThread(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleNewThread = () => {
     const active = threads.filter((t) => !t.archived);
     const limit = getThreadLimit(plan);
@@ -203,6 +218,7 @@ export default function AtfehThreadSidebar({
                   if (isMobile) closeDrawer();
                 }}
                 onArchive={() => handleArchive(t.id)}
+                onDelete={() => handleDelete(t.id)}
               />
             ))}
 
@@ -257,6 +273,7 @@ export default function AtfehThreadSidebar({
                         if (isMobile) closeDrawer();
                       }}
                       onRestore={() => handleRestore(t.id)}
+                      onDelete={() => handleDelete(t.id)}
                     />
                   ))}
               </div>
@@ -382,8 +399,17 @@ export default function AtfehThreadSidebar({
   );
 }
 
-function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore }) {
+function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore, onDelete }) {
   const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
 
   const baseStyle = {
     display: "flex",
@@ -405,13 +431,59 @@ function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore 
     textAlign: "left",
     width: "100%",
     fontFamily: "'Outfit', sans-serif",
+    position: "relative",
   };
+
+  const menuBtnStyle = {
+    background: "none",
+    border: "none",
+    color: "var(--color-text-placeholder)",
+    fontSize: 16,
+    cursor: "pointer",
+    padding: "2px 4px",
+    minWidth: 28,
+    minHeight: 28,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 4,
+    lineHeight: 1,
+    opacity: hovered || menuOpen ? 1 : 0,
+    transition: "opacity 150ms ease",
+  };
+
+  const dropdownStyle = {
+    position: "absolute",
+    top: "100%",
+    right: 0,
+    zIndex: 20,
+    marginTop: 4,
+    background: "var(--color-bg-card)",
+    border: "1px solid var(--color-border-default)",
+    borderRadius: 8,
+    padding: "4px 0",
+    minWidth: 130,
+    boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+  };
+
+  const menuItemStyle = (danger) => ({
+    display: "block",
+    width: "100%",
+    background: "none",
+    border: "none",
+    padding: "8px 14px",
+    fontSize: 12,
+    fontFamily: "'Outfit', sans-serif",
+    color: danger ? "var(--color-danger, #ef4444)" : "var(--color-text-primary)",
+    cursor: "pointer",
+    textAlign: "left",
+  });
 
   return (
     <div
       style={baseStyle}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
       onClick={onSelect}
       role="button"
       tabIndex={0}
@@ -433,7 +505,6 @@ function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore 
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {/* Message count badge */}
         {(thread.message_count ?? 0) > 0 && (
           <span
             style={{
@@ -450,54 +521,36 @@ function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore 
           </span>
         )}
 
-        {/* Action button — archive or restore */}
-        {archived && onRestore ? (
+        <div ref={menuRef} style={{ position: "relative" }}>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onRestore(); }}
-            title="Restore thread"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--color-accent)",
-              fontSize: 12,
-              cursor: "pointer",
-              padding: "2px 4px",
-              minWidth: 32,
-              minHeight: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'JetBrains Mono', monospace",
-              opacity: hovered ? 1 : 0.5,
-              transition: "opacity 150ms ease",
-            }}
+            style={menuBtnStyle}
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+            title="Thread actions"
+            aria-label="Thread actions"
           >
-            ↩
+            ⋮
           </button>
-        ) : !archived && onArchive && hovered ? (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onArchive(); }}
-            title="Archive thread"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--color-text-placeholder)",
-              fontSize: 11,
-              cursor: "pointer",
-              padding: "2px 4px",
-              minWidth: 32,
-              minHeight: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            ✕
-          </button>
-        ) : null}
+          {menuOpen && (
+            <div style={dropdownStyle}>
+              {archived && onRestore && (
+                <button type="button" style={menuItemStyle(false)} onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRestore(); }}>
+                  ↩ Restore
+                </button>
+              )}
+              {!archived && onArchive && (
+                <button type="button" style={menuItemStyle(false)} onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onArchive(); }}>
+                  Archive
+                </button>
+              )}
+              {onDelete && (
+                <button type="button" style={menuItemStyle(true)} onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}>
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
