@@ -10,6 +10,7 @@ import {
   incrementMemberProfileDemoSessions,
   signIn,
   signUp,
+  getPasswordRequirementStatus,
   validatePassword,
 } from "../lib/supabase.js";
 import { getTier } from "../lib/tiers.js";
@@ -128,7 +129,6 @@ export function AuthScreen({ onAuth }) {
   /** True only after Turnstile `render()` succeeds. */
   const [turnstileReady, setTurnstileReady] = useState(false);
   const [turnstileUnavailable, setTurnstileUnavailable] = useState(false);
-  const [signupPolicyErrors, setSignupPolicyErrors] = useState([]);
   /** Set from dynamic `zxcvbn` (register password strength meter). */
   const [registerStrengthScore, setRegisterStrengthScore] = useState(null);
   /** Login / signup password field visibility (default hidden). */
@@ -151,7 +151,6 @@ export function AuthScreen({ onAuth }) {
 
   const onPasswordChange = (e) => {
     setForm((f) => ({ ...f, password: e.target.value }));
-    setSignupPolicyErrors([]);
     setError("");
   };
 
@@ -379,14 +378,11 @@ export function AuthScreen({ onAuth }) {
       } else {
         if (!form.firstName?.trim() || !form.lastName?.trim() || !form.email?.trim() || !form.password) {
           setError("All fields required.");
-          setSignupPolicyErrors([]);
           return;
         }
-        setSignupPolicyErrors([]);
         const policy = validatePassword(form.password);
         if (!policy.valid) {
-          setSignupPolicyErrors(policy.errors);
-          setError("");
+          setError(policy.errors[0] ?? "Please meet all password requirements below.");
           return;
         }
         const mod = await import("zxcvbn");
@@ -906,33 +902,20 @@ export function AuthScreen({ onAuth }) {
     );
   }
 
-  let registerPasswordStrength = null;
-  if (mode === "register" && form.password.trim() !== "" && registerStrengthScore != null) {
-    const score = registerStrengthScore;
-    const color = ZXCVBN_STRENGTH_COLORS[score] ?? "#1e293b";
-    const label = ZXCVBN_STRENGTH_LABELS[score] ?? "";
-    const filled = Math.min(score + 1, 4);
-    registerPasswordStrength = (
-      <div style={{ marginBottom: signupPolicyErrors.length > 0 ? 10 : 14 }}>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 6,
-                borderRadius: 2,
-                background: i < filled ? color : "#1e293b",
-              }}
-            />
-          ))}
-        </div>
-        <div className="mono" style={{ fontSize: 12, color, marginTop: 6, letterSpacing: "0.04em" }}>
-          {label}
-        </div>
-      </div>
-    );
-  }
+  const registerPasswordReq = mode === "register" ? getPasswordRequirementStatus(form.password) : null;
+  const registerAllPasswordReqsMet = Boolean(
+    registerPasswordReq &&
+      registerPasswordReq.len10 &&
+      registerPasswordReq.upper &&
+      registerPasswordReq.lower &&
+      registerPasswordReq.numberOrSpecial
+  );
+  const registerDisplayStrengthScore =
+    mode === "register" && form.password.trim() !== "" && registerStrengthScore != null
+      ? registerAllPasswordReqsMet
+        ? registerStrengthScore
+        : Math.min(registerStrengthScore, 3)
+      : null;
 
   return (
     <AuthScaffold>
@@ -989,7 +972,7 @@ export function AuthScreen({ onAuth }) {
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
-          <div style={{ marginBottom: mode === "register" ? 8 : 20 }}>
+          <div style={{ marginBottom: 20 }}>
             <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".12em" }}>
               PASSWORD
             </div>
@@ -1040,23 +1023,6 @@ export function AuthScreen({ onAuth }) {
               </button>
             </div>
           </div>
-          {registerPasswordStrength}
-          {mode === "register" && signupPolicyErrors.length > 0 && (
-            <ul
-              style={{
-                margin: "0 0 14px 0",
-                paddingLeft: 18,
-                fontSize: 12,
-                color: "var(--color-danger)",
-                fontFamily: "'JetBrains Mono',monospace",
-                lineHeight: 1.5,
-              }}
-            >
-              {signupPolicyErrors.map((msg) => (
-                <li key={msg}>{msg}</li>
-              ))}
-            </ul>
-          )}
           {mode === "login" && (
             <div style={{ marginBottom: 14, textAlign: "right" }}>
               <button
@@ -1095,6 +1061,90 @@ export function AuthScreen({ onAuth }) {
               {error}
             </div>
           )}
+          {mode === "register" && registerPasswordReq && (
+            <>
+              {registerDisplayStrengthScore != null && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          flex: 1,
+                          height: 6,
+                          borderRadius: 2,
+                          background: i < Math.min(registerDisplayStrengthScore + 1, 4)
+                            ? (ZXCVBN_STRENGTH_COLORS[registerDisplayStrengthScore] ?? "#1e293b")
+                            : "#1e293b",
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: 12,
+                      color: ZXCVBN_STRENGTH_COLORS[registerDisplayStrengthScore] ?? "#1e293b",
+                      marginTop: 6,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {ZXCVBN_STRENGTH_LABELS[registerDisplayStrengthScore] ?? ""}
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: "12px 14px",
+                  background: "var(--color-bg-card)",
+                  border: "1px solid var(--color-border-hairline)",
+                  borderRadius: 8,
+                }}
+              >
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-text-placeholder)",
+                    marginBottom: 10,
+                    letterSpacing: ".1em",
+                  }}
+                >
+                  PASSWORD REQUIREMENTS
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { ok: registerPasswordReq.len10, label: "At least 10 characters" },
+                    { ok: registerPasswordReq.upper, label: "At least one uppercase letter (A–Z)" },
+                    { ok: registerPasswordReq.lower, label: "At least one lowercase letter (a–z)" },
+                    {
+                      ok: registerPasswordReq.numberOrSpecial,
+                      label: "At least one number (0–9) or special character (!@#$%^&* etc.)",
+                    },
+                  ].map((row) => (
+                    <div
+                      key={row.label}
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        fontSize: 12,
+                        color: row.ok ? "var(--color-accent)" : "var(--color-text-secondary)",
+                        fontFamily: "'Outfit',sans-serif",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <span style={{ flexShrink: 0, width: 14, textAlign: "center" }} aria-hidden>
+                        {row.ok ? "✓" : "○"}
+                      </span>
+                      <span>{row.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
           <button
             type="button"
             className="btn-teal"
@@ -1123,7 +1173,6 @@ export function AuthScreen({ onAuth }) {
                   onClick={() => {
                     setMode("register");
                     setError("");
-                    setSignupPolicyErrors([]);
                   }}
                 >
                   Sign up
@@ -1145,7 +1194,6 @@ export function AuthScreen({ onAuth }) {
                   onClick={() => {
                     setMode("login");
                     setError("");
-                    setSignupPolicyErrors([]);
                   }}
                 >
                   Sign in

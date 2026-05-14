@@ -121,25 +121,36 @@ function withWorkerMemberProfileTimezone(body) {
 const PASSWORD_SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/;
 
 /**
+ * @returns {{ len10: boolean, upper: boolean, lower: boolean, numberOrSpecial: boolean }}
+ */
+export function getPasswordRequirementStatus(password) {
+  const s = typeof password === "string" ? password : "";
+  return {
+    len10: s.length >= 10,
+    upper: /[A-Z]/.test(s),
+    lower: /[a-z]/.test(s),
+    numberOrSpecial: /[0-9]/.test(s) || PASSWORD_SPECIAL_RE.test(s),
+  };
+}
+
+/**
  * @returns {{ valid: boolean, errors: string[] }}
  */
 export function validatePassword(password) {
   const s = typeof password === "string" ? password : "";
   const errors = [];
-  if (s.length < 12) {
-    errors.push("Use at least 12 characters.");
+  const st = getPasswordRequirementStatus(s);
+  if (!st.len10) {
+    errors.push("Use at least 10 characters.");
   }
-  if (!/[A-Z]/.test(s)) {
+  if (!st.upper) {
     errors.push("Include at least one uppercase letter.");
   }
-  if (!/[a-z]/.test(s)) {
+  if (!st.lower) {
     errors.push("Include at least one lowercase letter.");
   }
-  if (!/[0-9]/.test(s)) {
-    errors.push("Include at least one number.");
-  }
-  if (!PASSWORD_SPECIAL_RE.test(s)) {
-    errors.push("Include at least one special character (!@#$%^&* etc.).");
+  if (!st.numberOrSpecial) {
+    errors.push("Include at least one number or special character (!@#$%^&* etc.).");
   }
   return { valid: errors.length === 0, errors };
 }
