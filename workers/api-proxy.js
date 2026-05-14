@@ -5963,7 +5963,7 @@ async function handleAtfehPostMessage(request, env, cors, threadId) {
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) return jsonResponse({ error: "AI service unavailable" }, 503, cors);
 
-  const model = (plan === "elite" || plan === "goat") ? "claude-sonnet-4-5" : "claude-haiku-4-5-20251001";
+  const model = (plan === "elite" || plan === "goat") ? MODEL_ELITE_GOAT : MODEL_ENTRY_PRO;
 
   let anthropicRes;
   try {
@@ -6070,7 +6070,7 @@ async function handleAtfehContinueThread(request, env, cors, threadId) {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: MODEL_ENTRY_PRO,
           max_tokens: 200,
           messages: [{
             role: "user",
