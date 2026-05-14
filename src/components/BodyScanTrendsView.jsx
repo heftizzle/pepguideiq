@@ -638,7 +638,7 @@ export function BodyScanTrendsView({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-primary)" }}>AI scan interpretation</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-primary)" }}>AI Atfeh 🧙 Scan Analysis</div>
           {isProPlus ? (
             <span
               className="mono"
@@ -655,6 +655,9 @@ export function BodyScanTrendsView({
             </span>
           ) : null}
         </div>
+        <p style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 2, marginBottom: 12 }}>
+          Two-step AI analysis of your scan history.
+        </p>
 
         {!isProPlus ? (
           <div style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 10 }}>
@@ -666,9 +669,14 @@ export function BodyScanTrendsView({
         ) : (
           <>
             {showInterpretTrendsButton ? (
-              <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "8px 14px", marginBottom: 12 }} disabled={interpretBusy} onClick={() => void runInterpret(false)}>
-                Interpret trends
-              </button>
+              <>
+                <button type="button" className="btn-teal" style={{ fontSize: 12, padding: "8px 14px", marginBottom: 4 }} disabled={interpretBusy} onClick={() => void runInterpret(false)}>
+                  Interpret trends
+                </button>
+                <p style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 4, marginBottom: 12 }}>
+                  Summarizes your scan trends in 3–5 sentences — actual numbers, dates, and correlations with your active protocol.
+                </p>
+              </>
             ) : null}
             {interpretErr ? (
               <div className="mono" style={{ fontSize: 12, color: "var(--color-warning)", marginBottom: 8 }}>
@@ -720,6 +728,9 @@ export function BodyScanTrendsView({
                 Export PDF (coming soon)
               </button>
             </div>
+            <p style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 4 }}>
+              Opens AI Atfeh with your full scan data and trend summary pre-loaded for a deeper protocol conversation. Run Interpret trends first to unlock.
+            </p>
           </>
         )}
       </div>
