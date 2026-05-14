@@ -667,7 +667,7 @@ function PepGuideIQApp({ user, setUser }) {
       const data = await res.json();
       setActiveThreadId(threadId);
       setThreadMessages(Array.isArray(data.messages) ? data.messages : []);
-      setThreadLocked(Boolean(data.thread?.locked));
+      setThreadLocked((data.thread?.message_count ?? 0) >= 10);
       setMobileSidebarOpen(false);
     } catch (err) {
       setThreadError(err.message || "Could not load thread");
@@ -1015,7 +1015,7 @@ function PepGuideIQApp({ user, setUser }) {
       }
       if (!res.ok) throw new Error(`Continue failed (${res.status})`);
       const data = await res.json();
-      setActiveThreadId(data.thread_id);
+      setActiveThreadId(data.thread?.id ?? data.thread_id);
       setThreadMessages([]);
       setThreadLocked(false);
       setThreadListVersion((n) => n + 1);
@@ -1196,6 +1196,7 @@ function PepGuideIQApp({ user, setUser }) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           content,
+          history: threadMessages,
           catalog,
           profile: {
             system_context: `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
@@ -1205,28 +1206,27 @@ function PepGuideIQApp({ user, setUser }) {
 
       if (sendRes.status === 429) {
         const errData = await sendRes.json().catch(() => ({}));
-        const errText =
-          typeof errData.error === "string" ? errData.error : "Daily Atfeh Chat limit reached.";
-        setThreadError(errText);
-        if (errData.limit_reached === true) {
-          openUpgradeModal("ai_guide");
+        if (errData.canContinue) {
+          setThreadLocked(true);
+          setThreadError("This thread is full. Continue it to keep going.");
+        } else {
+          const errText =
+            typeof errData.error === "string" ? errData.error : "Daily Atfeh Chat limit reached.";
+          setThreadError(errText);
+          if (errData.limit_reached === true) {
+            openUpgradeModal("ai_guide");
+          }
         }
-        setAiLoading(false);
-        return;
-      }
-      if (sendRes.status === 423) {
-        setThreadLocked(true);
-        setThreadError("This thread is full. Continue it to keep going.");
         setAiLoading(false);
         return;
       }
       if (!sendRes.ok) throw new Error(`Send failed (${sendRes.status})`);
 
       const data = await sendRes.json();
-      if (data.assistant_message) {
-        setThreadMessages((prev) => [...prev, data.assistant_message]);
+      if (data.content) {
+        setThreadMessages((prev) => [...prev, { role: "assistant", content: data.content, created_at: new Date().toISOString() }]);
       }
-      if (data.thread?.locked) setThreadLocked(true);
+      if (data.locked) setThreadLocked(true);
       if (data.usage && typeof data.usage.queries_today === "number") {
         setAiQueryUsage({
           today: data.usage.queries_today,
@@ -1240,7 +1240,7 @@ function PepGuideIQApp({ user, setUser }) {
     } finally {
       setAiLoading(false);
     }
-  }, [activeThreadId, activeProfileId, threadLocked, canAI, openUpgradeModal, buildAtfehProfileContext, user?.plan]);
+  }, [activeThreadId, activeProfileId, threadLocked, threadMessages, canAI, openUpgradeModal, buildAtfehProfileContext, user?.plan]);
 
   const sendAI = sendAtfehMessage;
 

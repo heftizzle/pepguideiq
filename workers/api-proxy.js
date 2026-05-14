@@ -5810,9 +5810,9 @@ async function handleAtfehCreateThread(request, env, cors) {
   const { profile_id, title } = body;
   if (!profile_id) return jsonResponse({ error: "Missing profile_id" }, 400, cors);
 
-  // Verify profile belongs to user
+  // Verify profile belongs to user (member_profiles, not legacy profiles table)
   const profRes = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
   );
   const profData = await profRes.json().catch(() => []);
@@ -5868,9 +5868,9 @@ async function handleAtfehGetThreads(request, env, cors) {
     }
   }
 
-  // Verify profile ownership
+  // Verify profile ownership (member_profiles, not legacy profiles table)
   const profRes = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    `${supabaseUrl}/rest/v1/member_profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
   );
   const profData = await profRes.json().catch(() => []);
@@ -5945,7 +5945,7 @@ async function handleAtfehPostMessage(request, env, cors, threadId) {
 
   let body = {};
   try { body = await request.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400, cors); }
-  const { content, history } = body;
+  const { content, history, profile } = body;
   if (!content || typeof content !== "string") return jsonResponse({ error: "Missing content" }, 400, cors);
 
   // Build message history for context (last 10 messages)
@@ -5955,8 +5955,10 @@ async function handleAtfehPostMessage(request, env, cors, threadId) {
   })).filter(m => m.content) : [];
   contextMessages.push({ role: "user", content });
 
-  // Atfeh system prompt
-  const atfehSystemPrompt = `You are AI Atfeh 🧙 (Advanced Technology For Enhanced Humans), the research assistant inside pepguideIQ. You are an expert in peptide science, nootropics, and human optimization protocols. You help users understand compounds, protocols, mechanisms of action, and research. You are not a doctor and never give medical advice. Be precise, cite mechanisms, and be honest about the limits of current research. Keep responses focused and research-grade.`;
+  const defaultSystemPrompt = `You are AI Atfeh 🧙 (Advanced Technology For Enhanced Humans), the research assistant inside pepguideIQ. You are an expert in peptide science, nootropics, and human optimization protocols. You help users understand compounds, protocols, mechanisms of action, and research. You are not a doctor and never give medical advice. Be precise, cite mechanisms, and be honest about the limits of current research. Keep responses focused and research-grade.`;
+  const atfehSystemPrompt = (typeof profile?.system_context === "string" && profile.system_context.trim())
+    ? profile.system_context
+    : defaultSystemPrompt;
 
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) return jsonResponse({ error: "AI service unavailable" }, 503, cors);

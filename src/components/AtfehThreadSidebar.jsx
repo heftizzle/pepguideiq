@@ -53,7 +53,7 @@ export default function AtfehThreadSidebar({
       );
       if (!res.ok) throw new Error(`Failed to load threads (${res.status})`);
       const data = await res.json();
-      setThreads(data.threads || []);
+      setThreads([...(data.active || []), ...(data.archived || [])]);
     } catch (err) {
       setError(err.message || "Failed to load threads");
     } finally {
@@ -71,7 +71,7 @@ export default function AtfehThreadSidebar({
       });
       if (!res.ok) throw new Error("Archive failed");
       setThreads((prev) =>
-        prev.map((t) => (t.id === threadId ? { ...t, archived_at: new Date().toISOString() } : t))
+        prev.map((t) => (t.id === threadId ? { ...t, archived: true } : t))
       );
     } catch (err) {
       setError(err.message);
@@ -86,7 +86,7 @@ export default function AtfehThreadSidebar({
       });
       if (!res.ok) throw new Error("Restore failed");
       setThreads((prev) =>
-        prev.map((t) => (t.id === threadId ? { ...t, archived_at: null } : t))
+        prev.map((t) => (t.id === threadId ? { ...t, archived: false } : t))
       );
     } catch (err) {
       setError(err.message);
@@ -94,7 +94,7 @@ export default function AtfehThreadSidebar({
   };
 
   const handleNewThread = () => {
-    const active = threads.filter((t) => !t.archived_at);
+    const active = threads.filter((t) => !t.archived);
     const limit = getThreadLimit(plan);
     if (active.length >= limit) {
       onUpgrade("thread_limit");
@@ -104,10 +104,10 @@ export default function AtfehThreadSidebar({
   };
 
   const active = threads
-    .filter((t) => !t.archived_at)
+    .filter((t) => !t.archived)
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   const archived = threads
-    .filter((t) => t.archived_at)
+    .filter((t) => t.archived)
     .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   const limit = getThreadLimit(plan);
 
