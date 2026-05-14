@@ -222,7 +222,7 @@ const LIBRARY_FILTER_PILL_BASE = {
 const LIBRARY_FILTER_PILL_ACTIVE = {
   border: "1px solid var(--color-accent-nav-border)",
   background: "var(--color-accent-nav-fill)",
-  boxShadow: "0 0 0 1px var(--color-accent-nav-ring)",
+  boxShadow: "0 0 0 1px var(--color-accent-nav-ring), 0 0 10px color-mix(in srgb, var(--color-accent) 20%, transparent)",
   color: "var(--color-accent)",
 };
 
@@ -2888,6 +2888,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             background: "var(--color-bg-page)",
             borderTop: "1px solid var(--color-border-hairline)",
             padding: "8px 10px calc(8px + env(safe-area-inset-bottom, 0px))",
+            boxShadow: "0 -8px 24px color-mix(in srgb, var(--color-accent) 6%, transparent)",
           }}
         >
           <div

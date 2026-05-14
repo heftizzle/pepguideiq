@@ -114,7 +114,7 @@ export function GlobalStyles() {
         backdrop-filter:blur(4px);
         -webkit-backdrop-filter:blur(4px);
       }
-      .pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,var(--color-accent));opacity:.5}
+      .pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,var(--color-accent));opacity:.75}
       .pcard:hover{
         transform:translateY(-2px);
         box-shadow:0 4px 16px var(--color-shadow-50),0 1px 4px var(--color-shadow-30);
