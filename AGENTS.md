@@ -109,6 +109,22 @@ Worker vars (non-secret, Cloudflare dashboard or `[vars]` in toml):
 - `ALLOWED_ORIGIN=https://pepguideiq.com` — exact origin, not `*`
 - `STRIPE_PRICE_ID_PRO`, `STRIPE_PRICE_ID_ELITE`, `STRIPE_PRICE_ID_GOAT`
 
+## Atfeh thread endpoint response contract
+
+Every thread endpoint that returns a single thread wraps it as `{ thread: {...}, ...extras }`. The client always reads `data.thread.id`, `data.thread.locked`, etc.
+
+| Endpoint | Response shape |
+|---|---|
+| `POST /atfeh/threads` (create) | `{ thread: { id, profile_id, title, ... } }` |
+| `GET /atfeh/threads` (list) | `{ active: [...], archived: [...] }` |
+| `GET /atfeh/threads/:id/messages` | `{ thread: { id, title, message_count, ... }, messages: [...] }` |
+| `POST /atfeh/threads/:id/messages` | `{ thread: { message_count, locked, canContinue }, content }` |
+| `POST /atfeh/threads/:id/continue` | `{ thread: { id, title, ... }, summary }` |
+| `PATCH .../archive` | `{ success: true }` |
+| `PATCH .../restore` | `{ success: true }` |
+
+New thread endpoints must follow this contract. Do not return bare Supabase rows at the top level.
+
 ## Hard rules
 
 - Do not `import` a library not in `package.json`.

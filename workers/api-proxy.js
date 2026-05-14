@@ -5843,7 +5843,8 @@ async function handleAtfehCreateThread(request, env, cors) {
   // Invalidate KV cache
   await env.RATE_LIMIT_KV.delete(`atfeh:threads:${profile_id}`).catch(() => {});
 
-  return jsonResponse(Array.isArray(insData) ? insData[0] : insData, 201, cors);
+  const thread = Array.isArray(insData) ? insData[0] : insData;
+  return jsonResponse({ thread }, 201, cors);
 }
 
 // GET /atfeh/threads — list threads for a profile (active + archived)
@@ -6020,10 +6021,8 @@ async function handleAtfehPostMessage(request, env, cors, threadId) {
 
   const newCount = thread.message_count + 2; // user + assistant
   return jsonResponse({
-    content: assistantContent,
-    message_count: newCount,
-    locked: newCount >= ATFEH_MESSAGE_LIMIT,
-    canContinue: newCount >= ATFEH_MESSAGE_LIMIT
+    thread: { message_count: newCount, locked: newCount >= ATFEH_MESSAGE_LIMIT, canContinue: newCount >= ATFEH_MESSAGE_LIMIT },
+    content: assistantContent
   }, 200, cors);
 }
 

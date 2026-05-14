@@ -1015,7 +1015,7 @@ function PepGuideIQApp({ user, setUser }) {
       }
       if (!res.ok) throw new Error(`Continue failed (${res.status})`);
       const data = await res.json();
-      setActiveThreadId(data.thread?.id ?? data.thread_id);
+      setActiveThreadId(data.thread?.id);
       setThreadMessages([]);
       setThreadLocked(false);
       setThreadListVersion((n) => n + 1);
@@ -1179,7 +1179,8 @@ function PepGuideIQApp({ user, setUser }) {
         }
         if (!createRes.ok) throw new Error(`Could not start thread (${createRes.status})`);
         const created = await createRes.json();
-        threadId = created.thread_id;
+        console.log("[Atfeh] thread created:", created);
+        threadId = created.thread.id;
         setActiveThreadId(threadId);
         setThreadListVersion((n) => n + 1);
       }
@@ -1226,7 +1227,7 @@ function PepGuideIQApp({ user, setUser }) {
       if (data.content) {
         setThreadMessages((prev) => [...prev, { role: "assistant", content: data.content, created_at: new Date().toISOString() }]);
       }
-      if (data.locked) setThreadLocked(true);
+      if (data.thread?.locked) setThreadLocked(true);
       if (data.usage && typeof data.usage.queries_today === "number") {
         setAiQueryUsage({
           today: data.usage.queries_today,
