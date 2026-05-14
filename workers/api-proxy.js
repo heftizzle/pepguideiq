@@ -5776,6 +5776,402 @@ async function handlePostStackPhoto(request, env, cors) {
 const isUUID = (s) =>
   typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
+// ─── ATLAS THREAD HELPERS ──────────────────────────────────────────────────
+
+const THREAD_LIMITS = { entry: 5, pro: 10, elite: 20, goat: 30 };
+const ATLAS_MESSAGE_LIMIT = 10;
+const ATLAS_KV_TTL = 300; // 5 min cache
+
+function getThreadLimit(plan) {
+  return THREAD_LIMITS[plan] ?? THREAD_LIMITS.entry;
+}
+
+async function getActiveThreadCount(supabaseUrl, serviceKey, profileId) {
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?profile_id=eq.${encodeURIComponent(profileId)}&archived=eq.false&select=id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data.length : 0;
+}
+
+// POST /atlas/threads — create new thread
+async function handleAtlasCreateThread(request, env, cors) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+
+  let body = {};
+  try { body = await request.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400, cors); }
+  const { profile_id, title } = body;
+  if (!profile_id) return jsonResponse({ error: "Missing profile_id" }, 400, cors);
+
+  // Verify profile belongs to user
+  const profRes = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const profData = await profRes.json().catch(() => []);
+  if (!Array.isArray(profData) || profData.length === 0) return jsonResponse({ error: "Profile not found" }, 404, cors);
+
+  // Check thread limit
+  const activeCount = await getActiveThreadCount(supabaseUrl, serviceKey, profile_id);
+  const limit = getThreadLimit(plan);
+  if (activeCount >= limit) {
+    return jsonResponse({ error: "Thread limit reached", limit, plan }, 429, cors);
+  }
+
+  const threadTitle = typeof title === "string" && title.trim() ? title.trim().slice(0, 120) : "New Thread";
+
+  const insRes = await fetch(`${supabaseUrl}/rest/v1/ai_threads`, {
+    method: "POST",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify({ profile_id, user_id: userId, title: threadTitle })
+  });
+  const insData = await insRes.json().catch(() => null);
+  if (!insRes.ok) return jsonResponse({ error: "Failed to create thread" }, 500, cors);
+
+  // Invalidate KV cache
+  await env.RATE_LIMIT_KV.delete(`atlas:threads:${profile_id}`).catch(() => {});
+
+  return jsonResponse(Array.isArray(insData) ? insData[0] : insData, 201, cors);
+}
+
+// GET /atlas/threads — list threads for a profile (active + archived)
+async function handleAtlasGetThreads(request, env, cors) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const url = new URL(request.url);
+  const profile_id = url.searchParams.get("profile_id");
+  if (!profile_id) return jsonResponse({ error: "Missing profile_id" }, 400, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+
+  // Check KV cache first
+  const cacheKey = `atlas:threads:${profile_id}`;
+  if (env.RATE_LIMIT_KV) {
+    const cached = await env.RATE_LIMIT_KV.get(cacheKey).catch(() => null);
+    if (cached) {
+      try { return jsonResponse(JSON.parse(cached), 200, cors); } catch {}
+    }
+  }
+
+  // Verify profile ownership
+  const profRes = await fetch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(profile_id)}&user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const profData = await profRes.json().catch(() => []);
+  if (!Array.isArray(profData) || profData.length === 0) return jsonResponse({ error: "Profile not found" }, 404, cors);
+
+  const threadsRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?profile_id=eq.${encodeURIComponent(profile_id)}&order=updated_at.desc&select=id,title,archived,message_count,forked_from,created_at,updated_at`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threads = await threadsRes.json().catch(() => []);
+
+  const active = threads.filter(t => !t.archived);
+  const archived = threads.filter(t => t.archived);
+  const result = { active, archived };
+
+  // Cache for 5 min
+  if (env.RATE_LIMIT_KV) {
+    await env.RATE_LIMIT_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: ATLAS_KV_TTL }).catch(() => {});
+  }
+
+  return jsonResponse(result, 200, cors);
+}
+
+// GET /atlas/threads/:threadId/messages — load thread messages
+async function handleAtlasGetMessages(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+
+  // Verify thread ownership via user_id
+  const threadRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,title,archived,message_count`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threadData = await threadRes.json().catch(() => []);
+  if (!Array.isArray(threadData) || threadData.length === 0) return jsonResponse({ error: "Thread not found" }, 404, cors);
+
+  const msgsRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_messages?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=id,role,content,tokens_used,created_at`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const messages = await msgsRes.json().catch(() => []);
+
+  return jsonResponse({ thread: threadData[0], messages }, 200, cors);
+}
+
+// POST /atlas/threads/:threadId/messages — post a message (Atlas AI call)
+async function handleAtlasPostMessage(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+
+  // Verify thread ownership
+  const threadRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,title,archived,message_count,profile_id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threadData = await threadRes.json().catch(() => []);
+  if (!Array.isArray(threadData) || threadData.length === 0) return jsonResponse({ error: "Thread not found" }, 404, cors);
+  const thread = threadData[0];
+  if (thread.archived) return jsonResponse({ error: "Thread is archived" }, 403, cors);
+  if (thread.message_count >= ATLAS_MESSAGE_LIMIT) {
+    return jsonResponse({ error: "Thread limit reached", canContinue: true }, 429, cors);
+  }
+
+  let body = {};
+  try { body = await request.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400, cors); }
+  const { content, history } = body;
+  if (!content || typeof content !== "string") return jsonResponse({ error: "Missing content" }, 400, cors);
+
+  // Build message history for context (last 10 messages)
+  const contextMessages = Array.isArray(history) ? history.slice(-10).map(m => ({
+    role: m.role === "assistant" ? "assistant" : "user",
+    content: typeof m.content === "string" ? m.content : ""
+  })).filter(m => m.content) : [];
+  contextMessages.push({ role: "user", content });
+
+  // Atlas system prompt
+  const atlasSystemPrompt = `You are AI Atlas 🧙, the research assistant inside pepguideIQ. You are an expert in peptide science, nootropics, and human optimization protocols. You help users understand compounds, protocols, mechanisms of action, and research. You are not a doctor and never give medical advice. Be precise, cite mechanisms, and be honest about the limits of current research. Keep responses focused and research-grade.`;
+
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) return jsonResponse({ error: "AI service unavailable" }, 503, cors);
+
+  const model = (plan === "elite" || plan === "goat") ? "claude-sonnet-4-5" : "claude-haiku-4-5-20251001";
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1024,
+        system: [{ type: "text", text: atlasSystemPrompt, cache_control: { type: "ephemeral" } }],
+        messages: contextMessages
+      })
+    });
+  } catch (fetchErr) {
+    return jsonResponse({ error: "AI service unavailable" }, 502, cors);
+  }
+
+  if (!anthropicRes.ok) return jsonResponse({ error: "AI service unavailable" }, 502, cors);
+
+  const anthropicData = await anthropicRes.json().catch(() => null);
+  const assistantContent = anthropicData?.content?.[0]?.text ?? "";
+  const tokensUsed = (anthropicData?.usage?.input_tokens ?? 0) + (anthropicData?.usage?.output_tokens ?? 0);
+
+  // Persist user message
+  await fetch(`${supabaseUrl}/rest/v1/ai_messages`, {
+    method: "POST",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: threadId, role: "user", content, tokens_used: 0 })
+  });
+
+  // Persist assistant message
+  await fetch(`${supabaseUrl}/rest/v1/ai_messages`, {
+    method: "POST",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: threadId, role: "assistant", content: assistantContent, tokens_used: tokensUsed })
+  });
+
+  // Auto-title thread on first message
+  if (thread.message_count === 0) {
+    const autoTitle = content.trim().slice(0, 80);
+    await fetch(`${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}`, {
+      method: "PATCH",
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ title: autoTitle })
+    });
+  }
+
+  // Invalidate KV thread list cache
+  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+
+  const newCount = thread.message_count + 2; // user + assistant
+  return jsonResponse({
+    content: assistantContent,
+    message_count: newCount,
+    locked: newCount >= ATLAS_MESSAGE_LIMIT,
+    canContinue: newCount >= ATLAS_MESSAGE_LIMIT
+  }, 200, cors);
+}
+
+// POST /atlas/threads/:threadId/continue — fork thread with Haiku summary
+async function handleAtlasContinueThread(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+
+  // Verify thread ownership
+  const threadRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,title,profile_id,message_count`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threadData = await threadRes.json().catch(() => []);
+  if (!Array.isArray(threadData) || threadData.length === 0) return jsonResponse({ error: "Thread not found" }, 404, cors);
+  const thread = threadData[0];
+
+  // Check active thread limit before forking
+  const activeCount = await getActiveThreadCount(supabaseUrl, serviceKey, thread.profile_id);
+  const limit = getThreadLimit(plan);
+  if (activeCount >= limit) {
+    return jsonResponse({ error: "Thread limit reached. Archive a thread first.", limit, plan }, 429, cors);
+  }
+
+  // Load last 10 messages for summary
+  const msgsRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_messages?thread_id=eq.${encodeURIComponent(threadId)}&order=created_at.asc&select=role,content`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const messages = await msgsRes.json().catch(() => []);
+
+  // Generate summary via Haiku
+  const apiKey = env.ANTHROPIC_API_KEY;
+  let summaryText = "Continuing previous research thread.";
+  if (apiKey && messages.length > 0) {
+    const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
+    try {
+      const sumRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 200,
+          messages: [{
+            role: "user",
+            content: `Summarize this research conversation in 2-3 sentences for context continuity. Focus on the key compounds, protocols, and conclusions discussed.\n\n${transcript}`
+          }]
+        })
+      });
+      const sumData = await sumRes.json().catch(() => null);
+      summaryText = sumData?.content?.[0]?.text ?? summaryText;
+    } catch {}
+  }
+
+  // Create forked thread
+  const newTitle = `${thread.title.replace(/ \(cont\.\d*\)$/, "")} (cont.)`;
+  const insRes = await fetch(`${supabaseUrl}/rest/v1/ai_threads`, {
+    method: "POST",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ profile_id: thread.profile_id, user_id: userId, title: newTitle, forked_from: threadId })
+  });
+  const insData = await insRes.json().catch(() => null);
+  if (!insRes.ok) return jsonResponse({ error: "Failed to fork thread" }, 500, cors);
+  const newThread = Array.isArray(insData) ? insData[0] : insData;
+
+  // Inject summary as system message
+  await fetch(`${supabaseUrl}/rest/v1/ai_messages`, {
+    method: "POST",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: newThread.id, role: "system", content: `Previous context: ${summaryText}`, tokens_used: 0 })
+  });
+
+  // Invalidate KV
+  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+
+  return jsonResponse({ thread: newThread, summary: summaryText }, 201, cors);
+}
+
+// PATCH /atlas/threads/:threadId/archive — manual archive
+async function handleAtlasArchiveThread(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+
+  const patchRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ archived: true })
+    }
+  );
+  const patchData = await patchRes.json().catch(() => null);
+  if (!patchRes.ok) return jsonResponse({ error: "Failed to archive thread" }, 500, cors);
+
+  // Get profile_id to invalidate cache
+  const t = Array.isArray(patchData) ? patchData[0] : patchData;
+  if (t?.profile_id) await env.RATE_LIMIT_KV.delete(`atlas:threads:${t.profile_id}`).catch(() => {});
+
+  return jsonResponse({ success: true }, 200, cors);
+}
+
+// PATCH /atlas/threads/:threadId/restore — restore from archive
+async function handleAtlasRestoreThread(request, env, cors, threadId) {
+  const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
+
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const userId = user.sub;
+  const plan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+
+  // Get thread + profile_id
+  const threadRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,profile_id`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  const threadData = await threadRes.json().catch(() => []);
+  if (!Array.isArray(threadData) || threadData.length === 0) return jsonResponse({ error: "Thread not found" }, 404, cors);
+  const thread = threadData[0];
+
+  // Check limit before restoring
+  const activeCount = await getActiveThreadCount(supabaseUrl, serviceKey, thread.profile_id);
+  const limit = getThreadLimit(plan);
+  if (activeCount >= limit) {
+    return jsonResponse({ error: "Thread limit reached. Archive another thread first.", limit, plan }, 429, cors);
+  }
+
+  const patchRes = await fetch(
+    `${supabaseUrl}/rest/v1/ai_threads?id=eq.${encodeURIComponent(threadId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: false })
+    }
+  );
+  if (!patchRes.ok) return jsonResponse({ error: "Failed to restore thread" }, 500, cors);
+
+  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+  return jsonResponse({ success: true }, 200, cors);
+}
+
 /**
  * Stripe → Supabase sync. Configure Payment Links / Checkout with client_reference_id = Supabase user UUID
  * and subscription or price metadata `plan` = entry|pro|elite|goat.
@@ -6419,6 +6815,31 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/v1/app-help" && request.method === "POST") {
       return handleAppHelp(request, env, cors);
+    }
+
+    // ─── ATLAS THREAD ROUTES ──────────────────────────────────────────────────
+    if (url.pathname === "/atlas/threads" && request.method === "POST") {
+      return handleAtlasCreateThread(request, env, cors);
+    }
+    if (url.pathname === "/atlas/threads" && request.method === "GET") {
+      return handleAtlasGetThreads(request, env, cors);
+    }
+    const atlasMessagesMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/messages\/?$/);
+    if (atlasMessagesMatch) {
+      if (request.method === "GET") return handleAtlasGetMessages(request, env, cors, atlasMessagesMatch[1]);
+      if (request.method === "POST") return handleAtlasPostMessage(request, env, cors, atlasMessagesMatch[1]);
+    }
+    const atlasContinueMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/continue\/?$/);
+    if (atlasContinueMatch && request.method === "POST") {
+      return handleAtlasContinueThread(request, env, cors, atlasContinueMatch[1]);
+    }
+    const atlasArchiveMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/archive\/?$/);
+    if (atlasArchiveMatch && request.method === "PATCH") {
+      return handleAtlasArchiveThread(request, env, cors, atlasArchiveMatch[1]);
+    }
+    const atlasRestoreMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/restore\/?$/);
+    if (atlasRestoreMatch && request.method === "PATCH") {
+      return handleAtlasRestoreThread(request, env, cors, atlasRestoreMatch[1]);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {
