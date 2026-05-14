@@ -4,7 +4,7 @@ import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
 import { getSessionAccessToken, supabase } from "../lib/supabase.js";
-import { buildAdvisorCatalogPayload } from "../lib/advisorCatalogPayload.js";
+import { buildAtfehCatalogPayload } from "../lib/atfehCatalogPayload.js";
 import { LibrarySearchInput } from "./LibrarySearchInput.jsx";
 import { DEFAULT_STACK_SESSIONS } from "./SavedStackEntryRow.jsx";
 import { CLOSE_SIZES } from "../lib/closeButtonSizes.js";
@@ -20,28 +20,28 @@ const FREQ_OPTIONS = [
   { id: "custom", label: "Custom" },
 ];
 
-const ADVISOR_TIER_KEYS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
+const STACK_TIER_KEYS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
 
 /** @param {unknown} t */
-function normalizeAdvisorTier(t) {
+function normalizeStackTier(t) {
   if (typeof t !== "string") return undefined;
   const k = t.trim().toLowerCase().replace(/-/g, "_");
-  return ADVISOR_TIER_KEYS.has(k) ? k : undefined;
+  return STACK_TIER_KEYS.has(k) ? k : undefined;
 }
 
-/** localStorage key prefix for advisor result cache. */
+/** localStorage key prefix for stack picks result cache (kept as "advisor" for back-compat with existing user caches). */
 const ADVISOR_CACHE_KEY_PREFIX = "pepguideiq.advisor_cache.v1.";
 
-/** Advisor cache TTL: 24 hours. Long enough to survive multiple sessions; short enough that catalog updates eventually flush. */
-const ADVISOR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+/** Stack picks cache TTL: 24 hours. Long enough to survive multiple sessions; short enough that catalog updates eventually flush. */
+const STACK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Read a cached advisor result for the given fingerprint.
+ * Read a cached stack picks result for the given fingerprint.
  * Returns null if missing, expired, or unparseable.
  * @param {string} fingerprint
  * @returns {{ insight: string, recommendations: Array<{peptideId: string, name: string, rationale: string, tier?: string}> } | null}
  */
-function readAdvisorCache(fingerprint) {
+function readStackCache(fingerprint) {
   if (!fingerprint || typeof localStorage === "undefined") return null;
   try {
     const raw = localStorage.getItem(ADVISOR_CACHE_KEY_PREFIX + fingerprint);
@@ -49,7 +49,7 @@ function readAdvisorCache(fingerprint) {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return null;
     if (typeof parsed.cachedAt !== "number") return null;
-    if (Date.now() - parsed.cachedAt > ADVISOR_CACHE_TTL_MS) {
+    if (Date.now() - parsed.cachedAt > STACK_CACHE_TTL_MS) {
       try {
         localStorage.removeItem(ADVISOR_CACHE_KEY_PREFIX + fingerprint);
       } catch {
@@ -68,12 +68,12 @@ function readAdvisorCache(fingerprint) {
 }
 
 /**
- * Persist an advisor result for the given fingerprint.
+ * Persist a stack picks result for the given fingerprint.
  * Best-effort; silently fails on quota/serialization errors.
  * @param {string} fingerprint
  * @param {{ insight: string, recommendations: Array<{peptideId: string, name: string, rationale: string, tier?: string}> }} data
  */
-function writeAdvisorCache(fingerprint, data) {
+function writeStackCache(fingerprint, data) {
   if (!fingerprint || !data || typeof localStorage === "undefined") return;
   try {
     const payload = JSON.stringify({ cachedAt: Date.now(), data });
@@ -83,7 +83,7 @@ function writeAdvisorCache(fingerprint, data) {
   }
 }
 
-const ADVISOR_TIER_BADGE_STYLES = {
+const STACK_TIER_BADGE_STYLES = {
   must_have: {
     emoji: "🟢",
     label: "Must Have",
@@ -115,10 +115,10 @@ const ADVISOR_TIER_BADGE_STYLES = {
 };
 
 /** @param {{ tier?: string }} props */
-function AdvisorTierBadge({ tier }) {
-  const key = normalizeAdvisorTier(tier);
+function StackTierBadge({ tier }) {
+  const key = normalizeStackTier(tier);
   if (!key) return null;
-  const cfg = ADVISOR_TIER_BADGE_STYLES[key];
+  const cfg = STACK_TIER_BADGE_STYLES[key];
   return (
     <span
       className="mono"
@@ -301,20 +301,20 @@ export function BuildTab({
   const savedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
   const copiedResetTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
 
-  const [advisorData, setAdvisorData] = useState(
+  const [stackPicksData, setStackPicksData] = useState(
     /** @type {{ insight: string, recommendations: { peptideId: string, name: string, rationale: string, tier?: string }[] } | null} */ (
       null
     )
   );
-  const [advisorLoading, setAdvisorLoading] = useState(false);
-  /** Set when the last advisor request failed (non-2xx / network); cleared on new attempt. */
-  const [advisorError, setAdvisorError] = useState(/** @type {string | null} */ (null));
-  const advisorDebounce = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
-  const advisorFetchGen = useRef(0);
+  const [stackPicksLoading, setStackPicksLoading] = useState(false);
+  /** Set when the last stack picks request failed (non-2xx / network); cleared on new attempt. */
+  const [stackPicksError, setStackPicksError] = useState(/** @type {string | null} */ (null));
+  const stackPicksDebounce = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const stackPicksFetchGen = useRef(0);
   /** Fingerprint of the stack we last successfully loaded recommendations for (includes plan/user so tier changes refetch). */
-  const lastAdvisorFingerprint = useRef("");
+  const lastStackPicksFingerprint = useRef("");
 
-  const advisorStackFingerprint = useMemo(() => {
+  const stackPicksFingerprint = useMemo(() => {
     if (rows.length === 0) return "";
     const ids = rows.map((r) => r.peptideId).sort().join(",");
     return `${user?.id ?? "anon"}:${plan ?? "entry"}:${ids}`;
@@ -324,7 +324,7 @@ export function BuildTab({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const advisorRecsUnlocked = true;
+  const stackPicksUnlocked = true;
 
   useEffect(() => {
     return () => {
@@ -337,38 +337,38 @@ export function BuildTab({
 
   /** Show loading skeleton on the first paint whenever we will fetch (effect runs after paint). */
   useLayoutEffect(() => {
-    if (!advisorStackFingerprint || !isApiWorkerConfigured()) return;
-    setAdvisorLoading(true);
-  }, [advisorStackFingerprint]);
+    if (!stackPicksFingerprint || !isApiWorkerConfigured()) return;
+    setStackPicksLoading(true);
+  }, [stackPicksFingerprint]);
 
   useEffect(() => {
     if (rows.length === 0) {
-      lastAdvisorFingerprint.current = "";
-      setAdvisorData(null);
-      setAdvisorError(null);
-      setAdvisorLoading(false);
-      if (advisorDebounce.current != null) {
-        window.clearTimeout(advisorDebounce.current);
-        advisorDebounce.current = null;
+      lastStackPicksFingerprint.current = "";
+      setStackPicksData(null);
+      setStackPicksError(null);
+      setStackPicksLoading(false);
+      if (stackPicksDebounce.current != null) {
+        window.clearTimeout(stackPicksDebounce.current);
+        stackPicksDebounce.current = null;
       }
       return;
     }
     if (!isApiWorkerConfigured()) {
-      setAdvisorData(null);
-      setAdvisorError(null);
-      setAdvisorLoading(false);
+      setStackPicksData(null);
+      setStackPicksError(null);
+      setStackPicksLoading(false);
       return;
     }
 
     // CACHE HYDRATION — check localStorage for a prior result matching this fingerprint.
     // If found, render it immediately and skip the network fetch entirely.
     // This makes Stack Builder cold-open instant when the stack hasn't changed.
-    const cached = readAdvisorCache(advisorStackFingerprint);
+    const cached = readStackCache(stackPicksFingerprint);
     if (cached) {
-      lastAdvisorFingerprint.current = advisorStackFingerprint;
-      setAdvisorData(cached);
-      setAdvisorError(null);
-      setAdvisorLoading(false);
+      lastStackPicksFingerprint.current = stackPicksFingerprint;
+      setStackPicksData(cached);
+      setStackPicksError(null);
+      setStackPicksLoading(false);
       return;
     }
 
@@ -378,20 +378,20 @@ export function BuildTab({
     // When they switch back to stackBuilder, this effect will rerun (activeTab is in the dep array)
     // and the fetch will fire then.
     if (activeTab !== "stackBuilder") {
-      setAdvisorLoading(false);
+      setStackPicksLoading(false);
       return;
     }
 
-    const myId = ++advisorFetchGen.current;
-    setAdvisorLoading(true);
-    setAdvisorError(null);
+    const myId = ++stackPicksFetchGen.current;
+    setStackPicksLoading(true);
+    setStackPicksError(null);
 
-    if (advisorDebounce.current != null) window.clearTimeout(advisorDebounce.current);
-    advisorDebounce.current = window.setTimeout(() => {
+    if (stackPicksDebounce.current != null) window.clearTimeout(stackPicksDebounce.current);
+    stackPicksDebounce.current = window.setTimeout(() => {
       void (async () => {
         try {
-          if (advisorStackFingerprint === lastAdvisorFingerprint.current) {
-            if (myId === advisorFetchGen.current) setAdvisorLoading(false);
+          if (stackPicksFingerprint === lastStackPicksFingerprint.current) {
+            if (myId === stackPicksFetchGen.current) setStackPicksLoading(false);
             return;
           }
 
@@ -402,27 +402,27 @@ export function BuildTab({
             })
             .filter(Boolean);
           if (currentStack.length === 0) {
-            if (myId === advisorFetchGen.current) {
-              setAdvisorData(null);
-              setAdvisorError(
-                "Stack rows do not match the catalog, so AI Atlas has nothing to analyze. Add compounds from search above."
+            if (myId === stackPicksFetchGen.current) {
+              setStackPicksData(null);
+              setStackPicksError(
+                "Stack rows do not match the catalog, so AI Atfeh has nothing to analyze. Add compounds from search above."
               );
             }
             return;
           }
 
-          const compactCatalog = buildAdvisorCatalogPayload(catalog, primaryCategory);
+          const compactCatalog = buildAtfehCatalogPayload(catalog, primaryCategory);
 
           const accessToken = await getSessionAccessToken();
           if (!accessToken) {
-            if (myId === advisorFetchGen.current) {
-              setAdvisorData(null);
-              setAdvisorError("Sign in to use AI Atlas.");
+            if (myId === stackPicksFetchGen.current) {
+              setStackPicksData(null);
+              setStackPicksError("Sign in to use AI Atfeh.");
             }
             return;
           }
 
-          const res = await fetch(`${API_WORKER_URL}/ai-guide`, {
+          const res = await fetch(`${API_WORKER_URL}/atfeh/stack-recommendations`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -431,46 +431,46 @@ export function BuildTab({
             body: JSON.stringify({ currentStack, catalog: compactCatalog }),
           });
 
-          if (myId !== advisorFetchGen.current) return;
+          if (myId !== stackPicksFetchGen.current) return;
 
           if (res.status === 401) {
-            if (myId === advisorFetchGen.current) {
-              setAdvisorData(null);
-              setAdvisorError("Session expired or not signed in. Sign in again to use AI Atlas.");
+            if (myId === stackPicksFetchGen.current) {
+              setStackPicksData(null);
+              setStackPicksError("Session expired or not signed in. Sign in again to use AI Atfeh.");
             }
             return;
           }
 
           if (res.status === 429) {
             const data = await res.json().catch(() => ({}));
-            if (myId !== advisorFetchGen.current) return;
-            setAdvisorData({
+            if (myId !== stackPicksFetchGen.current) return;
+            setStackPicksData({
               insight:
                 typeof data.limitMessage === "string" && data.limitMessage.trim()
                   ? data.limitMessage.trim()
-                  : "Daily AI Atlas limit reached. Upgrade for more.",
+                  : "Daily AI Atfeh limit reached. Upgrade for more.",
               recommendations: [],
             });
-            setAdvisorError(null);
-            lastAdvisorFingerprint.current = advisorStackFingerprint;
-            setAdvisorLoading(false);
+            setStackPicksError(null);
+            lastStackPicksFingerprint.current = stackPicksFingerprint;
+            setStackPicksLoading(false);
             return;
           }
 
           if (!res.ok) {
-            if (myId === advisorFetchGen.current) {
-              setAdvisorData(null);
-              setAdvisorError(`AI Atlas request failed (${res.status}). Check that the Worker exposes POST /ai-guide.`);
+            if (myId === stackPicksFetchGen.current) {
+              setStackPicksData(null);
+              setStackPicksError(`AI Atfeh request failed (${res.status}). Check that the Worker exposes POST /atfeh/stack-recommendations.`);
             }
             return;
           }
 
           const data = await res.json().catch(() => ({}));
-          if (myId !== advisorFetchGen.current) return;
+          if (myId !== stackPicksFetchGen.current) return;
 
           if (!data || typeof data !== "object") {
-            setAdvisorData(null);
-            setAdvisorError("Invalid response from AI Atlas.");
+            setStackPicksData(null);
+            setStackPicksError("Invalid response from AI Atfeh.");
             return;
           }
           const insightRaw = typeof data.insight === "string" ? data.insight : "";
@@ -492,7 +492,7 @@ export function BuildTab({
                   : typeof r.rationale === "string"
                     ? r.rationale.trim()
                     : "";
-              const tier = normalizeAdvisorTier(r.tier);
+              const tier = normalizeStackTier(r.tier);
               return {
                 peptideId: pid,
                 name: typeof r.name === "string" && r.name.trim() ? r.name.trim() : pid,
@@ -503,35 +503,35 @@ export function BuildTab({
             .filter(Boolean)
             .slice(0, 4);
           const insightTrim = insightRaw.trim();
-          setAdvisorError(null);
+          setStackPicksError(null);
           if (insightTrim || recs.length) {
-            lastAdvisorFingerprint.current = advisorStackFingerprint;
+            lastStackPicksFingerprint.current = stackPicksFingerprint;
             const newData = { insight: insightTrim, recommendations: recs };
-            setAdvisorData(newData);
-            writeAdvisorCache(advisorStackFingerprint, newData);
+            setStackPicksData(newData);
+            writeStackCache(stackPicksFingerprint, newData);
           } else {
-            lastAdvisorFingerprint.current = "";
-            setAdvisorData(null);
-            setAdvisorError("No recommendations returned. Try again after changing your stack.");
+            lastStackPicksFingerprint.current = "";
+            setStackPicksData(null);
+            setStackPicksError("No recommendations returned. Try again after changing your stack.");
           }
         } catch {
-          if (myId === advisorFetchGen.current) {
-            setAdvisorData(null);
-            setAdvisorError("Could not reach AI Atlas. Check your network and API worker URL.");
+          if (myId === stackPicksFetchGen.current) {
+            setStackPicksData(null);
+            setStackPicksError("Could not reach AI Atfeh. Check your network and API worker URL.");
           }
         } finally {
-          if (myId === advisorFetchGen.current) setAdvisorLoading(false);
+          if (myId === stackPicksFetchGen.current) setStackPicksLoading(false);
         }
       })();
     }, 2500);
 
     return () => {
-      if (advisorDebounce.current != null) {
-        window.clearTimeout(advisorDebounce.current);
-        advisorDebounce.current = null;
+      if (stackPicksDebounce.current != null) {
+        window.clearTimeout(stackPicksDebounce.current);
+        stackPicksDebounce.current = null;
       }
     };
-  }, [advisorStackFingerprint, activeTab]);
+  }, [stackPicksFingerprint, activeTab]);
 
   useEffect(() => {
     if (activeTab !== "stackBuilder") return;
@@ -977,8 +977,8 @@ export function BuildTab({
 
       {isApiWorkerConfigured() && (
         <div
-          data-tutorial-target={TUTORIAL_TARGET.atlas_build_panel}
-          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atlas_build_panel)))}
+          data-tutorial-target={TUTORIAL_TARGET.atfeh_build_panel}
+          {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atfeh_build_panel)))}
           style={{
             marginTop: 16,
             border: "1px solid var(--color-border-emphasis)",
@@ -1008,7 +1008,7 @@ export function BuildTab({
               <span className="pepv-emoji" aria-hidden>
                 🧙{" "}
               </span>
-              AI Atlas
+              AI Atfeh
             </div>
             <span className="mono" style={{ fontSize: 10, color: "var(--color-text-secondary)", letterSpacing: "0.12em" }}>
               Pep Guide
@@ -1017,9 +1017,9 @@ export function BuildTab({
           <div style={{ height: 1, background: "var(--color-accent-subtle-30)", marginBottom: 12 }} />
           {rows.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.55, margin: 0 }}>
-              Add compounds above to unlock AI Atlas stack analysis.
+              Add compounds above to unlock AI Atfeh stack analysis.
             </p>
-          ) : advisorLoading ? (
+          ) : stackPicksLoading ? (
             <>
               <div className="pepv-advisor-skeleton" style={{ height: 40, marginBottom: 14 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1029,16 +1029,16 @@ export function BuildTab({
                 <div className="pepv-advisor-skeleton" style={{ minHeight: 88 }} />
               </div>
             </>
-          ) : advisorError && !advisorData ? (
+          ) : stackPicksError && !stackPicksData ? (
             <p style={{ fontSize: 13, color: "var(--color-danger)", lineHeight: 1.55, margin: 0 }}>
-              {advisorError}
+              {stackPicksError}
             </p>
-          ) : advisorData ? (
+          ) : stackPicksData ? (
             <>
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.55, margin: "0 0 14px" }}>
-                {advisorData.insight}
+                {stackPicksData.insight}
               </p>
-              {advisorData.recommendations.length > 0 ? (
+              {stackPicksData.recommendations.length > 0 ? (
                 <>
                   <div
                     className="mono"
@@ -1052,11 +1052,11 @@ export function BuildTab({
                     CONSIDER ADDING
                   </div>
                   <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
-                    {advisorData.recommendations.map((rec) => {
+                    {stackPicksData.recommendations.map((rec) => {
                       const p = catalogById.get(rec.peptideId);
                       if (!p) return null;
                       const cat0 = primaryCategory(p);
-                      const tierNorm = normalizeAdvisorTier(rec.tier);
+                      const tierNorm = normalizeStackTier(rec.tier);
                       return (
                         <div
                           key={rec.peptideId}
@@ -1071,7 +1071,7 @@ export function BuildTab({
                             ...getCategoryCssVars(cat0),
                           }}
                         >
-                          <AdvisorTierBadge tier={rec.tier} />
+                          <StackTierBadge tier={rec.tier} />
                           <div style={{ minWidth: 0, paddingRight: tierNorm ? 8 : 0 }}>
                             <div className="brand" style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text-primary)" }}>
                               {p.name}
@@ -1102,7 +1102,7 @@ export function BuildTab({
                             ) : (
                               <div style={{ flex: "1 1 auto" }} />
                             )}
-                            {advisorRecsUnlocked ? (
+                            {stackPicksUnlocked ? (
                               <button
                                 type="button"
                                 className="btn-teal"
@@ -1116,7 +1116,7 @@ export function BuildTab({
                         </div>
                       );
                     })}
-                    {!advisorRecsUnlocked ? (
+                    {!stackPicksUnlocked ? (
                       <div
                         style={{
                           position: "absolute",

@@ -12,7 +12,7 @@ There is no router library. Add one only if a new multi-page requirement justifi
 
 ## Catalog size (do not hardcode)
 
-Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`. **Live count:** `PEPTIDES.length` / `CATALOG_COUNT` (currently **275** after BATCH41). `MAX_ADVISOR_CATALOG` in `src/lib/advisorCatalogPayload.js` is the **AI advisor payload cap** (153), not the library size.
+Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`. **Live count:** `PEPTIDES.length` / `CATALOG_COUNT` (currently **275** after BATCH41). The AI Atfeh catalog payload (`src/lib/atfehCatalogPayload.js`) sends all compounds — no hardcoded cap.
 
 ## Route filtering data source
 
@@ -45,7 +45,7 @@ The normalization pipeline in `normalizeNewCatalogEntry` only emits fields neede
                            └── <DoseLogFAB/>
 ```
 
-`PepGuideIQApp` (line 386 in App.jsx) owns the giant state surface: tabs, library filters, stack, AI Atlas, modals, mobile layout flags. Over 40 `useState` calls. Don't "simplify" this without understanding the cross-tab flows.
+`PepGuideIQApp` (line 386 in App.jsx) owns the giant state surface: tabs, library filters, stack, AI Atfeh, modals, mobile layout flags. Over 40 `useState` calls. Don't "simplify" this without understanding the cross-tab flows.
 
 ## Tabs (`PEPV_VALID_TABS`)
 
@@ -142,7 +142,7 @@ Everything goes through `src/lib/supabase.js` (57 exports) or explicit `fetch()`
 - **Peptide math**: `peptideMath.js` (blend dose), `vialDoseMath.js` (units ↔ mcg), `peptideBioavailability.js`
 - **Protocol logic**: `doseRouteKind.js`, `protocolDoseRows.js`, `protocolGuardrails.js` (timing warnings), `protocolLogCooldown.js`, `protocolMessages.js` (session flavor text), `sessionSchedule.js` (wake time → session)
 - **Time**: `localCalendarDay.js`, `streakUtils.js`
-- **Catalog utilities**: `advisorCatalogPayload.js`, `catalogStability.js`, `catalogVendorSanitize.js`, `normalizeNewCatalogEntry.js`, `resolveStackCatalogPeptide.js`
+- **Catalog utilities**: `atfehCatalogPayload.js`, `catalogStability.js`, `catalogVendorSanitize.js`, `normalizeNewCatalogEntry.js`, `resolveStackCatalogPeptide.js`
 - **Member profile**: `memberAvatarUrl.js`, `memberFasts.js`, `memberProfileHandle.js`, `publicMemberProfile.js`, `openPublicProfile.js`, `socialProfileLinks.js`
 - **Stack sharing**: `stackShare.js`
 - **Social graph**: `follows.js`
@@ -173,7 +173,7 @@ Before inventing a new util, grep this list.
 
 Normalize defensively with `normalizeStackSessions(s)` from `components/SavedStackEntryRow.jsx`.
 
-## AI Atlas request contract
+## AI Atfeh request contract
 
 ```
 POST ${API_WORKER_URL}/v1/chat
@@ -183,7 +183,7 @@ body: { messages: [{role, content}], system: string, catalog: [...] }
 
 Response: `{ text: string, usage: { queries_today, queries_limit } }`.
 
-Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCategoryFn)` from `src/lib/advisorCatalogPayload.js` (caps at 153 rows (AI advisor payload cap, not catalog size), strips mechanism to one ≤160-char sentence).
+Build the catalog payload with `buildAtfehCatalogPayload(catalog, primaryCategoryFn)` from `src/lib/atfehCatalogPayload.js` (sends all compounds, strips mechanism to one ≤160-char sentence).
 
 ## Adding a compound
 

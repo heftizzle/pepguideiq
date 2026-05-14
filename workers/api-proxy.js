@@ -35,7 +35,7 @@ const DAILY_QUERY_LIMIT = {
   goat: 16,
 };
 
-const DAILY_ADVISOR_LIMIT = {
+const DAILY_STACK_LIMIT = {
   entry: 3,
   pro: 10,
   elite: 20,
@@ -332,7 +332,7 @@ async function supabasePatchInbodyScanHistory(supabaseUrl, serviceKey, scanId, u
 }
 
 /**
- * POST /inbody-scan/interpret — Pro+ only. Sonnet stream; caches per `scanId` on `inbody_scan_history`. Does not use AI Atlas KV quota.
+ * POST /inbody-scan/interpret — Pro+ only. Sonnet stream; caches per `scanId` on `inbody_scan_history`. Does not use AI Atfeh KV quota.
  * Body: `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`.
  * Cached hit: JSON `{ cached: true, interpretation, ai_interpreted_at }` (no stream).
  * @param {Request} request
@@ -571,7 +571,7 @@ const SECURITY_HEADERS = {
 /**
  * IP sliding-window limits (RATE_LIMIT_KV, keys `iprl:<type>:<ip>`). This is
  * defense-in-depth for auth/api/R2 routes. Primary usage and abuse control for
- * paid upstreams is daily per-user KV (`rl:<userId>:<date>`, advisor keys, etc.).
+ * paid upstreams is daily per-user KV (`rl:<userId>:<date>`, atfeh-stack keys, etc.).
  */
 const RATE_LIMITS = {
   auth: { windowMs: 60_000, max: 10 },
@@ -841,15 +841,15 @@ function normalizeMessages(messages) {
   }));
 }
 
-// ─── AI ATLAS (stack recommendations) ───────────────────────────────────────
+// ─── AI ATFEH (stack recommendations) ───────────────────────────────────────
 /**
- * POST /ai-guide (aliases: /ai-stack-advisor, /stack-advisor) — Build-tab stack suggestions (permissive CORS).
+ * POST /atfeh/stack-recommendations (aliases: /ai-guide, /ai-stack-advisor, /stack-advisor) — Atfeh Stack Picks (permissive CORS).
  * Upstream / transport failures → 502 { error }; invalid model JSON on 200 → empty insight/recommendations.
  * Auth: same session + fetchProfilePlan pattern as POST /v1/chat (no client-supplied plan or user id).
  * @param {Request} request
  * @param {Record<string, string | undefined>} env
  */
-async function handleStackAdvisor(request, env) {
+async function handleAtfehStackRecommendations(request, env) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -862,7 +862,7 @@ async function handleStackAdvisor(request, env) {
 
   const production = isProduction(env);
   if (production && !supabaseAuthReady(env)) {
-    log(env, "error", "production_missing_supabase", { route: "stack_advisor" });
+    log(env, "error", "production_missing_supabase", { route: "atfeh_stack" });
     return new Response(
       JSON.stringify({ error: "Server misconfiguration: Supabase auth is required" }),
       { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -872,7 +872,7 @@ async function handleStackAdvisor(request, env) {
   let sessionUserId = null;
   let plan = "entry";
   /** @type {string[]} */
-  let advisorUserContextLines = [];
+  let stackContextLines = [];
   if (supabaseAuthReady(env)) {
     const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
     if (error || !user?.sub) {
@@ -886,7 +886,7 @@ async function handleStackAdvisor(request, env) {
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
     plan = await fetchProfilePlan(supabaseUrl, serviceKey, sessionUserId, env);
     const aiCtx = await fetchProfileAiContextFields(supabaseUrl, serviceKey, sessionUserId);
-    advisorUserContextLines = [
+    stackContextLines = [
       biologicalSexPromptLineFromDb(aiCtx.biological_sex),
       agePromptLineFromDob(aiCtx.date_of_birth),
       trainingExperiencePromptLineFromDb(aiCtx.training_experience),
@@ -898,11 +898,11 @@ async function handleStackAdvisor(request, env) {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    log(env, "warn", "dev_mode_stack_advisor_without_supabase", {});
+    log(env, "warn", "dev_mode_atfeh_stack_without_supabase", {});
   }
 
-  const advisorRateUserId = sessionUserId ?? "anon";
-  const dailyLimit = DAILY_ADVISOR_LIMIT[plan] ?? DAILY_ADVISOR_LIMIT.entry;
+  const stackRateUserId = sessionUserId ?? "anon";
+  const dailyLimit = DAILY_STACK_LIMIT[plan] ?? DAILY_STACK_LIMIT.entry;
 
   try {
     const { currentStack, catalog } = await request.json();
@@ -922,7 +922,7 @@ async function handleStackAdvisor(request, env) {
 
     if (dailyLimit < 999 && env.RATE_LIMIT_KV) {
       const today = new Date().toISOString().split("T")[0];
-      const kvKey = `advisor:${advisorRateUserId}:${today}`;
+      const kvKey = `atfeh-stack:${stackRateUserId}:${today}`;
       const count = parseInt((await env.RATE_LIMIT_KV.get(kvKey)) ?? "0", 10);
 
       if (count >= dailyLimit) {
@@ -931,7 +931,7 @@ async function handleStackAdvisor(request, env) {
             insight: "",
             recommendations: [],
             rateLimited: true,
-            limitMessage: `You've used your ${dailyLimit} daily AI Atlas calls on the ${plan} plan.`,
+            limitMessage: `You've used your ${dailyLimit} daily AI Atfeh Stack Picks on the ${plan} plan.`,
           }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -952,7 +952,7 @@ async function handleStackAdvisor(request, env) {
         brief: typeof c.brief === "string" ? c.brief : "",
       }));
 
-    const systemPrompt = `You are an expert peptide and biohacking protocol advisor. The user is building a research stack and needs honest, nuanced compound recommendations. You MUST only recommend compounds that exist in the provided catalog — never invent compounds not in the list. Be specific about mechanisms and overlap with the current stack. Return ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON. Exact shape required:
+    const systemPrompt = `You are AI Atfeh (Advanced Technology For Enhanced Humans), generating stack recommendations for the user. You are an expert in peptide science and biohacking protocols. The user is building a research stack and needs honest, nuanced compound recommendations. You MUST only recommend compounds that exist in the provided catalog — never invent compounds not in the list. Be specific about mechanisms and overlap with the current stack. Return ONLY valid JSON — no markdown, no preamble, no explanation outside the JSON. Exact shape required:
 {
   "insight": "1-2 sentences assessing the current stack (strengths, gaps, redundancy)",
   "recommendations": [
@@ -978,8 +978,8 @@ Tier assignment rules:
 
 Only use peptideId values from the provided catalog.`;
 
-    const advisorContextBlock = advisorUserContextLines.length ? advisorUserContextLines.join("\n") : "";
-    const stackAdvisorSystemText = [systemPrompt, advisorContextBlock, AI_AGE_TRAINING_SAFETY_NOTE]
+    const stackContextBlock = stackContextLines.length ? stackContextLines.join("\n") : "";
+    const atfehStackSystemText = [systemPrompt, stackContextBlock, AI_AGE_TRAINING_SAFETY_NOTE]
       .filter(Boolean)
       .join("\n\n");
 
@@ -1003,7 +1003,7 @@ Only use peptideId values from the provided catalog.`;
         body: JSON.stringify({
           model: MODEL_ENTRY_PRO,
           max_tokens: 900,
-          system: [{ type: "text", text: stackAdvisorSystemText, cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: atfehStackSystemText, cache_control: { type: "ephemeral" } }],
           messages: [
             {
               role: "user",
@@ -1023,16 +1023,16 @@ Only use peptideId values from the provided catalog.`;
         }),
       });
     } catch (fetchErr) {
-      log(env, "error", "stack_advisor_fetch_failed", { message: String(fetchErr) });
-      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+      log(env, "error", "atfeh_stack_fetch_failed", { message: String(fetchErr) });
+      return new Response(JSON.stringify({ error: "Atfeh Stack Picks temporarily unavailable" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!anthropicRes.ok) {
-      log(env, "warn", "stack_advisor_anthropic_status", { status: anthropicRes.status });
-      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+      log(env, "warn", "atfeh_stack_anthropic_status", { status: anthropicRes.status });
+      return new Response(JSON.stringify({ error: "Atfeh Stack Picks temporarily unavailable" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1042,8 +1042,8 @@ Only use peptideId values from the provided catalog.`;
     try {
       anthropicData = await anthropicRes.json();
     } catch (jsonErr) {
-      log(env, "error", "stack_advisor_anthropic_json", { message: String(jsonErr) });
-      return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+      log(env, "error", "atfeh_stack_anthropic_json", { message: String(jsonErr) });
+      return new Response(JSON.stringify({ error: "Atfeh Stack Picks temporarily unavailable" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1062,7 +1062,7 @@ Only use peptideId values from the provided catalog.`;
     }
 
     const catalogIdSet = new Set(catalog.map((c) => (c && c.id ? String(c.id) : "")).filter(Boolean));
-    const ADVISOR_TIERS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
+    const ATFEH_STACK_TIERS = new Set(["must_have", "nice_to_have", "not_necessary", "redundant"]);
     const rawRecs = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
     const safeRecs = rawRecs
       .map((r) => {
@@ -1075,7 +1075,7 @@ Only use peptideId values from the provided catalog.`;
               : "";
         if (!pid || !catalogIdSet.has(pid)) return null;
         const tierRaw = typeof r.tier === "string" ? r.tier.trim().toLowerCase().replace(/-/g, "_") : "";
-        const tier = ADVISOR_TIERS.has(tierRaw) ? tierRaw : undefined;
+        const tier = ATFEH_STACK_TIERS.has(tierRaw) ? tierRaw : undefined;
         const name = typeof r.name === "string" && r.name.trim() ? r.name.trim() : pid;
         const reason =
           typeof r.reason === "string"
@@ -1095,8 +1095,8 @@ Only use peptideId values from the provided catalog.`;
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    log(env, "error", "stack_advisor_error", { message: String(err) });
-    return new Response(JSON.stringify({ error: "Advisor temporarily unavailable" }), {
+    log(env, "error", "atfeh_stack_error", { message: String(err) });
+    return new Response(JSON.stringify({ error: "Atfeh Stack Picks temporarily unavailable" }), {
       status: 502,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -1439,7 +1439,7 @@ function trainingExperiencePromptLineFromDb(raw) {
 }
 
 /**
- * Profile fields used for AI Atlas and Stack Advisor safety context (single REST round-trip).
+ * Profile fields used for AI Atfeh Chat and Stack Picks safety context (single REST round-trip).
  * @param {string} supabaseUrl
  * @param {string} serviceKey
  * @param {string} userId
@@ -1474,9 +1474,9 @@ async function fetchProfileAiContextFields(supabaseUrl, serviceKey, userId) {
   };
 }
 
-/** Cached system prefix for AI Atlas (/v1/chat); dynamic user context is a separate block. */
+/** Cached system prefix for AI Atfeh (/v1/chat); dynamic user context is a separate block. */
 const AI_GUIDE_SYSTEM_BASE =
-  "You are an expert peptide research advisor with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
+  "You are an expert peptide research assistant with deep knowledge of peptide pharmacology, biohacking protocols, dosing strategies, and interactions. Be direct, technical, and practical. Always include safety notes — these are research chemicals requiring physician oversight.";
 
 const APP_HELP_DAILY_LIMIT = 10; // keep in sync with DAILY_LIMIT in AppHelpModal.jsx
 
@@ -1484,7 +1484,7 @@ const APP_HELP_SYSTEM_PROMPT = `You are App Help for pepguideIQ — a concise, f
 
 ## Hard redirect rule
 If a user asks ANYTHING about peptide science, dosing amounts, mechanism of action, medical effects, research, BAC water ratios, reconstitution math, or any topic requiring scientific knowledge — respond ONLY with:
-"Great question for AI Atlas 🧙 — open the hamburger menu (☰) in the top-right corner to find it."
+"Great question for AI Atfeh 🧙 — open the hamburger menu (☰) in the top-right corner to find it."
 Do not attempt to answer the science question. Redirect immediately, every time, no exceptions.
 
 ---
@@ -1504,7 +1504,7 @@ Do not attempt to answer the science question. Redirect immediately, every time,
 Not all tabs may be visible depending on tier and app version.
 
 ### Hamburger Menu (☰ top-right corner)
-- AI Atlas 🧙 — AI assistant for peptide science questions (science questions only)
+- AI Atfeh 🧙 — AI assistant for peptide science questions (science questions only)
 - App Help 💬 — Navigation and app usage help (that's me)
 - FAQ / Support — Frequently asked questions and contact
 - Settings — Theme picker and account preferences
@@ -1544,16 +1544,16 @@ Note: Stack slots are limited by your plan tier.
 ### Viewing dose history
 Tap Profile → scroll to your dose log section.
 
-### Using AI Atlas
-Open the hamburger menu (☰) → tap "AI Atlas 🧙" → ask your peptide science question.
-Daily Atlas query limits apply by tier.
+### Using AI Atfeh
+Open the hamburger menu (☰) → tap "AI Atfeh 🧙" → ask your peptide science question.
+Daily Atfeh query limits apply by tier.
 
 ---
 
 ## Tiers & Limits
 (Verify current pricing in-app under Subscription)
 
-| Tier     | Stack Slots | AI Atlas/day | App Help/day |
+| Tier     | Stack Slots | AI Atfeh/day | App Help/day |
 |----------|-------------|--------------|--------------|
 | Entry 💸  | 2           | 2            | 10           |
 | Pro 🔬    | 10          | 4            | 10           |
@@ -1568,9 +1568,9 @@ To upgrade: hamburger menu (☰) → Subscription.
 
 **Stack** — Your personal list of compounds you are actively tracking. Separate from your dose log.
 **Stack Slots** — Maximum compounds in your stack at once. Set by tier.
-**BAC Water** — Bacteriostatic water used for reconstituting lyophilized peptides. Ratios = science → AI Atlas 🧙.
-**Lyophilized** — Freeze-dried powder form most peptides ship in. Science topic → AI Atlas 🧙.
-**AI Atlas 🧙** — In-app AI for peptide science, protocol, and research. Daily limits by tier.
+**BAC Water** — Bacteriostatic water used for reconstituting lyophilized peptides. Ratios = science → AI Atfeh 🧙.
+**Lyophilized** — Freeze-dried powder form most peptides ship in. Science topic → AI Atfeh 🧙.
+**AI Atfeh 🧙** — In-app AI for peptide science, protocol, and research. Daily limits by tier.
 **Dose Log** — Record of what you administered and when. Found in Stack and Profile.
 **Vial Tracker** — Track remaining volume in each vial. Access via the Vial Tracker tab.
 
@@ -1583,7 +1583,7 @@ If asked about these, confirm they are on the roadmap.
 ---
 
 ## Tone
-Concise. Numbered steps for how-to questions. Never answer science questions — redirect to Atlas every time.`;
+Concise. Numbered steps for how-to questions. Never answer science questions — redirect to Atfeh every time.`;
 
 
 /**
@@ -5776,11 +5776,11 @@ async function handlePostStackPhoto(request, env, cors) {
 const isUUID = (s) =>
   typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
-// ─── ATLAS THREAD HELPERS ──────────────────────────────────────────────────
+// ─── ATFEH THREAD HELPERS ──────────────────────────────────────────────────
 
 const THREAD_LIMITS = { entry: 5, pro: 10, elite: 20, goat: 30 };
-const ATLAS_MESSAGE_LIMIT = 10;
-const ATLAS_KV_TTL = 300; // 5 min cache
+const ATFEH_MESSAGE_LIMIT = 10;
+const ATFEH_KV_TTL = 300; // 5 min cache
 
 function getThreadLimit(plan) {
   return THREAD_LIMITS[plan] ?? THREAD_LIMITS.entry;
@@ -5795,8 +5795,8 @@ async function getActiveThreadCount(supabaseUrl, serviceKey, profileId) {
   return Array.isArray(data) ? data.length : 0;
 }
 
-// POST /atlas/threads — create new thread
-async function handleAtlasCreateThread(request, env, cors) {
+// POST /atfeh/threads — create new thread
+async function handleAtfehCreateThread(request, env, cors) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -5841,13 +5841,13 @@ async function handleAtlasCreateThread(request, env, cors) {
   if (!insRes.ok) return jsonResponse({ error: "Failed to create thread" }, 500, cors);
 
   // Invalidate KV cache
-  await env.RATE_LIMIT_KV.delete(`atlas:threads:${profile_id}`).catch(() => {});
+  await env.RATE_LIMIT_KV.delete(`atfeh:threads:${profile_id}`).catch(() => {});
 
   return jsonResponse(Array.isArray(insData) ? insData[0] : insData, 201, cors);
 }
 
-// GET /atlas/threads — list threads for a profile (active + archived)
-async function handleAtlasGetThreads(request, env, cors) {
+// GET /atfeh/threads — list threads for a profile (active + archived)
+async function handleAtfehGetThreads(request, env, cors) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -5860,7 +5860,7 @@ async function handleAtlasGetThreads(request, env, cors) {
   const userId = user.sub;
 
   // Check KV cache first
-  const cacheKey = `atlas:threads:${profile_id}`;
+  const cacheKey = `atfeh:threads:${profile_id}`;
   if (env.RATE_LIMIT_KV) {
     const cached = await env.RATE_LIMIT_KV.get(cacheKey).catch(() => null);
     if (cached) {
@@ -5888,14 +5888,14 @@ async function handleAtlasGetThreads(request, env, cors) {
 
   // Cache for 5 min
   if (env.RATE_LIMIT_KV) {
-    await env.RATE_LIMIT_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: ATLAS_KV_TTL }).catch(() => {});
+    await env.RATE_LIMIT_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: ATFEH_KV_TTL }).catch(() => {});
   }
 
   return jsonResponse(result, 200, cors);
 }
 
-// GET /atlas/threads/:threadId/messages — load thread messages
-async function handleAtlasGetMessages(request, env, cors, threadId) {
+// GET /atfeh/threads/:threadId/messages — load thread messages
+async function handleAtfehGetMessages(request, env, cors, threadId) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -5920,8 +5920,8 @@ async function handleAtlasGetMessages(request, env, cors, threadId) {
   return jsonResponse({ thread: threadData[0], messages }, 200, cors);
 }
 
-// POST /atlas/threads/:threadId/messages — post a message (Atlas AI call)
-async function handleAtlasPostMessage(request, env, cors, threadId) {
+// POST /atfeh/threads/:threadId/messages — post a message (Atfeh AI call)
+async function handleAtfehPostMessage(request, env, cors, threadId) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -5939,7 +5939,7 @@ async function handleAtlasPostMessage(request, env, cors, threadId) {
   if (!Array.isArray(threadData) || threadData.length === 0) return jsonResponse({ error: "Thread not found" }, 404, cors);
   const thread = threadData[0];
   if (thread.archived) return jsonResponse({ error: "Thread is archived" }, 403, cors);
-  if (thread.message_count >= ATLAS_MESSAGE_LIMIT) {
+  if (thread.message_count >= ATFEH_MESSAGE_LIMIT) {
     return jsonResponse({ error: "Thread limit reached", canContinue: true }, 429, cors);
   }
 
@@ -5955,8 +5955,8 @@ async function handleAtlasPostMessage(request, env, cors, threadId) {
   })).filter(m => m.content) : [];
   contextMessages.push({ role: "user", content });
 
-  // Atlas system prompt
-  const atlasSystemPrompt = `You are AI Atlas 🧙, the research assistant inside pepguideIQ. You are an expert in peptide science, nootropics, and human optimization protocols. You help users understand compounds, protocols, mechanisms of action, and research. You are not a doctor and never give medical advice. Be precise, cite mechanisms, and be honest about the limits of current research. Keep responses focused and research-grade.`;
+  // Atfeh system prompt
+  const atfehSystemPrompt = `You are AI Atfeh 🧙 (Advanced Technology For Enhanced Humans), the research assistant inside pepguideIQ. You are an expert in peptide science, nootropics, and human optimization protocols. You help users understand compounds, protocols, mechanisms of action, and research. You are not a doctor and never give medical advice. Be precise, cite mechanisms, and be honest about the limits of current research. Keep responses focused and research-grade.`;
 
   const apiKey = env.ANTHROPIC_API_KEY;
   if (!apiKey) return jsonResponse({ error: "AI service unavailable" }, 503, cors);
@@ -5975,7 +5975,7 @@ async function handleAtlasPostMessage(request, env, cors, threadId) {
       body: JSON.stringify({
         model,
         max_tokens: 1024,
-        system: [{ type: "text", text: atlasSystemPrompt, cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: atfehSystemPrompt, cache_control: { type: "ephemeral" } }],
         messages: contextMessages
       })
     });
@@ -6014,19 +6014,19 @@ async function handleAtlasPostMessage(request, env, cors, threadId) {
   }
 
   // Invalidate KV thread list cache
-  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+  await env.RATE_LIMIT_KV.delete(`atfeh:threads:${thread.profile_id}`).catch(() => {});
 
   const newCount = thread.message_count + 2; // user + assistant
   return jsonResponse({
     content: assistantContent,
     message_count: newCount,
-    locked: newCount >= ATLAS_MESSAGE_LIMIT,
-    canContinue: newCount >= ATLAS_MESSAGE_LIMIT
+    locked: newCount >= ATFEH_MESSAGE_LIMIT,
+    canContinue: newCount >= ATFEH_MESSAGE_LIMIT
   }, 200, cors);
 }
 
-// POST /atlas/threads/:threadId/continue — fork thread with Haiku summary
-async function handleAtlasContinueThread(request, env, cors, threadId) {
+// POST /atfeh/threads/:threadId/continue — fork thread with Haiku summary
+async function handleAtfehContinueThread(request, env, cors, threadId) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -6100,13 +6100,13 @@ async function handleAtlasContinueThread(request, env, cors, threadId) {
   });
 
   // Invalidate KV
-  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+  await env.RATE_LIMIT_KV.delete(`atfeh:threads:${thread.profile_id}`).catch(() => {});
 
   return jsonResponse({ thread: newThread, summary: summaryText }, 201, cors);
 }
 
-// PATCH /atlas/threads/:threadId/archive — manual archive
-async function handleAtlasArchiveThread(request, env, cors, threadId) {
+// PATCH /atfeh/threads/:threadId/archive — manual archive
+async function handleAtfehArchiveThread(request, env, cors, threadId) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -6127,13 +6127,13 @@ async function handleAtlasArchiveThread(request, env, cors, threadId) {
 
   // Get profile_id to invalidate cache
   const t = Array.isArray(patchData) ? patchData[0] : patchData;
-  if (t?.profile_id) await env.RATE_LIMIT_KV.delete(`atlas:threads:${t.profile_id}`).catch(() => {});
+  if (t?.profile_id) await env.RATE_LIMIT_KV.delete(`atfeh:threads:${t.profile_id}`).catch(() => {});
 
   return jsonResponse({ success: true }, 200, cors);
 }
 
-// PATCH /atlas/threads/:threadId/restore — restore from archive
-async function handleAtlasRestoreThread(request, env, cors, threadId) {
+// PATCH /atfeh/threads/:threadId/restore — restore from archive
+async function handleAtfehRestoreThread(request, env, cors, threadId) {
   const { data: user, error } = await getSessionUser(env, request.headers.get("Authorization"));
   if (error || !user?.sub) return jsonResponse({ error: "Unauthorized" }, 401, cors);
 
@@ -6168,7 +6168,7 @@ async function handleAtlasRestoreThread(request, env, cors, threadId) {
   );
   if (!patchRes.ok) return jsonResponse({ error: "Failed to restore thread" }, 500, cors);
 
-  await env.RATE_LIMIT_KV.delete(`atlas:threads:${thread.profile_id}`).catch(() => {});
+  await env.RATE_LIMIT_KV.delete(`atfeh:threads:${thread.profile_id}`).catch(() => {});
   return jsonResponse({ success: true }, 200, cors);
 }
 
@@ -6801,45 +6801,46 @@ async function handleRequest(request, env) {
       return handleGetStackPhoto(request, env, cors);
     }
 
-    // ─── AI ATLAS (stack recommendations) ────────────────────────────────
-    // Normalize trailing slash so POST /ai-guide/ still matches (avoids 404 from typo/proxies).
-    const stackAdvisorPath = (url.pathname.replace(/\/+$/, "") || "/");
+    // ─── AI ATFEH STACK PICKS ────────────────────────────────────────────
+    // Normalize trailing slash so POST /atfeh/stack-recommendations/ still matches.
+    const atfehStackPath = (url.pathname.replace(/\/+$/, "") || "/");
     if (
-      (stackAdvisorPath === "/ai-guide" ||
-        stackAdvisorPath === "/ai-stack-advisor" ||
-        stackAdvisorPath === "/stack-advisor") &&
+      (atfehStackPath === "/atfeh/stack-recommendations" ||
+        atfehStackPath === "/ai-guide" || // DEPRECATED — remove after one release
+        atfehStackPath === "/ai-stack-advisor" || // DEPRECATED — remove after one release
+        atfehStackPath === "/stack-advisor") && // DEPRECATED — remove after one release
       request.method === "POST"
     ) {
-      return handleStackAdvisor(request, env);
+      return handleAtfehStackRecommendations(request, env);
     }
 
     if (url.pathname === "/v1/app-help" && request.method === "POST") {
       return handleAppHelp(request, env, cors);
     }
 
-    // ─── ATLAS THREAD ROUTES ──────────────────────────────────────────────────
-    if (url.pathname === "/atlas/threads" && request.method === "POST") {
-      return handleAtlasCreateThread(request, env, cors);
+    // ─── ATFEH THREAD ROUTES ──────────────────────────────────────────────────
+    if (url.pathname === "/atfeh/threads" && request.method === "POST") {
+      return handleAtfehCreateThread(request, env, cors);
     }
-    if (url.pathname === "/atlas/threads" && request.method === "GET") {
-      return handleAtlasGetThreads(request, env, cors);
+    if (url.pathname === "/atfeh/threads" && request.method === "GET") {
+      return handleAtfehGetThreads(request, env, cors);
     }
-    const atlasMessagesMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/messages\/?$/);
-    if (atlasMessagesMatch) {
-      if (request.method === "GET") return handleAtlasGetMessages(request, env, cors, atlasMessagesMatch[1]);
-      if (request.method === "POST") return handleAtlasPostMessage(request, env, cors, atlasMessagesMatch[1]);
+    const atfehMessagesMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/messages\/?$/);
+    if (atfehMessagesMatch) {
+      if (request.method === "GET") return handleAtfehGetMessages(request, env, cors, atfehMessagesMatch[1]);
+      if (request.method === "POST") return handleAtfehPostMessage(request, env, cors, atfehMessagesMatch[1]);
     }
-    const atlasContinueMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/continue\/?$/);
-    if (atlasContinueMatch && request.method === "POST") {
-      return handleAtlasContinueThread(request, env, cors, atlasContinueMatch[1]);
+    const atfehContinueMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/continue\/?$/);
+    if (atfehContinueMatch && request.method === "POST") {
+      return handleAtfehContinueThread(request, env, cors, atfehContinueMatch[1]);
     }
-    const atlasArchiveMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/archive\/?$/);
-    if (atlasArchiveMatch && request.method === "PATCH") {
-      return handleAtlasArchiveThread(request, env, cors, atlasArchiveMatch[1]);
+    const atfehArchiveMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/archive\/?$/);
+    if (atfehArchiveMatch && request.method === "PATCH") {
+      return handleAtfehArchiveThread(request, env, cors, atfehArchiveMatch[1]);
     }
-    const atlasRestoreMatch = url.pathname.match(/^\/atlas\/threads\/([^/]+)\/restore\/?$/);
-    if (atlasRestoreMatch && request.method === "PATCH") {
-      return handleAtlasRestoreThread(request, env, cors, atlasRestoreMatch[1]);
+    const atfehRestoreMatch = url.pathname.match(/^\/atfeh\/threads\/([^/]+)\/restore\/?$/);
+    if (atfehRestoreMatch && request.method === "PATCH") {
+      return handleAtfehRestoreThread(request, env, cors, atfehRestoreMatch[1]);
     }
 
     if (url.pathname !== "/v1/chat" || request.method !== "POST") {

@@ -11,7 +11,7 @@ const SUGGESTED_PROMPTS = [
   "What is BAC water?",
   "How do I add to my stack?",
   "What's the difference between tiers?",
-  "Where is AI Atlas?",
+  "Where is AI Atfeh?",
 ];
 
 function MessageBubble({ message }) {

@@ -51,9 +51,9 @@ export function getUpgradeGateCopy(gateReason) {
       };
     case "ai_guide":
       return {
-        title: "AI Atlas is a Pro feature",
+        title: "AI Atfeh is a Pro feature",
         body: "Upgrade to unlock smarter answers and higher daily limits. Firm on science, soft on vibes — you bring the peptides, we bring the receipts.",
-        ctaLabel: "Unlock AI Atlas",
+        ctaLabel: "Unlock AI Atfeh",
       };
     default:
       return {

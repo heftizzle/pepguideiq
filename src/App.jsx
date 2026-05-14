@@ -89,14 +89,14 @@ import {
 import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
 import { formatLibraryCardHalfLifeDisplay } from "./lib/libraryCardHalfLifeDisplay.js";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
-import { buildAdvisorCatalogPayload } from "./lib/advisorCatalogPayload.js";
+import { buildAtfehCatalogPayload } from "./lib/atfehCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const getCatColor = (cat) => CAT_COLORS[cat] ?? "var(--color-accent)";
 
-/** Assistant message markdown (AI Atlas); stable ref for react-markdown. */
+/** Assistant message markdown (AI Atfeh); stable ref for react-markdown. */
 const AI_GUIDE_MARKDOWN_COMPONENTS = {
   h2: ({ children }) => (
     <div className="brand" style={{ fontSize: 14, fontWeight: 700, color: "var(--color-accent)", marginBottom: 6, marginTop: 12 }}>
@@ -466,7 +466,7 @@ function TutorialSpotlightGate() {
   );
 }
 
-/** One line per compound for AI Atlas `sendAI` stack context (same strings as the previous inline `stackCtx` builder). */
+/** One line per compound for AI Atfeh `sendAI` stack context (same strings as the previous inline `stackCtx` builder). */
 function formatMyStackLinesForAi(items) {
   return items
     .map((p) => {
@@ -569,7 +569,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
-  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Atlas). */
+  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Atfeh). */
   const [buildRows, setBuildRows] = useState([]);
   const [buildLocalStackName, setBuildLocalStackName] = useState("");
   const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -602,7 +602,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   /** Exit animation plays before unmount; keeps overlay mounted while activeTab is still "guide". */
   const [guideExiting, setGuideExiting] = useState(false);
-  /** AI Atlas: below 768px hides sidebar; goals live in a toggle + horizontal pill row. */
+  /** AI Atfeh: below 768px hides sidebar; goals live in a toggle + horizontal pill row. */
   const [guideLayoutMobile, setGuideLayoutMobile] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
   );
@@ -612,7 +612,7 @@ function PepGuideIQApp({ user, setUser }) {
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
   const buildPrevTabRef = useRef(activeTab);
-  /** After Stack Builder → AI Atlas, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
+  /** After Stack Builder → AI Atfeh, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
   const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
@@ -1010,7 +1010,7 @@ function PepGuideIQApp({ user, setUser }) {
         : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
 
-    // --- Atlas live user context injection ---
+    // --- Atfeh live user context injection ---
     let scanCtx = "";
     let doseLogCtx = "";
     let profileCtx = "";
@@ -1072,8 +1072,8 @@ function PepGuideIQApp({ user, setUser }) {
       }
     }
 
-    const system = `You are PepGuideIQ AI Atlas — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`;
-    const catalog = buildAdvisorCatalogPayload(PEPTIDES, primaryCategory);
+    const system = `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`;
+    const catalog = buildAtfehCatalogPayload(PEPTIDES, primaryCategory);
     if (!isApiWorkerConfigured()) {
       setAiMsgs((prev) => [
         ...prev,
@@ -1657,7 +1657,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
     // Step 2 — auto-open first compound so CTA is in DOM
     if (
       flowKey === "guide" &&
-      highlightTarget === TUTORIAL_TARGET.atlas_compound_cta &&
+      highlightTarget === TUTORIAL_TARGET.atfeh_compound_cta &&
       activeTab === "library" &&
       !selPeptide
     ) {
@@ -1671,7 +1671,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
       flowKey === "guide" &&
       highlightTarget != null &&
       highlightTarget !== TUTORIAL_TARGET.nav_library &&
-      highlightTarget !== TUTORIAL_TARGET.atlas_compound_cta &&
+      highlightTarget !== TUTORIAL_TARGET.atfeh_compound_cta &&
       selPeptide
     ) {
       setSelPeptide(null);
@@ -1788,7 +1788,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     <span aria-hidden className="pepv-emoji" style={{ fontSize: 15, lineHeight: 1 }}>
                       🧙
                     </span>
-                    {" "}AI Atlas
+                    {" "}AI Atfeh
                   </button>
                   <NotificationsBell userId={user.id} userGoals={activeProfile?.goals} />
                   <HamburgerMenu
@@ -2455,7 +2455,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="AI Atlas"
+            aria-label="AI Atfeh"
             className={`guide-takeover-root${guideExiting ? " guide-takeover-root--exit" : ""}`}
             style={{ zIndex: 72 }}
             onClick={onGuideTakeoverRootClick}
@@ -2463,7 +2463,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
           >
             <CloseButton
               className="guide-takeover-close"
-              ariaLabel="Close AI Atlas"
+              ariaLabel="Close AI Atfeh"
               style={{ zIndex: 72 }}
               stopPropagationOnClick
               onClose={beginCloseGuide}
@@ -2834,8 +2834,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   type="button"
                   className="btn-teal"
                   style={{ fontSize: 13 }}
-                  data-tutorial-target={TUTORIAL_TARGET.atlas_compound_cta}
-                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atlas_compound_cta))}
+                  data-tutorial-target={TUTORIAL_TARGET.atfeh_compound_cta}
+                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atfeh_compound_cta))}
                   onClick={() => {
                     if (!canAI) {
                       openUpgradeModal("ai_guide");
@@ -2846,7 +2846,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     setActiveTab("guide");
                   }}
                 >
-                  Ask AI Atlas →
+                  Ask AI Atfeh →
                 </button>
                 <button
                   type="button"

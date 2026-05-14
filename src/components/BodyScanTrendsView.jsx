@@ -536,7 +536,7 @@ export function BodyScanTrendsView({
 
   const deepPrompt = useMemo(() => {
     if (!interpretText.trim()) return "";
-    return `You are the PepGuideIQ AI Atlas. The user just ran an Elite InBody trend interpretation:\n\n${interpretText}\n\nGive a deeper, structured analysis: key drivers, what to watch next scan, and how protocol timing lines up — still no medical directives or dosing changes.`;
+    return `You are the PepGuideIQ AI Atfeh. The user just ran an Elite InBody trend interpretation:\n\n${interpretText}\n\nGive a deeper, structured analysis: key drivers, what to watch next scan, and how protocol timing lines up — still no medical directives or dosing changes.`;
   }, [interpretText]);
 
   const toggleMetric = (id) => {
@@ -627,8 +627,8 @@ export function BodyScanTrendsView({
       ) : null}
 
       <div
-        data-tutorial-target={TUTORIAL_TARGET.atlas_scan_interpret}
-        {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atlas_scan_interpret)))}
+        data-tutorial-target={TUTORIAL_TARGET.atfeh_scan_interpret}
+        {...tutorialHighlightProps(Boolean(tutorial?.isHighlighted(TUTORIAL_TARGET.atfeh_scan_interpret)))}
         style={{
           border: "1px solid var(--color-border-default)",
           borderRadius: 10,

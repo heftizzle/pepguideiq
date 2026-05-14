@@ -4,7 +4,7 @@ Read before making changes. This file tells you what's actually in the repo vs w
 
 ## What this is
 
-A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 275-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Atlas (Anthropic) and Stack Advisor — both proxied through a Cloudflare Worker so the API key never hits the browser.
+A research-peptide reference and personal-protocol tracker. Production: [pepguideiq.com](https://pepguideiq.com). 275-compound catalog, per-user saved stacks (JSONB), vial lifecycle tracking, dose logging, social profile layer with follows + a receipted network feed, AI Atfeh (Advanced Technology For Enhanced Humans) (Anthropic) — powering two surfaces: Atfeh Chat and Atfeh Stack Picks — both proxied through a Cloudflare Worker so the API key never hits the browser.
 
 ## Stack (exact)
 
@@ -23,7 +23,7 @@ Production deps (7, exhaustive):
 - `@supabase/supabase-js` ^2.49.1
 - `react` ^19.0.0
 - `react-dom` ^19.0.0
-- `react-markdown` ^9.0.3 — renders AI Atlas assistant messages
+- `react-markdown` ^9.0.3 — renders AI Atfeh assistant messages
 - `zxcvbn` ^4.4.2 — lazy-loaded in AuthScreen for password strength
 
 Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. Before `import`ing anything else, add it to `package.json` first.
@@ -56,7 +56,7 @@ Never use backticks inside CSS comments within `GlobalStyles.jsx` or any other t
 
 ```
 workers/api-proxy.js              ~5400 lines — Anthropic proxy, Stripe, R2, member profiles, Turnstile
-src/App.jsx                       2784 lines — main shell, 8 tabs, AI Atlas
+src/App.jsx                       2784 lines — main shell, 8 tabs, AI Atfeh
 src/components/ProfileTab.jsx     2752 lines
 src/components/VialTracker.jsx    2003 lines
 src/components/BuildTab.jsx       1385 lines
@@ -71,7 +71,7 @@ Subdirectory briefs: `src/CLAUDE.md`, `workers/CLAUDE.md`, `supabase/CLAUDE.md`.
 
 ## Corrections to common AI assumptions
 
-- **Catalog has 275 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count do `PEPTIDES.length`.
+- **Catalog has 275 compounds.** For the live count do `PEPTIDES.length`. The catalog payload for AI Atfeh (`src/lib/atfehCatalogPayload.js`) sends all compounds — no hardcoded cap.
 - **Tier emojis are 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** Source: `src/lib/tiers.js`.
 - **Tier IDs are `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", no "basic", no "premium".
 - **No Tailwind. No CSS modules. No router. No state management lib.** Inline styles + a few global classes in `src/components/GlobalStyles.jsx`. Routing is regex in `src/main.jsx`. State is `useState` / context.

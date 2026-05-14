@@ -86,10 +86,10 @@ Copy
 - [ ] BATCH37+ compound additions (catalog frozen at 264 pre-launch)
 ---
  
-## 🧠 V2 — AI Atlas Memory Layer (RAG + Custom Agent)
+## 🧠 V2 — AI Atfeh Memory Layer (RAG + Custom Agent)
 > The moat. Johnny Hughes is the architect on this.
  
-Instead of AI Atlas working from general training data, it works from the user's
+Instead of AI Atfeh working from general training data, it works from the user's
 **actual logged protocol** — their stack, doses, cycle history, InBody trends, notes.
  
 **Architecture path:**
@@ -98,17 +98,17 @@ Instead of AI Atlas working from general training data, it works from the user's
    protocol data (dose logs, InBody entries, stack events, compound interactions)
 2. **Embedding pipeline** — every log entry becomes a vector; Johnny has prior
    experience with this pipeline pattern
-3. **RAG retrieval** — Atlas pulls the user's own data as context before every response;
+3. **RAG retrieval** — Atfeh pulls the user's own data as context before every response;
    compound catalog also embedded for reference
-4. **Memory synthesis** — Atlas makes personalized calls based on actual history:
+4. **Memory synthesis** — Atfeh makes personalized calls based on actual history:
    *"Your retatrutide titration started at 1mg 6 weeks ago, your last InBody showed
    +2.1 lbs lean, your current dose is 3mg — here's what the data suggests."*
 5. **Custom AI Agent** — full personalized profile management, not just Q&A;
    proactive protocol suggestions driven by logged trends
 **Why this is the moat:**
 - The user's data is the context. Nobody else has it.
-- Every log entry makes Atlas smarter for that specific user.
-- Social feed flywheel: log to share → log to track → log to teach Atlas.
+- Every log entry makes Atfeh smarter for that specific user.
+- Social feed flywheel: log to share → log to track → log to teach Atfeh.
   **Three reasons to log. One action.**
 - Coach Tier ($50/mo) becomes clinical-grade for TRT clinics and functional
   medicine practices — a legitimate B2B SaaS wedge.
@@ -126,7 +126,7 @@ It's not just branding. It describes the architecture.
 - [ ] Network tab full — follower system, @DihexaDan in top nav, receipted feed
 - [ ] **REEL DOSES** — receipted photo/video tied to dose log entries; injection content
   Instagram cannot host. V2 kill shot for influencer growth.
-- [ ] PWA offline — catalog, vials, calculator offline; AI Atlas requires connectivity
+- [ ] PWA offline — catalog, vials, calculator offline; AI Atfeh requires connectivity
 - [ ] Compound PDF library — 2–3 page PDFs per compound, feeds RAG pipeline;
   v3 = personalized GOAT-tier stack report PDF
 - [ ] Daily movie quote — in-app dose-logging reward
@@ -166,7 +166,7 @@ It's not just branding. It describes the architecture.
 | Domain | Purpose |
 |---|---|
 | pepguideiq.com | Primary — live now |
-| pepguideiq.ai | Future primary — flip when RAG/Atlas ships ($160/2yr) |
+| pepguideiq.ai | Future primary — flip when RAG/Atfeh ships ($160/2yr) |
 | pepguideiq.app | Post App Store launch |
 | pepguideiq.io | Developer / technical credibility |
 | pepguideiq.co | Defensive |
@@ -224,8 +224,8 @@ It's not just branding. It describes the architecture.
 - [x] Dose history calendar with backfill
 - [x] Per-compound LOG DOSE (oral + injectable + nasal + topical)
 - [x] Saved stacks with R2 photo upload
-- [x] AI Atlas 🧙 (Haiku for Entry/Pro, Sonnet for Elite/GOAT) — daily limits: 2/4/8/16
-- [x] AI Stack Advisor — daily limits: 3/10/20/30
+- [x] AI Atfeh 🧙 (Haiku for Entry/Pro, Sonnet for Elite/GOAT) — daily limits: 2/4/8/16
+- [x] AI Atfeh Stack Picks — daily limits: 3/10/20/30
 - [x] 4-tier pricing — 💸 Entry free / 🔬 Pro $8.99 / ⚡ Elite $16.99 / 🐐 GOAT $23.99
 - [x] Stack limits: Entry 2 / Pro 10 / Elite 25 / GOAT 50
 - [x] Multi-profile: Entry/Pro 1 / Elite 2 / GOAT 4

@@ -20,14 +20,14 @@ You are working on pepguideIQ, a research-peptide reference and personal-protoco
 - `@supabase/supabase-js` ^2.49.1
 - `react` ^19.0.0
 - `react-dom` ^19.0.0
-- `react-markdown` ^9.0.3 (renders AI Atlas output)
+- `react-markdown` ^9.0.3 (renders AI Atfeh output)
 - `zxcvbn` ^4.4.2 (password strength, lazy-loaded)
 
 Dev deps: `vite`, `@vitejs/plugin-react`, `wrangler`, `eslint`. **Do not `import` any other library without first adding it to `package.json`.**
 
 ## Corrections to common assumptions
 
-- **Catalog has 275 compounds.** `MAX_ADVISOR_CATALOG = 153` in `src/lib/advisorCatalogPayload.js` is the AI advisor payload cap, NOT the catalog size. For the live count, use `PEPTIDES.length`.
+- **Catalog has 275 compounds.** For the live count, use `PEPTIDES.length`. The catalog payload for AI Atfeh (`src/lib/atfehCatalogPayload.js`) sends all compounds — no hardcoded cap.
 - **51 Supabase migrations** (`001` through `050` plus `045a`).
 - **Tier emojis: 💸 Entry · 🔬 Pro · ⚡ Elite · 🐐 GOAT.** NOT 🌱 for Entry.
 - **Tier IDs: `entry`, `pro`, `elite`, `goat` — exactly 4.** No "free", "basic", "premium", or "pro+".
@@ -42,7 +42,7 @@ All Supabase access goes through `src/lib/supabase.js` (57 exported functions). 
 
 Worker routes (38 total, list in `workers/CLAUDE.md`). Do not invent routes.
 
-## AI Atlas / Stack Advisor request contract
+## AI Atfeh request contract (Chat + Stack Picks)
 
 ```
 POST ${API_WORKER_URL}/v1/chat
@@ -51,7 +51,7 @@ body: { messages: [{role, content}], system: string, catalog: [...] }
 response: { text: string, usage: { queries_today, queries_limit } }
 ```
 
-Build the catalog payload with `buildAdvisorCatalogPayload(catalog, primaryCategoryFn)` from `src/lib/advisorCatalogPayload.js`.
+Build the catalog payload with `buildAtfehCatalogPayload(catalog, primaryCategoryFn)` from `src/lib/atfehCatalogPayload.js`.
 
 ## Hard rules
 

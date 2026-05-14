@@ -283,7 +283,7 @@ export function GlobalStyles() {
       @media (pointer: coarse) {
         input, select, textarea { font-size: 16px !important; }
       }
-      /* AI Atlas full-screen takeover — open/close use same duration per breakpoint */
+      /* AI Atfeh full-screen takeover — open/close use same duration per breakpoint */
       .guide-takeover-root{
         position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;box-sizing:border-box;
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
@@ -472,7 +472,7 @@ export function GlobalStyles() {
         }
       }
 
-      /* Header: AI Atlas / tier / profile pills — desktop may wrap; mobile = one scrollable row */
+      /* Header: AI Atfeh / tier / profile pills — desktop may wrap; mobile = one scrollable row */
       .pepv-nav-account-pill-row{
         display:flex;
         align-items:center;
@@ -482,7 +482,7 @@ export function GlobalStyles() {
         overflow-x:auto;
       }
       @media (max-width:767px){
-        /* Own row + full width so justify-content:flex-end pins ? / AI Atlas / bell / menu to the right */
+        /* Own row + full width so justify-content:flex-end pins ? / AI Atfeh / bell / menu to the right */
         .pepv-nav-account-pill-row{
           flex-basis:100%;
           width:100%;

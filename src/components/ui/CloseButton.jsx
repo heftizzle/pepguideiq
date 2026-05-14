@@ -7,7 +7,7 @@
  *   toolbar       ~44×44 tap target (LibraryMobileSearch chip, TutorialChrome dismiss)
  *   floating      Lightbox circle; caller may pass additional style for isDark edge cases
  *
- * Takeover layers (AI Atlas, PeopleSearch, PublicMemberProfile) — NO variant.
+ * Takeover layers (AI Atfeh, PeopleSearch, PublicMemberProfile) — NO variant.
  * Pass className="guide-takeover-close" directly so GlobalStyles stay untouched:
  *   <CloseButton onClose={onClose} className="guide-takeover-close" style={{ zIndex: 72 }} />
  *

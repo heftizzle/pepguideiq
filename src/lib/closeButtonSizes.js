@@ -5,7 +5,7 @@
  * To resize a family app-wide, change the value here only.
  *
  * modal     — CloseButton variant="modal-accent" (Modal.jsx chrome)
- * takeover  — .guide-takeover-close (AI Atlas, PeopleSearch,
+ * takeover  — .guide-takeover-close (AI Atfeh, PeopleSearch,
  *              PublicMemberProfile) — CSS only, cannot import JS;
  *              keep in sync manually when changing this value.
  * danger    — BuildTab compound remove (btn-red family, red border)

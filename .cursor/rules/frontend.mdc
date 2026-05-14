@@ -122,7 +122,7 @@ Normalize with `normalizeStackSessions(s)` from `components/SavedStackEntryRow.j
 - **Peptide math**: `peptideMath.js`, `vialDoseMath.js`, `peptideBioavailability.js`
 - **Protocol logic**: `doseRouteKind.js`, `protocolDoseRows.js`, `protocolGuardrails.js`, `protocolLogCooldown.js`, `protocolMessages.js`, `sessionSchedule.js`
 - **Time**: `localCalendarDay.js`, `streakUtils.js`
-- **Catalog utilities**: `advisorCatalogPayload.js`, `catalogStability.js`, `catalogVendorSanitize.js`, `normalizeNewCatalogEntry.js`, `resolveStackCatalogPeptide.js`
+- **Catalog utilities**: `atfehCatalogPayload.js`, `catalogStability.js`, `catalogVendorSanitize.js`, `normalizeNewCatalogEntry.js`, `resolveStackCatalogPeptide.js`
 - **Member profile**: `memberAvatarUrl.js`, `memberFasts.js`, `memberProfileHandle.js`, `publicMemberProfile.js`, `openPublicProfile.js`, `socialProfileLinks.js`
 - **Stack sharing**: `stackShare.js`
 - **Social graph**: `follows.js`

@@ -5,8 +5,8 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 ## Routes (exactly 38)
 
 ### AI
-- `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Stack Advisor when payload indicates — branches in `handleStackAdvisor()` (line 397).
-- `POST /v1/app-help` — App Help (Haiku). Auth Bearer; separate KV cap `apphelp:{userId}:{YYYY-MM-DD}` (10/day). Body: `{messages}`. Response: `{text, usage: {queries_today, queries_limit}}`. No Atlas catalog or profile context injection.
+- `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Atfeh Stack Picks — see `handleAtfehStackRecommendations()`. Canonical route: `POST /atfeh/stack-recommendations`.
+- `POST /v1/app-help` — App Help (Haiku). Auth Bearer; separate KV cap `apphelp:{userId}:{YYYY-MM-DD}` (10/day). Body: `{messages}`. Response: `{text, usage: {queries_today, queries_limit}}`. No Atfeh catalog or profile context injection.
 
 ### Stripe
 - `POST /stripe/webhook` — event handler: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`. Syncs plan via `update_user_plan`. After a successful paid `checkout.session.completed`, sends a Resend confirmation email (plan + amount + CTA) when `RESEND_API_KEY` is set.
@@ -44,8 +44,8 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `GET /hashtags/:tag/posts` — network-visible `posts` rows linked to tag, merged with `member_profiles` for feed cards (auth).
 
 ### Body composition (InBody / DEXA)
-- `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Atlas daily KV quota.
-- `POST /inbody-scan/interpret` — JSON body `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`. **Pro+** only. If `inbody_scan_history.ai_interpretation` is already set for `scanId` (and `reinterpret` is not true), returns JSON `{ cached: true, interpretation, ai_interpreted_at }` with no Anthropic call. Otherwise streams Sonnet (`MODEL_ELITE_GOAT`) as `text/event-stream`, then persists to `ai_interpretation` / `ai_interpreted_at` on that row. Does **not** use AI Atlas daily KV quota.
+- `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Atfeh daily KV quota.
+- `POST /inbody-scan/interpret` — JSON body `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`. **Pro+** only. If `inbody_scan_history.ai_interpretation` is already set for `scanId` (and `reinterpret` is not true), returns JSON `{ cached: true, interpretation, ai_interpreted_at }` with no Anthropic call. Otherwise streams Sonnet (`MODEL_ELITE_GOAT`) as `text/event-stream`, then persists to `ai_interpretation` / `ai_interpreted_at` on that row. Does **not** use AI Atfeh daily KV quota.
 
 ### R2 images
 - `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated).

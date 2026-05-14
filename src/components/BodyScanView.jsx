@@ -106,7 +106,7 @@ export function BodyScanView({
   const [bodyTab, setBodyTab] = useState(/** @type {"scans" | "trends"} */ ("scans"));
 
   const guideInterpretSpotlight =
-    tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret;
+    tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atfeh_scan_interpret;
   const trendsUnlocked = rows.length >= 2 || (guideInterpretSpotlight && rows.length >= 1);
 
   const reload = useCallback(async () => {
@@ -125,14 +125,14 @@ export function BodyScanView({
   }, [reload]);
 
   useEffect(() => {
-    if (tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret && rows.length > 0) {
+    if (tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atfeh_scan_interpret && rows.length > 0) {
       setBodyTab("trends");
     }
   }, [tutorial?.flowKey, tutorial?.highlightTarget, rows.length]);
 
   useEffect(() => {
     if (bodyTab !== "trends" || rows.length >= 2) return;
-    if (!(tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atlas_scan_interpret)) {
+    if (!(tutorial?.flowKey === "guide" && tutorial?.highlightTarget === TUTORIAL_TARGET.atfeh_scan_interpret)) {
       setBodyTab("scans");
     }
   }, [bodyTab, rows.length, tutorial?.flowKey, tutorial?.highlightTarget]);
