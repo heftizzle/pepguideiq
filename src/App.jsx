@@ -1987,7 +1987,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </>
                       ) : null}
                       <div className="pcard-footer" style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,minWidth:0 }}>
-                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-placeholder)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>Half-life:</span>{" "}{halfLifeDisplay ?? ""}</div>
+                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-secondary)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>Half-life:</span>{" "}{halfLifeDisplay ?? ""}</div>
                         <button
                           type="button"
                           className={inStack?"btn-green":"btn-teal"}

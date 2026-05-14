@@ -119,6 +119,7 @@ export function GlobalStyles() {
         transform:translateY(-2px);
         box-shadow:0 4px 16px var(--color-shadow-50),0 1px 4px var(--color-shadow-30);
         border-top-color:var(--color-border-pcard-hover);
+        border-left-color:var(--cc,var(--color-accent));
         transition:transform 0.18s ease,box-shadow 0.18s ease,border-color 0.18s ease;
       }
       .pcard:active{transform:translateY(-1px)}
