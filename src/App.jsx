@@ -91,6 +91,7 @@ import { formatLibraryCardHalfLifeDisplay } from "./lib/libraryCardHalfLifeDispl
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { buildAtfehCatalogPayload } from "./lib/atfehCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
+import AtfehThreadSidebar from "./components/AtfehThreadSidebar.jsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -466,7 +467,7 @@ function TutorialSpotlightGate() {
   );
 }
 
-/** One line per compound for AI Atfeh `sendAI` stack context (same strings as the previous inline `stackCtx` builder). */
+/** One line per compound for AI Atfeh thread message context (same strings as the previous inline `stackCtx` builder). */
 function formatMyStackLinesForAi(items) {
   return items
     .map((p) => {
@@ -589,6 +590,14 @@ function PepGuideIQApp({ user, setUser }) {
   const [aiLoading, setAiLoading] = useState(false);
   /** From Worker POST /v1/chat success: `usage.queries_today` / `queries_limit`. */
   const [aiQueryUsage, setAiQueryUsage] = useState(null);
+  const [activeThreadId, setActiveThreadId] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState(null);
+  const [threadLocked, setThreadLocked] = useState(false);
+  const [threadListVersion, setThreadListVersion] = useState(0);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [cachedAccessToken, setCachedAccessToken] = useState(null);
   const [goals, setGoals]         = useState([]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
@@ -634,6 +643,73 @@ function PepGuideIQApp({ user, setUser }) {
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) { setCachedAccessToken(null); return; }
+    getSessionAccessToken().then((t) => setCachedAccessToken(t ?? null));
+  }, [user?.id]);
+
+  const handleSelectThread = useCallback(async (threadId) => {
+    if (!threadId) {
+      setActiveThreadId(null);
+      setThreadMessages([]);
+      setThreadLocked(false);
+      return;
+    }
+    setThreadLoading(true);
+    setThreadError(null);
+    try {
+      const token = await getSessionAccessToken();
+      const res = await fetch(`${API_WORKER_URL}/atfeh/threads/${threadId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Failed to load thread (${res.status})`);
+      const data = await res.json();
+      setActiveThreadId(threadId);
+      setThreadMessages(Array.isArray(data.messages) ? data.messages : []);
+      setThreadLocked(Boolean(data.thread?.locked));
+      setMobileSidebarOpen(false);
+    } catch (err) {
+      setThreadError(err.message || "Could not load thread");
+    } finally {
+      setThreadLoading(false);
+    }
+  }, []);
+
+  const handleNewThread = useCallback(() => {
+    setActiveThreadId(null);
+    setThreadMessages([]);
+    setThreadLocked(false);
+    setThreadError(null);
+    setMobileSidebarOpen(false);
+  }, []);
+
+  const handleContinueThread = useCallback(async () => {
+    if (!activeThreadId) return;
+    setAiLoading(true);
+    setThreadError(null);
+    try {
+      const token = await getSessionAccessToken();
+      const res = await fetch(`${API_WORKER_URL}/atfeh/threads/${activeThreadId}/continue`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 402) {
+        openUpgradeModal("thread_limit");
+        return;
+      }
+      if (!res.ok) throw new Error(`Continue failed (${res.status})`);
+      const data = await res.json();
+      setActiveThreadId(data.thread_id);
+      setThreadMessages([]);
+      setThreadLocked(false);
+      setThreadListVersion((n) => n + 1);
+    } catch (err) {
+      setThreadError(err.message || "Could not continue thread");
+    } finally {
+      setAiLoading(false);
+    }
+  }, [activeThreadId, openUpgradeModal]);
 
   const toggleGuideGoal = useCallback(
     (g) => {
@@ -994,15 +1070,7 @@ function PepGuideIQApp({ user, setUser }) {
   const removeFromStack = (rowKey) =>
     setMyStack((prev) => prev.filter((s) => getStackRowListKey(s) !== rowKey));
 
-  const sendAI = async () => {
-    if (!aiInput.trim() || aiLoading) return;
-    if (!canAI) {
-      openUpgradeModal("ai_guide");
-      return;
-    }
-    const userMsg = { role:"user", content:aiInput };
-    const msgs = [...aiMsgs, userMsg];
-    setAiMsgs(msgs); setAiInput(""); setAiLoading(true);
+  const buildAtfehProfileContext = useCallback(async () => {
     const stackLines = myStack.length > 0 ? formatMyStackLinesForAi(myStack) : "";
     const stackCtx =
       myStack.length > 0
@@ -1010,7 +1078,6 @@ function PepGuideIQApp({ user, setUser }) {
         : "";
     const goalsCtx = goals.length > 0 ? `\n\nUser's goals: ${goals.join(", ")}.` : "";
 
-    // --- Atfeh live user context injection ---
     let scanCtx = "";
     let doseLogCtx = "";
     let profileCtx = "";
@@ -1072,10 +1139,18 @@ function PepGuideIQApp({ user, setUser }) {
       }
     }
 
-    const system = `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`;
-    const catalog = buildAtfehCatalogPayload(PEPTIDES, primaryCategory);
+    return { stackCtx, goalsCtx, scanCtx, doseLogCtx, profileCtx };
+  }, [myStack, stackName, goals, activeProfileId, user]);
+
+  const sendAtfehMessage = useCallback(async (content) => {
+    if (!content || !content.trim()) return;
+    if (threadLocked) return;
+    if (!canAI) {
+      openUpgradeModal("ai_guide");
+      return;
+    }
     if (!isApiWorkerConfigured()) {
-      setAiMsgs((prev) => [
+      setThreadMessages((prev) => [
         ...prev,
         {
           role: "assistant",
@@ -1083,63 +1158,93 @@ function PepGuideIQApp({ user, setUser }) {
             "Configure VITE_API_WORKER_URL in .env.local (deploy workers/api-proxy.js and use POST /v1/chat). The Anthropic key must stay on the Worker only.",
         },
       ]);
-      setAiLoading(false);
       return;
     }
+    setAiLoading(true);
+    setThreadError(null);
     try {
       const token = await getSessionAccessToken();
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const res = await fetch(`${API_WORKER_URL}/v1/chat`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ messages: msgs, system, catalog }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const errText =
-          typeof data.error === "string" ? data.error : data.error?.message || `Worker ${res.status}`;
-        if (res.status === 429) {
-          setAiMsgs((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: errText,
-              limitReached: data.limit_reached === true,
-            },
-          ]);
-          if (data.limit_reached === true) {
-            openUpgradeModal("ai_guide");
-          }
+      let threadId = activeThreadId;
+
+      if (!threadId) {
+        const createRes = await fetch(`${API_WORKER_URL}/atfeh/threads`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ profile_id: activeProfileId }),
+        });
+        if (createRes.status === 402) {
+          openUpgradeModal("thread_limit");
           setAiLoading(false);
           return;
         }
-        throw new Error(errText);
+        if (!createRes.ok) throw new Error(`Could not start thread (${createRes.status})`);
+        const created = await createRes.json();
+        threadId = created.thread_id;
+        setActiveThreadId(threadId);
+        setThreadListVersion((n) => n + 1);
       }
-      const { text, usage } = data;
-      const outText = typeof text === "string" ? text : "";
-      if (
-        usage &&
-        typeof usage.queries_today === "number" &&
-        typeof usage.queries_limit === "number"
-      ) {
+
+      const userMsg = { role: "user", content, created_at: new Date().toISOString() };
+      setThreadMessages((prev) => [...prev, userMsg]);
+
+      const { stackCtx, goalsCtx, scanCtx, doseLogCtx, profileCtx } =
+        await buildAtfehProfileContext();
+      const catalog = buildAtfehCatalogPayload(PEPTIDES, primaryCategory);
+
+      const sendRes = await fetch(`${API_WORKER_URL}/atfeh/threads/${threadId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          content,
+          catalog,
+          profile: {
+            system_context: `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
+          },
+        }),
+      });
+
+      if (sendRes.status === 429) {
+        const errData = await sendRes.json().catch(() => ({}));
+        const errText =
+          typeof errData.error === "string" ? errData.error : "Daily Atfeh Chat limit reached.";
+        setThreadError(errText);
+        if (errData.limit_reached === true) {
+          openUpgradeModal("ai_guide");
+        }
+        setAiLoading(false);
+        return;
+      }
+      if (sendRes.status === 423) {
+        setThreadLocked(true);
+        setThreadError("This thread is full. Continue it to keep going.");
+        setAiLoading(false);
+        return;
+      }
+      if (!sendRes.ok) throw new Error(`Send failed (${sendRes.status})`);
+
+      const data = await sendRes.json();
+      if (data.assistant_message) {
+        setThreadMessages((prev) => [...prev, data.assistant_message]);
+      }
+      if (data.thread?.locked) setThreadLocked(true);
+      if (data.usage && typeof data.usage.queries_today === "number") {
         setAiQueryUsage({
-          today: usage.queries_today,
-          limit: usage.queries_limit,
-          plan: typeof usage.plan === "string" ? usage.plan : user.plan,
+          today: data.usage.queries_today,
+          limit: data.usage.queries_limit,
+          plan: typeof data.usage.plan === "string" ? data.usage.plan : user?.plan,
         });
       }
-      setAiMsgs((prev) => [...prev, { role: "assistant", content: outText || "No response." }]);
-    } catch (e) {
-      setAiMsgs((prev) => [
-        ...prev,
-        { role: "assistant", content: e instanceof Error ? e.message : "API error — check Worker and network." },
-      ]);
+      setThreadListVersion((n) => n + 1);
+    } catch (err) {
+      setThreadError(err.message || "Could not send message");
+    } finally {
+      setAiLoading(false);
     }
-    setAiLoading(false);
-  };
+  }, [activeThreadId, activeProfileId, threadLocked, canAI, openUpgradeModal, buildAtfehProfileContext, user?.plan]);
 
-  useEffect(() => { msgEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [aiMsgs]);
+  const sendAI = sendAtfehMessage;
+
+  useEffect(() => { msgEnd.current?.scrollIntoView({ behavior:"smooth" }); }, [threadMessages]);
 
   const handleSignOut = async () => {
     try {
@@ -1402,6 +1507,24 @@ function PepGuideIQApp({ user, setUser }) {
     updateStackItem,
     removeFromStack,
     sendAI,
+    sendAtfehMessage,
+    activeThreadId,
+    setActiveThreadId,
+    threadMessages,
+    setThreadMessages,
+    threadLoading,
+    threadError,
+    setThreadError,
+    threadLocked,
+    setThreadLocked,
+    threadListVersion,
+    setThreadListVersion,
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+    cachedAccessToken,
+    handleSelectThread,
+    handleNewThread,
+    handleContinueThread,
     handleSignOut,
     showHandlePrompt,
     glossaryModalOpen,
@@ -1595,6 +1718,24 @@ function PepGuideIQMainTree({ mainUiRef }) {
     updateStackItem,
     removeFromStack,
     sendAI,
+    sendAtfehMessage,
+    activeThreadId,
+    setActiveThreadId,
+    threadMessages,
+    setThreadMessages,
+    threadLoading,
+    threadError,
+    setThreadError,
+    threadLocked,
+    setThreadLocked,
+    threadListVersion,
+    setThreadListVersion,
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+    cachedAccessToken,
+    handleSelectThread,
+    handleNewThread,
+    handleContinueThread,
     handleSignOut,
     showHandlePrompt,
     glossaryModalOpen,
@@ -2469,43 +2610,19 @@ function PepGuideIQMainTree({ mainUiRef }) {
               onClose={beginCloseGuide}
             />
             <div className="guide-takeover-panel-wrap" onClick={(e) => e.stopPropagation()}>
-              <div
-                style={{
-                  width: 190,
-                  flexShrink: 0,
-                  overflowY: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 5,
-                }}
-                className="guide-sidebar"
-              >
-                <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: ".15em", marginBottom: 6 }}>
-                  GOALS <span style={{ color: "var(--color-text-placeholder)" }}>(optional)</span>
-                </div>
-                {GOALS.map((g) => (
-                  <button
-                    type="button"
-                    key={g}
-                    className={`goal-chip ${goals.includes(g) ? "on" : ""}`}
-                    onClick={() => toggleGuideGoal(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-                {myStack.length > 0 && (
-                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--color-border-hairline)" }}>
-                    <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", letterSpacing: ".15em", marginBottom: 6 }}>
-                      SAVED STACK LOADED
-                    </div>
-                    {myStack.map((p) => (
-                      <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 13, color: "var(--color-upgrade-muted-border)", padding: "2px 0" }}>
-                        → {p.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <AtfehThreadSidebar
+                workerUrl={API_WORKER_URL}
+                accessToken={cachedAccessToken}
+                profileId={activeProfileId}
+                plan={planForStackLimits}
+                activeThreadId={activeThreadId}
+                onSelectThread={handleSelectThread}
+                onNewThread={handleNewThread}
+                onUpgrade={openUpgradeModal}
+                refreshKey={threadListVersion}
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={() => setMobileSidebarOpen(false)}
+              />
 
               <div
                 className="guide-takeover-chat-panel"
@@ -2531,6 +2648,30 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     flexShrink: 0,
                   }}
                 >
+                  {guideLayoutMobile && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileSidebarOpen(true)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        background: "none",
+                        border: "1px solid var(--color-border-default)",
+                        borderRadius: 6,
+                        padding: "4px 8px",
+                        color: "var(--color-accent)",
+                        fontSize: 12,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        cursor: "pointer",
+                        minHeight: 32,
+                        flexShrink: 0,
+                      }}
+                      aria-label="Open threads sidebar"
+                    >
+                      ☰
+                    </button>
+                  )}
                   <div
                     className={aiLoading ? "pulse" : ""}
                     style={{
@@ -2565,8 +2706,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   )}
                 </div>
 
-                {guideLayoutMobile && (
-                  <div className="guide-mobile-goals-dropdown">
+                <div className="guide-mobile-goals-dropdown">
                     <button
                       type="button"
                       className="guide-mobile-goals-toggle"
@@ -2618,7 +2758,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       </div>
                     )}
                   </div>
-                )}
 
                 <div
                   className="guide-takeover-msgs"
@@ -2631,13 +2770,11 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     color: "var(--color-text-primary)",
                   }}
                 >
-                  {aiMsgs.length === 0 && (
+                  {threadMessages.length === 0 && !threadLoading && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
                       <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13, marginBottom: 18 }}>
-                        {guideLayoutMobile
-                          ? "Optional: open 🎯 Goals, then ask anything."
-                          : "Optional: select goals in the sidebar, then ask anything."}
+                        Optional: open 🎯 Goals, then ask anything.
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
                         {[
@@ -2651,7 +2788,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             type="button"
                             key={s}
                             className="sugg-btn"
-                            onClick={() => (canAI ? setAiInput(s) : openUpgradeModal("ai_guide"))}
+                            onClick={() => (canAI ? sendAtfehMessage(s) : openUpgradeModal("ai_guide"))}
                           >
                             {s}
                           </button>
@@ -2659,7 +2796,14 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       </div>
                     </div>
                   )}
-                  {aiMsgs.map((msg, i) => (
+                  {threadLoading && threadMessages.length === 0 && (
+                    <div style={{ textAlign: "center", padding: "32px 16px" }}>
+                      <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
+                        Loading thread…
+                      </div>
+                    </div>
+                  )}
+                  {threadMessages.map((msg, i) => (
                     <div key={i} className={`ai-msg ${msg.role === "user" ? "ai-user" : "ai-bot"}`}>
                       {msg.role === "assistant" && (
                         <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 5, letterSpacing: ".15em" }}>
@@ -2696,30 +2840,73 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 </div>
 
                 <div className="guide-takeover-input-bar">
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <textarea
-                      className="ai-input"
-                      rows={2}
-                      placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          sendAI();
-                        }
+                  {threadError && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--color-danger, #ef4444)",
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        background: "rgba(239,68,68,0.08)",
+                        marginBottom: 6,
                       }}
-                    />
-                    <button
-                      type="button"
-                      className="btn-teal"
-                      onClick={sendAI}
-                      disabled={aiLoading || !aiInput.trim()}
-                      style={{ padding: "0 18px", alignSelf: "stretch", fontSize: 16 }}
                     >
-                      {aiLoading ? "…" : "→"}
-                    </button>
-                  </div>
+                      {threadError}
+                    </div>
+                  )}
+                  {threadLocked ? (
+                    <div
+                      style={{
+                        background: "var(--color-bg-card, #0e1520)",
+                        border: "1px solid var(--color-border-default)",
+                        borderRadius: 8,
+                        padding: 14,
+                        textAlign: "center",
+                      }}
+                    >
+                      <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 8 }}>
+                        This thread is full (10 messages).
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-teal"
+                        onClick={handleContinueThread}
+                        disabled={aiLoading}
+                        style={{ fontSize: 13, padding: "8px 16px" }}
+                      >
+                        {aiLoading ? "Creating…" : "Continue Thread →"}
+                      </button>
+                      <div style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 6 }}>
+                        A new thread will be started with a summary of this one.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <textarea
+                        className="ai-input"
+                        rows={2}
+                        placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
+                        value={aiInput}
+                        onChange={(e) => setAiInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            sendAtfehMessage(aiInput);
+                            setAiInput("");
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-teal"
+                        onClick={() => { sendAtfehMessage(aiInput); setAiInput(""); }}
+                        disabled={aiLoading || !aiInput.trim()}
+                        style={{ padding: "0 18px", alignSelf: "stretch", fontSize: 16 }}
+                      >
+                        {aiLoading ? "…" : "→"}
+                      </button>
+                    </div>
+                  )}
                   {canAI && aiQueryUsage != null && (
                     <div style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "right", marginTop: 4 }}>
                       {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today

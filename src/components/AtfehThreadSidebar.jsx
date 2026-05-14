@@ -15,14 +15,24 @@ export default function AtfehThreadSidebar({
   onSelectThread,
   onNewThread,
   onUpgrade,
+  refreshKey,
+  mobileOpen,
+  onMobileClose,
 }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
   const drawerRef = useRef(null);
+
+  const isControlled = mobileOpen !== undefined;
+  const drawerOpen = isControlled ? mobileOpen : internalDrawerOpen;
+  const closeDrawer = () => {
+    if (isControlled) onMobileClose?.();
+    else setInternalDrawerOpen(false);
+  };
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -49,7 +59,7 @@ export default function AtfehThreadSidebar({
     } finally {
       setLoading(false);
     }
-  }, [workerUrl, accessToken, profileId]);
+  }, [workerUrl, accessToken, profileId, refreshKey]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
@@ -204,7 +214,7 @@ export default function AtfehThreadSidebar({
                 isActive={t.id === activeThreadId}
                 onSelect={() => {
                   onSelectThread(t.id);
-                  if (isMobile) setDrawerOpen(false);
+                  if (isMobile) closeDrawer();
                 }}
                 onArchive={() => handleArchive(t.id)}
               />
@@ -258,7 +268,7 @@ export default function AtfehThreadSidebar({
                       archived
                       onSelect={() => {
                         onSelectThread(t.id);
-                        if (isMobile) setDrawerOpen(false);
+                        if (isMobile) closeDrawer();
                       }}
                       onRestore={() => handleRestore(t.id)}
                     />
@@ -274,29 +284,29 @@ export default function AtfehThreadSidebar({
   if (isMobile) {
     return (
       <>
-        {/* Mobile trigger button — rendered inline by parent */}
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            background: "none",
-            border: "1px solid var(--color-border-default)",
-            borderRadius: 6,
-            padding: "6px 10px",
-            color: "var(--color-accent)",
-            fontSize: 12,
-            fontFamily: "'JetBrains Mono', monospace",
-            cursor: "pointer",
-            minHeight: 36,
-          }}
-        >
-          ☰ Threads
-        </button>
+        {!isControlled && (
+          <button
+            type="button"
+            onClick={() => setInternalDrawerOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "1px solid var(--color-border-default)",
+              borderRadius: 6,
+              padding: "6px 10px",
+              color: "var(--color-accent)",
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+              cursor: "pointer",
+              minHeight: 36,
+            }}
+          >
+            ☰ Threads
+          </button>
+        )}
 
-        {/* Drawer */}
         {drawerOpen && (
           <div
             style={{
@@ -306,17 +316,15 @@ export default function AtfehThreadSidebar({
               display: "flex",
             }}
           >
-            {/* Backdrop */}
             <div
               style={{
                 position: "absolute",
                 inset: 0,
                 background: "rgba(0,0,0,0.5)",
               }}
-              onClick={() => setDrawerOpen(false)}
+              onClick={closeDrawer}
             />
 
-            {/* Drawer panel */}
             <div
               ref={drawerRef}
               style={{
@@ -331,10 +339,9 @@ export default function AtfehThreadSidebar({
                 animation: "slideInLeft 200ms ease-out",
               }}
             >
-              {/* Close button */}
               <button
                 type="button"
-                onClick={() => setDrawerOpen(false)}
+                onClick={closeDrawer}
                 style={{
                   position: "absolute",
                   top: 10,
@@ -362,7 +369,6 @@ export default function AtfehThreadSidebar({
           </div>
         )}
 
-        {/* Keyframe for drawer slide-in */}
         <style>{`
           @keyframes slideInLeft {
             from { transform: translateX(-100%); }
