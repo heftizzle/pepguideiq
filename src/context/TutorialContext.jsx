@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
+import { CATALOG_COUNT } from "../data/catalog.js";
 import { POST_TUTORIAL_COMPLETE_EVENT } from "../lib/postTutorialSession.js";
 import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
 import { SLOW_MOUNT_TARGETS } from "../lib/spotlightUtils.js";
@@ -234,7 +235,7 @@ const STATIC_FLOWS = {
       target: TUTORIAL_TARGET.nav_library,
       tab: "library",
       text: "Browse the compound library",
-      tooltip: "275 compounds with stability data, dosing info, and Finnrick vendor links. This is your research hub.",
+      tooltip: `${CATALOG_COUNT} compounds with stability data, dosing info, and Finnrick vendor links. This is your research hub.`,
     },
     {
       target: TUTORIAL_TARGET.library_add_stack,
@@ -273,7 +274,7 @@ const STATIC_FLOWS = {
       tab: "library",
       text: "Start in the Library",
       tooltip:
-        "Every compound card has an 'Ask AI Atfeh →' button at the bottom. AI Atfeh knows the full 275-compound catalog — ask it anything about any compound.",
+        `Every compound card has an 'Ask AI Atfeh →' button at the bottom. AI Atfeh knows the full ${CATALOG_COUNT}-compound catalog — ask it anything about any compound.`,
     },
     {
       target: TUTORIAL_TARGET.atfeh_compound_cta,
