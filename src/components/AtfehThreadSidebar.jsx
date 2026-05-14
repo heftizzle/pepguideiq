@@ -130,25 +130,9 @@ export default function AtfehThreadSidebar({
       {/* New Thread button */}
       <button
         type="button"
+        className="btn-teal"
         onClick={handleNewThread}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          padding: "8px 12px",
-          minHeight: 44,
-          background: "var(--color-accent-dim, rgba(0,212,170,0.1))",
-          color: "var(--color-accent)",
-          border: "1px solid var(--color-accent)",
-          borderRadius: 7,
-          fontSize: 13,
-          fontWeight: 500,
-          fontFamily: "'Outfit', sans-serif",
-          cursor: "pointer",
-          flexShrink: 0,
-          transition: "background 150ms ease",
-        }}
+        style={{ width: "100%", fontSize: 13, marginBottom: 8 }}
       >
         + New Thread
       </button>
@@ -194,16 +178,18 @@ export default function AtfehThreadSidebar({
             </div>
           </div>
         ) : active.length === 0 && archived.length === 0 ? (
-          <div
-            style={{
-              padding: "24px 8px",
-              textAlign: "center",
-              color: "var(--color-text-muted)",
-              fontSize: 13,
-              lineHeight: 1.5,
-            }}
-          >
-            No threads yet — start a new research conversation
+          <div style={{ textAlign: "center", padding: "24px 8px" }}>
+            <div style={{
+              fontSize: 28,
+              marginBottom: 8,
+              opacity: 0.5,
+              filter: "drop-shadow(0 0 8px color-mix(in srgb, var(--color-accent) 30%, transparent))"
+            }}>⬡</div>
+            <div className="mono" style={{
+              color: "var(--color-text-placeholder)",
+              fontSize: 12,
+              lineHeight: 1.6
+            }}>No threads yet —<br/>start a research<br/>conversation</div>
           </div>
         ) : (
           <>
@@ -331,7 +317,7 @@ export default function AtfehThreadSidebar({
                 position: "relative",
                 width: 280,
                 height: "100%",
-                background: "var(--color-bg-card, #0e1520)",
+                background: "var(--color-bg-card)",
                 borderRight: "1px solid var(--color-border-default)",
                 padding: "16px 14px",
                 overflowY: "auto",
@@ -410,7 +396,7 @@ function ThreadRow({ thread, isActive, archived, onSelect, onArchive, onRestore 
       ? "1px solid var(--color-accent)"
       : "1px solid var(--color-border-default)",
     background: isActive
-      ? "var(--color-accent-subtle-10, rgba(0,212,170,0.1))"
+      ? "var(--color-accent-subtle-10)"
       : hovered
         ? "var(--color-bg-hover)"
         : "transparent",

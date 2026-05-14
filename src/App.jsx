@@ -2682,8 +2682,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       flexShrink: 0,
                     }}
                   />
-                  <div className="brand" style={{ fontSize: 13, color: "var(--color-text-placeholder)", letterSpacing: ".06em" }}>
-                    <span style={{ color: "var(--color-accent)" }}>Pep</span>GuideIQ INTELLIGENCE
+                  <div className="brand" style={{ fontSize: 15, color: "var(--color-text-secondary)", letterSpacing: ".1em", fontWeight: 700 }}>
+                    <span style={{ color: "var(--color-accent)" }}>Pep</span>Guide<span style={{ color: "var(--color-accent)" }}>IQ</span>
+                    <span style={{ color: "var(--color-text-placeholder)", fontWeight: 400, fontSize: 12, letterSpacing: ".15em", marginLeft: 8 }}>INTELLIGENCE</span>
                   </div>
                   {goals.length > 0 && (
                     <span className="mono" style={{ fontSize: 13, color: "var(--color-text-placeholder)" }}>
@@ -2749,7 +2750,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                               SAVED STACK
                             </div>
                             {myStack.map((p) => (
-                              <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "var(--color-upgrade-muted-border)", padding: "2px 0" }}>
+                              <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", padding: "2px 0" }}>
                                 → {p.name}
                               </div>
                             ))}
@@ -2765,14 +2766,25 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     flex: 1,
                     overflowY: "auto",
                     padding: 14,
-                    background: "var(--color-bg-page)",
                     "--color-text-primary": "var(--color-text-primary)",
                     color: "var(--color-text-primary)",
                   }}
                 >
                   {threadMessages.length === 0 && !threadLoading && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
-                      <div style={{ fontSize: 28, opacity: 0.2, marginBottom: 10 }}>⬡</div>
+                      <img
+                        src="/app-icon.png"
+                        alt=""
+                        aria-hidden="true"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          marginBottom: 12,
+                          opacity: 0.75,
+                          filter: "drop-shadow(0 0 12px color-mix(in srgb, var(--color-accent) 40%, transparent))",
+                          borderRadius: 16,
+                        }}
+                      />
                       <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13, marginBottom: 18 }}>
                         Optional: open 🎯 Goals, then ask anything.
                       </div>
