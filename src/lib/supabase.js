@@ -1995,6 +1995,56 @@ export async function listRecentDosedAtDates(userId, profileId) {
   return { dates: data?.map((r) => r.dosed_at) ?? [], error };
 }
 
+// ─── Lab reports (migration 097) ───────────────────────────────────────────
+
+/**
+ * @returns {Promise<{ rows: { id: string, name: string }[], error: Error | null }>}
+ */
+export async function fetchLabProviders() {
+  if (!supabase) return { rows: [], error: notConfiguredError() };
+  const { data, error } = await supabase.from("lab_providers").select("id,name").order("name", { ascending: true });
+  return { rows: Array.isArray(data) ? /** @type {{ id: string, name: string }[]} */ (data) : [], error: error ?? null };
+}
+
+/**
+ * Upserts lab_reports on unique (profile_id, date_drawn, report_type).
+ * @param {Record<string, unknown>} row
+ * @returns {Promise<{ id: string | null, error: Error | null }>}
+ */
+export async function upsertLabReport(row) {
+  if (!supabase) return { id: null, error: notConfiguredError() };
+  const { data, error } = await supabase
+    .from("lab_reports")
+    .upsert(row, { onConflict: "profile_id,date_drawn,report_type" })
+    .select("id")
+    .maybeSingle();
+  const id = data && typeof data.id === "string" ? data.id.trim() : null;
+  return { id: id || null, error: error ?? null };
+}
+
+/**
+ * @param {string} reportId
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function deleteLabResultsForReport(reportId) {
+  if (!supabase) return { error: notConfiguredError() };
+  const id = typeof reportId === "string" ? reportId.trim() : "";
+  if (!id) return { error: new Error("Missing report id.") };
+  const { error } = await supabase.from("lab_results").delete().eq("report_id", id);
+  return { error: error ?? null };
+}
+
+/**
+ * @param {Record<string, unknown>[]} rows
+ * @returns {Promise<{ error: Error | null }>}
+ */
+export async function insertLabResults(rows) {
+  if (!supabase) return { error: notConfiguredError() };
+  if (!Array.isArray(rows) || rows.length === 0) return { error: null };
+  const { error } = await supabase.from("lab_results").insert(rows);
+  return { error: error ?? null };
+}
+
 // ─── Notifications (migration 036) ─────────────────────────────────────────
 
 /**

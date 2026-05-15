@@ -55,7 +55,7 @@ Never use backticks inside CSS comments within `GlobalStyles.jsx` or any other t
 ## File map
 
 ```
-workers/api-proxy.js              ~5400 lines — Anthropic proxy, Stripe, R2, member profiles, Turnstile
+workers/api-proxy.js              ~6900 lines — Anthropic proxy, Stripe, R2, member profiles, Turnstile
 src/App.jsx                       2784 lines — main shell, 8 tabs, AI Atfeh
 src/components/ProfileTab.jsx     2752 lines
 src/components/VialTracker.jsx    2003 lines
@@ -122,7 +122,7 @@ New thread endpoints must follow this contract. Do not return bare Supabase rows
 
 - Do not `import` a library not in `package.json`.
 - Do not set `profiles.plan` from the client. Use `update_user_plan` RPC from the Worker only.
-- Do not invent Worker routes. There are exactly 38 — see `workers/CLAUDE.md`.
+- Do not invent Worker routes. There are exactly 40 — see `workers/CLAUDE.md`.
 - Do not invent tab IDs, session IDs, or tier IDs.
 - Do not introduce a CSS framework. Use inline styles and existing `GlobalStyles.jsx` classes.
 - Do not persist R2 URLs with cache-bust params (`?v=…`). Store the key; apply busting at render time only.

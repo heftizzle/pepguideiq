@@ -2,7 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { SettingsTab } from "./SettingsTab.jsx";
 import { BodyMetricStepper } from "./BodyMetricStepper.jsx";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "../lib/config.js";
-import { formatPlan } from "../lib/tiers.js";
+import { formatPlan, TIER_RANK } from "../lib/tiers.js";
 import { calculateStreak } from "../lib/streakUtils.js";
 import { shouldShowCharProximityCounter } from "../lib/charCounterProximity.js";
 import {
@@ -40,6 +40,7 @@ import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
 import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
 import { BodyScanView } from "./BodyScanView.jsx";
 import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
+import { LabScanSection } from "./LabScanSection.jsx";
 import { ProfileCtx } from "../context/ProfileContext.jsx";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
 import { useMemberAvatarSrc } from "../hooks/useMemberAvatarSrc.js";
@@ -870,6 +871,8 @@ export function ProfileTab({
   const tutorial = useTutorialOptional();
   const fileRef = useRef(null);
   const workerOk = isApiWorkerConfigured();
+  const planKeyForScanGate = typeof user?.plan === "string" ? user.plan.trim().toLowerCase() : "entry";
+  const canUploadBodyScan = (TIER_RANK[planKeyForScanGate] ?? 0) >= TIER_RANK.pro;
   const [subView, setSubView] = useState(/** @type {"profile" | "settings"} */ ("profile"));
   const [goalIds, setGoalIds] = useState(/** @type {string[]} */ ([]));
   const [weightUnit, setWeightUnit] = useState("lbs");
@@ -2437,6 +2440,28 @@ export function ProfileTab({
                 );
               })}
             </div>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <div className="mono" style={{ fontSize: 13, color: "var(--color-accent)", marginBottom: 8, letterSpacing: "0.08em" }}>
+              LAB REPORT
+            </div>
+            <div className="mono" style={{ fontSize: 11, color: "var(--color-text-secondary)", marginBottom: 10, lineHeight: 1.45 }}>
+              Upload PDF or photo — AI extraction (Pro+). Personal tracking only; not medical advice.
+            </div>
+            {typeof user?.id === "string" && activeProfileId ? (
+              <LabScanSection
+                userId={user.id}
+                profileId={activeProfileId}
+                canUploadBodyScan={canUploadBodyScan}
+                workerOk={workerOk}
+                onOpenUpgrade={onOpenUpgrade}
+                onErrorMessage={(m) => setErr(typeof m === "string" ? m : "")}
+                onSavedBriefly={showSavedBriefly}
+                activeStack={savedStackPeptides}
+                protocolEvents={[]}
+              />
+            ) : null}
           </div>
 
           <div ref={setFieldRef("weight")}>

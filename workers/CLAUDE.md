@@ -1,8 +1,8 @@
 # pepguideIQ Worker — agent brief
 
-Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain around the bottom of the file.
+Single file: `workers/api-proxy.js` (~6900+ lines). Dispatch is a long `if/else` chain around the bottom of the file.
 
-## Routes (exactly 38)
+## Routes (exactly 40)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`. Also handles Atfeh Stack Picks — see `handleAtfehStackRecommendations()`. Canonical route: `POST /atfeh/stack-recommendations`.
@@ -43,12 +43,14 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `GET /hashtags/search?q=` — prefix typeahead on `hashtags.tag` (auth).
 - `GET /hashtags/:tag/posts` — network-visible `posts` rows linked to tag, merged with `member_profiles` for feed cards (auth).
 
-### Body composition (InBody / DEXA)
+### Body composition (InBody / DEXA) & labs
 - `POST /inbody-scan/extract` — multipart `file` (JPEG/PNG/WebP/GIF). **Pro+** only. Claude Haiku vision → `{ values, confidence, rawText }` JSON for review before save. Does not consume AI Atfeh daily KV quota.
 - `POST /inbody-scan/interpret` — JSON body `{ scanId, scans?, protocolEvents?, activeStack?, reinterpret?: boolean }`. **Pro+** only. If `inbody_scan_history.ai_interpretation` is already set for `scanId` (and `reinterpret` is not true), returns JSON `{ cached: true, interpretation, ai_interpreted_at }` with no Anthropic call. Otherwise streams Sonnet (`MODEL_ELITE_GOAT`) as `text/event-stream`, then persists to `ai_interpretation` / `ai_interpreted_at` on that row. Does **not** use AI Atfeh daily KV quota.
+- `POST /lab-report/extract` — multipart `file` (**PDF** via Claude document block, or **JPEG/PNG/WebP** via Haiku vision). **Pro+** only. Returns `{ provider, date_drawn, markers[], rawText }` JSON with markers normalized via bundled `labMarkersRegistry.generated.json`. Does **not** consume AI Atfeh daily KV quota.
+- `POST /lab-report/interpret` — JSON `{ reportId, markers?, protocolEvents?, activeStack? }`. **Pro+** only. Sonnet (`MODEL_ELITE_GOAT`) returns structured JSON `{ summary, flags, insights, stack_interactions }`; persisted under `lab_reports.metadata.ai_interpretation` + `ai_interpreted_at`. Response `{ interpretation }`. Does **not** use AI Atfeh daily KV quota.
 
 ### R2 images
-- `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated).
+- `POST /stack-photo` — multipart upload to R2 bucket `stack-photos`. Returns `{url, key, private: true}`. Use `kind=inbody_scan_history` + `member_profile_id` for timestamped keys under `{userId}/scans/{iso}.jpg` (no `member_profiles` body_scan columns updated). Use **`kind=lab_report`** + `member_profile_id` for PDF/images under `{userId}/member-profiles/{profileId}/lab-reports/{iso}-{sha}.{ext}` (**Pro+**).
 - `POST /upload-post-media` — same handler as `POST /stack-photo`; forces `kind=post` + `member_profile_id` (UUID). Keys under `{userId}/member-profiles/{memberProfileId}/posts/{sha}.jpg`. No `member_profiles` column update; client inserts `public.posts`.
 - `POST /upload-stack-photo` — alias of the above, kept for compatibility.
 - `GET /stack-photo?key=…` — authenticated private read. User can only read keys prefixed with their own user id.

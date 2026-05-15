@@ -1,14 +1,14 @@
 ---
-description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 38 routes. Model routing, rate limits, security invariants.
+description: pepguideIQ Worker — Anthropic proxy, Stripe, R2, Turnstile. Single-file worker with 40 routes. Model routing, rate limits, security invariants.
 globs: workers/**/*
 alwaysApply: false
 ---
 
 # Worker rules
 
-Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` chain near the bottom of the file. **There is no framework** (no Hono, no itty-router) — raw `fetch` event handlers.
+Single file: `workers/api-proxy.js` (~6900 lines). Dispatch is a long `if/else` chain near the bottom of the file. **There is no framework** (no Hono, no itty-router) — raw `fetch` event handlers.
 
-## Routes (exactly 38 — do not invent)
+## Routes (exactly 40 — do not invent)
 
 ### AI
 - `POST /v1/chat` — Anthropic proxy. Plan-gated, KV rate-limited per user per day. Body: `{messages, system, catalog}`. Response: `{text, usage: {queries_today, queries_limit}}`.
@@ -45,8 +45,14 @@ Single file: `workers/api-proxy.js` (~5400 lines). Dispatch is a long `if/else` 
 - `DELETE /member-follows`
 - `GET /member-follows/following?profile_id=`
 
+### Body scans & labs (4)
+- `POST /inbody-scan/extract` — Bearer; JPEG/PNG/WebP → Haiku vision structured extraction
+- `POST /inbody-scan/interpret` — Bearer; Sonnet → wellness narrative merged into `inbody_scan_history.metadata`
+- `POST /lab-report/extract` — Bearer; PDF (document block) or image → structured markers + meta
+- `POST /lab-report/interpret` — Bearer; Sonnet → narrative merged into `lab_reports.metadata`
+
 ### R2 images (6)
-- `POST /stack-photo` — multipart upload to `stack-photos` R2 bucket
+- `POST /stack-photo` — multipart upload to `stack-photos` R2 bucket (`kind=` includes `stack`, `inbody_scan`, `lab_report`, etc.)
 - `POST /upload-post-media` — profile post image upload (`kind=post` + `member_profile_id`); same multipart handler as stack-photo
 - `POST /upload-stack-photo` — alias
 - `GET /stack-photo?key=…` — authenticated private read (caller's prefix only)
@@ -141,7 +147,7 @@ bucket_name = "stack-photos"
 
 ## Adding a new route
 
-1. Add dispatch line around line 3720: `if (url.pathname === "/your-route" && request.method === "…") return handler(request, env, cors);`
+1. Add dispatch line near the bottom `if/else` chain: `if (url.pathname === "/your-route" && request.method === "…") return handler(request, env, cors);`
 2. Implement `handler(request, env, cors)` in the handler section above (alphabetical-ish grouping).
 3. Rate-limit type defaults to `api` — change in dispatch if write or auth path.
 4. Always `return jsonResponse({...}, status, cors)`.

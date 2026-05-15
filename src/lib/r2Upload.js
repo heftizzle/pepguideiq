@@ -11,6 +11,15 @@ export const R2_UPLOAD_ALLOWED_TYPES = new Set([
 ]);
 export const R2_UPLOAD_ACCEPT_ATTR = "image/jpeg,image/png,image/webp,image/gif";
 
+/** Lab reports — Worker accepts PDF + JPEG/PNG/WebP only (`LAB_REPORT_UPLOAD_TYPES`). */
+export const LAB_REPORT_UPLOAD_ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+export const LAB_REPORT_ACCEPT_ATTR = "application/pdf,image/jpeg,image/png,image/webp";
+
 /**
  * Append `v` query for cache-busting image/worker URLs (e.g. right after upload).
  * @param {string} url
@@ -75,6 +84,38 @@ export function validateUploadFile(file) {
 }
 
 /**
+ * @param {File | null | undefined} file
+ * @returns {string | null}
+ */
+export function validateLabReportUploadFile(file) {
+  if (!file) return "No file selected";
+  if (typeof file.size !== "number" || file.size <= 0) return "File is empty";
+  if (file.size > R2_UPLOAD_MAX_BYTES) return "File too large — max 10MB";
+  const t = typeof file.type === "string" ? file.type.toLowerCase() : "";
+  if (!LAB_REPORT_UPLOAD_ALLOWED_TYPES.has(t)) return "Unsupported file type — use PDF, JPEG, PNG, or WebP";
+  return null;
+}
+
+/**
+ * POST `/stack-photo` with kind lab_report + PDF/images (same `{ url, key, private }` contract).
+ *
+ * @param {object} params
+ * @param {File} params.file
+ * @param {string} params.memberProfileId
+ * @param {(state: "uploading" | "retrying") => void} [params.onState]
+ * @returns {Promise<{ ok: true, url: string, key: string, private: boolean } | { ok: false, status: number | null, error: string }>}
+ */
+export async function uploadLabReportToR2({ file, memberProfileId, onState }) {
+  return uploadImageToR2({
+    path: "/stack-photo",
+    file,
+    fields: { kind: "lab_report", member_profile_id: memberProfileId },
+    onState,
+    validateFile: validateLabReportUploadFile,
+  });
+}
+
+/**
  * Upload an image to the Worker, with two automatic retries on transient
  * failures (network errors and 503). The Worker response is expected to be
  * `{ url, key, private }` — on success, `url` includes a one-time cache-bust
@@ -86,10 +127,11 @@ export function validateUploadFile(file) {
  * @param {File} params.file
  * @param {Record<string, string | undefined | null>} [params.fields] — extra multipart fields.
  * @param {(state: "uploading" | "retrying") => void} [params.onState]
+ * @param {(file: File) => string | null} [params.validateFile] — defaults to `validateUploadFile` (lab uploads pass `validateLabReportUploadFile`).
  * @returns {Promise<{ ok: true, url: string, key: string, private: boolean } | { ok: false, status: number | null, error: string }>}
  */
-export async function uploadImageToR2({ path, file, fields, onState }) {
-  const validationErr = validateUploadFile(file);
+export async function uploadImageToR2({ path, file, fields, onState, validateFile = validateUploadFile }) {
+  const validationErr = validateFile(file);
   if (validationErr) return { ok: false, status: 400, error: validationErr };
   if (!API_WORKER_URL) {
     return { ok: false, status: null, error: "Upload service not configured" };

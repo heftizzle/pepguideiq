@@ -1822,14 +1822,14 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                             return `${p.name} (${dose}${freq})${note}`;
                           })
                           .join("; ");
-                        const title = stackName ? `â€œ${stackName}â€: ` : "";
+                        const title = stackName ? `"${stackName}": ` : "";
                         setAiInput(`Analyze my current stack and give me optimization recommendations, timing protocols, and safety considerations: ${title}${summary}`);
                         setActiveTab("guide");
                       }}>
-                      Analyze with AI â†’
+                      Analyze with AI →
                     </button>
                     <div style={{ marginTop: 10, fontSize: 13, color: "var(--color-text-secondary)" }}>
-                      <span style={{ color: "var(--color-warning)" }}>âš  </span>Review injection schedules for timing conflicts. Consult your physician.
+                      <span style={{ color: "var(--color-warning)" }}>⚠ </span>Review injection schedules for timing conflicts. Consult your physician.
                     </div>
                   </div>
                 </div>

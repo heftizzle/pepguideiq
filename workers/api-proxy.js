@@ -1,3 +1,5 @@
+import LAB_MARKERS_REGISTRY_PAYLOAD from "./labMarkersRegistry.generated.json";
+
 /**
  * Cloudflare Worker: Anthropic proxy, Stripe billing helpers, R2 stack photos.
  *
@@ -53,6 +55,14 @@ const STACK_PHOTO_TYPES = new Map([
   ["image/gif", "gif"],
 ]);
 
+/** MIME → extension for lab report uploads (PDF + images; no GIF). */
+const LAB_REPORT_UPLOAD_TYPES = new Map([
+  ["application/pdf", "pdf"],
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+]);
+
 /**
  * Verify file magic bytes match claimed image/* (defense against MIME spoofing).
  * JPEG FF D8 FF; PNG 89 50 4E 47; WEBP RIFF..WEBP; GIF GIF8.
@@ -85,6 +95,52 @@ function imageMagicMatchesClaimedMime(buf, mime) {
     );
   }
   return false;
+}
+
+/**
+ * PDF magic: %PDF-
+ * @param {ArrayBuffer} buf
+ */
+function pdfMagicMatchesClaimedPdf(buf) {
+  const u = new Uint8Array(buf.slice(0, 5));
+  if (u.length < 5) return false;
+  return u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46 && u[4] === 0x2d;
+}
+
+/** @returns {{ markers: Array<{ canonical_key: string, display_name: string, short_name: string | null, aliases: string[] }> }} */
+function labMarkersCompactPayload() {
+  const p = LAB_MARKERS_REGISTRY_PAYLOAD && typeof LAB_MARKERS_REGISTRY_PAYLOAD === "object" ? LAB_MARKERS_REGISTRY_PAYLOAD : {};
+  const markers = Array.isArray(p.markers) ? p.markers : [];
+  return { markers };
+}
+
+/** @param {string | null | undefined} rawName */
+function resolveLabMarkerKey(rawName) {
+  if (!rawName || typeof rawName !== "string") return null;
+  const normalized = rawName.trim().toUpperCase();
+  if (!normalized) return null;
+  const { markers } = labMarkersCompactPayload();
+  for (const marker of markers) {
+    if (typeof marker.display_name === "string" && marker.display_name.toUpperCase() === normalized) {
+      return marker.canonical_key ?? null;
+    }
+    if (marker.short_name && String(marker.short_name).toUpperCase() === normalized) {
+      return marker.canonical_key ?? null;
+    }
+    const aliases = Array.isArray(marker.aliases) ? marker.aliases : [];
+    if (aliases.some((a) => String(a).toUpperCase() === normalized)) {
+      return marker.canonical_key ?? null;
+    }
+  }
+  return null;
+}
+
+/** @param {string | null | undefined} key */
+function labCanonicalKeyExists(key) {
+  if (!key || typeof key !== "string") return false;
+  const k = key.trim();
+  const { markers } = labMarkersCompactPayload();
+  return markers.some((m) => m.canonical_key === k);
 }
 
 /**
@@ -290,6 +346,445 @@ scan_date, weight_lbs, lean_mass_lbs, smm_lbs, pbf_pct, fat_mass_lbs, inbody_sco
   }
 
   return jsonResponse({ values, confidence, rawText: cleaned }, 200, cors);
+}
+
+/** Verbatim constraint reminder for Haiku + implementers (report_type set client-side from MIME). */
+const LAB_REPORT_TYPE_RULE_LINE =
+  "Image uploads (JPEG/PNG/WebP): use report_type structured_manual. PDF uploads: use pdf_parsed. These are the only two values this flow produces — stay within the migration CHECK constraint.";
+
+/**
+ * @param {unknown} n
+ */
+function labNumOrNull(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
+}
+
+/**
+ * @param {unknown} v
+ */
+function labStrOrEmpty(v) {
+  if (v == null) return "";
+  return String(v).trim();
+}
+
+/**
+ * @param {unknown} v
+ */
+function labBoolOrNull(v) {
+  if (v === true) return true;
+  if (v === false) return false;
+  return null;
+}
+
+/**
+ * @param {unknown[]} markersIn
+ */
+function normalizeLabMarkersFromHaiku(markersIn) {
+  if (!Array.isArray(markersIn)) return [];
+  const out = [];
+  for (const raw of markersIn) {
+    if (!raw || typeof raw !== "object") continue;
+    const rawName = labStrOrEmpty(raw.raw_name);
+    if (!rawName) continue;
+    let ck =
+      typeof raw.canonical_key === "string" && raw.canonical_key.trim()
+        ? raw.canonical_key.trim()
+        : null;
+    if (ck && !labCanonicalKeyExists(ck)) ck = null;
+    const resolved = ck ?? resolveLabMarkerKey(rawName);
+    out.push({
+      raw_name: rawName,
+      canonical_key: resolved,
+      value_numeric: labNumOrNull(raw.value_numeric),
+      value_text: labStrOrEmpty(raw.value_text) || null,
+      unit: labStrOrEmpty(raw.unit) || null,
+      ref_low: labNumOrNull(raw.ref_low),
+      ref_high: labNumOrNull(raw.ref_high),
+      in_range: labBoolOrNull(raw.in_range),
+      flag: labStrOrEmpty(raw.flag) || null,
+    });
+  }
+  return out;
+}
+
+/**
+ * POST /lab-report/extract — multipart file (PDF or JPEG/PNG/WebP). Pro+ only. Haiku; PDF via document block.
+ */
+async function handleLabReportExtract(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "Pro plan or higher required" }, 403, cors);
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return jsonResponse({ error: "Invalid multipart body" }, 400, cors);
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string" || typeof file.arrayBuffer !== "function") {
+    return jsonResponse({ error: 'Expected multipart field "file"' }, 400, cors);
+  }
+  const size = typeof file.size === "number" ? file.size : 0;
+  if (size <= 0) return jsonResponse({ error: "File is empty" }, 400, cors);
+  if (size > STACK_PHOTO_MAX_BYTES) {
+    return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
+  }
+
+  const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
+  if (!LAB_REPORT_UPLOAD_TYPES.has(mime)) {
+    return jsonResponse({ error: "Unsupported file type — use PDF, JPEG, PNG, or WebP" }, 415, cors);
+  }
+
+  let bytes;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return jsonResponse({ error: "Could not read file" }, 400, cors);
+  }
+
+  if (mime === "application/pdf") {
+    if (!pdfMagicMatchesClaimedPdf(bytes)) {
+      return jsonResponse({ error: "File content does not match PDF" }, 415, cors);
+    }
+  } else if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+    return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
+  }
+
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return jsonResponse({ error: "Lab extraction is not configured" }, 503, cors);
+  }
+
+  const systemText = `You extract structured laboratory bloodwork from the attached report.
+
+Rules:
+- Return ONLY valid JSON (no markdown fences, no commentary).
+- Exact shape: {"provider": string|null, "date_drawn": string|null, "markers": [...] }
+- provider: one of "Quest Diagnostics", "LabCorp", "Cleveland HeartLab" when clearly identifiable from letterhead/footer/logo text; otherwise null.
+- date_drawn: specimen or collection date as YYYY-MM-DD when printed; otherwise null.
+- markers: array of rows with keys raw_name (required string), canonical_key (string|null), value_numeric (number|null), value_text (string|null), unit (string|null), ref_low (number|null), ref_high (number|null), in_range (boolean|null), flag (string|null e.g. H/L).
+- Extract printed numbers only; use null when illegible or absent.
+- Never invent clinical interpretation beyond printed flags.
+
+${LAB_REPORT_TYPE_RULE_LINE}`;
+
+  const userHint =
+    mime === "application/pdf"
+      ? "Read all pages of this PDF lab report and return the JSON object."
+      : "Read this lab report image (OCR) and return the JSON object.";
+
+  const b64 = arrayBufferToBase64(bytes);
+
+  /** @type {Record<string, unknown>} */
+  const anthropicBody =
+    mime === "application/pdf"
+      ? {
+          model: MODEL_ENTRY_PRO,
+          max_tokens: 8192,
+          system: systemText,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "document",
+                  source: {
+                    type: "base64",
+                    media_type: "application/pdf",
+                    data: b64,
+                  },
+                },
+                { type: "text", text: userHint },
+              ],
+            },
+          ],
+        }
+      : {
+          model: MODEL_ENTRY_PRO,
+          max_tokens: 8192,
+          system: systemText,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: mime,
+                    data: b64,
+                  },
+                },
+                { type: "text", text: userHint },
+              ],
+            },
+          ],
+        };
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify(anthropicBody),
+    });
+  } catch (e) {
+    log(env, "error", "lab_report_extract_fetch_failed", { message: String(e) });
+    return jsonResponse({ error: "Extraction request failed" }, 502, cors);
+  }
+
+  if (!anthropicRes.ok) {
+    const t = await anthropicRes.text().catch(() => "");
+    log(env, "warn", "lab_report_extract_anthropic_status", { status: anthropicRes.status, body: String(t).slice(0, 400) });
+    return jsonResponse({ error: "Lab extraction temporarily unavailable" }, 502, cors);
+  }
+
+  let anthropicData;
+  try {
+    anthropicData = await anthropicRes.json();
+  } catch (jsonErr) {
+    log(env, "error", "lab_report_extract_anthropic_json", { message: String(jsonErr) });
+    return jsonResponse({ error: "Invalid response from extraction service" }, 502, cors);
+  }
+
+  const rawText = anthropicData.content?.[0]?.text ?? "";
+  const cleaned = rawText.replace(/```json|```/gi, "").trim();
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    log(env, "warn", "lab_report_extract_parse_failed", { preview: cleaned.slice(0, 200) });
+    return jsonResponse({ error: "Could not parse extraction result" }, 422, cors);
+  }
+
+  let provider =
+    parsed && typeof parsed.provider === "string" && parsed.provider.trim() ? parsed.provider.trim() : null;
+  if (provider) {
+    const pl = provider.toLowerCase();
+    if (pl.includes("quest")) provider = "Quest Diagnostics";
+    else if (pl.includes("labcorp")) provider = "LabCorp";
+    else if (pl.includes("cleveland") || pl.includes("heartlab") || pl.includes("cardioiq")) provider = "Cleveland HeartLab";
+  }
+
+  let date_drawn =
+    parsed && typeof parsed.date_drawn === "string" && parsed.date_drawn.trim()
+      ? parsed.date_drawn.trim().slice(0, 10)
+      : null;
+  if (date_drawn && !/^\d{4}-\d{2}-\d{2}$/.test(date_drawn)) date_drawn = null;
+
+  const markers = normalizeLabMarkersFromHaiku(parsed && Array.isArray(parsed.markers) ? parsed.markers : []);
+
+  return jsonResponse({ provider, date_drawn, markers, rawText: cleaned }, 200, cors);
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} reportId
+ * @param {string} userId
+ */
+async function supabaseFetchLabReportRow(supabaseUrl, serviceKey, reportId, userId) {
+  const url = `${supabaseUrl}/rest/v1/lab_reports?id=eq.${encodeURIComponent(reportId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,profile_id,user_id,metadata`;
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  });
+  if (!res.ok) return { row: null };
+  const data = await res.json().catch(() => []);
+  const row = Array.isArray(data) && data[0] ? data[0] : null;
+  return { row };
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} profileId
+ */
+async function supabaseFetchRecentLabResults(supabaseUrl, serviceKey, profileId) {
+  const url = `${supabaseUrl}/rest/v1/lab_results?profile_id=eq.${encodeURIComponent(profileId)}&select=canonical_key,value_numeric,value_text,unit,date_drawn,report_id&order=date_drawn.desc.nullslast&limit=60`;
+  const res = await fetch(url, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * @param {string} supabaseUrl
+ * @param {string} serviceKey
+ * @param {string} reportId
+ * @param {string} userId
+ * @param {Record<string, unknown>} metadata
+ */
+async function supabasePatchLabReportMetadata(supabaseUrl, serviceKey, reportId, userId, metadata) {
+  const url = `${supabaseUrl}/rest/v1/lab_reports?id=eq.${encodeURIComponent(reportId)}&user_id=eq.${encodeURIComponent(userId)}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ metadata }),
+  });
+  return res.ok;
+}
+
+/**
+ * POST /lab-report/interpret — Pro+ only. Sonnet JSON → lab_reports.metadata.ai_interpretation. Not AI Atfeh KV quota.
+ */
+async function handleLabReportInterpret(request, env, cors) {
+  if (!supabaseAuthReady(env)) {
+    return jsonResponse({ error: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set on the Worker" }, 503, cors);
+  }
+  const { data: sessionUser, error: authErr } = await getSessionUser(env, request.headers.get("Authorization"));
+  if (authErr || !sessionUser?.sub) {
+    return jsonResponse({ error: "Unauthorized" }, 401, cors);
+  }
+  const userId = sessionUser.sub;
+  const supabaseUrl = (env.SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
+  if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
+    return jsonResponse({ error: "Pro plan or higher required" }, 403, cors);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
+  }
+
+  const reportId = typeof body.reportId === "string" ? body.reportId.trim() : "";
+  if (!reportId) {
+    return jsonResponse({ error: 'Missing "reportId"' }, 400, cors);
+  }
+
+  const markers = Array.isArray(body.markers) ? body.markers : [];
+  const protocolEvents = Array.isArray(body.protocolEvents) ? body.protocolEvents : [];
+  const activeStack = Array.isArray(body.activeStack) ? body.activeStack : [];
+
+  const { row: anchorRow } = await supabaseFetchLabReportRow(supabaseUrl, serviceKey, reportId, userId);
+  if (!anchorRow || typeof anchorRow.profile_id !== "string") {
+    return jsonResponse({ error: "Lab report not found" }, 404, cors);
+  }
+
+  const profileId = anchorRow.profile_id.trim();
+  const priorSample = await supabaseFetchRecentLabResults(supabaseUrl, serviceKey, profileId);
+
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return jsonResponse({ error: "Interpretation is not configured" }, 503, cors);
+  }
+
+  const systemText = `You analyze laboratory bloodwork for an informed adult who tracks research peptides for personal tracking only — not medical care.
+
+Return ONLY valid JSON (no markdown fences). Exact shape:
+{"summary":"string","flags":["string"],"insights":["string"],"stack_interactions":["string"]}
+
+Rules:
+- Use currentMarkers for this draw; reference priorLabResultsSample only for rough trends (association, not diagnosis).
+- Relate findings cautiously to activeStack peptides where biologically plausible — hypothesis-level only.
+- No medical diagnoses, no treatment instructions, no dosing recommendations. No "you should" clinical directives.
+- summary: 3–6 sentences, factual, cite marker names and values where helpful.
+- flags: short bullet strings for attention-worthy labs (e.g. out-of-range).
+- insights: educational observations only.
+- stack_interactions: peptide-/stack-related cautions or correlations only when justified by the data context.`;
+
+  const userPayload = JSON.stringify(
+    {
+      reportId,
+      currentMarkers: markers.slice(0, 120),
+      priorLabResultsSample: priorSample.slice(0, 60),
+      protocolEvents,
+      activeStack,
+    },
+    null,
+    0
+  );
+
+  let anthropicRes;
+  try {
+    anthropicRes = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: MODEL_ELITE_GOAT,
+        max_tokens: 2048,
+        stream: false,
+        system: systemText,
+        messages: [{ role: "user", content: userPayload }],
+      }),
+    });
+  } catch (e) {
+    log(env, "error", "lab_report_interpret_fetch_failed", { message: String(e) });
+    return jsonResponse({ error: "Upstream request failed" }, 502, cors);
+  }
+
+  const anthropicData = await anthropicRes.json().catch(() => ({}));
+  if (!anthropicRes.ok) {
+    log(env, "warn", "lab_report_interpret_anthropic_status", { status: anthropicRes.status, body: anthropicData });
+    return jsonResponse({ error: "Interpretation temporarily unavailable" }, 502, cors);
+  }
+
+  const rawInterp = anthropicData.content?.[0]?.text ?? "";
+  const cleanedInterp = rawInterp.replace(/```json|```/gi, "").trim();
+  /** @type {Record<string, unknown>} */
+  let interpretation;
+  try {
+    interpretation = JSON.parse(cleanedInterp);
+  } catch {
+    log(env, "warn", "lab_report_interpret_parse_failed", { preview: cleanedInterp.slice(0, 200) });
+    return jsonResponse({ error: "Could not parse interpretation" }, 422, cors);
+  }
+
+  const metaPrev =
+    anchorRow.metadata && typeof anchorRow.metadata === "object" && !Array.isArray(anchorRow.metadata)
+      ? /** @type {Record<string, unknown>} */ ({ ...anchorRow.metadata })
+      : {};
+
+  const atIso = new Date().toISOString();
+  const metaNext = {
+    ...metaPrev,
+    ai_interpretation: interpretation,
+    ai_interpreted_at: atIso,
+  };
+
+  const patched = await supabasePatchLabReportMetadata(supabaseUrl, serviceKey, reportId, userId, metaNext);
+  if (!patched) {
+    log(env, "warn", "lab_report_interpret_persist_failed", { reportId });
+    return jsonResponse({ error: "Could not save interpretation" }, 502, cors);
+  }
+
+  const inputTok = anthropicData.usage?.input_tokens ?? 0;
+  const outputTok = anthropicData.usage?.output_tokens ?? 0;
+  logUsage(env, userId, profilePlan, MODEL_ELITE_GOAT, inputTok + outputTok);
+
+  return jsonResponse({ interpretation }, 200, cors);
 }
 
 /**
@@ -5510,16 +6005,17 @@ async function handlePostStackPhoto(request, env, cors) {
   const memberProfileId =
     typeof memberProfileIdRaw === "string" ? memberProfileIdRaw.trim() : "";
 
-  if (kind === "body_scan" || kind === "inbody_scan_history") {
+  if (kind === "body_scan" || kind === "inbody_scan_history" || kind === "lab_report") {
     const profilePlan = await fetchProfilePlan(supabaseUrl, serviceKey, userId, env);
     if (TIER_RANK[profilePlan] < TIER_RANK.pro) {
-      return jsonResponse({ error: "Pro plan or higher required for InBody / DEXA scan upload" }, 403, cors);
+      return jsonResponse({ error: "Pro plan or higher required for body scan or lab report uploads" }, 403, cors);
     }
   }
 
   const memberScopedKinds = new Set([
     "body_scan",
     "inbody_scan_history",
+    "lab_report",
     "progress_front",
     "progress_side",
     "progress_back",
@@ -5529,7 +6025,7 @@ async function handlePostStackPhoto(request, env, cors) {
     return jsonResponse(
       {
         error:
-          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, inbody_scan_history, progress_front, progress_side, progress_back, or post",
+          "kind must be stack_shot_1, stack_shot_2, vial, avatar, body_scan, inbody_scan_history, lab_report, progress_front, progress_side, progress_back, or post",
       },
       400,
       cors
@@ -5573,9 +6069,16 @@ async function handlePostStackPhoto(request, env, cors) {
   }
 
   const mime = typeof file.type === "string" ? file.type.trim().toLowerCase() : "";
-  if (!STACK_PHOTO_TYPES.has(mime)) {
+  const mimeOkLab = kind === "lab_report" && LAB_REPORT_UPLOAD_TYPES.has(mime);
+  const mimeOkPhoto = kind !== "lab_report" && STACK_PHOTO_TYPES.has(mime);
+  if (!mimeOkLab && !mimeOkPhoto) {
     return jsonResponse(
-      { error: "Unsupported file type — use JPEG, PNG, WebP, or GIF" },
+      {
+        error:
+          kind === "lab_report"
+            ? "Unsupported file type — use PDF, JPEG, PNG, or WebP"
+            : "Unsupported file type — use JPEG, PNG, WebP, or GIF",
+      },
       415,
       cors
     );
@@ -5591,7 +6094,15 @@ async function handlePostStackPhoto(request, env, cors) {
     return jsonResponse({ error: "File too large — max 10MB" }, 413, cors);
   }
 
-  if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+  if (kind === "lab_report") {
+    if (mime === "application/pdf") {
+      if (!pdfMagicMatchesClaimedPdf(bytes)) {
+        return jsonResponse({ error: "File content does not match PDF" }, 415, cors);
+      }
+    } else if (!imageMagicMatchesClaimedMime(bytes, mime)) {
+      return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
+    }
+  } else if (!imageMagicMatchesClaimedMime(bytes, mime)) {
     return jsonResponse({ error: "File content does not match declared image type" }, 415, cors);
   }
 
@@ -5606,6 +6117,10 @@ async function handlePostStackPhoto(request, env, cors) {
   else if (kind === "inbody_scan_history") {
     const safeIso = isoNow.replace(/[:.]/g, "-");
     key = `${userId}/scans/${safeIso}-${sha}.jpg`;
+  } else if (kind === "lab_report") {
+    const safeIso = isoNow.replace(/[:.]/g, "-");
+    const ext = LAB_REPORT_UPLOAD_TYPES.get(mime) ?? "bin";
+    key = `${userId}/member-profiles/${memberProfileId}/lab-reports/${safeIso}-${sha}.${ext}`;
   } else if (kind === "body_scan") key = `${userId}/member-profiles/${memberProfileId}/body-scan-${sha}.jpg`;
   else if (kind === "progress_front") key = `${userId}/member-profiles/${memberProfileId}/progress-front-${sha}.jpg`;
   else if (kind === "progress_side") key = `${userId}/member-profiles/${memberProfileId}/progress-side-${sha}.jpg`;
@@ -5715,6 +6230,9 @@ async function handlePostStackPhoto(request, env, cors) {
       url = publicMemberAvatarUrl(request, key);
     }
   } else if (kind === "inbody_scan_history") {
+    patched = true;
+    url = privateStackPhotoUrl(request, key);
+  } else if (kind === "lab_report") {
     patched = true;
     url = privateStackPhotoUrl(request, key);
   } else if (kind === "body_scan") {
@@ -6811,6 +7329,24 @@ async function handleRequest(request, env) {
       }
       if (request.method === "POST") {
         return handleInbodyScanInterpret(request, env, cors);
+      }
+    }
+
+    if (url.pathname === "/lab-report/extract") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: cors });
+      }
+      if (request.method === "POST") {
+        return handleLabReportExtract(request, env, cors);
+      }
+    }
+
+    if (url.pathname === "/lab-report/interpret") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: cors });
+      }
+      if (request.method === "POST") {
+        return handleLabReportInterpret(request, env, cors);
       }
     }
 

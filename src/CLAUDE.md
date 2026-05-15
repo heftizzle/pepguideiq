@@ -16,6 +16,14 @@ Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`
 
 **Phase B:** [`src/data/catalogMeta.js`](../data/catalogMeta.js) duplicates `CATALOG_COUNT` for the entry bundle (nav, goals UI). It **must** equal `catalog.js`’s `CATALOG_COUNT`. **`pnpm run build` runs `check:catalog-meta` first** — the build fails if they drift.
 
+## Lab marker registry (do not hardcode counts)
+
+Canonical marker definitions live in [`src/data/labMarkerRegistry.js`](data/labMarkerRegistry.js). Use **`LAB_MARKER_REGISTRY.length`**, **`LAB_CATEGORIES.length`**, or **`REGISTRY_STATS`** from that module — never hardcode marker totals in UI or copy.
+
+Worker-side extraction resolves aliases from bundled [`workers/labMarkersRegistry.generated.json`](../../workers/labMarkersRegistry.generated.json). Regenerate it with **`node scripts/generateLabRegistry.js`** whenever registry source files change; **`pnpm run build`** runs that script automatically before `vite build`. Commit the updated JSON.
+
+Persisted lab uploads and parsed rows use Supabase **`lab_providers`**, **`lab_reports`**, and **`lab_results`** (see `supabase/migrations/097_lab_providers_reports_results.sql`). Row ownership matches **`inbody_scan_history`**: **`user_id`** references `auth.users`, **`profile_id`** references `public.member_profiles` (not `profiles`).
+
 ### BATCH merge checklist (housekeeping)
 
 When a new **`batchN.js`** lands and `PEPTIDES.length` changes:
