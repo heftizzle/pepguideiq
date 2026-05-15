@@ -1027,7 +1027,7 @@ export function NetworkTab({ userId, scrollToDosePostId = null, onConsumedDosePo
       void loadDoseFeed();
       void loadMediaPostFeed();
       void loadVialFeed();
-    }, 60_000);
+    }, 600_000);
     const onVis = () => {
       if (document.visibilityState === "visible") {
         void loadDoseFeed();
