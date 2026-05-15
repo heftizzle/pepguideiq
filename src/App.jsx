@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { CATALOG_COUNT, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalogMeta.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
@@ -129,7 +129,7 @@ function profileHandleFromWindowPath() {
 }
 
 const PEPV_LAST_TAB_KEY = "pepv_last_tab";
-/** localStorage key â€” user's sticky preference for which tab to land on after browser restart. */
+/** localStorage key — user's sticky preference for which tab to land on after browser restart. */
 const PEPV_PREFERRED_TAB_KEY = "pepguideiq.preferred_tab";
 const PEPV_DEFAULT_TAB = "profile";
 
@@ -194,7 +194,7 @@ function formatMyStackLinesForAi(items) {
  * override the resolved tab or respect the user's stored choice.
  */
 function readInitialActiveTab() {
-  // Priority 1: sessionStorage â€” last tab the user was on, survives reloads within session.
+  // Priority 1: sessionStorage — last tab the user was on, survives reloads within session.
   if (typeof sessionStorage !== "undefined") {
     try {
       const raw = sessionStorage.getItem(PEPV_LAST_TAB_KEY);
@@ -207,7 +207,7 @@ function readInitialActiveTab() {
       /* ignore and fall through */
     }
   }
-  // Priority 2: localStorage â€” sticky personal preference, survives full browser restart.
+  // Priority 2: localStorage — sticky personal preference, survives full browser restart.
   if (typeof localStorage !== "undefined") {
     try {
       const raw = localStorage.getItem(PEPV_PREFERRED_TAB_KEY);
@@ -269,12 +269,12 @@ function PepGuideIQApp({ user, setUser }) {
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("popular");
-  /** Library filter query â€” kept in PepGuideIQApp so it survives modal open/close and mobile search panel unmount. */
+  /** Library filter query — kept in PepGuideIQApp so it survives modal open/close and mobile search panel unmount. */
   const [search, setSearch] = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
-  /** Stack Builder tab editor â€” lifted so it survives unmount (e.g. full-screen AI Atfeh). */
+  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Atfeh). */
   const [buildRows, setBuildRows] = useState([]);
   const [buildLocalStackName, setBuildLocalStackName] = useState("");
   const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -306,9 +306,9 @@ function PepGuideIQApp({ user, setUser }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
-  /** Why the upgrade sheet opened â€” drives friendly copy + checkout CTA (`upgradeGateCopy.js`). */
+  /** Why the upgrade sheet opened — drives friendly copy + checkout CTA (`upgradeGateCopy.js`). */
   const [upgradeGateReason, setUpgradeGateReason] = useState(/** @type {string | null} */ (null));
-  /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id â†’ open). */
+  /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
   /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
@@ -325,7 +325,7 @@ function PepGuideIQApp({ user, setUser }) {
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
   const buildPrevTabRef = useRef(activeTab);
-  /** After Stack Builder â†’ AI Atfeh, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
+  /** After Stack Builder → AI Atfeh, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
   const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
@@ -869,7 +869,7 @@ function PepGuideIQApp({ user, setUser }) {
           history: threadMessages,
           catalog,
           profile: {
-            system_context: `You are PepGuideIQ AI Atfeh â€” a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
+            system_context: `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
           },
         }),
       });
@@ -948,7 +948,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
   /** Prefill Find People (e.g. deep link or reopen). */
   const [peopleSearchInitialQuery, setPeopleSearchInitialQuery] = useState(/** @type {string | null} */ (null));
-  /** Scroll Network â€œLive dosingâ€ card to this `network_feed.id`, then clear via callback. */
+  /** Scroll Network “Live dosing” card to this `network_feed.id`, then clear via callback. */
   const [networkScrollToDosePostId, setNetworkScrollToDosePostId] = useState(/** @type {string | null} */ (null));
   /** `/profile/:handle` in-app overlay (logged-in shell). */
   const [publicProfileOverlayHandle, setPublicProfileOverlayHandle] = useState(/** @type {string | null} */ (null));
@@ -1091,7 +1091,7 @@ function PepGuideIQApp({ user, setUser }) {
   /** Bottom nav tab `<button>` elements for `NavTooltips` positioning. */
   const navTabButtonRefs = useRef(/** @type {Partial<Record<string, HTMLButtonElement | null>>} */ ({}));
 
-  /** PepGuideIQMainTree destructures the same keys â€” keep this object and that destructure identical. */
+  /** PepGuideIQMainTree destructures the same keys — keep this object and that destructure identical. */
   mainUiRef.current = {
     user,
     setUser,
@@ -1716,8 +1716,8 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                     >
                       {myStack.length} peptide{myStack.length !== 1 ? "s" : ""} saved
                       {Number.isFinite(savedStackLimit)
-                        ? ` Â· ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`
-                        : " Â· Unlimited Saved Stacks"}
+                        ? ` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`
+                        : " · Unlimited Saved Stacks"}
                     </div>
                   </div>
                   <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
@@ -1741,7 +1741,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
               </div>
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed var(--color-border-default)",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
-                  <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>â¬¡</div>
+                  <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>⬇</div>
                   <div className="mono" style={{ color:"var(--color-text-placeholder)",fontSize: 13 }}>No Saved Stacks yet. Add compounds from the Library.</div>
                 </div>
               ) : (
@@ -1818,7 +1818,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                           .map((p) => {
                             const dose = p.stackDose || p.startDose || "";
                             const freq = p.stackFrequency ? ` ${p.stackFrequency}` : "";
-                            const note = p.stackNotes ? ` â€” ${p.stackNotes}` : "";
+                            const note = p.stackNotes ? ` — ${p.stackNotes}` : "";
                             return `${p.name} (${dose}${freq})${note}`;
                           })
                           .join("; ");
@@ -1899,7 +1899,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                       return (
                         tutorialGhostVialTracker ?? (
                           <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                            No injectable compounds with vial tracking in your stack â€” add one from the Library or open Stacks to build your protocol.
+                            No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
                           </div>
                         )
                       );
@@ -1949,7 +1949,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                           }}
                         >
                           Archived Vials ({archivedCount})
-                          {archivedCount === 0 ? " â€” none yet" : ""}
+                          {archivedCount === 0 ? " — none yet" : ""}
                         </button>
                         <ArchivedVialsModal
                           isOpen={archivedModalOpen}
@@ -2129,7 +2129,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                       }}
                       aria-label="Open threads sidebar"
                     >
-                      â˜°
+                      ☰
                     </button>
                   )}
                   <div
@@ -2177,7 +2177,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                       onClick={() => setGoalsOpen((o) => !o)}
                     >
                       <span className="pepv-emoji" aria-hidden>
-                        ðŸŽ¯{" "}
+                        🎯{" "}
                       </span>
                       Goals
                       {goals.length > 0 ? (
@@ -2187,7 +2187,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                         </span>
                       ) : null}
                       <span className="mono" style={{ marginLeft: "auto", color: "var(--color-text-secondary)", fontSize: 11 }}>
-                        {goalsOpen ? "â–²" : "â–¼"}
+                        {goalsOpen ? "▲" : "▼"}
                       </span>
                     </button>
                     {goalsOpen && (
@@ -2211,7 +2211,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                             </div>
                             {myStack.map((p) => (
                               <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", padding: "2px 0" }}>
-                                â†’ {p.name}
+                                → {p.name}
                               </div>
                             ))}
                           </div>
@@ -2246,7 +2246,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                         }}
                       />
                       <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13, marginBottom: 18 }}>
-                        Optional: open ðŸŽ¯ Goals, then ask anything.
+                        Optional: open 🎯 Goals, then ask anything.
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
                         {[
@@ -2271,7 +2271,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                   {threadLoading && threadMessages.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
-                        Loading threadâ€¦
+                        Loading thread…
                       </div>
                     </div>
                   )}
@@ -2304,7 +2304,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                   {aiLoading && (
                     <div className="ai-msg ai-bot">
                       <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
-                        Analyzing protocol dataâ€¦
+                        Analyzing protocol data…
                       </div>
                     </div>
                   )}
@@ -2346,7 +2346,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                         disabled={aiLoading}
                         style={{ fontSize: 13, padding: "8px 16px" }}
                       >
-                        {aiLoading ? "Creatingâ€¦" : "Continue Thread â†’"}
+                        {aiLoading ? "Creating…" : "Continue Thread →"}
                       </button>
                       <div style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 6 }}>
                         A new thread will be started with a summary of this one.
@@ -2357,7 +2357,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                       <textarea
                         className="ai-input"
                         rows={2}
-                        placeholder="Ask about dosing, protocols, stacking, mechanisms, cyclingâ€¦"
+                        placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
                         value={aiInput}
                         onChange={(e) => setAiInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -2375,7 +2375,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                         disabled={aiLoading || !aiInput.trim()}
                         style={{ padding: "0 18px", alignSelf: "stretch", fontSize: 16 }}
                       >
-                        {aiLoading ? "â€¦" : "â†’"}
+                        {aiLoading ? "…" : "→"}
                       </button>
                     </div>
                   )}
@@ -2384,7 +2384,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                       {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
                       {aiQueryUsage.today >= aiQueryUsage.limit && (
                         <span style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ color: "var(--color-warning)", fontWeight: 700 }}>Â· Limit reached</span>
+                          <span style={{ color: "var(--color-warning)", fontWeight: 700 }}>· Limit reached</span>
                           <button
                             type="button"
                             onClick={() => openUpgradeModal("ai_guide")}
@@ -2507,7 +2507,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
                 style={{ fontSize: 18, lineHeight: 1, opacity: libraryNavActive ? 1 : 0.72 }}
                 aria-hidden
               >
-                ðŸ§¬
+                🧬
               </span>
               <span
                 className="pepv-bottom-nav-label"
@@ -2526,7 +2526,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
             {[
               {
                 tabId: "vialTracker",
-                emoji: "ðŸ§ª",
+                emoji: "💊",
                 labelTop: "VIAL",
                 label: "TRACKER",
                 ariaLabel: "Vial Tracker",
@@ -2536,7 +2536,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
               },
               {
                 tabId: "stackBuilder",
-                emoji: "ðŸ—ï¸",
+                emoji: "🏗️",
                 labelTop: "STACK",
                 label: "BUILDER",
                 ariaLabel: "Stack Builder",
@@ -2546,7 +2546,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
               },
               {
                 tabId: "stacks",
-                emoji: "ðŸ“‹",
+                emoji: "📋",
                 labelTop: "SAVED",
                 label: "STACKS",
                 ariaLabel: "Stacks",
@@ -2814,7 +2814,7 @@ export default function PepGuideIQ() {
             fontSize: 13,
           }}
         >
-          Loading sessionâ€¦
+          Loading session…
         </div>
       </>
     ) : !user ? (
