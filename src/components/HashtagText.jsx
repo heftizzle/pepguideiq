@@ -1,42 +1,63 @@
+import { openPublicMemberProfile } from "../lib/openPublicProfile.js";
+
 /**
- * Split caption text into plain segments and `#tags` (letters/digits/underscore after `#`).
+ * Segment text into plain, `#tag`, and `@handle` tokens in a single regex pass.
+ *
+ * Both token types require the first character to be a letter.
+ * Handles allow letters, digits, underscores, and hyphens (max 50 chars).
+ * Hashtags allow letters and digits only (max 50 chars).
+ *
  * @param {string} text
- * @returns {{ type: 'text' | 'tag'; value: string }[]}
+ * @returns {{ type: 'text' | 'tag' | 'mention'; value: string }[]}
  */
-export function segmentTextWithHashtags(text) {
+export function segmentText(text) {
   const s = typeof text === "string" ? text : "";
   if (!s) return [];
-  const re = /#([a-zA-Z][a-zA-Z0-9_]{0,49})/g;
+  const re = /(?:#([a-zA-Z][a-zA-Z0-9_]{0,49}))|(?:@([a-zA-Z][a-zA-Z0-9_-]{0,49}))/g;
   const out = [];
   let last = 0;
   let m;
   while ((m = re.exec(s)) !== null) {
     const start = m.index;
-    if (start > last) {
-      out.push({ type: "text", value: s.slice(last, start) });
+    if (start > last) out.push({ type: "text", value: s.slice(last, start) });
+    if (m[1] !== undefined) {
+      out.push({ type: "tag", value: m[1] });
+    } else {
+      out.push({ type: "mention", value: m[2] });
     }
-    out.push({ type: "tag", value: m[1] });
     last = start + m[0].length;
   }
-  if (last < s.length) {
-    out.push({ type: "text", value: s.slice(last) });
-  }
+  if (last < s.length) out.push({ type: "text", value: s.slice(last) });
   return out;
 }
 
+/** @deprecated Use `segmentText` — kept for backward compatibility with existing imports. */
+export const segmentTextWithHashtags = segmentText;
+
 /**
+ * Renders comment/caption text with tappable `#hashtag` and `@handle` tokens.
+ *
+ * Hashtags: `var(--color-text-info, #38bdf8)` per DESIGN.md.
+ * Mentions: `var(--color-accent)` per DESIGN.md.
+ *
+ * Mention default navigation calls `openPublicMemberProfile()` (SPA overlay,
+ * `/profile/{handle}`). Pass `onMentionNavigate` to override.
+ * Hashtag default navigation is `window.location.assign('/explore/hashtag/...')`.
+ * Pass `onHashtagNavigate` to override.
+ *
  * @param {{
  *   text: string;
  *   onHashtagNavigate?: (tag: string) => void;
+ *   onMentionNavigate?: (handle: string) => void;
  * }} props
  */
-export function HashtagText({ text, onHashtagNavigate }) {
-  const segments = segmentTextWithHashtags(text);
+export function HashtagText({ text, onHashtagNavigate, onMentionNavigate }) {
+  const segments = segmentText(text);
   if (segments.length === 0) {
     return text ? <span>{text}</span> : null;
   }
 
-  const go = (tag) => {
+  const goTag = (tag) => {
     const t = String(tag ?? "").trim().toLowerCase();
     if (!t) return;
     if (typeof onHashtagNavigate === "function") {
@@ -54,31 +75,70 @@ export function HashtagText({ text, onHashtagNavigate }) {
     }
   };
 
+  const goMention = (handle) => {
+    const h = String(handle ?? "").trim().toLowerCase();
+    if (!h) return;
+    if (typeof onMentionNavigate === "function") {
+      try {
+        onMentionNavigate(h);
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    openPublicMemberProfile(h);
+  };
+
   return (
     <>
       {segments.map((seg, i) => {
         if (seg.type === "text") {
           return <span key={`t-${i}`}>{seg.value}</span>;
         }
+
+        if (seg.type === "tag") {
+          const lower = seg.value.toLowerCase();
+          return (
+            <span
+              key={`h-${i}-${lower}`}
+              role="link"
+              tabIndex={0}
+              onClick={() => goTag(lower)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                goTag(lower);
+              }}
+              style={{
+                color: "var(--color-text-info, #38bdf8)",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              #{seg.value}
+            </span>
+          );
+        }
+
         const lower = seg.value.toLowerCase();
         return (
           <span
-            key={`h-${i}-${lower}`}
+            key={`m-${i}-${lower}`}
             role="link"
             tabIndex={0}
-            onClick={() => go(lower)}
+            onClick={() => goMention(lower)}
             onKeyDown={(e) => {
               if (e.key !== "Enter" && e.key !== " ") return;
               e.preventDefault();
-              go(lower);
+              goMention(lower);
             }}
             style={{
-              color: "var(--color-text-info, #38bdf8)",
+              color: "var(--color-accent)",
               fontWeight: 600,
               cursor: "pointer",
             }}
           >
-            #{seg.value}
+            @{seg.value}
           </span>
         );
       })}

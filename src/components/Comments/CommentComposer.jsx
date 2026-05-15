@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { shouldShowCharProximityCounter } from "../../lib/charCounterProximity.js";
+import { API_WORKER_URL } from "../../lib/config.js";
+import { getSessionAccessToken } from "../../lib/supabase.js";
+import { searchMemberProfiles } from "../../lib/follows.js";
 
 const SOFT_MAX = 1000;
 const HARD_MAX = 2000;
@@ -8,33 +11,103 @@ const HARD_MAX = 2000;
 function CounterFooterSlot({ count }) {
   const show = shouldShowCharProximityCounter(count, SOFT_MAX);
   if (!show) return null;
-  return <span className="mono" style={{ color: "var(--color-text-danger)" }}>{count}/{SOFT_MAX}</span>;
+  return (
+    <span className="mono" style={{ color: "var(--color-text-danger)" }}>
+      {count}/{SOFT_MAX}
+    </span>
+  );
+}
+
+/**
+ * @mention autocomplete dropdown.
+ * onMouseDown + e.preventDefault() keeps the textarea focused so the
+ * feed layout's onBlur collapse never fires during a pick.
+ *
+ * Only renders when open=true AND (loading OR results.length > 0).
+ */
+function MentionDropdown({ open, results, activeIndex, onPick, loading }) {
+  if (!open) return null;
+  if (!loading && results.length === 0) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 6px)",
+        left: 0,
+        right: 0,
+        background: "var(--color-bg-card)",
+        border: "1px solid var(--color-border-default)",
+        borderRadius: 10,
+        overflow: "hidden",
+        zIndex: 200,
+        boxShadow: "0 -4px 20px rgba(0,0,0,0.35)",
+        maxHeight: 224,
+        overflowY: "auto",
+      }}
+    >
+      {loading && results.length === 0 ? (
+        <div style={{ padding: "10px 14px", fontSize: 13, color: "var(--color-text-muted)" }}>
+          Searching…
+        </div>
+      ) : (
+        results.map((p, i) => {
+          const displayHandle = p.display_handle || p.handle || "";
+          const displayName = p.display_name || "";
+          const active = i === activeIndex;
+          return (
+            <button
+              key={p.user_id || p.handle || i}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onPick(p);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "9px 14px",
+                background: active
+                  ? "var(--color-bg-hover, rgba(255,255,255,0.06))"
+                  : "transparent",
+                border: "none",
+                borderBottom: "1px solid var(--color-border-subtle, rgba(255,255,255,0.04))",
+                cursor: "pointer",
+                textAlign: "left",
+                color: "var(--color-text-primary)",
+                fontSize: 14,
+                fontFamily: "inherit",
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "var(--color-accent)", flexShrink: 0 }}>
+                @{displayHandle}
+              </span>
+              {displayName ? (
+                <span
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {displayName}
+                </span>
+              ) : null}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
 }
 
 /**
  * Textarea + Post button composer used both as the post-level composer
  * in `CommentsSection` and as the inline reply composer inside a
  * `CommentItem`.
- *
- * Always-visible slot: when `!currentUserId || !currentProfileId`,
- * renders a "Sign in to comment" stub that dispatches a click event —
- * the host page shows the auth flow via existing `/` route.
- *
- * Submits via `hook.post({ body, parentCommentId? })`. For the
- * top-level post composer, the hook is the full `useComments` return.
- * For the reply composer in `CommentItem`, the parent passes a
- * lightweight `{ post }` shim that injects `parentCommentId`.
- *
- * @param {{
- *   hook: { post: (args: { body: string, parentCommentId?: string | null }) => Promise<{ ok: boolean, error?: string }> },
- *   currentUserId: string | null,
- *   currentProfileId: string | null,
- *   placeholder?: string,
- *   initialValue?: string,
- *   autoFocus?: boolean,
- *   compact?: boolean,
- *   layout?: "default" | "feed",
- * }} props
  */
 export default function CommentComposer({
   hook,
@@ -45,12 +118,157 @@ export default function CommentComposer({
   autoFocus = false,
   compact = false,
   layout = "default",
+  workerUrl,
 }) {
   const [value, setValue] = useState(initialValue);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [feedExpanded, setFeedExpanded] = useState(false);
   const taRef = useRef(/** @type {HTMLTextAreaElement | null} */ (null));
+
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionResults, setMentionResults] = useState(/** @type {any[]} */ ([]));
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionTriggerIdx = useRef(-1);
+
+  useEffect(() => {
+    if (!mentionQuery) {
+      setMentionResults([]);
+      setMentionOpen(false);
+      setMentionLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMentionLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const wUrl = workerUrl || API_WORKER_URL;
+        if (!wUrl) return;
+        const token = await getSessionAccessToken();
+        if (!token || cancelled) return;
+        const results = await searchMemberProfiles(mentionQuery, wUrl, token, {
+          handleOnly: true,
+        });
+        if (!cancelled) {
+          const capped = results.slice(0, 6);
+          setMentionResults(capped);
+          setMentionOpen(capped.length > 0);
+          setMentionIndex(0);
+        }
+      } catch {
+        if (!cancelled) setMentionOpen(false);
+      } finally {
+        if (!cancelled) setMentionLoading(false);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mentionQuery, workerUrl]);
+
+  const closeMention = useCallback(() => {
+    setMentionOpen(false);
+    setMentionQuery("");
+    setMentionLoading(false);
+    mentionTriggerIdx.current = -1;
+  }, []);
+
+  const pickMention = useCallback(
+    (profile) => {
+      if (!profile) return;
+      const handle = profile.display_handle || profile.handle || "";
+      if (!handle) return;
+      const trigIdx = mentionTriggerIdx.current;
+      if (trigIdx < 0) return;
+      const cursorPos = taRef.current?.selectionStart ?? value.length;
+      const before = value.slice(0, trigIdx);
+      const after = value.slice(cursorPos);
+      const insert = `@${handle} `;
+      const next = (before + insert + after).slice(0, HARD_MAX);
+      setValue(next);
+      closeMention();
+      requestAnimationFrame(() => {
+        if (!taRef.current) return;
+        taRef.current.focus();
+        const pos = before.length + insert.length;
+        taRef.current.setSelectionRange(pos, pos);
+      });
+    },
+    [value, closeMention]
+  );
+
+  const handleChange = useCallback((e) => {
+    const raw = e.target.value.slice(0, HARD_MAX);
+    setValue(raw);
+    const cursor = e.target.selectionStart ?? raw.length;
+    const before = raw.slice(0, cursor);
+    const match = before.match(/@([a-zA-Z0-9_-]*)$/);
+    if (match) {
+      mentionTriggerIdx.current = cursor - match[0].length;
+      const q = match[1];
+      setMentionQuery(q);
+      if (!q) {
+        setMentionOpen(false);
+        setMentionLoading(true);
+      }
+    } else {
+      mentionTriggerIdx.current = -1;
+      setMentionQuery("");
+      setMentionOpen(false);
+      setMentionLoading(false);
+    }
+  }, []);
+
+  const submit = useCallback(async () => {
+    const trimmed = value.trim();
+    if (submitting || !trimmed) return;
+    setSubmitting(true);
+    setError("");
+    const result = await hook.post({ body: trimmed });
+    setSubmitting(false);
+    if (!result || !result.ok) {
+      setError(result?.error || "Could not post comment.");
+      return;
+    }
+    setValue("");
+    closeMention();
+    if (layout === "feed") setFeedExpanded(false);
+  }, [value, submitting, hook, closeMention, layout]);
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (mentionOpen && mentionResults.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.min(i + 1, mentionResults.length - 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setMentionIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          pickMention(mentionResults[mentionIndex]);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeMention();
+          return;
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        void submit();
+      }
+    },
+    [mentionOpen, mentionResults, mentionIndex, pickMention, closeMention, submit]
+  );
 
   useEffect(() => {
     if (autoFocus && taRef.current) {
@@ -75,7 +293,6 @@ export default function CommentComposer({
   }, [layout, feedExpanded]);
 
   const isAnon = !currentUserId || !currentProfileId;
-
   if (isAnon) {
     return (
       <a
@@ -103,27 +320,6 @@ export default function CommentComposer({
   const over = value.length > SOFT_MAX;
   const count = value.length;
 
-  const submit = async () => {
-    if (disabled) return;
-    setSubmitting(true);
-    setError("");
-    const result = await hook.post({ body: trimmed });
-    setSubmitting(false);
-    if (!result || !result.ok) {
-      setError(result?.error || "Could not post comment.");
-      return;
-    }
-    setValue("");
-    if (layout === "feed") setFeedExpanded(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      void submit();
-    }
-  };
-
   const footerRow = (
     <div
       style={{
@@ -135,7 +331,7 @@ export default function CommentComposer({
         color: over ? "var(--color-warning)" : "var(--color-text-muted)",
       }}
     >
-      <span>{error ? error : ""}</span>
+      <span>{error || ""}</span>
       <CounterFooterSlot count={count} />
     </div>
   );
@@ -145,6 +341,7 @@ export default function CommentComposer({
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div
           style={{
+            position: "relative",
             display: "flex",
             alignItems: "flex-start",
             gap: 8,
@@ -154,10 +351,17 @@ export default function CommentComposer({
             padding: "6px 8px",
           }}
         >
+          <MentionDropdown
+            open={mentionOpen}
+            results={mentionResults}
+            activeIndex={mentionIndex}
+            onPick={pickMention}
+            loading={mentionLoading}
+          />
           <textarea
             ref={taRef}
             value={value}
-            onChange={(e) => setValue(e.target.value.slice(0, HARD_MAX))}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             rows={1}
@@ -236,10 +440,17 @@ export default function CommentComposer({
               minHeight: 44,
             }}
           >
+            <MentionDropdown
+              open={mentionOpen}
+              results={mentionResults}
+              activeIndex={mentionIndex}
+              onPick={pickMention}
+              loading={mentionLoading}
+            />
             <textarea
               ref={taRef}
               value={value}
-              onChange={(e) => setValue(e.target.value.slice(0, HARD_MAX))}
+              onChange={handleChange}
               onKeyDown={handleKeyDown}
               onBlur={() => {
                 window.setTimeout(() => {
@@ -293,8 +504,23 @@ export default function CommentComposer({
                 padding: 0,
               }}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                <line x1="4" y1="12" x2="18" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <line
+                  x1="4"
+                  y1="12"
+                  x2="18"
+                  y2="12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
                 <polyline
                   points="13 7 18 12 13 17"
                   fill="none"
@@ -308,13 +534,7 @@ export default function CommentComposer({
           </div>
         )}
         {error ? (
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--color-warning)",
-              padding: "0 2px",
-            }}
-          >
+          <div style={{ fontSize: 11, color: "var(--color-warning)", padding: "0 2px" }}>
             {error}
           </div>
         ) : null}
@@ -326,6 +546,7 @@ export default function CommentComposer({
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "flex-start",
           gap: 8,
@@ -335,10 +556,17 @@ export default function CommentComposer({
           padding: "8px 10px",
         }}
       >
+        <MentionDropdown
+          open={mentionOpen}
+          results={mentionResults}
+          activeIndex={mentionIndex}
+          onPick={pickMention}
+          loading={mentionLoading}
+        />
         <textarea
           ref={taRef}
           value={value}
-          onChange={(e) => setValue(e.target.value.slice(0, HARD_MAX))}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           rows={2}

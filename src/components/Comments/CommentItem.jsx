@@ -9,6 +9,7 @@ import { resolveMemberAvatarDisplayUrlFromKey } from "../../lib/memberAvatarUrl.
 import { formatHandleDisplay } from "../../lib/memberProfileHandle.js";
 import { openPublicMemberProfile } from "../../lib/openPublicProfile.js";
 import { formatTimeAgo } from "../../lib/formatTime.js";
+import { HashtagText } from "../HashtagText.jsx";
 
 /**
  * Single comment row with avatar + handle + body + footer (like button,
@@ -242,7 +243,10 @@ export default function CommentItem({
             wordBreak: "break-word",
           }}
         >
-          {body}
+          <HashtagText
+            text={body}
+            onMentionNavigate={(h) => openPublicMemberProfile(h)}
+          />
         </div>
 
         <div
