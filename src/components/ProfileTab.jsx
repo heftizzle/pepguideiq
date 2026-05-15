@@ -40,6 +40,7 @@ import { FastingTrackerSection } from "./FastingTrackerSection.jsx";
 import { formatInbodyScanDateOnly, inbodyToNum } from "../lib/inbodyScanDisplay.js";
 import { BodyScanView } from "./BodyScanView.jsx";
 import { InbodyScoreRing } from "./InbodyScoreRing.jsx";
+import { LabResultsCard } from "./LabResultsCard.jsx";
 import { LabScanSection } from "./LabScanSection.jsx";
 import { ProfileCtx } from "../context/ProfileContext.jsx";
 import { TUTORIAL_TARGET, tutorialHighlightProps, useTutorialOptional } from "../context/TutorialContext.jsx";
@@ -949,6 +950,8 @@ export function ProfileTab({
   );
   /** Local copies of `profiles` fields so App.jsx auth refresh cannot wipe pill/input UI mid-session. */
   const [bioSex, setBioSex] = useState(() => user?.biological_sex ?? null);
+  /** Bumped after lab report save so LabResultsCard refetches (profileId unchanged). */
+  const [labReportCardRefresh, setLabReportCardRefresh] = useState(0);
   const [trainingExp, setTrainingExp] = useState(() => user?.training_experience ?? null);
   const initDob = splitYmdParts(user?.date_of_birth ?? null);
   const [dobMonth, setDobMonth] = useState(initDob.m);
@@ -976,6 +979,11 @@ export function ProfileTab({
       savedFlashTimerRef.current = null;
     }, 2200);
   }, []);
+
+  const onLabReportSavedBriefly = useCallback(() => {
+    setLabReportCardRefresh((n) => n + 1);
+    showSavedBriefly();
+  }, [showSavedBriefly]);
 
   /** Hydrate locals from global `user` when it updates from server — not while a profiles save is in flight. */
   useEffect(() => {
@@ -2457,10 +2465,13 @@ export function ProfileTab({
                 workerOk={workerOk}
                 onOpenUpgrade={onOpenUpgrade}
                 onErrorMessage={(m) => setErr(typeof m === "string" ? m : "")}
-                onSavedBriefly={showSavedBriefly}
+                onSavedBriefly={onLabReportSavedBriefly}
                 activeStack={savedStackPeptides}
                 protocolEvents={[]}
               />
+            ) : null}
+            {typeof user?.id === "string" && activeProfileId ? (
+              <LabResultsCard profileId={activeProfileId} biologicalSex={bioSex} refreshKey={labReportCardRefresh} />
             ) : null}
           </div>
 

@@ -2007,6 +2007,53 @@ export async function fetchLabProviders() {
 }
 
 /**
+ * Latest `lab_reports` row for the profile plus all `lab_results` for that report.
+ * Ordered by date_drawn DESC (nulls last), then created_at DESC.
+ *
+ * @param {string} profileId
+ * @returns {Promise<{ report: Record<string, unknown> | null, results: Record<string, unknown>[], error: Error | null }>}
+ */
+export async function fetchLatestLabReport(profileId) {
+  if (!supabase) return { report: null, results: [], error: notConfiguredError() };
+  const pid = typeof profileId === "string" ? profileId.trim() : "";
+  if (!pid) return { report: null, results: [], error: new Error("Missing profile id.") };
+
+  const { data: reportRow, error: repErr } = await supabase
+    .from("lab_reports")
+    .select("id, user_id, profile_id, date_drawn, report_type, lab_provider_id, r2_key, metadata, raw_text, created_at")
+    .eq("profile_id", pid)
+    .order("date_drawn", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (repErr) return { report: null, results: [], error: repErr };
+  if (!reportRow || typeof reportRow.id !== "string") return { report: null, results: [], error: null };
+
+  const { data: resultRows, error: resErr } = await supabase
+    .from("lab_results")
+    .select("*")
+    .eq("report_id", reportRow.id)
+    .order("canonical_key", { ascending: true });
+
+  if (resErr) return { report: /** @type {Record<string, unknown>} */ (reportRow), results: [], error: resErr };
+
+  let provider_name = null;
+  const lpId = reportRow.lab_provider_id;
+  if (typeof lpId === "string" && lpId.trim()) {
+    const { data: prov } = await supabase.from("lab_providers").select("name").eq("id", lpId.trim()).maybeSingle();
+    if (prov && typeof prov.name === "string") provider_name = prov.name;
+  }
+
+  const report = { ...reportRow, provider_name };
+  return {
+    report: /** @type {Record<string, unknown>} */ (report),
+    results: Array.isArray(resultRows) ? /** @type {Record<string, unknown>[]} */ (resultRows) : [],
+    error: null,
+  };
+}
+
+/**
  * Upserts lab_reports on unique (profile_id, date_drawn, report_type).
  * @param {Record<string, unknown>} row
  * @returns {Promise<{ id: string | null, error: Error | null }>}
