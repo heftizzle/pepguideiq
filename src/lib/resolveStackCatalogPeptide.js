@@ -1,18 +1,18 @@
-import { PEPTIDES } from "../data/catalog.js";
-
 /**
  * Match a saved stack row to the live catalog by `id` or case-insensitive alias
  * (e.g. stack still has "cjc-ipa" while catalog id is "cjc-ipa-combo").
  * @param {{ id?: unknown } | null | undefined} stackRow
+ * @param {readonly { id?: unknown; aliases?: unknown[] }[]} catalog — pass `PEPTIDES` from caller; empty array skips lookup.
  */
-export function findCatalogPeptideForStackRow(stackRow) {
+export function findCatalogPeptideForStackRow(stackRow, catalog) {
+  const list = Array.isArray(catalog) ? catalog : [];
   const id = String(stackRow?.id ?? "").trim();
   if (!id) return null;
-  const direct = PEPTIDES.find((c) => c.id === id);
+  const direct = list.find((c) => c.id === id);
   if (direct) return direct;
   const lower = id.toLowerCase();
   return (
-    PEPTIDES.find(
+    list.find(
       (c) => Array.isArray(c.aliases) && c.aliases.some((a) => String(a).toLowerCase() === lower)
     ) ?? null
   );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { getCategoryCssVars } from "../data/catalog.js";
+import { PEPTIDES, getCategoryCssVars } from "../data/catalog.js";
 import { useActiveProfile } from "../context/ProfileContext.jsx";
 // Worker: set `VITE_API_WORKER_URL` (e.g. https://pepguideiq-api-proxy.pepguideiq.workers.dev).
 import { API_WORKER_URL, isApiWorkerConfigured } from "../lib/config.js";
@@ -271,7 +271,7 @@ function useWideLayout() {
 
 export function BuildTab({
   activeTab,
-  catalog,
+  catalog = PEPTIDES,
   myStack,
   stackName,
   setStackName,

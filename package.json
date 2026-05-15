@@ -6,7 +6,8 @@
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "check:catalog-meta": "node scripts/check-catalog-meta-count.mjs",
+    "build": "pnpm run check:catalog-meta && vite build",
     "preview": "vite preview",
     "lint": "eslint src/ workers/ --ext .js,.jsx",
     "deploy:worker": "wrangler deploy --config wrangler.worker.toml",

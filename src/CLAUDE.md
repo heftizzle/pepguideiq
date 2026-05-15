@@ -12,7 +12,19 @@ There is no router library. Add one only if a new multi-page requirement justifi
 
 ## Catalog size (do not hardcode)
 
-Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`. **Live count:** `PEPTIDES.length` / `CATALOG_COUNT` (currently **275** after BATCH41). The AI Atfeh catalog payload (`src/lib/atfehCatalogPayload.js`) sends all compounds — no hardcoded cap.
+Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`. **Live count:** `PEPTIDES.length` / `CATALOG_COUNT` from `catalog.js` (do not trust stale numbers in docs). The AI Atfeh catalog payload (`src/lib/atfehCatalogPayload.js`) sends all compounds — no hardcoded cap.
+
+**Phase B:** [`src/data/catalogMeta.js`](../data/catalogMeta.js) duplicates `CATALOG_COUNT` for the entry bundle (nav, goals UI). It **must** equal `catalog.js`’s `CATALOG_COUNT`. **`pnpm run build` runs `check:catalog-meta` first** — the build fails if they drift.
+
+### BATCH merge checklist (housekeeping)
+
+When a new **`batchN.js`** lands and `PEPTIDES.length` changes:
+
+1. [ ] Run `node -e "import('./src/data/catalog.js').then(m => console.log(m.CATALOG_COUNT))"` from the repo root.
+2. [ ] Set `export const CATALOG_COUNT` in [`src/data/catalogMeta.js`](../data/catalogMeta.js) to that integer (same as updating any other nav copy if needed).
+3. [ ] `pnpm run build` (or at least `pnpm run check:catalog-meta`) before pushing — CI will fail the same check if you skip step 2.
+
+Same PR as the batch is ideal so `main` never ships a wrong nav count on cold boot.
 
 ## Route filtering data source
 

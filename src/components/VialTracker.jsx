@@ -1705,7 +1705,7 @@ export function VialTracker({ userId, profileId, peptideId, catalogEntry, canUse
   const resolvePeptideName = useCallback(
     (id) => {
       if (id && typeof id === "string" && peptideNameById.has(id)) return peptideNameById.get(id);
-      const catalogMatch = findCatalogPeptideForStackRow({ id });
+      const catalogMatch = findCatalogPeptideForStackRow({ id }, []);
       if (catalogMatch?.name) return catalogMatch.name;
       return compoundName;
     },

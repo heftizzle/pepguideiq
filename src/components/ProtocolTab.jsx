@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { findCatalogPeptideForStackRow } from "../lib/resolveStackCatalogPeptide.js";
+import { PEPTIDES } from "../data/catalog.js";
 import { isSupabaseConfigured } from "../lib/config.js";
 import { buildProtocolDoseRow } from "../lib/protocolDoseRows.js";
 import {
@@ -174,7 +175,7 @@ export function ProtocolTab({
     }
     const built = [];
     for (const row of protocolCandidates) {
-      const peptide = findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name });
+      const peptide = findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }, PEPTIDES);
       built.push(await buildProtocolDoseRow(userId, profileId, row.peptideId, row.name, peptide, ymd));
     }
     const { startIso, endIso } = localDayStartEndIso(ymd);
@@ -370,7 +371,7 @@ export function ProtocolTab({
     setLogLockUntilMs((prev) => ({ ...prev, [peptideId]: lockUntil }));
     setGuardrail(null);
     void refreshMemberProfiles();
-    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name });
+    const cat = findCatalogPeptideForStackRow({ id: peptideId, name: r.name }, PEPTIDES);
     const planKey = typeof userPlan === "string" ? userPlan.trim().toLowerCase() : "entry";
     const toastMessage = getConfirmationMessage(protocolSessionFromHour(), [peptideId], planKey);
     const doseLogId =
@@ -696,7 +697,7 @@ function ProtocolTodayDoseLogs({ logs, rowKind, protocolRow, onChanged }) {
   }, [menuId]);
 
   const catalog = useMemo(
-    () => findCatalogPeptideForStackRow({ id: protocolRow.peptideId, name: protocolRow.name }),
+    () => findCatalogPeptideForStackRow({ id: protocolRow.peptideId, name: protocolRow.name }, PEPTIDES),
     [protocolRow.peptideId, protocolRow.name]
   );
   const blendComponents = Array.isArray(catalog?.components) ? catalog.components : null;
@@ -1038,7 +1039,7 @@ function ProtocolIntranasalSprayRow({
 }) {
   const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
   const catalog = useMemo(
-    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }),
+    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }, PEPTIDES),
     [row.peptideId, row.name]
   );
   const sprays = row.sprays ?? 1;
@@ -1158,7 +1159,7 @@ function ProtocolOralVialRow({
 }) {
   const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
   const catalog = useMemo(
-    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }),
+    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }, PEPTIDES),
     [row.peptideId, row.name]
   );
   const doseMl = row.doseMl ?? 0.5;
@@ -1382,7 +1383,7 @@ function ProtocolInjectableRow({
 }) {
   const vial = row.vials.find((v) => v.id === row.selectedVialId) ?? row.vials[0];
   const catalog = useMemo(
-    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }),
+    () => findCatalogPeptideForStackRow({ id: row.peptideId, name: row.name }, PEPTIDES),
     [row.peptideId, row.name]
   );
   const blendComponents = catalog?.components;

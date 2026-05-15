@@ -1,6 +1,6 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
+﻿import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { PEPTIDES, CATALOG_COUNT, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalog.js";
+import { CATALOG_COUNT, GOALS, CAT_COLORS, getCategoryCssVars } from "./data/catalogMeta.js";
 import { AuthScreen } from "./components/AuthScreen.jsx";
 import { HandleSetup } from "./components/HandleSetup.jsx";
 import { GlobalStyles } from "./components/GlobalStyles.jsx";
@@ -8,7 +8,6 @@ import { Logo } from "./components/Logo.jsx";
 import { Modal } from "./components/Modal.jsx";
 import { CloseButton } from "./components/ui/CloseButton.jsx";
 import { LibraryMobileSearchIcon, LibraryMobileSearchPanel } from "./components/LibraryMobileSearch.jsx";
-import { AddToStackForm } from "./components/AddToStackForm.jsx";
 import { SavedStackEntryRow, getStackRowListKey, normalizeStackSessions } from "./components/SavedStackEntryRow.jsx";
 import { ProtocolTab } from "./components/ProtocolTab.jsx";
 import { SavedStackNameInput } from "./components/SavedStackNameInput.jsx";
@@ -21,7 +20,7 @@ import { StackProtocolQuickLog } from "./components/StackProtocolQuickLog.jsx";
 import { NetworkTab } from "./components/NetworkTab.jsx";
 import { DoseLogFAB } from "./components/DoseLogFAB.jsx";
 import { StackShareControls } from "./components/StackShareControls.jsx";
-import { BuildTab } from "./components/BuildTab.jsx";
+import { primaryCategory } from "./lib/catalogHelpers.js";
 import { ProfileTab } from "./components/ProfileTab.jsx";
 import { PeopleSearch } from "./components/PeopleSearch.jsx";
 import { PublicMemberProfilePage } from "./components/PublicMemberProfilePage.jsx";
@@ -81,13 +80,6 @@ import {
   supabase,
 } from "./lib/supabase.js";
 import { normalizeHandleInput } from "./lib/memberProfileHandle.js";
-import {
-  BIOAVAILABILITY_WARN_TOOLTIP,
-  resolvePeptideBioavailability,
-  shouldShowBioavailabilityOnLibraryCard,
-} from "./lib/peptideBioavailability.js";
-import { normalizeFinnrickProductUrl } from "./lib/finnrickUrl.js";
-import { formatLibraryCardHalfLifeDisplay } from "./lib/libraryCardHalfLifeDisplay.js";
 import { readAgeVerifiedFromStorage } from "./lib/ageVerification.js";
 import { buildAtfehCatalogPayload } from "./lib/atfehCatalogPayload.js";
 import { buildRowsFromMyStack } from "./lib/buildRowsFromMyStack.js";
@@ -95,7 +87,13 @@ import AtfehThreadSidebar from "./components/AtfehThreadSidebar.jsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const LibraryTab = React.lazy(() => import("./components/LibraryTab.jsx"));
+const BuildTab = React.lazy(() => import("./components/BuildTab.jsx"));
+
 const getCatColor = (cat) => CAT_COLORS[cat] ?? "var(--color-accent)";
+
+/** Tutorial ghost vial: stable ID-only stub; resolveStability assigns peptide fridge rules without loading catalog in App. */
+const TUTORIAL_GHOST_BPC157 = { id: "bpc-157", name: "BPC-157" };
 
 /** Assistant message markdown (AI Atfeh); stable ref for react-markdown. */
 const AI_GUIDE_MARKDOWN_COMPONENTS = {
@@ -116,300 +114,6 @@ const AI_GUIDE_MARKDOWN_COMPONENTS = {
     <li style={{ marginBottom: 4, lineHeight: 1.6, marginLeft: 16 }}>{children}</li>
   ),
 };
-
-/** Parent row for a variant (`variantOf` id), if present in the catalog. */
-function getVariantParent(peptide) {
-  if (!peptide?.variantOf) return null;
-  return PEPTIDES.find((q) => q.id === peptide.variantOf) ?? null;
-}
-
-/** All catalog categories for a row (multi-label imports use `categories[]`; core rows use string `category`). */
-function peptideCategories(p) {
-  if (Array.isArray(p.categories) && p.categories.length) return p.categories;
-  if (Array.isArray(p.category)) return p.category;
-  if (typeof p.category === "string" && p.category) return [p.category];
-  return [];
-}
-
-/** Each filter pill value maps to one or more data `category` / `categories` strings. */
-const CATEGORY_FILTER_MAP = {
-  Longevity: ["Longevity", "Antioxidant", "Methylation"],
-  Nootropic: ["Nootropic", "Cognitive"],
-  Healing: ["Healing / Recovery", "Healing"],
-  "GLP / Metabolic": ["GLP / Metabolic", "Metabolic"],
-  "Anabolics / HRT": ["Anabolics / HRT", "HRT", "TRT", "Hormone Replacement", "Hormone"],
-  "Khavinson Bioregulators": ["Khavinson Bioregulators", "Bioregulator"],
-  "Skin / Hair / Nails": ["Skin / Hair / Nails", "Cosmetic"],
-  "Diabetes Management": ["Diabetes Management"],
-  Cardiovascular: ["Cardiovascular"],
-  Adaptogen: ["Adaptogen"],
-  Performance: ["Performance"],
-  Foundational: ["Foundational", "Foundational Supplement"],
-  "Sexual Health": ["Sexual Health", "Relational Performance", "Sexual Function"],
-};
-
-function matchesCategory(p, activeCategory) {
-  if (activeCategory === "All") return true;
-  const filterStrings = CATEGORY_FILTER_MAP[activeCategory] ?? [activeCategory];
-  const pCats = [
-    ...(Array.isArray(p.category) ? p.category : p.category ? [p.category] : []),
-    ...(Array.isArray(p.categories) ? p.categories : p.categories ? [p.categories] : []),
-  ];
-  return filterStrings.some((f) => pCats.includes(f));
-}
-
-function primaryCategory(p) {
-  return peptideCategories(p)[0] ?? "";
-}
-
-/** Route-of-administration filter keys; one active at a time, stacks with category + search. */
-const ROUTE_FILTERS = [
-  { id: "injectable", label: "💉 Injectable" },
-  { id: "intranasal", label: "👃 Intranasal" },
-  { id: "oral", label: "💊 Oral" },
-  { id: "topical", label: "🧴 Topical" },
-];
-
-function peptideMatchesRouteFilter(p, routeKey) {
-  if (!routeKey) return true;
-  const parts = Array.isArray(p.route) ? p.route.map((x) => String(x).toLowerCase()) : [];
-  const s = parts.join(" | ");
-  switch (routeKey) {
-    case "injectable":
-      return (
-        /subq|subcutaneous|intramuscular|injection|injectable|iv infusion|intravenous|nebulized/.test(s) ||
-        /\biv\b/.test(s) ||
-        /(^|[\s,/])im([\s,/]|$)/.test(s)
-      );
-    case "intranasal":
-      return /intranasal|nasal|nasal spray/.test(s);
-    case "oral":
-      return /\boral\b|tablet|capsule/.test(s);
-    case "topical":
-      return /topical|cream|serum|transdermal/.test(s);
-    default:
-      return true;
-  }
-}
-
-const SORT_OPTIONS = [
-  { value: "popular", label: "Popular" },
-  { value: "az", label: "A → Z" },
-  { value: "za", label: "Z → A" },
-  { value: "category", label: "Category" },
-];
-
-/** Library filter pills — chrome matches bottom nav buttons (App.jsx nav: inactive / active). */
-const LIBRARY_FILTER_PILL_BASE = {
-  minHeight: 44,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "6px 12px",
-  borderRadius: 12,
-  border: "1px solid var(--color-border-default)",
-  background: "var(--color-bg-hover)",
-  boxShadow: "none",
-  fontSize: 13,
-  fontFamily: "'JetBrains Mono', monospace",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-  lineHeight: 1.15,
-  color: "var(--color-text-secondary)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  transition: "border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
-};
-
-const LIBRARY_FILTER_PILL_ACTIVE = {
-  border: "1px solid var(--color-accent-nav-border)",
-  background: "var(--color-accent-nav-fill)",
-  boxShadow: "0 0 0 1px var(--color-accent-nav-ring), 0 0 10px color-mix(in srgb, var(--color-accent) 20%, transparent)",
-  color: "var(--color-accent)",
-};
-
-/** Display-only short names on filter pills + pcard badges; filter `selCat` / CSS still use full data strings. */
-const CATEGORY_SHORT = {
-  "Khavinson Bioregulators": "Bioregulators",
-  "Anabolics / HRT": "HRT / TRT",
-  "GLP / Metabolic": "GLP",
-  "Diabetes Management": "Diabetes",
-  "Healing / Recovery": "Healing",
-  "Anti-Inflammatory": "Anti-Inflam",
-  "Skin / Hair / Nails": "Skin",
-  "Bronchodilator": "Broncho",
-  "Testosterone Support": "Test Support",
-};
-
-/** @param {string | { label: string; value: string }} cat */
-function libraryCategoryEntry(cat) {
-  const value = typeof cat === "string" ? cat : cat.value;
-  const label = CATEGORY_SHORT[value] ?? (typeof cat === "object" && cat.label ? cat.label : value);
-  return { label, value };
-}
-
-/** Library category pills — two horizontal scroll rows (order is intentional). */
-const LIBRARY_CATEGORY_ROW_1 = [
-  "All",
-  "Foundational",
-  "Anabolics / HRT",
-  "Sexual Health",
-  "GH Peptides",
-  "Sleep",
-  "Healing",
-  "Cardiovascular",
-  "Longevity",
-  "Nootropic",
-  "Immune",
-  "Adaptogen",
-  "Performance",
-];
-
-const LIBRARY_CATEGORY_ROW_2 = [
-  "GLP / Metabolic",
-  { label: "Diabetes", value: "Diabetes Management" },
-  "Skin / Hair / Nails",
-  "Mitochondrial",
-  "Estrogen Control",
-  "Testosterone Support",
-  "Thyroid Support",
-  "SARMs",
-  "Khavinson Bioregulators",
-  "Vitamin",
-];
-
-const LIBRARY_CAT_SCROLL_OUTER = {
-  overflowX: "auto",
-  overflowY: "hidden",
-  WebkitOverflowScrolling: "touch",
-  scrollbarWidth: "none",
-  msOverflowStyle: "none",
-  width: "100%",
-  maxWidth: "100%",
-  minWidth: 0,
-  touchAction: "pan-x",
-  overscrollBehaviorX: "contain",
-};
-
-const LIBRARY_CAT_SCROLL_INNER = {
-  display: "flex",
-  flexDirection: "row",
-  flexWrap: "nowrap",
-  alignItems: "center",
-  gap: 6,
-  width: "max-content",
-};
-
-const LIBRARY_CAT_CHEV_BTN = {
-  position: "absolute",
-  top: "50%",
-  transform: "translateY(-50%)",
-  width: 28,
-  height: 28,
-  borderRadius: "50%",
-  border: "none",
-  background: "rgba(0,0,0,0.6)",
-  color: "var(--color-accent)",
-  fontSize: 16,
-  lineHeight: 1,
-  cursor: "pointer",
-  zIndex: 10,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 0,
-};
-
-/**
- * @param {{ cats: (string | { label: string; value: string })[]; selCat: string; onSelect: (cat: string) => void; marginBottom: number }} props
- */
-function LibraryCategoryPillScrollRow({ cats, selCat, onSelect, marginBottom }) {
-  const scrollRef = useRef(null);
-  const [showLeft, setShowLeft] = useState(false);
-  const [showRight, setShowRight] = useState(false);
-
-  const updateChevrons = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setShowLeft(scrollLeft > 2);
-    setShowRight(scrollLeft + clientWidth < scrollWidth - 2);
-  }, []);
-
-  useLayoutEffect(() => {
-    updateChevrons();
-  }, [updateChevrons, cats]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    updateChevrons();
-    const onScroll = () => updateChevrons();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updateChevrons);
-    const ro = new ResizeObserver(updateChevrons);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updateChevrons);
-      ro.disconnect();
-    };
-  }, [updateChevrons]);
-
-  return (
-    <div style={{ position: "relative", marginBottom, width: "100%", minWidth: 0 }}>
-      <div
-        ref={scrollRef}
-        className="pepv-library-cat-scroll"
-        style={{ ...LIBRARY_CAT_SCROLL_OUTER, marginBottom: 0 }}
-      >
-        <div style={LIBRARY_CAT_SCROLL_INNER}>
-          {cats.map((cat) => {
-            const { label, value } = libraryCategoryEntry(cat);
-            return (
-              <button
-                type="button"
-                key={value}
-                onClick={() => onSelect(value)}
-                style={{
-                  ...LIBRARY_FILTER_PILL_BASE,
-                  flexShrink: 0,
-                  whiteSpace: "nowrap",
-                  ...(selCat === value ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      {showLeft ? (
-        <button
-          type="button"
-          className="pepv-library-cat-chev"
-          aria-label="Scroll categories left"
-          onClick={() => scrollRef.current?.scrollBy({ left: -200, behavior: "smooth" })}
-          style={{ ...LIBRARY_CAT_CHEV_BTN, left: 0 }}
-        >
-          ‹
-        </button>
-      ) : null}
-      {showRight ? (
-        <button
-          type="button"
-          className="pepv-library-cat-chev"
-          aria-label="Scroll categories right"
-          onClick={() => scrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })}
-          style={{ ...LIBRARY_CAT_CHEV_BTN, right: 0 }}
-        >
-          ›
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
 /** Top-right header: member profile avatar initial (no image). */
 function profileHandleFromWindowPath() {
   if (typeof window === "undefined") return null;
@@ -425,7 +129,7 @@ function profileHandleFromWindowPath() {
 }
 
 const PEPV_LAST_TAB_KEY = "pepv_last_tab";
-/** localStorage key — user's sticky preference for which tab to land on after browser restart. */
+/** localStorage key â€” user's sticky preference for which tab to land on after browser restart. */
 const PEPV_PREFERRED_TAB_KEY = "pepguideiq.preferred_tab";
 const PEPV_DEFAULT_TAB = "profile";
 
@@ -490,7 +194,7 @@ function formatMyStackLinesForAi(items) {
  * override the resolved tab or respect the user's stored choice.
  */
 function readInitialActiveTab() {
-  // Priority 1: sessionStorage — last tab the user was on, survives reloads within session.
+  // Priority 1: sessionStorage â€” last tab the user was on, survives reloads within session.
   if (typeof sessionStorage !== "undefined") {
     try {
       const raw = sessionStorage.getItem(PEPV_LAST_TAB_KEY);
@@ -503,7 +207,7 @@ function readInitialActiveTab() {
       /* ignore and fall through */
     }
   }
-  // Priority 2: localStorage — sticky personal preference, survives full browser restart.
+  // Priority 2: localStorage â€” sticky personal preference, survives full browser restart.
   if (typeof localStorage !== "undefined") {
     try {
       const raw = localStorage.getItem(PEPV_PREFERRED_TAB_KEY);
@@ -565,12 +269,12 @@ function PepGuideIQApp({ user, setUser }) {
   const [selCat, setSelCat]       = useState("All");
   const [routeFilter, setRouteFilter] = useState(null);
   const [sortMode, setSortMode]   = useState("popular");
-  /** Library filter query — kept in PepGuideIQApp so it survives modal open/close and mobile search panel unmount. */
+  /** Library filter query â€” kept in PepGuideIQApp so it survives modal open/close and mobile search panel unmount. */
   const [search, setSearch] = useState("");
   const [selPeptide, setSelPeptide] = useState(null);
   const [myStack, setMyStack]     = useState([]);
   const [stackName, setStackName] = useState("");
-  /** Stack Builder tab editor — lifted so it survives unmount (e.g. full-screen AI Atfeh). */
+  /** Stack Builder tab editor â€” lifted so it survives unmount (e.g. full-screen AI Atfeh). */
   const [buildRows, setBuildRows] = useState([]);
   const [buildLocalStackName, setBuildLocalStackName] = useState("");
   const [buildVialOverrides, setBuildVialOverrides] = useState(/** @type {Record<string, string>} */ ({}));
@@ -602,9 +306,9 @@ function PepGuideIQApp({ user, setUser }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   /** Which paid tier row to emphasize when the modal opens (next tier above current). */
   const [upgradeFocusTier, setUpgradeFocusTier] = useState(null);
-  /** Why the upgrade sheet opened — drives friendly copy + checkout CTA (`upgradeGateCopy.js`). */
+  /** Why the upgrade sheet opened â€” drives friendly copy + checkout CTA (`upgradeGateCopy.js`). */
   const [upgradeGateReason, setUpgradeGateReason] = useState(/** @type {string | null} */ (null));
-  /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id → open). */
+  /** Library `.pcard` variant-line: inline expand for variantNote (tap toggles; id â†’ open). */
   const [variantNoteExpandedById, setVariantNoteExpandedById] = useState({});
   /** Protocol session from Library pills, URL, or localStorage; persists across tabs until sign-out or URL handoff. */
   const [protocolDeepLink, setProtocolDeepLink] = useState(null);
@@ -621,7 +325,7 @@ function PepGuideIQApp({ user, setUser }) {
   const stackHydrated = useRef(false);
   const prevTabRef = useRef(activeTab);
   const buildPrevTabRef = useRef(activeTab);
-  /** After Stack Builder → AI Atfeh, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
+  /** After Stack Builder â†’ AI Atfeh, skip one hydrate from `myStack` when user returns to Stack Builder (guide closes via Library). */
   const preserveBuildEditorAfterGuideRef = useRef(false);
 
   const resetGuideAiState = useCallback(() => {
@@ -903,43 +607,6 @@ function PepGuideIQApp({ user, setUser }) {
   // Filter logic: p.category.includes(activeCategory) && (!activeSecondaryCategory || p.secondaryCategory?.includes(activeSecondaryCategory))
   // This enables stacking filters like "GH Peptides" + "Longevity" without a boolean OR mess
 
-  const filtered = useMemo(
-    () =>
-      PEPTIDES.filter((p) => {
-        const mc = matchesCategory(p, selCat);
-        const mr = peptideMatchesRouteFilter(p, routeFilter);
-        const ms =
-          !search ||
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase())) ||
-          p.aliases.some((a) => a.toLowerCase().includes(search.toLowerCase()));
-        return mc && mr && ms;
-      }),
-    [selCat, routeFilter, search]
-  );
-
-  const sortedPeptides = useMemo(() => {
-    const base = [...filtered];
-    const rankOf = (p) =>
-      typeof p.popularityRank === "number" && Number.isFinite(p.popularityRank) ? p.popularityRank : 999;
-    switch (sortMode) {
-      case "popular":
-        return base.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
-      case "az":
-        return base.sort((a, b) => a.name.localeCompare(b.name));
-      case "za":
-        return base.sort((a, b) => b.name.localeCompare(a.name));
-      case "category":
-        return base.sort((a, b) => {
-          const catA = primaryCategory(a) || "";
-          const catB = primaryCategory(b) || "";
-          return catA.localeCompare(catB) || a.name.localeCompare(b.name);
-        });
-      default:
-        return base.sort((a, b) => rankOf(a) - rankOf(b) || a.name.localeCompare(b.name));
-    }
-  }, [filtered, sortMode]);
-
   const handleCategorySelect = (cat) => {
     setSelCat(cat);
     setSortMode("popular");
@@ -1125,8 +792,9 @@ function PepGuideIQApp({ user, setUser }) {
       }
 
       if (recentDoseLogs?.length) {
+        const { PEPTIDES: catalogPeptides } = await import("./data/catalog.js");
         const lines = recentDoseLogs.map((d) => {
-          const name = PEPTIDES.find((p) => p.id === d.peptide_id)?.name ?? d.peptide_id;
+          const name = catalogPeptides.find((p) => p.id === d.peptide_id)?.name ?? d.peptide_id;
           const doseStr =
             d.dose_mcg != null
               ? `${d.dose_mcg} mcg`
@@ -1190,7 +858,8 @@ function PepGuideIQApp({ user, setUser }) {
 
       const { stackCtx, goalsCtx, scanCtx, doseLogCtx, profileCtx } =
         await buildAtfehProfileContext();
-      const catalog = buildAtfehCatalogPayload(PEPTIDES, primaryCategory);
+      const { PEPTIDES: catalogData } = await import("./data/catalog.js");
+      const catalog = buildAtfehCatalogPayload(catalogData, primaryCategory);
 
       const sendRes = await fetch(`${API_WORKER_URL}/atfeh/threads/${threadId}/messages`, {
         method: "POST",
@@ -1200,7 +869,7 @@ function PepGuideIQApp({ user, setUser }) {
           history: threadMessages,
           catalog,
           profile: {
-            system_context: `You are PepGuideIQ AI Atfeh — a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
+            system_context: `You are PepGuideIQ AI Atfeh â€” a precision biohacking intelligence layer. You have full context on this user. Answer specifically to their situation, never generically.${profileCtx}${stackCtx}${goalsCtx}${scanCtx}${doseLogCtx}`,
           },
         }),
       });
@@ -1279,7 +948,7 @@ function PepGuideIQApp({ user, setUser }) {
   const [peopleSearchToken, setPeopleSearchToken] = useState(/** @type {string | null} */ (null));
   /** Prefill Find People (e.g. deep link or reopen). */
   const [peopleSearchInitialQuery, setPeopleSearchInitialQuery] = useState(/** @type {string | null} */ (null));
-  /** Scroll Network “Live dosing” card to this `network_feed.id`, then clear via callback. */
+  /** Scroll Network â€œLive dosingâ€ card to this `network_feed.id`, then clear via callback. */
   const [networkScrollToDosePostId, setNetworkScrollToDosePostId] = useState(/** @type {string | null} */ (null));
   /** `/profile/:handle` in-app overlay (logged-in shell). */
   const [publicProfileOverlayHandle, setPublicProfileOverlayHandle] = useState(/** @type {string | null} */ (null));
@@ -1422,7 +1091,7 @@ function PepGuideIQApp({ user, setUser }) {
   /** Bottom nav tab `<button>` elements for `NavTooltips` positioning. */
   const navTabButtonRefs = useRef(/** @type {Partial<Record<string, HTMLButtonElement | null>>} */ ({}));
 
-  /** PepGuideIQMainTree destructures the same keys — keep this object and that destructure identical. */
+  /** PepGuideIQMainTree destructures the same keys â€” keep this object and that destructure identical. */
   mainUiRef.current = {
     user,
     setUser,
@@ -1490,8 +1159,6 @@ function PepGuideIQApp({ user, setUser }) {
     beginCloseGuide,
     handleGuideTakeoverAnimationEnd,
     onGuideTakeoverRootClick,
-    sortedPeptides,
-    handleCategorySelect,
     planForStackLimits,
     savedStackLimit,
     canAddToStack,
@@ -1575,7 +1242,7 @@ function PepGuideIQApp({ user, setUser }) {
         </>
       ) : (
         <DoseToastProvider>
-          <PepGuideIQMainTree mainUiRef={mainUiRef} />
+          <PepGuideIQMainTree mainUiRef={mainUiRef} onCategorySelect={handleCategorySelect} />
           <NavTooltips tabButtonRefs={navTabButtonRefs} />
           <TutorialBar />
         {showPeopleSearch && activeProfileId && typeof document !== "undefined"
@@ -1631,7 +1298,7 @@ function PepGuideIQApp({ user, setUser }) {
   );
 }
 
-function PepGuideIQMainTree({ mainUiRef }) {
+function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
   const topHeaderRef = useRef(null);
   const { isHighlighted, stripVisible, highlightTarget, flowKey, setHelpMenuOpen, forced } = useTutorial();
   const {
@@ -1701,8 +1368,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
     beginCloseGuide,
     handleGuideTakeoverAnimationEnd,
     onGuideTakeoverRootClick,
-    sortedPeptides,
-    handleCategorySelect,
     planForStackLimits,
     savedStackLimit,
     canAddToStack,
@@ -1796,19 +1461,23 @@ function PepGuideIQMainTree({ mainUiRef }) {
   const libraryNavActive = activeTab === "library" || activeTab === "protocol";
 
   useEffect(() => {
-    // Step 2 — auto-open first compound so CTA is in DOM
+    let cancelled = false;
     if (
       flowKey === "guide" &&
       highlightTarget === TUTORIAL_TARGET.atfeh_compound_cta &&
       activeTab === "library" &&
       !selPeptide
     ) {
-      const first = sortedPeptides[0];
-      if (first) setSelPeptide(first);
-      return;
+      void import("./data/catalog.js").then((mod) => {
+        if (cancelled) return;
+        const first = mod.PEPTIDES[0];
+        if (first) setSelPeptide(first);
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
-    // Close modal when guide flow moves past step 2 (not on library intro or compound CTA)
     if (
       flowKey === "guide" &&
       highlightTarget != null &&
@@ -1818,7 +1487,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
     ) {
       setSelPeptide(null);
     }
-  }, [flowKey, highlightTarget, activeTab]);
+    return undefined;
+  }, [flowKey, highlightTarget, activeTab, selPeptide, setSelPeptide]);
 
   useLayoutEffect(() => {
     const el = topHeaderRef.current;
@@ -1852,8 +1522,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
   const tutorialGhostVialTracker =
     forced && user?.id && activeProfileId
       ? (() => {
-          const bpc = PEPTIDES.find((c) => c.id === "bpc-157");
-          const stab = bpc ? resolveStability(bpc) : { stabilityDays: 30, stabilityNote: null };
+          const stab = resolveStability(TUTORIAL_GHOST_BPC157);
           return (
             <VialTracker
               key="tutorial-ghost-vial"
@@ -1861,9 +1530,9 @@ function PepGuideIQMainTree({ mainUiRef }) {
               profileId={activeProfileId}
               peptideId="bpc-157"
               catalogEntry={{
-                ...(bpc ?? { name: "BPC-157" }),
-                name: bpc?.name ?? "BPC-157",
-                stabilityDays: typeof stab.stabilityDays === "number" ? stab.stabilityDays : 30,
+                ...TUTORIAL_GHOST_BPC157,
+                name: "BPC-157",
+                stabilityDays: typeof stab.stabilityDays === "number" ? stab.stabilityDays : 90,
                 stabilityNote: stab.stabilityNote ?? null,
               }}
               canUse={canVialTracker}
@@ -1990,259 +1659,42 @@ function PepGuideIQMainTree({ mainUiRef }) {
           }}
         >
 
-          {activeTab === "library" && (
-            <div style={{ width: "100%", minWidth: 0 }}>
-              <LibraryCategoryPillScrollRow
-                cats={LIBRARY_CATEGORY_ROW_1}
+          {(activeTab === "library" || selPeptide != null || showAdd) && (
+            <React.Suspense
+              fallback={
+                <div className="mono" style={{ padding: 24, color: "var(--color-text-placeholder)" }}>
+                  Loading library…
+                </div>
+              }
+            >
+              <LibraryTab
+                showLibraryGrid={activeTab === "library"}
                 selCat={selCat}
-                onSelect={handleCategorySelect}
-                marginBottom={6}
+                onCategorySelect={onCategorySelect}
+                routeFilter={routeFilter}
+                setRouteFilter={setRouteFilter}
+                sortMode={sortMode}
+                setSortMode={setSortMode}
+                search={search}
+                selPeptide={selPeptide}
+                setSelPeptide={setSelPeptide}
+                showAdd={showAdd}
+                setShowAdd={setShowAdd}
+                addTarget={addTarget}
+                setAddTarget={setAddTarget}
+                openAdd={openAdd}
+                confirmAdd={confirmAdd}
+                myStack={myStack}
+                stackListReady={stackListReady}
+                openUpgradeModal={openUpgradeModal}
+                canAI={canAI}
+                setActiveTab={setActiveTab}
+                setAiInput={setAiInput}
+                variantNoteExpandedById={variantNoteExpandedById}
+                setVariantNoteExpandedById={setVariantNoteExpandedById}
+                isHighlighted={isHighlighted}
               />
-              <LibraryCategoryPillScrollRow
-                cats={LIBRARY_CATEGORY_ROW_2}
-                selCat={selCat}
-                onSelect={handleCategorySelect}
-                marginBottom={search.trim() !== "" ? 8 : 12}
-              />
-              {search.trim() !== "" && (
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 12,
-                    color: "var(--color-text-placeholder)",
-                    marginBottom: 12,
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  Showing {sortedPeptides.length} results for &quot;{search.trim()}&quot;
-                </div>
-              )}
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 16,
-                }}
-              >
-                <span
-                  style={{
-                    color: "var(--color-text-inverse)",
-                    fontSize: 13,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontWeight: 500,
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  Sort
-                </span>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setSortMode(opt.value)}
-                      style={{
-                        ...LIBRARY_FILTER_PILL_BASE,
-                        ...(sortMode === opt.value ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {ROUTE_FILTERS.map((r) => (
-                    <button
-                      type="button"
-                      key={r.id}
-                      onClick={() => setRouteFilter((prev) => (prev === r.id ? null : r.id))}
-                      style={{
-                        ...LIBRARY_FILTER_PILL_BASE,
-                        ...(routeFilter === r.id ? LIBRARY_FILTER_PILL_ACTIVE : {}),
-                      }}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))",
-                  gap: 14,
-                  width: "100%",
-                  minWidth: 0,
-                }}
-              >
-                {sortedPeptides.map((p, cardIdx) => {
-                  const cat0 = primaryCategory(p);
-                  const categoryBadgeLabel = CATEGORY_SHORT[cat0] ?? cat0;
-                  const inStack = myStack.some((s) => s.id === p.id);
-                  const finnrickHref = normalizeFinnrickProductUrl(p.finnrickUrl);
-                  const halfLifeDisplay = formatLibraryCardHalfLifeDisplay(p.halfLife);
-                  return (
-                    <div
-                      key={p.id}
-                      className="pcard pcard--library"
-                      data-testid="compound-card"
-                      style={getCategoryCssVars(cat0)}
-                      onClick={() => setSelPeptide(p)}
-                      onKeyDown={(e) => e.key === "Enter" && setSelPeptide(p)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:8,minWidth:0 }}>
-                        <div className="pcard-head-main">
-                          <div className="brand" style={{ fontWeight:700,fontSize:14,color:"var(--color-text-primary)" }}>{p.name}</div>
-                          {p.variantOf && (
-                            <div>
-                              <div
-                                className="mono"
-                                title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
-                                onClick={
-                                  typeof p.variantNote === "string" && p.variantNote.trim()
-                                    ? (e) => {
-                                        e.stopPropagation();
-                                        setVariantNoteExpandedById((prev) => ({
-                                          ...prev,
-                                          [p.id]: !prev[p.id],
-                                        }));
-                                      }
-                                    : undefined
-                                }
-                                style={{
-                                  fontSize: 13,
-                                  opacity: 0.65,
-                                  color: "var(--color-text-secondary)",
-                                  marginTop: 3,
-                                  lineHeight: 1.35,
-                                  fontWeight: 400,
-                                  WebkitTapHighlightColor: "transparent",
-                                  ...(typeof p.variantNote === "string" && p.variantNote.trim()
-                                    ? { cursor: "pointer" }
-                                    : {}),
-                                }}
-                              >
-                                Variant of: {getVariantParent(p)?.name ?? p.variantOf}
-                              </div>
-                              {variantNoteExpandedById[p.id] &&
-                                typeof p.variantNote === "string" &&
-                                p.variantNote.trim() && (
-                                  <div
-                                    className="mono"
-                                    onClick={(e) => e.stopPropagation()}
-                                    style={{
-                                      fontSize: 13,
-                                      opacity: 0.8,
-                                      color: "var(--color-text-secondary)",
-                                      marginTop: 4,
-                                      lineHeight: 1.45,
-                                    }}
-                                  >
-                                    {p.variantNote}
-                                  </div>
-                                )}
-                            </div>
-                          )}
-                          {p.aliases[0] && <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:1 }}>{p.aliases[0]}</div>}
-                        </div>
-                        <span className="pill pill--category">{categoryBadgeLabel}</span>
-                      </div>
-                      <div className="pcard-summary" style={{ fontSize: 13, color: "var(--color-text-secondary)", marginBottom: 8, lineHeight: 1.55 }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
-                          {p.mechanism}
-                        </ReactMarkdown>
-                      </div>
-                      {shouldShowBioavailabilityOnLibraryCard(p) ? (
-                        <>
-                          {(() => {
-                            const ba = resolvePeptideBioavailability(p);
-                            if (!ba) return null;
-                            return (
-                              <div
-                                className="mono pcard-bioavail"
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  fontSize: 13,
-                                  color: ba.warn ? "var(--color-warning)" : "var(--color-text-secondary)",
-                                  marginBottom: 8,
-                                  lineHeight: 1.45,
-                                }}
-                                title={ba.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
-                              >
-                                {ba.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                                <span style={{ color: ba.warn ? "var(--color-warning)" : "var(--color-text-secondary)" }}>Bioavailability: </span>
-                                {ba.text}
-                              </div>
-                            );
-                          })()}
-                          {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
-                            <div
-                              className="mono pcard-bioavail-warn"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 8, lineHeight: 1.45 }}
-                            >
-                              ⚠ {p.bioavailabilityNote}
-                            </div>
-                          )}
-                        </>
-                      ) : null}
-                      <div className="pcard-footer" style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,minWidth:0 }}>
-                        <div className="mono pcard-halflife" style={{ fontSize: 13,color:"var(--color-text-secondary)",flex:"1 1 auto",minWidth:0 }}><span style={{ color:"color-mix(in srgb, var(--cc, var(--color-accent)) 50%, transparent)" }}>Half-life:</span>{" "}{halfLifeDisplay ?? ""}</div>
-                        <button
-                          type="button"
-                          className={inStack?"btn-green":"btn-teal"}
-                          style={{
-                            padding:"5px 10px",
-                            fontSize: 13,
-                            opacity: inStack ? 1 : !stackListReady ? 0.55 : 1,
-                            flexShrink: 0,
-                          }}
-                          data-tutorial-target={cardIdx === 0 ? TUTORIAL_TARGET.library_add_stack : undefined}
-                          {...tutorialHighlightProps(cardIdx === 0 && isHighlighted(TUTORIAL_TARGET.library_add_stack))}
-                          disabled={!inStack && !stackListReady}
-                          title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!inStack && stackListReady) openAdd(p);
-                          }}
-                        >
-                          {inStack ? "✓ Added to Stack" : "+ Add to Stack"}
-                        </button>
-                      </div>
-                      {finnrickHref ? (
-                        <a
-                          href={finnrickHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mono"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          style={{
-                            display: "block",
-                            marginTop: 10,
-                            fontSize: 12,
-                            color: "var(--color-accent)",
-                            textDecoration: "none",
-                            letterSpacing: "0.02em",
-                            lineHeight: 1.35,
-                            WebkitTapHighlightColor: "transparent",
-                          }}
-                        >
-                          Verified by Finnrick ↗
-                        </a>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                {sortedPeptides.length === 0 && <div className="mono" style={{ color:"var(--color-text-placeholder)",fontSize: 13,padding:"40px 0",gridColumn:"1/-1" }}>No results</div>}
-              </div>
-            </div>
+            </React.Suspense>
           )}
 
           {activeTab === "stack" && (
@@ -2264,8 +1716,8 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     >
                       {myStack.length} peptide{myStack.length !== 1 ? "s" : ""} saved
                       {Number.isFinite(savedStackLimit)
-                        ? ` · ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`
-                        : " · Unlimited Saved Stacks"}
+                        ? ` Â· ${Math.max(0, savedStackLimit - myStack.length)} of ${savedStackLimit} Saved Stacks remaining`
+                        : " Â· Unlimited Saved Stacks"}
                     </div>
                   </div>
                   <button type="button" className="btn-teal" onClick={() => setActiveTab("library")}>+ Browse Library</button>
@@ -2289,7 +1741,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               </div>
               {myStack.length === 0 ? (
                 <div style={{ border:"1px dashed var(--color-border-default)",borderRadius:10,padding:"80px 0",textAlign:"center" }}>
-                  <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>⬡</div>
+                  <div style={{ fontSize:36,marginBottom:12,opacity:.3 }}>â¬¡</div>
                   <div className="mono" style={{ color:"var(--color-text-placeholder)",fontSize: 13 }}>No Saved Stacks yet. Add compounds from the Library.</div>
                 </div>
               ) : (
@@ -2366,18 +1818,18 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           .map((p) => {
                             const dose = p.stackDose || p.startDose || "";
                             const freq = p.stackFrequency ? ` ${p.stackFrequency}` : "";
-                            const note = p.stackNotes ? ` — ${p.stackNotes}` : "";
+                            const note = p.stackNotes ? ` â€” ${p.stackNotes}` : "";
                             return `${p.name} (${dose}${freq})${note}`;
                           })
                           .join("; ");
-                        const title = stackName ? `“${stackName}”: ` : "";
+                        const title = stackName ? `â€œ${stackName}â€: ` : "";
                         setAiInput(`Analyze my current stack and give me optimization recommendations, timing protocols, and safety considerations: ${title}${summary}`);
                         setActiveTab("guide");
                       }}>
-                      Analyze with AI →
+                      Analyze with AI â†’
                     </button>
                     <div style={{ marginTop: 10, fontSize: 13, color: "var(--color-text-secondary)" }}>
-                      <span style={{ color: "var(--color-warning)" }}>⚠ </span>Review injection schedules for timing conflicts. Consult your physician.
+                      <span style={{ color: "var(--color-warning)" }}>âš  </span>Review injection schedules for timing conflicts. Consult your physician.
                     </div>
                   </div>
                 </div>
@@ -2386,10 +1838,16 @@ function PepGuideIQMainTree({ mainUiRef }) {
           )}
 
           {activeTab === "stackBuilder" && (
-            <BuildTab
-              activeTab={activeTab}
-              catalog={PEPTIDES}
-              myStack={myStack}
+            <React.Suspense
+              fallback={
+                <div className="mono" style={{ padding: 24, color: "var(--color-text-placeholder)" }}>
+                  Loading stack builder…
+                </div>
+              }
+            >
+              <BuildTab
+                activeTab={activeTab}
+                myStack={myStack}
               stackName={stackName}
               setStackName={setStackName}
               setMyStack={setMyStack}
@@ -2408,6 +1866,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               user={user}
               plan={planForStackLimits}
             />
+            </React.Suspense>
           )}
 
           {activeTab === "vialTracker" && (
@@ -2432,7 +1891,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {(() => {
                     const injectableRows = myStack.filter((p) => {
-                      const catalogPeptide = findCatalogPeptideForStackRow(p);
+                      const catalogPeptide = findCatalogPeptideForStackRow(p, []);
                       const stab = resolveStability(catalogPeptide ?? p);
                       return hasInjectableRoute(catalogPeptide ?? p) && stab.stabilityDays != null;
                     });
@@ -2440,7 +1899,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       return (
                         tutorialGhostVialTracker ?? (
                           <div className="mono" style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                            No injectable compounds with vial tracking in your stack — add one from the Library or open Stacks to build your protocol.
+                            No injectable compounds with vial tracking in your stack â€” add one from the Library or open Stacks to build your protocol.
                           </div>
                         )
                       );
@@ -2449,7 +1908,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                     return (
                       <>
                         {injectableRows.map((p, vialIdx) => {
-                          const catalogPeptide = findCatalogPeptideForStackRow(p);
+                          const catalogPeptide = findCatalogPeptideForStackRow(p, []);
                           const stab = resolveStability(catalogPeptide ?? p);
                           return (
                             <VialTracker
@@ -2490,7 +1949,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                           }}
                         >
                           Archived Vials ({archivedCount})
-                          {archivedCount === 0 ? " — none yet" : ""}
+                          {archivedCount === 0 ? " â€” none yet" : ""}
                         </button>
                         <ArchivedVialsModal
                           isOpen={archivedModalOpen}
@@ -2670,7 +2129,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       }}
                       aria-label="Open threads sidebar"
                     >
-                      ☰
+                      â˜°
                     </button>
                   )}
                   <div
@@ -2718,7 +2177,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       onClick={() => setGoalsOpen((o) => !o)}
                     >
                       <span className="pepv-emoji" aria-hidden>
-                        🎯{" "}
+                        ðŸŽ¯{" "}
                       </span>
                       Goals
                       {goals.length > 0 ? (
@@ -2728,7 +2187,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         </span>
                       ) : null}
                       <span className="mono" style={{ marginLeft: "auto", color: "var(--color-text-secondary)", fontSize: 11 }}>
-                        {goalsOpen ? "▲" : "▼"}
+                        {goalsOpen ? "â–²" : "â–¼"}
                       </span>
                     </button>
                     {goalsOpen && (
@@ -2752,7 +2211,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                             </div>
                             {myStack.map((p) => (
                               <div key={getStackRowListKey(p)} className="mono" style={{ fontSize: 12, color: "var(--color-text-secondary)", padding: "2px 0" }}>
-                                → {p.name}
+                                â†’ {p.name}
                               </div>
                             ))}
                           </div>
@@ -2787,7 +2246,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         }}
                       />
                       <div className="mono" style={{ color: "var(--color-text-placeholder)", fontSize: 13, marginBottom: 18 }}>
-                        Optional: open 🎯 Goals, then ask anything.
+                        Optional: open ðŸŽ¯ Goals, then ask anything.
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 7, maxWidth: 360, margin: "0 auto" }}>
                         {[
@@ -2812,7 +2271,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   {threadLoading && threadMessages.length === 0 && (
                     <div style={{ textAlign: "center", padding: "32px 16px" }}>
                       <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
-                        Loading thread…
+                        Loading threadâ€¦
                       </div>
                     </div>
                   )}
@@ -2845,7 +2304,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                   {aiLoading && (
                     <div className="ai-msg ai-bot">
                       <div className="mono pulse" style={{ fontSize: 13, color: "var(--color-accent)" }}>
-                        Analyzing protocol data…
+                        Analyzing protocol dataâ€¦
                       </div>
                     </div>
                   )}
@@ -2887,7 +2346,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         disabled={aiLoading}
                         style={{ fontSize: 13, padding: "8px 16px" }}
                       >
-                        {aiLoading ? "Creating…" : "Continue Thread →"}
+                        {aiLoading ? "Creatingâ€¦" : "Continue Thread â†’"}
                       </button>
                       <div style={{ fontSize: 11, color: "var(--color-text-placeholder)", marginTop: 6 }}>
                         A new thread will be started with a summary of this one.
@@ -2898,7 +2357,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       <textarea
                         className="ai-input"
                         rows={2}
-                        placeholder="Ask about dosing, protocols, stacking, mechanisms, cycling…"
+                        placeholder="Ask about dosing, protocols, stacking, mechanisms, cyclingâ€¦"
                         value={aiInput}
                         onChange={(e) => setAiInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -2916,7 +2375,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                         disabled={aiLoading || !aiInput.trim()}
                         style={{ padding: "0 18px", alignSelf: "stretch", fontSize: 16 }}
                       >
-                        {aiLoading ? "…" : "→"}
+                        {aiLoading ? "â€¦" : "â†’"}
                       </button>
                     </div>
                   )}
@@ -2925,7 +2384,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                       {aiQueryUsage.today} of {aiQueryUsage.limit} queries used today
                       {aiQueryUsage.today >= aiQueryUsage.limit && (
                         <span style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ color: "var(--color-warning)", fontWeight: 700 }}>· Limit reached</span>
+                          <span style={{ color: "var(--color-warning)", fontWeight: 700 }}>Â· Limit reached</span>
                           <button
                             type="button"
                             onClick={() => openUpgradeModal("ai_guide")}
@@ -2951,169 +2410,6 @@ function PepGuideIQMainTree({ mainUiRef }) {
               </div>
             </div>
           </div>
-        )}
-
-        {selPeptide && (() => {
-          const p = selPeptide;
-          const pCat = primaryCategory(p);
-          const inStack = myStack.some((s)=>s.id===p.id);
-          const baDetail = resolvePeptideBioavailability(p);
-          return (
-            <Modal
-              onClose={() => setSelPeptide(null)}
-              label={p.name}
-              header={
-                <div
-                  className="pepv-peptide-modal-head"
-                  data-testid="compound-detail"
-                  style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",...getCategoryCssVars(pCat) }}
-                >
-                  <div>
-                    <div className="brand" style={{ fontSize:20,fontWeight:800,color:"var(--color-text-primary)" }}>{p.name}</div>
-                    {p.variantOf && (
-                      <div
-                        className="mono"
-                        title={typeof p.variantNote === "string" && p.variantNote.trim() ? p.variantNote : undefined}
-                        style={{
-                          fontSize: 13,
-                          opacity: 0.65,
-                          color: "var(--color-text-secondary)",
-                          marginTop: 4,
-                          lineHeight: 1.4,
-                          fontWeight: 400,
-                          ...(p.variantNote ? { cursor: "help" } : {}),
-                        }}
-                      >
-                        Variant of: {getVariantParent(p)?.name ?? p.variantOf}
-                      </div>
-                    )}
-                    <div className="mono" style={{ fontSize: 13,color:"var(--color-text-placeholder)",marginTop:3 }}>{p.aliases.join(" · ")}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className="pill pill--category">{pCat}</span>
-                  </div>
-                </div>
-              }
-            >
-              {[
-                ["Typical Dose", p.typicalDose],
-                ["Start Dose", p.startDose],
-                ["Titration", p.titrationNote],
-                ["Half-life", p.halfLife],
-                ...(typeof p.form === "string" && p.form.trim() ? [["Form", p.form.trim()]] : []),
-                ...(typeof p.unit === "string" && p.unit.trim() ? [["Unit", p.unit.trim()]] : []),
-                ["Route", p.route.join(", ")],
-                ["Cycle", p.cycle],
-                ["Storage", p.storage],
-                ["Reconstitution", p.reconstitution],
-              ].map(([l, v]) => (
-                <div key={l} className="drow"><span className="dlabel">{l}</span><span className="dval mono">{v}</span></div>
-              ))}
-              {baDetail && (
-                <div
-                  className="mono"
-                  style={{ fontSize: 13, color: baDetail.warn ? "var(--color-warning)" : "var(--color-text-secondary)", marginTop: 12, marginBottom: 12, lineHeight: 1.45 }}
-                  title={baDetail.warn ? BIOAVAILABILITY_WARN_TOOLTIP : undefined}
-                >
-                  {baDetail.warn ? <span className="pepv-emoji" aria-hidden>⚠ </span> : null}
-                  <span style={{ color: baDetail.warn ? "var(--color-warning)" : "var(--color-text-secondary)" }}>Bioavailability: </span>
-                  {baDetail.text}
-                </div>
-              )}
-              {typeof p.bioavailabilityNote === "string" && p.bioavailabilityNote.trim() !== "" && (
-                <div className="mono" style={{ fontSize: 13, color: "var(--color-warning)", marginBottom: 12, lineHeight: 1.45 }}>
-                  ⚠ {p.bioavailabilityNote}
-                </div>
-              )}
-              <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize: 13,color:"var(--color-accent)",letterSpacing:".12em",marginBottom:7 }}>BENEFITS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.benefits.map((b) => <span key={b} className="pill" style={{ padding:"1px 5px",background:"var(--color-accent-subtle-0e)",color:"var(--color-accent-subtle-50)",border:"1px solid var(--color-accent-subtle-18)" }}>{b}</span>)}</div>
-              </div>
-              <div style={{ marginTop:8,marginBottom:8,paddingTop:8,paddingBottom:8,borderTop:"1px solid var(--color-border-hairline)",borderBottom:"1px solid var(--color-border-hairline)",background:"transparent",display:"flex",justifyContent:"flex-end",gap:8 }}>
-                <button
-                  type="button"
-                  className="btn-teal"
-                  style={{ fontSize: 13 }}
-                  data-tutorial-target={TUTORIAL_TARGET.atfeh_compound_cta}
-                  {...tutorialHighlightProps(isHighlighted(TUTORIAL_TARGET.atfeh_compound_cta))}
-                  onClick={() => {
-                    if (!canAI) {
-                      openUpgradeModal("ai_guide");
-                      return;
-                    }
-                    setSelPeptide(null);
-                    setAiInput(`Deep dive on ${p.name}: optimal protocol, titration, stacking strategy, and advanced use cases`);
-                    setActiveTab("guide");
-                  }}
-                >
-                  Ask AI Atfeh →
-                </button>
-                <button
-                  type="button"
-                  className={inStack?"btn-green":"btn-teal"}
-                  style={{ fontSize: 13, opacity: inStack ? 1 : !stackListReady ? 0.55 : 1 }}
-                  disabled={!inStack && !stackListReady}
-                  title={!inStack && !stackListReady ? "Loading your stack…" : undefined}
-                  onClick={() => {
-                    if (!inStack && stackListReady) {
-                      openAdd(p);
-                      setSelPeptide(null);
-                    }
-                  }}
-                >
-                  {inStack ? "✓ Saved" : "+ Add to Saved Stack"}
-                </button>
-              </div>
-              <div style={{ marginTop:10 }}>
-                <div className="mono" style={{ fontSize: 13,color:"var(--color-warning)",letterSpacing:".12em",marginBottom:7 }}>SIDE EFFECTS</div>
-                <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.sideEffects.map((s) => <span key={s} className="pill" style={{ padding:"1px 5px",background:"#f59e0b0e",color:"#f59e0b70",border:"1px solid #f59e0b18" }}>{s}</span>)}</div>
-              </div>
-              {p.stacksWith.length > 0 && (
-                <div style={{ marginTop:10 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#8b5cf6",letterSpacing:".12em",marginBottom:7 }}>STACKS WELL WITH</div>
-                  <div style={{ display:"flex",flexWrap:"wrap",gap:5 }}>{p.stacksWith.map((s) => <span key={s} className="pill" style={{ padding:"1px 5px",background:"#8b5cf60e",color:"#8b5cf670",border:"1px solid #8b5cf618" }}>{s}</span>)}</div>
-                </div>
-              )}
-              <div
-                style={{
-                  ...getCategoryCssVars(pCat),
-                  borderLeft: "3px solid var(--cc)",
-                  paddingLeft: 12,
-                  marginTop: 12,
-                  marginBottom: 14,
-                  fontSize: 13,
-                  color: "var(--color-text-placeholder)",
-                  lineHeight: 1.6,
-                }}
-              >
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <span>{children}</span> }}>
-                  {p.mechanism}
-                </ReactMarkdown>
-              </div>
-              {p.notes && (
-                <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>NOTES</div>
-                  <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.notes}</div>
-                </div>
-              )}
-              {typeof p.sourcingNotes === "string" && p.sourcingNotes.trim() !== "" && (
-                <div style={{ marginTop:12,background:"var(--color-bg-page)",border:"1px solid var(--color-border-hairline)",borderRadius:6,padding:12 }}>
-                  <div className="mono" style={{ fontSize: 13,color:"#c8c8d4",marginBottom:5,letterSpacing:".15em" }}>SOURCING NOTES</div>
-                  <div style={{ fontSize: 13,color:"var(--color-text-placeholder)",lineHeight:1.65 }}>{p.sourcingNotes}</div>
-                </div>
-              )}
-            </Modal>
-          );
-        })()}
-
-        {showAdd && addTarget && (
-          <Modal onClose={() => { setShowAdd(false); setAddTarget(null); }} maxWidth={380} label="Add to Saved Stack">
-            <AddToStackForm
-              peptide={addTarget}
-              onCancel={() => { setShowAdd(false); setAddTarget(null); }}
-              onSave={confirmAdd}
-            />
-          </Modal>
         )}
 
         {showUpgrade && (
@@ -3211,7 +2507,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
                 style={{ fontSize: 18, lineHeight: 1, opacity: libraryNavActive ? 1 : 0.72 }}
                 aria-hidden
               >
-                🧬
+                ðŸ§¬
               </span>
               <span
                 className="pepv-bottom-nav-label"
@@ -3230,7 +2526,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
             {[
               {
                 tabId: "vialTracker",
-                emoji: "🧪",
+                emoji: "ðŸ§ª",
                 labelTop: "VIAL",
                 label: "TRACKER",
                 ariaLabel: "Vial Tracker",
@@ -3240,7 +2536,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               },
               {
                 tabId: "stackBuilder",
-                emoji: "🏗️",
+                emoji: "ðŸ—ï¸",
                 labelTop: "STACK",
                 label: "BUILDER",
                 ariaLabel: "Stack Builder",
@@ -3250,7 +2546,7 @@ function PepGuideIQMainTree({ mainUiRef }) {
               },
               {
                 tabId: "stacks",
-                emoji: "📋",
+                emoji: "ðŸ“‹",
                 labelTop: "SAVED",
                 label: "STACKS",
                 ariaLabel: "Stacks",
@@ -3518,7 +2814,7 @@ export default function PepGuideIQ() {
             fontSize: 13,
           }}
         >
-          Loading session…
+          Loading sessionâ€¦
         </div>
       </>
     ) : !user ? (

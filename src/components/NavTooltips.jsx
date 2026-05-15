@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { CATALOG_COUNT } from "../data/catalog.js";
+import { CATALOG_COUNT } from "../data/catalogMeta.js";
 
 const STORAGE_KEY = "pepv_nav_tips_seen";
 

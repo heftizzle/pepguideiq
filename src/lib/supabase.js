@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { PEPTIDES } from "../data/catalog.js";
 import { getStoredAffiliateRef, normalizeAffiliateRef } from "./affiliateRef.js";
 import { API_WORKER_URL, isApiWorkerConfigured, isSupabaseConfigured } from "./config.js";
 import { generateShareId8 } from "./stackShare.js";
@@ -691,10 +690,23 @@ export async function deleteInbodyScanHistoryRow(scanRowId) {
 
 /** @type {Map<string, string> | null} */
 let _peptideNameByIdCache = null;
-function peptideDisplayNameFromCatalog(peptideId) {
-  if (!_peptideNameByIdCache) {
-    _peptideNameByIdCache = new Map(PEPTIDES.map((p) => [p.id, typeof p.name === "string" ? p.name : p.id]));
+/** Single in-flight promise so concurrent callers don't double-import. */
+let _catalogLoadPromise = null;
+
+async function ensurePeptideCache() {
+  if (_peptideNameByIdCache) return;
+  if (!_catalogLoadPromise) {
+    _catalogLoadPromise = import("../data/catalog.js").then(({ PEPTIDES }) => {
+      _peptideNameByIdCache = new Map(
+        PEPTIDES.map((p) => [p.id, typeof p.name === "string" ? p.name : p.id])
+      );
+    });
   }
+  await _catalogLoadPromise;
+}
+
+async function peptideDisplayNameFromCatalog(peptideId) {
+  await ensurePeptideCache();
   const id = typeof peptideId === "string" ? peptideId.trim() : "";
   if (!id) return "Unknown";
   return _peptideNameByIdCache.get(id) ?? id;
@@ -726,7 +738,7 @@ const PEPTIDE_TREND_DISPLAY_NAMES = {
   "hgh-191aa": "HGH 191AA",
 };
 
-function peptideTrendDisplayName(peptideId) {
+async function peptideTrendDisplayName(peptideId) {
   const id = typeof peptideId === "string" ? peptideId.trim() : "";
   if (!id) return "Unknown";
   if (Object.prototype.hasOwnProperty.call(PEPTIDE_TREND_DISPLAY_NAMES, id)) {
@@ -772,7 +784,7 @@ export async function fetchProtocolEventsForTrends(userId, profileId) {
       const tb = Date.parse(String(b.dosed_at ?? ""));
       return (Number.isFinite(ta) ? ta : 0) - (Number.isFinite(tb) ? tb : 0);
     });
-    const name = peptideTrendDisplayName(peptideId);
+    const name = await peptideTrendDisplayName(peptideId);
     const first = rows[0];
     const d0 = first && typeof first.dosed_at === "string" ? first.dosed_at.slice(0, 10) : "";
     if (d0 && first) {

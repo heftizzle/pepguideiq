@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { isApiWorkerConfigured } from "../lib/config.js";
-import { CATALOG_COUNT } from "../data/catalog.js";
+import { CATALOG_COUNT } from "../data/catalogMeta.js";
 import { POST_TUTORIAL_COMPLETE_EVENT } from "../lib/postTutorialSession.js";
 import { patchMemberProfileViaWorker, updateMemberProfile } from "../lib/supabase.js";
 import { SLOW_MOUNT_TARGETS } from "../lib/spotlightUtils.js";

@@ -24,7 +24,10 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const x = id.replace(/\\/g, "/");
-          if (x.includes("src/data/compounds")) return "compounds";
+          // Phase B: catalogMeta.js (GOALS, CAT_COLORS, getCategoryCssVars, CATALOG_COUNT) stays in the
+          // entry bundle. catalog.js + compounds/ load only on Library visit or first Atfeh message, etc.
+          // Match catalog.js exactly so catalogMeta.js is not pulled into "compounds" (substring trap).
+          if (x.includes("src/data/compounds") || /src\/data\/catalog\.js$/.test(x)) return "compounds";
           if (x.includes("node_modules/@supabase")) return "vendor-supabase";
           if (
             x.includes("node_modules/react/") ||
