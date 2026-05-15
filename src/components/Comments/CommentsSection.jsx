@@ -80,7 +80,6 @@ export default function CommentsSection({
     if (composerLayout !== "feed") return;
     if (!autoOpenThread) return;
     if (autoOpenedFeedRef.current) return;
-    if (totalKnownCount < 3) return;
     autoOpenedFeedRef.current = true;
     setFeedThreadExpanded(true);
   }, [composerLayout, autoOpenThread, totalKnownCount]);
@@ -93,19 +92,16 @@ export default function CommentsSection({
 
   /** Top two newest top-level rows for inline preview (feed layout only). */
   const previewComments =
-    composerLayout === "feed" && !(feedThreadExpanded && totalKnownCount >= 3) ? hook.topLevel.slice(0, 2) : [];
+    composerLayout === "feed" && !feedThreadExpanded ? hook.topLevel.slice(0, 2) : [];
 
   const showFeedPreview =
-    composerLayout === "feed" &&
-    totalKnownCount > 0 &&
-    previewComments.length > 0 &&
-    !(totalKnownCount >= 3 && feedThreadExpanded);
+    composerLayout === "feed" && !feedThreadExpanded && previewComments.length > 0;
 
   const showFeedViewAll =
-    composerLayout === "feed" && totalKnownCount >= 3 && !feedThreadExpanded;
+    composerLayout === "feed" && totalKnownCount >= 1 && !feedThreadExpanded;
 
   const showFeedExpandedThread =
-    composerLayout === "feed" && totalKnownCount >= 3 && feedThreadExpanded;
+    composerLayout === "feed" && totalKnownCount >= 1 && feedThreadExpanded;
 
   if (composerLayout === "feed") {
     return (
@@ -143,7 +139,13 @@ export default function CommentsSection({
           </>
         ) : (
           <>
-            {showFeedPreview ? <CommentPreview comments={previewComments} /> : null}
+            {showFeedPreview ? (
+              <CommentPreview
+                comments={previewComments}
+                currentUserId={currentUserId}
+                onDeleteComment={hook.deleteComment}
+              />
+            ) : null}
             {showFeedViewAll ? (
               <button
                 type="button"
@@ -163,7 +165,7 @@ export default function CommentsSection({
                   textDecoration: "none",
                 }}
               >
-                {`View all ${totalKnownCount} comments`}
+                {totalKnownCount === 1 ? "View 1 comment" : `View all ${totalKnownCount} comments`}
               </button>
             ) : null}
           </>
