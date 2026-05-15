@@ -23,7 +23,9 @@ function loadDotEnvFile(relativePath) {
 loadDotEnvFile("e2e/.env");
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: ".",
+  testMatch: ["e2e/**/*.spec.js", "tests/**/*.spec.js"],
+  testIgnore: [/\/(node_modules|dist)\//],
   globalSetup: "./e2e/global-setup.js",
   timeout: 60_000, // default would be 30_000
   expect: {
