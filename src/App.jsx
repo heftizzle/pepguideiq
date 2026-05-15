@@ -2526,7 +2526,7 @@ function PepGuideIQMainTree({ mainUiRef, onCategorySelect }) {
             {[
               {
                 tabId: "vialTracker",
-                emoji: "💊",
+                emoji: "🧪",
                 labelTop: "VIAL",
                 label: "TRACKER",
                 ariaLabel: "Vial Tracker",
