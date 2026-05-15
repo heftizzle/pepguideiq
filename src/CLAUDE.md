@@ -20,7 +20,9 @@ Batches in `src/data/compounds/` merge into `PEPTIDES` via `src/data/catalog.js`
 
 Canonical marker definitions live in [`src/data/labMarkerRegistry.js`](data/labMarkerRegistry.js). Use **`LAB_MARKER_REGISTRY.length`**, **`LAB_CATEGORIES.length`**, or **`REGISTRY_STATS`** from that module — never hardcode marker totals in UI or copy.
 
-Worker-side extraction resolves aliases from bundled [`workers/labMarkersRegistry.generated.json`](../../workers/labMarkersRegistry.generated.json). Regenerate it with **`node scripts/generateLabRegistry.js`** whenever registry source files change; **`pnpm run build`** runs that script automatically before `vite build`. Commit the updated JSON.
+Worker-side extraction resolves aliases from bundled [`workers/labMarkersRegistry.generated.json`](../../workers/labMarkersRegistry.generated.json). **`wrangler deploy` does not run Node generators** — Wrangler only static-imports whatever JSON is on disk, like a compiled protobuf or SVG sprite. Regenerate locally with **`node scripts/generateLabRegistry.js`** (or **`pnpm run build`**, which runs it before `vite build`).
+
+**Always commit `workers/labMarkersRegistry.generated.json` in the same commit as any `src/data/labMarkers/*.js` or [`labMarkerRegistry.js`](data/labMarkerRegistry.js) merge change.** If you ship source without the refreshed JSON, the Worker silently resolves markers against a stale bundle. **`marker_count` in the JSON header should match `LAB_MARKER_REGISTRY.length`** — drift means something was committed out of order.
 
 Persisted lab uploads and parsed rows use Supabase **`lab_providers`**, **`lab_reports`**, and **`lab_results`** (see `supabase/migrations/097_lab_providers_reports_results.sql`). Row ownership matches **`inbody_scan_history`**: **`user_id`** references `auth.users`, **`profile_id`** references `public.member_profiles` (not `profiles`).
 
