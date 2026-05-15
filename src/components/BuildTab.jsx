@@ -269,7 +269,7 @@ function useWideLayout() {
   return wide;
 }
 
-export function BuildTab({
+export default function BuildTab({
   activeTab,
   catalog = PEPTIDES,
   myStack,
